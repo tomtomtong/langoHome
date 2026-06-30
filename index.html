@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="screen-orientation" content="landscape">
+  <title>Uncle Tommy — Voice Agent</title>
+  <link rel="preload" href="/visme/Tommyv4.vrm" as="fetch" crossorigin>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/",
+        "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.3.4/lib/three-vrm.module.js"
+      }
+    }
+  </script>
+  <style>
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f1117;
+      color: #e8eaed;
+    }
+
+    /* ── Portrait blocker ── */
+    #portrait-prompt {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      padding: 2rem;
+      background: #0f1117;
+      text-align: center;
+    }
+
+    #portrait-prompt svg {
+      width: 64px;
+      height: 64px;
+      color: #6c8cff;
+      animation: rotate-hint 2s ease-in-out infinite;
+    }
+
+    @keyframes rotate-hint {
+      0%, 100% { transform: rotate(0deg); }
+      50% { transform: rotate(90deg); }
+    }
+
+    @media (orientation: portrait) and (max-width: 900px) {
+      #portrait-prompt { display: flex; }
+      #app { display: none !important; }
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* ── Idle screen (before Inworld session) ── */
+    #idle-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      padding: 1.5rem;
+      gap: 1rem;
+    }
+
+    #idle-screen h1 {
+      margin: 0;
+      font-size: clamp(1.25rem, 4vw, 1.75rem);
+      font-weight: 600;
+    }
+
+    .idle-controls {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.75rem;
+      width: min(420px, 100%);
+    }
+
+    #status-idle {
+      color: #9aa0a6;
+      font-size: 0.875rem;
+      text-align: center;
+    }
+
+    #err-idle {
+      display: none;
+      max-width: 100%;
+      padding: 0.625rem 0.75rem;
+      border-radius: 8px;
+      background: #3a1e1e;
+      color: #f28b82;
+      font-size: 0.8125rem;
+      text-align: center;
+    }
+
+    /* ── Fullscreen avatar (only during session) ── */
+    #avatar-stage {
+      display: none;
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      background: #0b1222;
+    }
+
+    body.in-session #avatar-stage {
+      display: block;
+    }
+
+    body.in-session #idle-screen {
+      display: none;
+    }
+
+    #vrm-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+
+    /* ── Session overlay controls ── */
+    #session-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    body.in-session #session-overlay {
+      display: block;
+    }
+
+    .overlay-top {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: max(0.75rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) 0.75rem max(1rem, env(safe-area-inset-left));
+      pointer-events: auto;
+      background: linear-gradient(to bottom, rgba(15, 17, 23, 0.75), transparent);
+    }
+
+    .overlay-bottom {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+      pointer-events: auto;
+      background: linear-gradient(to top, rgba(15, 17, 23, 0.85), transparent);
+    }
+
+    #football-icon {
+      display: none;
+      font-size: clamp(2.5rem, 8vw, 4rem);
+      line-height: 1;
+      filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
+      animation: football-pop 0.45s ease-out;
+      pointer-events: none;
+    }
+
+    #football-icon.visible { display: block; }
+
+    @keyframes football-pop {
+      0% { transform: scale(0.4) rotate(-20deg); opacity: 0; }
+      70% { transform: scale(1.15) rotate(8deg); opacity: 1; }
+      100% { transform: scale(1) rotate(0deg); opacity: 1; }
+    }
+
+    .football-wrap {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+
+    button {
+      padding: 0.65rem 1.25rem;
+      border: none;
+      border-radius: 8px;
+      background: #6c8cff;
+      color: #fff;
+      font-size: 0.9375rem;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    button:hover:not(:disabled) { background: #5a7aef; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    #btn-stop {
+      background: rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    #btn-stop:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    #status {
+      color: #c4c7c5;
+      font-size: 0.875rem;
+      text-align: center;
+      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+    }
+
+    #status.active { color: #81c995; }
+
+    #avatar-status {
+      margin: 0;
+      font-size: 0.75rem;
+      color: #9aa0a6;
+      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+    }
+
+    a {
+      color: #9aa0a6;
+      font-size: 0.8125rem;
+      text-decoration: none;
+    }
+
+    a:hover { color: #6c8cff; }
+
+    #err {
+      display: none;
+      max-width: min(480px, 90vw);
+      padding: 0.5rem 0.75rem;
+      border-radius: 8px;
+      background: rgba(58, 30, 30, 0.9);
+      color: #f28b82;
+      font-size: 0.8125rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div id="portrait-prompt">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <rect x="5" y="2" width="14" height="20" rx="2"/>
+      <path d="M12 18v.01"/>
+    </svg>
+    <p>Rotate your device to landscape to use Uncle Tommy</p>
+  </div>
+
+  <div id="app">
+    <div id="idle-screen">
+      <h1>Uncle Tommy</h1>
+      <div class="idle-controls">
+        <button id="btn-start">Start Conversation</button>
+        <div id="status-idle">Say &quot;Hello&quot; to start a conversation</div>
+        <div id="err-idle"></div>
+      </div>
+    </div>
+
+    <div id="avatar-stage">
+      <canvas id="vrm-canvas"></canvas>
+    </div>
+
+    <div id="session-overlay">
+      <div class="overlay-top">
+        <span id="avatar-status"></span>
+        <a href="/config">Settings</a>
+      </div>
+      <div class="football-wrap">
+        <div id="football-icon" aria-hidden="true" title="Football mentioned">⚽</div>
+      </div>
+      <div class="overlay-bottom">
+        <div id="status">Connecting…</div>
+        <div id="err"></div>
+        <button id="btn-stop" type="button">End Conversation</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { TommyAvatar } from "/visme/avatar.js";
+
+    const KEY = "inworld_api_key";
+    const PROMPT_KEY = "inworld_system_prompt";
+    const VOICE_KEY = "inworld_voice_id";
+    const MODEL_KEY = "inworld_model";
+    const DEFAULT_PROMPT = "You are Uncle Tommy, a friendly voice assistant. Keep responses brief.";
+    const DEFAULT_VOICE = "default-zylgts2tamenvybeti3z0w__uncle_tommy";
+    const DEFAULT_MODEL = "openai/gpt-4o-mini";
+
+    const btnStart = document.getElementById("btn-start");
+    const btnStop = document.getElementById("btn-stop");
+    const statusEl = document.getElementById("status");
+    const statusIdleEl = document.getElementById("status-idle");
+    const errEl = document.getElementById("err");
+    const errIdleEl = document.getElementById("err-idle");
+    const footballEl = document.getElementById("football-icon");
+    const avatarStatusEl = document.getElementById("avatar-status");
+    const SHOW_FOOTBALL_ICON = "show_football_icon";
+    const END_CONVERSATION = "end_conversation";
+
+    let avatar = null;
+    let avatarLoading = null;
+    let footballHideTimer = null;
+    let ws, ctx, src, proc, source, stream;
+    let active = false, inSession = false, playing = false, nextPlayTime = 0;
+    let recognition = null, wakeWordEnabled = true, listeningForWakeWord = false;
+    let wakeWordRestartTimer = null;
+    let wakeWordRestartAttempts = 0;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const WAKE_WORD = "hello";
+    const queue = [];
+    const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    // iOS Safari needs a much longer delay for the mic to be released
+    // after getUserMedia stops before SpeechRecognition can grab it again.
+    const WAKE_WORD_RESTART_DELAY = IS_IOS ? 1500 : 500;
+
+    let responseId = null;
+    let responseText = "";
+    let responseAudioMs = 0;
+    let speechPlaybackStart = 0;
+    let speechStarted = false;
+    let audioDone = false;
+    let lipsyncRaf = null;
+    let pendingEndConversation = false;
+    let endConversationCloseTimer = null;
+    let goodbyeNudged = false;
+    const pendingFunctionCalls = new Map();
+
+    function showErr(msg) {
+      errEl.textContent = msg;
+      errEl.style.display = msg ? "block" : "none";
+      errIdleEl.textContent = msg;
+      errIdleEl.style.display = msg ? "block" : "none";
+    }
+
+    function setStatus(msg, isActive = false) {
+      statusEl.textContent = msg;
+      statusEl.classList.toggle("active", isActive);
+      statusIdleEl.textContent = msg;
+    }
+
+    async function ensureAvatar() {
+      if (avatar) return avatar;
+      if (avatarLoading) return avatarLoading;
+      avatarLoading = (async () => {
+        avatar = new TommyAvatar(document.getElementById("vrm-canvas"));
+        avatar.onStatus = (msg) => { avatarStatusEl.textContent = msg; };
+        await avatar.load();
+        return avatar;
+      })();
+      return avatarLoading;
+    }
+
+    async function enterSessionView() {
+      if (inSession) {
+        avatar?.refreshAfterVisible();
+        return;
+      }
+      inSession = true;
+      document.body.classList.add("in-session");
+      if (!avatar?.loaded) setStatus("Loading avatar…");
+      // Let layout paint so the canvas has real dimensions before WebGL init.
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      try {
+        await ensureAvatar();
+        avatar.refreshAfterVisible();
+      } catch (e) {
+        console.error(e);
+        showErr(`Avatar failed to load: ${e.message}`);
+      }
+      try {
+        await screen.orientation?.lock?.("landscape");
+      } catch {}
+      avatar?.refreshAfterVisible();
+    }
+
+    function exitSessionView() {
+      if (!inSession) return;
+      inSession = false;
+      document.body.classList.remove("in-session");
+      try { screen.orientation?.unlock?.(); } catch {}
+    }
+
+    function cleanupSession() {
+      hideFootballIcon();
+      active = false;
+      pendingEndConversation = false;
+      pendingFunctionCalls.clear();
+      goodbyeNudged = false;
+      if (endConversationCloseTimer) {
+        clearTimeout(endConversationCloseTimer);
+        endConversationCloseTimer = null;
+      }
+      try { stopAudio(); } catch (e) { console.warn("stopAudio failed", e); }
+      try { stopAvatarSpeech(); } catch (e) { console.warn("stopAvatarSpeech failed", e); }
+      resetResponseState(null);
+      exitSessionView();
+      try { proc?.disconnect(); } catch (e) { console.warn("proc disconnect failed", e); }
+      try { source?.disconnect(); } catch (e) { console.warn("source disconnect failed", e); }
+      proc = null;
+      source = null;
+      try { stream?.getTracks().forEach((t) => t.stop()); } catch (e) { console.warn("stream stop failed", e); }
+      stream = null;
+      try { if (ctx?.state !== "closed") ctx?.close(); } catch (e) { console.warn("ctx close failed", e); }
+      ctx = null;
+      ws = null;
+      btnStart.textContent = "Start Conversation";
+      btnStart.disabled = false;
+    }
+
+    function returnToHelloCycle() {
+      showErr("");
+      wakeWordEnabled = true;
+      wakeWordRestartAttempts = 0;
+      stopWakeWordListening();
+      setStatus(IS_IOS ? 'Tap "Start" or say "Hello" to begin' : 'Say "Hello" to start a conversation');
+      if (wakeWordRestartTimer) clearTimeout(wakeWordRestartTimer);
+      wakeWordRestartTimer = setTimeout(() => {
+        wakeWordRestartTimer = null;
+        if (wakeWordEnabled && !active) startWakeWordListening();
+      }, WAKE_WORD_RESTART_DELAY);
+    }
+
+    function closeAfterToolEnd() {
+      if (!pendingEndConversation || ws?.readyState !== WebSocket.OPEN) return;
+      if (playing || queue.length > 0) return;
+      ws.close();
+    }
+
+    function scheduleForceCloseAfterTool() {
+      if (endConversationCloseTimer) clearTimeout(endConversationCloseTimer);
+      endConversationCloseTimer = setTimeout(() => {
+        if (!pendingEndConversation || ws?.readyState !== WebSocket.OPEN) return;
+        stopAudio();
+        ws.close();
+      }, 4000);
+    }
+
+    function trackFunctionCallItem(item) {
+      if (!item || item.type !== "function_call") return;
+      const callId = item.call_id || item.id;
+      if (!callId) return;
+      pendingFunctionCalls.set(item.id || callId, {
+        name: item.name,
+        call_id: callId,
+      });
+    }
+
+    function resolveFunctionCall(event) {
+      const tracked = pendingFunctionCalls.get(event.item_id);
+      return {
+        name: event.name || tracked?.name,
+        call_id: event.call_id || tracked?.call_id || event.item_id,
+        arguments: event.arguments || "{}",
+      };
+    }
+
+    function isGoodbye(text) {
+      const t = text.toLowerCase().trim();
+      return /\b(goodbye|good bye|bye bye|see you|see ya|gotta go|got to go|i'?m leaving|im leaving|take care|farewell|talk later|catch you later)\b/.test(t)
+        || /\bbye\b/.test(t);
+    }
+
+    function nudgeEndConversation() {
+      if (pendingEndConversation || goodbyeNudged || ws?.readyState !== WebSocket.OPEN) return;
+      goodbyeNudged = true;
+      ws.send(JSON.stringify({
+        type: "conversation.item.create",
+        item: {
+          type: "message",
+          role: "user",
+          content: [{ type: "input_text", text: "[The user said goodbye. Give a brief farewell and call end_conversation now.]" }],
+        },
+      }));
+      ws.send(JSON.stringify({ type: "response.create" }));
+    }
+
+    function hideFootballIcon() {
+      footballEl.classList.remove("visible");
+      if (footballHideTimer) { clearTimeout(footballHideTimer); footballHideTimer = null; }
+    }
+
+    function showFootballIcon() {
+      footballEl.classList.remove("visible");
+      void footballEl.offsetWidth;
+      footballEl.classList.add("visible");
+      if (footballHideTimer) clearTimeout(footballHideTimer);
+      footballHideTimer = setTimeout(hideFootballIcon, 4000);
+    }
+
+    function resetResponseState(id) {
+      responseId = id ?? null;
+      responseText = "";
+      responseAudioMs = 0;
+      speechStarted = false;
+      audioDone = false;
+      speechPlaybackStart = 0;
+    }
+
+    function syncLipsyncTimeline() {
+      if (!responseText.trim() || !avatar) return;
+      avatar.updateSpeechText(responseText, responseAudioMs);
+    }
+
+    function startLipsyncClock() {
+      if (lipsyncRaf) return;
+      const tick = () => {
+        if (avatar?.speaking && ctx && speechPlaybackStart > 0) {
+          avatar.setSpeechElapsedMs(Math.max(0, (ctx.currentTime - speechPlaybackStart) * 1000));
+        }
+        lipsyncRaf = requestAnimationFrame(tick);
+      };
+      lipsyncRaf = requestAnimationFrame(tick);
+    }
+
+    function stopLipsyncClock() {
+      if (lipsyncRaf) { cancelAnimationFrame(lipsyncRaf); lipsyncRaf = null; }
+    }
+
+    function beginAvatarSpeech() {
+      if (speechStarted || !avatar) return;
+      speechStarted = true;
+      speechPlaybackStart = Math.max(ctx.currentTime, nextPlayTime);
+      syncLipsyncTimeline();
+      avatar.beginSpeech();
+      startLipsyncClock();
+    }
+
+    function maybeEndAvatarSpeech() {
+      if (!speechStarted || !avatar) return;
+      if (audioDone && !playing && queue.length === 0) {
+        stopLipsyncClock();
+        avatar.endSpeech();
+        speechStarted = false;
+      }
+    }
+
+    function stopAvatarSpeech() {
+      stopLipsyncClock();
+      avatar?.endSpeech();
+      speechStarted = false;
+      audioDone = false;
+    }
+
+    function handleNewResponse(id) {
+      if (id && id !== responseId) {
+        stopAvatarSpeech();
+        resetResponseState(id);
+      }
+    }
+
+    function appendResponseText(delta) {
+      if (!delta) return;
+      responseText += delta;
+      syncLipsyncTimeline();
+    }
+
+    function addAudioChunkMs(pcm16) {
+      responseAudioMs += (pcm16.length / 24000) * 1000;
+      syncLipsyncTimeline();
+    }
+
+    function sendFunctionOutput(callId, output) {
+      ws.send(JSON.stringify({
+        type: "conversation.item.create",
+        item: {
+          type: "function_call_output",
+          call_id: callId,
+          output: JSON.stringify(output),
+        },
+      }));
+    }
+
+    function handleEndConversationTool(callId, argsJson) {
+      if (ws?.readyState !== WebSocket.OPEN) return;
+
+      let reason = "user said goodbye";
+      try {
+        const args = JSON.parse(argsJson || "{}");
+        if (args.reason) reason = args.reason;
+      } catch {}
+
+      sendFunctionOutput(callId, { success: true, reason });
+      pendingEndConversation = true;
+      setStatus("Conversation ended");
+      closeAfterToolEnd();
+      setTimeout(closeAfterToolEnd, 1500);
+      scheduleForceCloseAfterTool();
+    }
+
+    function handleFunctionCall(event) {
+      if (ws?.readyState !== WebSocket.OPEN) return;
+
+      const { name, call_id: callId, arguments: argsJson } = resolveFunctionCall(event);
+      if (!name || !callId) {
+        console.warn("Function call missing name or call_id", event);
+        return;
+      }
+
+      if (name === SHOW_FOOTBALL_ICON) {
+        showFootballIcon();
+        let topic = "football";
+        try {
+          const args = JSON.parse(argsJson || "{}");
+          if (args.topic) topic = args.topic;
+        } catch {}
+        sendFunctionOutput(callId, { success: true, topic });
+        ws.send(JSON.stringify({ type: "response.create" }));
+        return;
+      }
+
+      if (name === END_CONVERSATION) {
+        handleEndConversationTool(callId, argsJson);
+      }
+    }
+
+    async function getConfig() {
+      try {
+        const res = await fetch("/api/config");
+        if (res.ok) return await res.json();
+      } catch {}
+      return {
+        apiKey: localStorage.getItem(KEY),
+        instructions: localStorage.getItem(PROMPT_KEY),
+        voice: localStorage.getItem(VOICE_KEY),
+        model: localStorage.getItem(MODEL_KEY),
+      };
+    }
+
+    function stopWakeWordListening() {
+      listeningForWakeWord = false;
+      if (wakeWordRestartTimer) {
+        clearTimeout(wakeWordRestartTimer);
+        wakeWordRestartTimer = null;
+      }
+      try { recognition?.abort(); } catch {}
+      recognition = null;
+    }
+
+    function resumeWakeWordListening() {
+      returnToHelloCycle();
+    }
+
+    function containsWakeWord(text) {
+      return text.toLowerCase().split(/\s+/).some((word) => word.replace(/[^\w]/g, "") === WAKE_WORD);
+    }
+
+    function startWakeWordListening() {
+      if (!SpeechRecognition) {
+        showErr("Speech recognition is not supported in this browser. Use the Start button instead.");
+        setStatus("Tap Start to begin a conversation");
+        return;
+      }
+      if (active || listeningForWakeWord || !wakeWordEnabled) return;
+
+      recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = "en-US";
+
+      recognition.onresult = (event) => {
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          if (containsWakeWord(event.results[i][0].transcript)) {
+            wakeWordEnabled = false;
+            wakeWordRestartAttempts = 0;
+            stopWakeWordListening();
+            setStatus("Wake word detected — connecting…");
+            connectConversation();
+            return;
+          }
+        }
+      };
+
+      recognition.onerror = (event) => {
+        listeningForWakeWord = false;
+        if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+          showErr("Microphone access denied for speech recognition. Tap Start to begin.");
+          setStatus("Tap Start to begin a conversation");
+          return;
+        }
+        // iOS often fires "no-speech" / "audio-capture" after the mic was
+        // held by getUserMedia — retry with backoff.
+        scheduleWakeWordRestart();
+      };
+
+      recognition.onend = () => {
+        listeningForWakeWord = false;
+        if (wakeWordEnabled && !active) scheduleWakeWordRestart();
+      };
+
+      try {
+        recognition.start();
+        listeningForWakeWord = true;
+        wakeWordRestartAttempts = 0;
+        setStatus('Listening for "Hello"…');
+        showErr("");
+      } catch {
+        scheduleWakeWordRestart();
+      }
+    }
+
+    function scheduleWakeWordRestart() {
+      if (!wakeWordEnabled || active) return;
+      if (wakeWordRestartTimer) clearTimeout(wakeWordRestartTimer);
+      // Exponential backoff: iOS Safari blocks rapid recognition.start()
+      // calls after getUserMedia was used. Give it progressively more time.
+      wakeWordRestartAttempts = Math.min(wakeWordRestartAttempts + 1, 6);
+      const base = WAKE_WORD_RESTART_DELAY;
+      const delay = base * Math.pow(1.6, wakeWordRestartAttempts - 1);
+      // After several failed attempts on iOS, hint that tapping Start works.
+      if (IS_IOS && wakeWordRestartAttempts >= 4) {
+        setStatus('Tap "Start" or say "Hello" to begin');
+      }
+      wakeWordRestartTimer = setTimeout(() => {
+        wakeWordRestartTimer = null;
+        if (wakeWordEnabled && !active) startWakeWordListening();
+      }, delay);
+    }
+
+    async function connectConversation() {
+      if (active) return;
+
+      const cfg = await getConfig();
+      const apiKey = cfg.apiKey?.trim();
+      if (!apiKey) {
+        showErr("No API key set.");
+        resumeWakeWordListening();
+        return;
+      }
+
+      showErr("");
+      btnStart.disabled = true;
+      btnStart.textContent = "Connecting…";
+      setStatus("Connecting to Uncle Tommy…");
+
+      try {
+        ctx = new AudioContext({ sampleRate: 24000 });
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: { sampleRate: 24000, channelCount: 1, echoCancellation: true, noiseSuppression: true },
+        });
+      } catch {
+        showErr("Microphone access denied.");
+        btnStart.textContent = "Start Conversation";
+        btnStart.disabled = false;
+        resumeWakeWordListening();
+        return;
+      }
+
+      resetResponseState(null);
+
+      const wsProtocol = location.protocol === "https:" ? "wss:" : "ws:";
+      ws = new WebSocket(`${wsProtocol}//${location.host}/ws`);
+
+      ws.onopen = () => {
+        ws.send(JSON.stringify({
+          type: "client.auth",
+          apiKey,
+          instructions: cfg.instructions?.trim() || DEFAULT_PROMPT,
+          voice: cfg.voice?.trim() || DEFAULT_VOICE,
+          model: cfg.model?.trim() || DEFAULT_MODEL,
+        }));
+
+        active = true;
+        enterSessionView();
+        if (ctx?.state === "suspended") ctx.resume().catch(() => {});
+        source = ctx.createMediaStreamSource(stream);
+        proc = ctx.createScriptProcessor(2048, 1, 1);
+        proc.onaudioprocess = ({ inputBuffer }) => {
+          if (ws.readyState !== WebSocket.OPEN) return;
+          const f = inputBuffer.getChannelData(0);
+          const pcm = new Int16Array(f.length);
+          for (let i = 0; i < f.length; i++) pcm[i] = Math.max(-32768, Math.min(32767, f[i] * 32768));
+          ws.send(JSON.stringify({ type: "input_audio_buffer.append", audio: b64(pcm.buffer) }));
+        };
+        // Route mic through a zero-gain node so the ScriptProcessor fires
+        // (it must reach destination) but the user doesn't hear themselves.
+        const silentGain = ctx.createGain();
+        silentGain.gain.value = 0;
+        source.connect(proc);
+        proc.connect(silentGain);
+        silentGain.connect(ctx.destination);
+      };
+
+      ws.onmessage = ({ data }) => {
+        const e = JSON.parse(data);
+
+        if (e.type === "client.error") {
+          showErr(e.message);
+          ws.close();
+          return;
+        }
+
+        if (e.response_id) handleNewResponse(e.response_id);
+
+        if (e.type === "response.created") {
+          handleNewResponse(e.response?.id || e.response_id);
+        }
+
+        if (e.type === "response.output_text.delta" || e.type === "response.output_audio_transcript.delta") {
+          appendResponseText(e.delta);
+        }
+
+        if (e.type === "response.output_text.done" || e.type === "response.output_audio_transcript.done") {
+          if (e.text) responseText = e.text;
+          else if (e.transcript) responseText = e.transcript;
+          syncLipsyncTimeline();
+        }
+
+        if (e.type === "response.output_audio.delta") {
+          setStatus("Conversation active — speak anytime", true);
+
+          const pcm16 = Uint8Array.from(atob(e.delta), (c) => c.charCodeAt(0));
+          addAudioChunkMs(new Int16Array(pcm16.buffer));
+          queue.push(pcm16.buffer);
+          if (!playing) playNext();
+        } else if (e.type === "response.output_item.added") {
+          trackFunctionCallItem(e.item);
+        } else if (e.type === "response.output_item.done") {
+          trackFunctionCallItem(e.item);
+        } else if (e.type === "conversation.item.input_audio_transcription.completed") {
+          if (isGoodbye(e.transcript)) nudgeEndConversation();
+        } else if (e.type === "session.created") {
+          setStatus("Conversation active — speak anytime", true);
+          avatar?.refreshAfterVisible();
+        } else if (e.type === "input_audio_buffer.speech_started") {
+          goodbyeNudged = false;
+          stopAudio();
+          stopAvatarSpeech();
+          resetResponseState(null);
+        } else if (e.type === "input_audio_buffer.timeout_triggered") {
+          setStatus("No speech detected — waiting for end signal");
+        } else if (e.type === "response.output_audio.done") {
+          audioDone = true;
+          maybeEndAvatarSpeech();
+          closeAfterToolEnd();
+        } else if (e.type === "response.done") {
+          audioDone = true;
+          maybeEndAvatarSpeech();
+          closeAfterToolEnd();
+        } else if (e.type === "response.function_call_arguments.done") {
+          handleFunctionCall(e);
+        }
+      };
+
+      ws.onclose = () => {
+        try { cleanupSession(); }
+        catch (e) { console.error("cleanupSession threw", e); }
+        finally { returnToHelloCycle(); }
+      };
+    }
+
+    function endConversation() {
+      if (active) ws.close();
+    }
+
+    function playNext() {
+      if (!queue.length) {
+        playing = false;
+        maybeEndAvatarSpeech();
+        closeAfterToolEnd();
+        return;
+      }
+
+      playing = true;
+      beginAvatarSpeech();
+
+      const pcm16 = new Int16Array(queue.shift());
+      const len = pcm16.length;
+      const fade = 48;
+      const f32 = new Float32Array(len);
+      for (let i = 0; i < len; i++) f32[i] = pcm16[i] / 32768;
+      for (let i = 0; i < fade; i++) {
+        f32[i] *= i / fade;
+        f32[len - 1 - i] *= i / fade;
+      }
+
+      const buf = ctx.createBuffer(1, len, 24000);
+      buf.getChannelData(0).set(f32);
+      src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(ctx.destination);
+
+      const t = Math.max(ctx.currentTime, nextPlayTime);
+      if (!speechPlaybackStart) speechPlaybackStart = t;
+      nextPlayTime = t + buf.duration;
+      src.onended = playNext;
+      src.start(t);
+    }
+
+    function stopAudio() {
+      queue.length = 0;
+      playing = false;
+      nextPlayTime = 0;
+      try { src?.stop(); } catch {}
+      src = null;
+    }
+
+    function b64(buf) {
+      const b = new Uint8Array(buf);
+      let s = "";
+      for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]);
+      return btoa(s);
+    }
+
+    btnStart.addEventListener("click", () => {
+      wakeWordEnabled = false;
+      wakeWordRestartAttempts = 0;
+      stopWakeWordListening();
+      connectConversation();
+    });
+
+    btnStop.addEventListener("click", endConversation);
+
+    window.addEventListener("resize", () => {
+      if (inSession) avatar?.refreshAfterVisible();
+    });
+
+    // iOS Safari creates AudioContexts in "suspended" state and only allows
+    // resume() from a user gesture. Warm one up on the first touch so that
+    // later wake-word-triggered sessions (which have no fresh gesture) can
+    // resume their own context.
+    if (IS_IOS) {
+      const unlock = () => {
+        try {
+          const ac = new (window.AudioContext || window.webkitAudioContext)();
+          const osc = ac.createOscillator();
+          const g = ac.createGain();
+          g.gain.value = 0;
+          osc.connect(g);
+          g.connect(ac.destination);
+          osc.start();
+          osc.stop(ac.currentTime + 0.001);
+          ac.resume().then(() => ac.close()).catch(() => {});
+        } catch {}
+        window.removeEventListener('pointerdown', unlock);
+        window.removeEventListener('keydown', unlock);
+      };
+      window.addEventListener('pointerdown', unlock, { once: false });
+      window.addEventListener('keydown', unlock, { once: false });
+    }
+
+    async function init() {
+      setStatus("Loading avatar…");
+      try {
+        await ensureAvatar();
+      } catch (e) {
+        console.error(e);
+        showErr(`Avatar failed to load: ${e.message}`);
+      }
+      startWakeWordListening();
+    }
+
+    // Safety net: if wake-word listening dies silently (Chrome's
+    // SpeechRecognition can stop without firing onend, and iOS Safari
+    // can fail to restart after getUserMedia released the mic), make
+    // sure it gets restarted.
+    setInterval(() => {
+      if (wakeWordEnabled && !active && !listeningForWakeWord && !wakeWordRestartTimer) {
+        wakeWordRestartAttempts = 0;
+        startWakeWordListening();
+      }
+    }, 4000);
+
+    init();
+  </script>
+</body>
+</html>

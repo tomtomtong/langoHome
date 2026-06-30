@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tommy Lipsync</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/",
+          "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.3.4/lib/three-vrm.module.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <main class="container">
+      <h1>Tommy Lipsync</h1>
+      <p class="subtitle">Type a word or sentence, hit Speak, watch the avatar.</p>
+
+      <form id="speak-form">
+        <div class="input-row">
+          <input id="text-input" type="text" placeholder="hello world" autocomplete="off" required />
+          <button type="submit" id="speak-btn">Speak</button>
+        </div>
+        <div class="speed-row">
+          <label class="speed-label" for="speed-slider">Speaking speed</label>
+          <div class="speed-slider-wrap">
+            <span class="speed-end" aria-hidden="true">Faster</span>
+            <input
+              id="speed-slider"
+              type="range"
+              min="50"
+              max="280"
+              value="120"
+              step="5"
+              title="Lower values = faster; higher = slower"
+              aria-valuetext="120 milliseconds per sound"
+            />
+            <span class="speed-end" aria-hidden="true">Slower</span>
+          </div>
+          <output id="speed-value" class="speed-value" for="speed-slider">120 ms per sound</output>
+        </div>
+        <div class="speed-row">
+          <label class="speed-label" for="exaggerate-slider">IPA mouth exaggeration</label>
+          <div class="speed-slider-wrap">
+            <span class="speed-end" aria-hidden="true">Subtle</span>
+            <input
+              id="exaggerate-slider"
+              type="range"
+              min="0.2"
+              max="1.8"
+              value="1"
+              step="0.05"
+              title="Scales how strongly each IPA viseme opens the mouth"
+              aria-valuetext="1 times"
+            />
+            <span class="speed-end" aria-hidden="true">Strong</span>
+          </div>
+          <output id="exaggerate-value" class="speed-value" for="exaggerate-slider">1.00×</output>
+        </div>
+        <div class="speed-row">
+          <label class="speed-label" for="transition-slider">Viseme crossfade</label>
+          <div class="speed-slider-wrap">
+            <span class="speed-end" aria-hidden="true">Snap</span>
+            <input
+              id="transition-slider"
+              type="range"
+              min="0"
+              max="120"
+              value="50"
+              step="5"
+              title="Time constant for blending between IPA visemes; 0 = instant"
+              aria-valuetext="50 milliseconds"
+            />
+            <span class="speed-end" aria-hidden="true">Smooth</span>
+          </div>
+          <output id="transition-value" class="speed-value" for="transition-slider">50 ms</output>
+        </div>
+      </form>
+
+      <div id="ipa-display" class="ipa-display" hidden></div>
+      <div id="timeline" class="timeline" hidden></div>
+
+      <div class="canvas-wrap">
+        <canvas id="vrm-canvas" width="640" height="480"></canvas>
+      </div>
+      <p id="status" class="status">Loading avatar…</p>
+    </main>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
