@@ -268,6 +268,18 @@
 
     #btn-send-log:hover:not(:disabled) { background: rgba(255, 255, 255, 0.16); }
 
+    #btn-enable-mic {
+      display: none;
+      width: 100%;
+      background: #81c995;
+      color: #0f1117;
+      font-weight: 600;
+    }
+
+    #btn-enable-mic.visible { display: block; }
+
+    #btn-enable-mic:hover:not(:disabled) { background: #6fb888; }
+
     #debug-upload-status {
       margin-top: 0.375rem;
       font-size: 0.75rem;
@@ -292,6 +304,7 @@
     <div id="idle-screen">
       <h1>Uncle Tommy</h1>
       <div class="idle-controls">
+        <button id="btn-enable-mic" type="button">Tap to listen for &quot;Hello&quot;</button>
         <button id="btn-start">Start Conversation</button>
         <div id="status-idle">Say &quot;Hello&quot; to start a conversation</div>
         <div id="err-idle"></div>
@@ -332,6 +345,7 @@
     const DEFAULT_MODEL = "openai/gpt-4o-mini";
 
     const btnStart = document.getElementById("btn-start");
+    const btnEnableMic = document.getElementById("btn-enable-mic");
     const btnStop = document.getElementById("btn-stop");
     const statusEl = document.getElementById("status");
     const statusIdleEl = document.getElementById("status-idle");
@@ -352,8 +366,11 @@
     let ws, ctx, src, proc, source, stream;
     let active = false, inSession = false, playing = false, nextPlayTime = 0;
     let recognition = null, wakeWordEnabled = true, listeningForWakeWord = false;
+    let needsWakeGesture = false;
+    let iosResumeWakeFromGesture = false;
     let wakeWordRestartTimer = null;
     let wakeWordRestartAttempts = 0;
+    let recognitionWatchdog = null;
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const WAKE_WORD = "hello";
     const queue = [];
@@ -362,6 +379,8 @@
     // iOS Safari needs a much longer delay for the mic to be released
     // after getUserMedia stops before SpeechRecognition can grab it again.
     const WAKE_WORD_RESTART_DELAY = IS_IOS ? 1500 : 500;
+    const POST_SESSION_WAKE_DELAY = IS_IOS ? 3000 : 800;
+    const RECOGNITION_WATCHDOG_MS = IS_IOS ? 12000 : 8000;
 
     let responseId = null;
     let responseText = "";
@@ -388,6 +407,7 @@
         listeningForWakeWord,
         wakeWordRestartAttempts,
         wakeWordRestartTimer: !!wakeWordRestartTimer,
+        needsWakeGesture,
         pendingEndConversation,
         goodbyeNudged,
         playing,
@@ -506,6 +526,17 @@
       try { screen.orientation?.unlock?.(); } catch {}
     }
 
+    function releaseMicSync() {
+      try { proc?.disconnect(); } catch (e) { console.warn("proc disconnect failed", e); }
+      try { source?.disconnect(); } catch (e) { console.warn("source disconnect failed", e); }
+      proc = null;
+      source = null;
+      try { stream?.getTracks().forEach((t) => t.stop()); } catch (e) { console.warn("stream stop failed", e); }
+      stream = null;
+      try { if (ctx?.state !== "closed") ctx?.close(); } catch (e) { console.warn("ctx close failed", e); }
+      ctx = null;
+    }
+
     function cleanupSession() {
       uiLog("cleanup", "begin", "hello");
       hideFootballIcon();
@@ -521,18 +552,36 @@
       try { stopAvatarSpeech(); } catch (e) { console.warn("stopAvatarSpeech failed", e); }
       resetResponseState(null);
       exitSessionView();
-      try { proc?.disconnect(); } catch (e) { console.warn("proc disconnect failed", e); }
-      try { source?.disconnect(); } catch (e) { console.warn("source disconnect failed", e); }
-      proc = null;
-      source = null;
-      try { stream?.getTracks().forEach((t) => t.stop()); } catch (e) { console.warn("stream stop failed", e); }
-      stream = null;
-      try { if (ctx?.state !== "closed") ctx?.close(); } catch (e) { console.warn("ctx close failed", e); }
-      ctx = null;
+      releaseMicSync();
       ws = null;
       btnStart.textContent = "Start Conversation";
       btnStart.disabled = false;
       uiLog("cleanup", "done — ready for hello cycle", "hello");
+    }
+
+    function showWakeGesturePrompt() {
+      if (!IS_IOS) return;
+      needsWakeGesture = true;
+      btnEnableMic.classList.add("visible");
+      setStatus('Tap "Listen for Hello" below to re-enable the microphone');
+      uiLog("hello", "waiting for user tap to re-enable mic (iOS)", "hello");
+    }
+
+    function hideWakeGesturePrompt() {
+      needsWakeGesture = false;
+      btnEnableMic.classList.remove("visible");
+    }
+
+    function enableWakeWordWithGesture() {
+      if (!wakeWordEnabled || active) return;
+      hideWakeGesturePrompt();
+      wakeWordRestartAttempts = 0;
+      if (wakeWordRestartTimer) {
+        clearTimeout(wakeWordRestartTimer);
+        wakeWordRestartTimer = null;
+      }
+      uiLog("hello", "user tap — starting wake word listening", "hello");
+      startWakeWordListening();
     }
 
     function returnToHelloCycle() {
@@ -540,15 +589,26 @@
       showErr("");
       wakeWordEnabled = true;
       wakeWordRestartAttempts = 0;
+      if (IS_IOS && iosResumeWakeFromGesture) {
+        iosResumeWakeFromGesture = false;
+        hideWakeGesturePrompt();
+        setStatus('Listening for "Hello"…');
+        uiLog("hello", "wake word kept from End button gesture", "hello");
+        return;
+      }
       stopWakeWordListening();
-      setStatus(IS_IOS ? 'Tap "Start" or say "Hello" to begin' : 'Say "Hello" to start a conversation');
+      if (IS_IOS) {
+        showWakeGesturePrompt();
+        return;
+      }
+      setStatus('Say "Hello" to start a conversation');
       if (wakeWordRestartTimer) clearTimeout(wakeWordRestartTimer);
       wakeWordRestartTimer = setTimeout(() => {
         wakeWordRestartTimer = null;
-        uiLog("hello", `restart timer fired (delay ${WAKE_WORD_RESTART_DELAY}ms)`, "hello", snapshotHelloCycleState());
+        uiLog("hello", `restart timer fired (delay ${POST_SESSION_WAKE_DELAY}ms)`, "hello", snapshotHelloCycleState());
         if (wakeWordEnabled && !active) startWakeWordListening();
         else uiLog("hello", "restart timer skipped", "warn", snapshotHelloCycleState());
-      }, WAKE_WORD_RESTART_DELAY);
+      }, POST_SESSION_WAKE_DELAY);
     }
 
     function closeAfterToolEnd() {
@@ -784,15 +844,41 @@
       };
     }
 
+    function clearRecognitionWatchdog() {
+      if (recognitionWatchdog) {
+        clearTimeout(recognitionWatchdog);
+        recognitionWatchdog = null;
+      }
+    }
+
+    function armRecognitionWatchdog() {
+      clearRecognitionWatchdog();
+      recognitionWatchdog = setTimeout(() => {
+        recognitionWatchdog = null;
+        if (!listeningForWakeWord || !wakeWordEnabled || active) return;
+        uiLog("hello", "watchdog: no speech activity, restarting recognition", "warn");
+        stopWakeWordListening();
+        scheduleWakeWordRestart("watchdog");
+      }, RECOGNITION_WATCHDOG_MS);
+    }
+
     function stopWakeWordListening() {
       uiLog("hello", "stopWakeWordListening", "hello");
       listeningForWakeWord = false;
+      clearRecognitionWatchdog();
       if (wakeWordRestartTimer) {
         clearTimeout(wakeWordRestartTimer);
         wakeWordRestartTimer = null;
       }
-      try { recognition?.abort(); } catch (e) {
-        uiLog("hello", "recognition.abort failed", "warn", { message: e?.message });
+      if (recognition) {
+        recognition.onstart = null;
+        recognition.onresult = null;
+        recognition.onerror = null;
+        recognition.onend = null;
+        try { recognition.stop(); } catch {}
+        try { recognition.abort(); } catch (e) {
+          uiLog("hello", "recognition.abort failed", "warn", { message: e?.message });
+        }
       }
       recognition = null;
     }
@@ -812,6 +898,11 @@
         setStatus("Tap Start to begin a conversation");
         return;
       }
+      if (IS_IOS && needsWakeGesture) {
+        uiLog("hello", "startWakeWordListening blocked — needs user tap", "warn");
+        showWakeGesturePrompt();
+        return;
+      }
       if (active || listeningForWakeWord || !wakeWordEnabled) {
         uiLog("hello", "startWakeWordListening skipped", "warn", snapshotHelloCycleState());
         return;
@@ -819,11 +910,18 @@
 
       uiLog("hello", "startWakeWordListening", "hello");
       recognition = new SpeechRecognition();
-      recognition.continuous = true;
+      // continuous=true is unreliable on iOS Safari after getUserMedia sessions.
+      recognition.continuous = !IS_IOS;
       recognition.interimResults = true;
       recognition.lang = "en-US";
 
+      recognition.onstart = () => {
+        uiLog("hello", "recognition.onstart — mic active for wake word", "hello");
+        armRecognitionWatchdog();
+      };
+
       recognition.onresult = (event) => {
+        armRecognitionWatchdog();
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const transcript = event.results[i][0].transcript;
           const isFinal = event.results[i].isFinal;
@@ -866,6 +964,7 @@
         setStatus('Listening for "Hello"…');
         showErr("");
         uiLog("hello", "recognition.start OK", "hello");
+        armRecognitionWatchdog();
       } catch (e) {
         uiLog("hello", "recognition.start threw", "err", { message: e?.message });
         scheduleWakeWordRestart("start-threw");
@@ -875,6 +974,11 @@
     function scheduleWakeWordRestart(reason = "unknown") {
       if (!wakeWordEnabled || active) {
         uiLog("hello", `scheduleWakeWordRestart skipped (${reason})`, "warn", snapshotHelloCycleState());
+        return;
+      }
+      if (IS_IOS && needsWakeGesture) {
+        uiLog("hello", `scheduleWakeWordRestart deferred — needs user tap (${reason})`, "hello");
+        showWakeGesturePrompt();
         return;
       }
       if (wakeWordRestartTimer) clearTimeout(wakeWordRestartTimer);
@@ -1045,8 +1149,24 @@
 
     function endConversation() {
       uiLog("end", "End Conversation button", "hello", snapshotHelloCycleState());
-      if (active) ws.close();
-      else uiLog("end", "End Conversation ignored — not active", "warn");
+      if (!active) {
+        uiLog("end", "End Conversation ignored — not active", "warn");
+        return;
+      }
+      // iOS Safari only grants mic access inside a real user gesture — simulated
+      // clicks/dispatchEvent do not count. Reuse this button tap to restart wake word.
+      if (IS_IOS) {
+        try { stopAudio(); } catch {}
+        releaseMicSync();
+        hideWakeGesturePrompt();
+        wakeWordEnabled = true;
+        wakeWordRestartAttempts = 0;
+        stopWakeWordListening();
+        iosResumeWakeFromGesture = true;
+        uiLog("hello", "End button gesture — starting wake word immediately", "hello");
+        startWakeWordListening();
+      }
+      ws.close();
     }
 
     function playNext() {
@@ -1100,11 +1220,14 @@
 
     btnStart.addEventListener("click", () => {
       uiLog("hello", "Start button clicked", "hello");
+      hideWakeGesturePrompt();
       wakeWordEnabled = false;
       wakeWordRestartAttempts = 0;
       stopWakeWordListening();
       connectConversation();
     });
+
+    btnEnableMic.addEventListener("click", enableWakeWordWithGesture);
 
     btnStop.addEventListener("click", endConversation);
     btnSendLog.addEventListener("click", sendDebugLogToServer);
@@ -1153,6 +1276,7 @@
     // can fail to restart after getUserMedia released the mic), make
     // sure it gets restarted.
     setInterval(() => {
+      if (IS_IOS && needsWakeGesture) return;
       if (wakeWordEnabled && !active && !listeningForWakeWord && !wakeWordRestartTimer) {
         uiLog("hello", "safety net restart (idle but not listening)", "warn", snapshotHelloCycleState());
         wakeWordRestartAttempts = 0;
@@ -1160,7 +1284,7 @@
       }
     }, 4000);
 
-    uiLog("hello", "app init", "hello", { IS_IOS, WAKE_WORD_RESTART_DELAY });
+    uiLog("hello", "app init", "hello", { IS_IOS, WAKE_WORD_RESTART_DELAY, POST_SESSION_WAKE_DELAY });
     init();
   </script>
 </body>

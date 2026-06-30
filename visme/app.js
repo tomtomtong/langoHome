@@ -60,7 +60,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0b1222);
 
 const camera = new THREE.PerspectiveCamera(30, w / h, 0.1, 100);
-camera.position.set(0, 1.4, 1.6);
+camera.position.set(0, 1.3, 1.6);
 
 scene.add(new THREE.HemisphereLight(0xffffff, 0x444466, 1.1));
 const dir = new THREE.DirectionalLight(0xffffff, 0.85);
@@ -68,7 +68,7 @@ dir.position.set(1, 2, 2);
 scene.add(dir);
 
 const controls = new OrbitControls(camera, canvas);
-controls.target.set(0, 1.25, 0);
+controls.target.set(0, 1.42, 0);
 controls.update();
 
 window.addEventListener("resize", () => {

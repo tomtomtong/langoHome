@@ -4,6 +4,11 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
 import { LipsyncPlayer } from "./lipsync.js";
 
+// Default framing — face/upper body centered higher in the viewport.
+const DEFAULT_CAMERA_Y = 1.3;
+const DEFAULT_CAMERA_Z = 1.6;
+const DEFAULT_TARGET_Y = 1.42;
+
 export class TommyAvatar {
   constructor(canvas, { vrmUrl = "/visme/Tommyv4.vrm" } = {}) {
     this.canvas = canvas;
@@ -27,7 +32,7 @@ export class TommyAvatar {
     this.scene.background = new THREE.Color(0x0b1222);
 
     this.camera = new THREE.PerspectiveCamera(30, w / h, 0.1, 100);
-    this.camera.position.set(0, 1.4, 1.6);
+    this.camera.position.set(0, DEFAULT_CAMERA_Y, DEFAULT_CAMERA_Z);
 
     this.scene.add(new THREE.HemisphereLight(0xffffff, 0x444466, 1.1));
     const dir = new THREE.DirectionalLight(0xffffff, 0.85);
@@ -35,7 +40,7 @@ export class TommyAvatar {
     this.scene.add(dir);
 
     this.controls = new OrbitControls(this.camera, canvas);
-    this.controls.target.set(0, 1.25, 0);
+    this.controls.target.set(0, DEFAULT_TARGET_Y, 0);
     this.controls.enablePan = false;
     this.controls.update();
 
