@@ -303,6 +303,32 @@
     #debug-log .log-warn { color: #fdd663; }
     #debug-log .log-err { color: #f28b82; }
     #debug-log .log-hello { color: #8ab4f8; }
+
+    .debug-actions {
+      display: flex;
+      gap: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    #btn-send-log {
+      flex: 1;
+      padding: 0.45rem 0.75rem;
+      font-size: 0.75rem;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    #btn-send-log:hover:not(:disabled) { background: rgba(255, 255, 255, 0.16); }
+
+    #debug-upload-status {
+      flex: 1;
+      align-self: center;
+      font-size: 0.6875rem;
+      color: #81c995;
+      text-align: right;
+    }
+
+    #debug-upload-status.err { color: #f28b82; }
   </style>
 </head>
 <body>
@@ -325,6 +351,10 @@
           <summary>Hello cycle debug</summary>
           <div id="debug-state"></div>
           <div id="debug-log" aria-live="polite"></div>
+          <div class="debug-actions">
+            <button id="btn-send-log" type="button">Send log to server</button>
+            <span id="debug-upload-status"></span>
+          </div>
         </details>
       </div>
     </div>
@@ -370,6 +400,8 @@
     const avatarStatusEl = document.getElementById("avatar-status");
     const debugStateEl = document.getElementById("debug-state");
     const debugLogEl = document.getElementById("debug-log");
+    const btnSendLog = document.getElementById("btn-send-log");
+    const debugUploadStatusEl = document.getElementById("debug-upload-status");
     const SHOW_FOOTBALL_ICON = "show_football_icon";
     const END_CONVERSATION = "end_conversation";
     const DEBUG_LOG_MAX = 80;
@@ -448,6 +480,49 @@
         debugLogEl.removeChild(debugLogEl.firstChild);
       }
       debugLogEl.scrollTop = debugLogEl.scrollHeight;
+    }
+
+    function collectDebugLogLines() {
+      return Array.from(debugLogEl.children, (el) => el.textContent || "");
+    }
+
+    function setDebugUploadStatus(msg, isErr = false) {
+      debugUploadStatusEl.textContent = msg;
+      debugUploadStatusEl.classList.toggle("err", isErr);
+    }
+
+    async function sendDebugLogToServer() {
+      const lines = collectDebugLogLines();
+      if (!lines.length) {
+        setDebugUploadStatus("No log lines yet", true);
+        return;
+      }
+      btnSendLog.disabled = true;
+      setDebugUploadStatus("Sending…");
+      try {
+        const res = await fetch("/api/debug-log", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lines,
+            state: snapshotHelloCycleState(),
+            userAgent: navigator.userAgent,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setDebugUploadStatus(data.error || "Upload failed", true);
+          uiLog("debug", `upload failed: ${data.error || res.status}`, "err");
+          return;
+        }
+        setDebugUploadStatus("Sent — view in Settings");
+        uiLog("debug", `upload ok (${data.id})`, "hello");
+      } catch (e) {
+        setDebugUploadStatus("Could not reach server", true);
+        uiLog("debug", `upload error: ${e.message}`, "err");
+      } finally {
+        btnSendLog.disabled = false;
+      }
     }
 
     function showErr(msg) {
@@ -1106,6 +1181,7 @@
     });
 
     btnStop.addEventListener("click", endConversation);
+    btnSendLog.addEventListener("click", sendDebugLogToServer);
 
     window.addEventListener("resize", () => {
       if (inSession) avatar?.refreshAfterVisible();

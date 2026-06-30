@@ -1,3 +1,4 @@
 node_modules/
 .env
 config.json
+hello-debug-log.json

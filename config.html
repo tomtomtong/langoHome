@@ -23,6 +23,7 @@
       border-radius: 12px;
       border: 1px solid #2a2f3a;
     }
+    .card.wide { max-width: 720px; }
     h1 { margin: 0 0 0.25rem; font-size: 1.25rem; }
     p { margin: 0 0 1.5rem; color: #9aa0a6; font-size: 0.875rem; line-height: 1.5; }
     label { display: block; margin-bottom: 0.5rem; font-size: 0.875rem; font-weight: 500; }
@@ -91,10 +92,84 @@
     .status.err { display: block; background: #3a1e1e; color: #f28b82; }
     .hint { margin-top: 1.25rem; font-size: 0.75rem; color: #5f6368; line-height: 1.5; }
     .hint a { color: #6c8cff; }
+    .section-divider {
+      margin: 2rem 0 1.25rem;
+      border: none;
+      border-top: 1px solid #2a2f3a;
+    }
+    .debug-section h2 {
+      margin: 0 0 0.375rem;
+      font-size: 1rem;
+    }
+    .debug-section > p {
+      margin: 0 0 1rem;
+    }
+    .debug-toolbar {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .debug-toolbar button {
+      flex: 0 0 auto;
+      padding: 0.5rem 0.875rem;
+      border: 1px solid #3c4043;
+      background: transparent;
+      color: #c4c7c5;
+    }
+    .debug-toolbar button:hover { border-color: #5f6368; color: #e8eaed; }
+    #debug-reports {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      max-height: 420px;
+      overflow-y: auto;
+    }
+    .debug-report {
+      border: 1px solid #2a2f3a;
+      border-radius: 8px;
+      background: #0f1117;
+      overflow: hidden;
+    }
+    .debug-report summary {
+      padding: 0.625rem 0.75rem;
+      cursor: pointer;
+      font-size: 0.8125rem;
+      color: #c4c7c5;
+      list-style: none;
+    }
+    .debug-report summary::-webkit-details-marker { display: none; }
+    .debug-report-meta {
+      padding: 0 0.75rem 0.5rem;
+      font-size: 0.6875rem;
+      color: #5f6368;
+      line-height: 1.45;
+      word-break: break-word;
+    }
+    .debug-report pre {
+      margin: 0;
+      padding: 0.75rem;
+      border-top: 1px solid #2a2f3a;
+      max-height: 280px;
+      overflow: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.6875rem;
+      line-height: 1.45;
+      color: #9aa0a6;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .debug-empty {
+      padding: 0.875rem;
+      border: 1px dashed #3c4043;
+      border-radius: 8px;
+      color: #5f6368;
+      font-size: 0.8125rem;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
-  <div class="card">
+  <div class="card wide">
     <h1>Voice Agent Settings</h1>
     <p>Set your API key and optionally override the prompt, voice, or LLM model. Leave optional fields blank to use defaults.</p>
     <form id="form">
@@ -128,6 +203,19 @@
       Get a key at <a href="https://platform.inworld.ai/" target="_blank" rel="noopener">platform.inworld.ai</a>.
       You can also set <code>INWORLD_API_KEY</code> as a server environment variable instead.
     </p>
+
+    <hr class="section-divider">
+
+    <section class="debug-section">
+      <h2>Hello cycle debug logs</h2>
+      <p>Logs uploaded from the voice app via <strong>Send log to server</strong>. Newest first.</p>
+      <div class="debug-toolbar">
+        <button type="button" id="btn-refresh-logs">Refresh</button>
+      </div>
+      <div id="debug-reports">
+        <div class="debug-empty">Loading…</div>
+      </div>
+    </section>
   </div>
   <script>
     const KEY = 'inworld_api_key';
@@ -139,6 +227,61 @@
     const voice = document.getElementById('voice');
     const model = document.getElementById('model');
     const status = document.getElementById('status');
+    const debugReportsEl = document.getElementById('debug-reports');
+    const btnRefreshLogs = document.getElementById('btn-refresh-logs');
+
+    function formatReportTime(iso) {
+      try {
+        return new Date(iso).toLocaleString();
+      } catch {
+        return iso || 'Unknown time';
+      }
+    }
+
+    function renderDebugReports(reports) {
+      if (!reports.length) {
+        debugReportsEl.innerHTML = '<div class="debug-empty">No logs yet. Reproduce the issue on the voice app, then tap <strong>Send log to server</strong>.</div>';
+        return;
+      }
+
+      debugReportsEl.innerHTML = reports.map((report, index) => {
+        const stateText = report.state && Object.keys(report.state).length
+          ? Object.entries(report.state).map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`).join('\n')
+          : '(no state snapshot)';
+        const linesText = (report.lines || []).join('\n');
+        const ua = report.userAgent || 'Unknown device';
+        const title = `${formatReportTime(report.submittedAt)}${index === 0 ? ' (latest)' : ''}`;
+        return `
+          <details class="debug-report"${index === 0 ? ' open' : ''}>
+            <summary>${title}</summary>
+            <div class="debug-report-meta">
+              ID: ${report.id || '—'}<br>
+              Device: ${ua.replace(/</g, '&lt;')}
+            </div>
+            <pre>${stateText.replace(/</g, '&lt;')}
+
+--- log ---
+
+${linesText.replace(/</g, '&lt;')}</pre>
+          </details>
+        `;
+      }).join('');
+    }
+
+    async function loadDebugReports() {
+      debugReportsEl.innerHTML = '<div class="debug-empty">Loading…</div>';
+      try {
+        const res = await fetch('/api/debug-log');
+        if (!res.ok) throw new Error('load failed');
+        const data = await res.json();
+        renderDebugReports(Array.isArray(data.reports) ? data.reports : []);
+      } catch {
+        debugReportsEl.innerHTML = '<div class="debug-empty">Could not load debug logs from server.</div>';
+      }
+    }
+
+    btnRefreshLogs.addEventListener('click', loadDebugReports);
+    loadDebugReports();
 
     function syncLocalStorage(cfg) {
       if (cfg.apiKey) localStorage.setItem(KEY, cfg.apiKey);

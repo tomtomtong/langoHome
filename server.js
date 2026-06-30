@@ -9,6 +9,8 @@ const ROOT = dirname(fileURLToPath(import.meta.url));
 // Local: ./config.json  |  Railway: mount a volume (e.g. /app/data) — uses RAILWAY_VOLUME_MOUNT_PATH
 const CONFIG_DIR = process.env.CONFIG_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH || ROOT;
 const CONFIG_PATH = join(CONFIG_DIR, 'config.json');
+const DEBUG_LOG_PATH = join(CONFIG_DIR, 'hello-debug-log.json');
+const DEBUG_LOG_MAX_REPORTS = 20;
 
 function ensureConfigDir() {
   if (CONFIG_DIR === ROOT || existsSync(CONFIG_DIR)) return;
@@ -43,6 +45,41 @@ function loadConfig() {
 function saveConfig(config) {
   ensureConfigDir();
   writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2) + '\n');
+}
+
+function loadDebugLogs() {
+  try {
+    if (existsSync(DEBUG_LOG_PATH)) {
+      const data = JSON.parse(readFileSync(DEBUG_LOG_PATH, 'utf8'));
+      return Array.isArray(data.reports) ? data.reports : [];
+    }
+  } catch (e) {
+    console.warn('Could not load hello-debug-log.json:', e.message);
+  }
+  return [];
+}
+
+function saveDebugLogs(reports) {
+  ensureConfigDir();
+  writeFileSync(DEBUG_LOG_PATH, JSON.stringify({ reports }, null, 2) + '\n');
+}
+
+function readJsonBody(req, res, onData) {
+  let body = '';
+  req.on('data', (chunk) => {
+    body += chunk;
+    if (body.length > 512_000) {
+      req.destroy();
+      sendJson(res, 413, { error: 'Payload too large.' });
+    }
+  });
+  req.on('end', () => {
+    try {
+      onData(JSON.parse(body || '{}'));
+    } catch {
+      sendJson(res, 400, { error: 'Invalid JSON.' });
+    }
+  });
 }
 
 function sendJson(res, status, body) {
@@ -87,26 +124,51 @@ const server = createServer((req, res) => {
       return;
     }
     if (req.method === 'POST') {
-      let body = '';
-      req.on('data', (chunk) => { body += chunk; });
-      req.on('end', () => {
-        try {
-          const parsed = JSON.parse(body);
-          const apiKey = parsed.apiKey?.trim();
-          if (!apiKey) {
-            sendJson(res, 400, { error: 'API key is required.' });
-            return;
-          }
-          saveConfig({
-            apiKey,
-            instructions: parsed.instructions?.trim() || '',
-            voice: parsed.voice?.trim() || '',
-            model: parsed.model?.trim() || '',
-          });
-          sendJson(res, 200, { ok: true });
-        } catch {
-          sendJson(res, 400, { error: 'Invalid JSON.' });
+      readJsonBody(req, res, (parsed) => {
+        const apiKey = parsed.apiKey?.trim();
+        if (!apiKey) {
+          sendJson(res, 400, { error: 'API key is required.' });
+          return;
         }
+        saveConfig({
+          apiKey,
+          instructions: parsed.instructions?.trim() || '',
+          voice: parsed.voice?.trim() || '',
+          model: parsed.model?.trim() || '',
+        });
+        sendJson(res, 200, { ok: true });
+      });
+      return;
+    }
+    sendJson(res, 405, { error: 'Method not allowed.' });
+    return;
+  }
+
+  if (url === '/api/debug-log') {
+    if (req.method === 'GET') {
+      sendJson(res, 200, { reports: loadDebugLogs() });
+      return;
+    }
+    if (req.method === 'POST') {
+      readJsonBody(req, res, (parsed) => {
+        const lines = Array.isArray(parsed.lines)
+          ? parsed.lines.map((l) => String(l)).slice(-200)
+          : [];
+        if (!lines.length) {
+          sendJson(res, 400, { error: 'No log lines provided.' });
+          return;
+        }
+        const report = {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          submittedAt: new Date().toISOString(),
+          userAgent: String(parsed.userAgent || req.headers['user-agent'] || ''),
+          note: String(parsed.note || '').slice(0, 500),
+          state: parsed.state && typeof parsed.state === 'object' ? parsed.state : {},
+          lines,
+        };
+        const reports = [report, ...loadDebugLogs()].slice(0, DEBUG_LOG_MAX_REPORTS);
+        saveDebugLogs(reports);
+        sendJson(res, 200, { ok: true, id: report.id });
       });
       return;
     }
