@@ -1,11 +1,19 @@
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { createServer } from 'http';
 import { join, dirname, extname } from 'path';
 import { fileURLToPath } from 'url';
 import { WebSocketServer, WebSocket } from 'ws';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
-const CONFIG_PATH = join(ROOT, 'config.json');
+
+// Local: ./config.json  |  Railway: mount a volume (e.g. /app/data) — uses RAILWAY_VOLUME_MOUNT_PATH
+const CONFIG_DIR = process.env.CONFIG_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH || ROOT;
+const CONFIG_PATH = join(CONFIG_DIR, 'config.json');
+
+function ensureConfigDir() {
+  if (CONFIG_DIR === ROOT || existsSync(CONFIG_DIR)) return;
+  mkdirSync(CONFIG_DIR, { recursive: true });
+}
 
 const SECURITY_HEADERS = {
   'Cross-Origin-Opener-Policy': 'same-origin',
@@ -33,6 +41,7 @@ function loadConfig() {
 }
 
 function saveConfig(config) {
+  ensureConfigDir();
   writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2) + '\n');
 }
 
@@ -265,9 +274,8 @@ wss.on('connection', (browser) => {
   });
 });
 
-let port = 4000;
-server.on('error', (e) => {
-  if (e.code === 'EADDRINUSE') { console.warn(`Port ${port} in use, trying ${++port}…`); server.listen(port); }
-  else throw e;
+const port = Number(process.env.PORT) || 4000;
+server.listen(port, '0.0.0.0', () => {
+  console.log(`Listening on http://0.0.0.0:${port}  (config: /config)`);
+  if (CONFIG_DIR !== ROOT) console.log(`Config stored at ${CONFIG_PATH}`);
 });
-server.listen(port, () => console.log(`Open http://localhost:${port}  (config: http://localhost:${port}/config)`));

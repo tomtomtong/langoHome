@@ -123,7 +123,8 @@
     </form>
     <div id="status" class="status"></div>
     <p class="hint">
-      Settings are saved to <code>config.json</code> on the server and persist across browser restarts.
+      Settings are saved on the server (<code>config.json</code>) and persist across restarts.
+      On Railway, attach a volume mounted at <code>/app/data</code> so config survives redeploys.
       Get a key at <a href="https://platform.inworld.ai/" target="_blank" rel="noopener">platform.inworld.ai</a>.
       You can also set <code>INWORLD_API_KEY</code> as a server environment variable instead.
     </p>
