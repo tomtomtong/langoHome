@@ -10,7 +10,12 @@ const DEFAULT_CAMERA_Z = 1.6;
 const DEFAULT_TARGET_Y = 1.42;
 
 export class TommyAvatar {
-  constructor(canvas, { vrmUrl = "/visme/Tommyv4.vrm" } = {}) {
+  constructor(canvas, {
+    vrmUrl = "/visme/Tommyv4.vrm",
+    cameraY = DEFAULT_CAMERA_Y,
+    cameraZ = DEFAULT_CAMERA_Z,
+    targetY = DEFAULT_TARGET_Y,
+  } = {}) {
     this.canvas = canvas;
     this.vrmUrl = vrmUrl;
     this.morphMeshes = [];
@@ -32,7 +37,7 @@ export class TommyAvatar {
     this.scene.background = new THREE.Color(0x0b1222);
 
     this.camera = new THREE.PerspectiveCamera(30, w / h, 0.1, 100);
-    this.camera.position.set(0, DEFAULT_CAMERA_Y, DEFAULT_CAMERA_Z);
+    this.camera.position.set(0, cameraY, cameraZ);
 
     this.scene.add(new THREE.HemisphereLight(0xffffff, 0x444466, 1.1));
     const dir = new THREE.DirectionalLight(0xffffff, 0.85);
@@ -40,7 +45,7 @@ export class TommyAvatar {
     this.scene.add(dir);
 
     this.controls = new OrbitControls(this.camera, canvas);
-    this.controls.target.set(0, DEFAULT_TARGET_Y, 0);
+    this.controls.target.set(0, targetY, 0);
     this.controls.enablePan = false;
     this.controls.update();
 

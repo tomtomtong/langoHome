@@ -120,6 +120,7 @@ const server = createServer((req, res) => {
         instructions: cfg.instructions ?? '',
         voice: cfg.voice ?? '',
         model: cfg.model ?? '',
+        avatar: normalizeAvatar(cfg.avatar),
       });
       return;
     }
@@ -135,6 +136,7 @@ const server = createServer((req, res) => {
           instructions: parsed.instructions?.trim() || '',
           voice: parsed.voice?.trim() || '',
           model: parsed.model?.trim() || '',
+          avatar: normalizeAvatar(parsed.avatar),
         });
         sendJson(res, 200, { ok: true });
       });
@@ -190,6 +192,26 @@ const wss = new WebSocketServer({ server, path: '/ws' });
 const DEFAULT_VOICE_ID = 'default-zylgts2tamenvybeti3z0w__uncle_tommy';
 const DEFAULT_INSTRUCTIONS = 'You are Uncle Tommy, a friendly voice assistant. Keep responses brief.';
 const DEFAULT_MODEL = 'openai/gpt-4o-mini';
+
+const DEFAULT_AVATAR = {
+  cameraY: 1.3,
+  cameraZ: 1.6,
+  targetY: 1.42,
+};
+
+function parseAvatarNumber(value, fallback) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function normalizeAvatar(raw) {
+  const a = raw && typeof raw === 'object' ? raw : {};
+  return {
+    cameraY: parseAvatarNumber(a.cameraY, DEFAULT_AVATAR.cameraY),
+    cameraZ: parseAvatarNumber(a.cameraZ, DEFAULT_AVATAR.cameraZ),
+    targetY: parseAvatarNumber(a.targetY, DEFAULT_AVATAR.targetY),
+  };
+}
 
 const FOOTBALL_TOOL_INSTRUCTION =
   ' When the user mentions football, soccer, or related topics, call the show_football_icon tool.';

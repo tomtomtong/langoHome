@@ -340,6 +340,8 @@
     const PROMPT_KEY = "inworld_system_prompt";
     const VOICE_KEY = "inworld_voice_id";
     const MODEL_KEY = "inworld_model";
+    const AVATAR_KEY = "inworld_avatar";
+    const DEFAULT_AVATAR = { cameraY: 1.3, cameraZ: 1.6, targetY: 1.42 };
     const DEFAULT_PROMPT = "You are Uncle Tommy, a friendly voice assistant. Keep responses brief.";
     const DEFAULT_VOICE = "default-zylgts2tamenvybeti3z0w__uncle_tommy";
     const DEFAULT_MODEL = "openai/gpt-4o-mini";
@@ -484,11 +486,34 @@
       statusIdleEl.textContent = msg;
     }
 
+    function normalizeAvatar(raw) {
+      const a = raw && typeof raw === "object" ? raw : {};
+      const num = (v, fallback) => {
+        const n = Number(v);
+        return Number.isFinite(n) ? n : fallback;
+      };
+      return {
+        cameraY: num(a.cameraY, DEFAULT_AVATAR.cameraY),
+        cameraZ: num(a.cameraZ, DEFAULT_AVATAR.cameraZ),
+        targetY: num(a.targetY, DEFAULT_AVATAR.targetY),
+      };
+    }
+
+    function loadAvatarFromLocalStorage() {
+      try {
+        return normalizeAvatar(JSON.parse(localStorage.getItem(AVATAR_KEY) || "{}"));
+      } catch {
+        return { ...DEFAULT_AVATAR };
+      }
+    }
+
     async function ensureAvatar() {
       if (avatar) return avatar;
       if (avatarLoading) return avatarLoading;
       avatarLoading = (async () => {
-        avatar = new TommyAvatar(document.getElementById("vrm-canvas"));
+        const cfg = await getConfig();
+        const av = normalizeAvatar(cfg.avatar);
+        avatar = new TommyAvatar(document.getElementById("vrm-canvas"), av);
         avatar.onStatus = (msg) => { avatarStatusEl.textContent = msg; };
         await avatar.load();
         return avatar;
@@ -834,13 +859,20 @@
     async function getConfig() {
       try {
         const res = await fetch("/api/config");
-        if (res.ok) return await res.json();
+        if (res.ok) {
+          const cfg = await res.json();
+          if (cfg.avatar) {
+            localStorage.setItem(AVATAR_KEY, JSON.stringify(normalizeAvatar(cfg.avatar)));
+          }
+          return cfg;
+        }
       } catch {}
       return {
         apiKey: localStorage.getItem(KEY),
         instructions: localStorage.getItem(PROMPT_KEY),
         voice: localStorage.getItem(VOICE_KEY),
         model: localStorage.getItem(MODEL_KEY),
+        avatar: loadAvatarFromLocalStorage(),
       };
     }
 
