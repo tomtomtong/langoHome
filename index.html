@@ -1246,7 +1246,7 @@
           stopAvatarSpeech();
           resetResponseState(null);
         } else if (e.type === "input_audio_buffer.timeout_triggered") {
-          setStatus("No speech detected — waiting for end signal");
+          setStatus("No speech detected — Uncle Tommy is checking in", true);
         } else if (e.type === "response.output_audio.done") {
           audioDone = true;
           maybeEndAvatarSpeech();

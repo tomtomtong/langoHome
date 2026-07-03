@@ -295,6 +295,7 @@ function buildSessionCfg({ instructions, voice, model } = {}) {
       input: {
         turn_detection: {
           type: 'server_vad',
+          idle_timeout_ms: 15000,
           create_response: true,
         },
         transcription: {
