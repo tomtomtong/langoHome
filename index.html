@@ -445,21 +445,39 @@
     const MAX_IDLE_NUDGES = 2;
     let idleNudgeTimer = null;
     let idleNudgeCount = 0;
+    let idleEndNudged = false;
 
     function cancelIdleNudge() {
       if (idleNudgeTimer) { clearTimeout(idleNudgeTimer); idleNudgeTimer = null; }
     }
 
+    function nudgeIdleEndConversation() {
+      if (idleEndNudged || pendingEndConversation || ws?.readyState !== WebSocket.OPEN) return;
+      idleEndNudged = true;
+      cancelIdleNudge();
+      uiLog("idle", `${MAX_IDLE_NUDGES} nudges with no reply → ending conversation`, "hello");
+      setStatus("No response — ending conversation");
+      ws.send(JSON.stringify({
+        type: "conversation.item.create",
+        item: {
+          type: "message",
+          role: "user",
+          content: [{ type: "input_text", text: "[The user has not responded after two check-ins. Give a very brief, warm farewell and call end_conversation now.]" }],
+        },
+      }));
+      ws.send(JSON.stringify({ type: "response.create" }));
+    }
+
     function scheduleIdleNudge() {
       cancelIdleNudge();
-      if (!active || pendingEndConversation || ws?.readyState !== WebSocket.OPEN) return;
+      if (!active || pendingEndConversation || idleEndNudged || ws?.readyState !== WebSocket.OPEN) return;
       if (idleNudgeCount >= MAX_IDLE_NUDGES) {
-        uiLog("idle", `nudge cap reached (${MAX_IDLE_NUDGES}) — not rescheduling`, "warn");
+        nudgeIdleEndConversation();
         return;
       }
       idleNudgeTimer = setTimeout(() => {
         idleNudgeTimer = null;
-        if (!active || pendingEndConversation || ws?.readyState !== WebSocket.OPEN) return;
+        if (!active || pendingEndConversation || idleEndNudged || ws?.readyState !== WebSocket.OPEN) return;
         if (playing || queue.length > 0) return;
         idleNudgeCount++;
         uiLog("idle", `user silent ${IDLE_NUDGE_MS / 1000}s → nudge #${idleNudgeCount}`, "hello");
@@ -734,6 +752,7 @@
       goodbyeNudged = false;
       cancelIdleNudge();
       idleNudgeCount = 0;
+      idleEndNudged = false;
       if (endConversationCloseTimer) {
         clearTimeout(endConversationCloseTimer);
         endConversationCloseTimer = null;
@@ -1283,6 +1302,7 @@
         } else if (e.type === "input_audio_buffer.speech_started") {
           goodbyeNudged = false;
           idleNudgeCount = 0;
+          idleEndNudged = false;
           cancelIdleNudge();
           stopAudio();
           stopAvatarSpeech();
