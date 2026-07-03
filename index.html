@@ -339,7 +339,7 @@
       <h1>Uncle Tommy</h1>
       <div class="idle-controls">
         <button id="btn-start">Start Conversation</button>
-        <div id="status-idle">Say &quot;Hello&quot; to start a conversation</div>
+        <div id="status-idle">Tap Start to begin a conversation</div>
         <div id="err-idle"></div>
         <button id="btn-send-log" type="button">Send log to server</button>
         <div id="debug-upload-status"></div>
@@ -411,7 +411,8 @@
     let footballHideTimer = null;
     let ws, ctx, src, proc, source, stream;
     let active = false, inSession = false, playing = false, nextPlayTime = 0;
-    let recognition = null, wakeWordEnabled = true, listeningForWakeWord = false;
+    const ENABLE_WAKE_WORD = false;
+    let recognition = null, wakeWordEnabled = ENABLE_WAKE_WORD, listeningForWakeWord = false;
     let wakeWordRestartTimer = null;
     let wakeWordRestartAttempts = 0;
     let recognitionWatchdog = null;
@@ -712,10 +713,11 @@
     function returnToHelloCycle() {
       uiLog("hello", "returnToHelloCycle", "hello");
       showErr("");
-      wakeWordEnabled = true;
+      wakeWordEnabled = ENABLE_WAKE_WORD;
       wakeWordRestartAttempts = 0;
       stopWakeWordListening();
-      setStatus('Say "Hello" to start a conversation');
+      setStatus(ENABLE_WAKE_WORD ? 'Say "Hello" to start a conversation' : 'Tap "Start" to begin a conversation');
+      if (!ENABLE_WAKE_WORD) return;
       if (wakeWordRestartTimer) clearTimeout(wakeWordRestartTimer);
       wakeWordRestartTimer = setTimeout(() => {
         wakeWordRestartTimer = null;
@@ -1377,20 +1379,26 @@
         console.error(e);
         showErr(`Avatar failed to load: ${e.message}`);
       }
-      startWakeWordListening();
+      if (ENABLE_WAKE_WORD) {
+        startWakeWordListening();
+      } else {
+        setStatus('Tap "Start" to begin a conversation');
+      }
     }
 
     // Safety net: if wake-word listening dies silently (Chrome's
     // SpeechRecognition can stop without firing onend, and iOS Safari
     // can fail to restart after getUserMedia released the mic), make
     // sure it gets restarted.
-    setInterval(() => {
-      if (wakeWordEnabled && !active && !listeningForWakeWord && !wakeWordRestartTimer) {
-        uiLog("hello", "safety net restart (idle but not listening)", "warn", snapshotHelloCycleState());
-        wakeWordRestartAttempts = 0;
-        startWakeWordListening();
-      }
-    }, 4000);
+    if (ENABLE_WAKE_WORD) {
+      setInterval(() => {
+        if (wakeWordEnabled && !active && !listeningForWakeWord && !wakeWordRestartTimer) {
+          uiLog("hello", "safety net restart (idle but not listening)", "warn", snapshotHelloCycleState());
+          wakeWordRestartAttempts = 0;
+          startWakeWordListening();
+        }
+      }, 4000);
+    }
 
     uiLog("hello", "app init", "hello", { IS_IOS, WAKE_WORD_RESTART_DELAY, POST_SESSION_WAKE_DELAY });
     init();
