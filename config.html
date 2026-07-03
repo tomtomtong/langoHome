@@ -166,6 +166,18 @@
       font-size: 0.8125rem;
       text-align: center;
     }
+    .avatar-preview-wrap {
+      margin-bottom: 1rem;
+      border: 1px solid #2a2f3a;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #0b1222;
+    }
+    #avatar-preview-canvas {
+      display: block;
+      width: 100%;
+      height: 280px;
+    }
     button.secondary {
       flex: 0 0 auto;
       background: transparent;
@@ -206,6 +218,17 @@
       accent-color: #6c8cff;
     }
   </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/",
+        "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.3.4/lib/three-vrm.module.js",
+        "@pixiv/three-vrm-animation": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm-animation@3.3.4/lib/three-vrm-animation.module.js",
+        "vrm-mixamo-retarget": "https://cdn.jsdelivr.net/npm/vrm-mixamo-retarget@1.0.3/dist/index.esm.js"
+      }
+    }
+  </script>
 </head>
 <body>
   <div class="card wide">
@@ -232,7 +255,11 @@
       </div>
       <hr class="section-divider" style="margin: 1.5rem 0 1.25rem">
       <h2 style="margin: 0 0 0.375rem; font-size: 1rem">Lipsync (Visme)</h2>
-      <p style="margin: 0 0 1rem">Tune mouth movement sensitivity. Reload the voice app after saving to hear the changes.</p>
+      <p style="margin: 0 0 1rem">Tune mouth movement sensitivity. Use <strong>Test lipsync</strong> below to check viseme strength and timing on the preview.</p>
+      <div class="avatar-preview-wrap">
+        <canvas id="avatar-preview-canvas"></canvas>
+      </div>
+      <p id="avatar-preview-status" class="field-hint" style="margin-bottom: 1rem">Loading preview…</p>
       <div class="slider-field">
         <div class="slider-label">
           <label for="lipsync-exaggerate">Mouth strength</label>
@@ -267,6 +294,7 @@
         </div>
       </div>
       <div class="actions" style="margin-bottom: 1rem">
+        <button type="button" id="btn-test-lipsync" class="secondary">Test lipsync</button>
         <button type="button" id="btn-reset-lipsync" class="secondary">Reset lipsync defaults</button>
       </div>
       <div class="actions">
@@ -316,6 +344,7 @@
     const lipsyncExaggerateValue = document.getElementById('lipsync-exaggerate-value');
     const lipsyncSpeedValue = document.getElementById('lipsync-speed-value');
     const lipsyncCrossfadeValue = document.getElementById('lipsync-crossfade-value');
+    const btnTestLipsync = document.getElementById('btn-test-lipsync');
     const btnResetLipsync = document.getElementById('btn-reset-lipsync');
     const status = document.getElementById('status');
     const debugReportsEl = document.getElementById('debug-reports');
@@ -409,11 +438,22 @@ ${linesText.replace(/</g, '&lt;')}</pre>
       lipsyncSpeed.value = l.msPerPhone;
       lipsyncCrossfade.value = l.crossfadeMs;
       updateLipsyncLabels();
+      window.dispatchEvent(new CustomEvent('lipsync-fields-updated', { detail: l }));
     }
 
     lipsyncExaggerate.addEventListener('input', updateLipsyncLabels);
     lipsyncSpeed.addEventListener('input', updateLipsyncLabels);
     lipsyncCrossfade.addEventListener('input', updateLipsyncLabels);
+    lipsyncExaggerate.addEventListener('input', () => {
+      window.dispatchEvent(new CustomEvent('lipsync-fields-updated', { detail: readLipsyncFromForm() }));
+    });
+    lipsyncSpeed.addEventListener('input', () => {
+      window.dispatchEvent(new CustomEvent('lipsync-fields-updated', { detail: readLipsyncFromForm() }));
+    });
+    lipsyncCrossfade.addEventListener('input', () => {
+      window.dispatchEvent(new CustomEvent('lipsync-fields-updated', { detail: readLipsyncFromForm() }));
+    });
+    window.addEventListener('lipsync-labels-sync', updateLipsyncLabels);
     updateLipsyncLabels();
 
     function syncLocalStorage(cfg) {
@@ -475,6 +515,10 @@ ${linesText.replace(/</g, '&lt;')}</pre>
       applyLipsyncFields(DEFAULT_LIPSYNC);
     });
 
+    btnTestLipsync.addEventListener('click', () => {
+      window.dispatchEvent(new CustomEvent('lipsync-preview-requested'));
+    });
+
     document.getElementById('form').onsubmit = async (e) => {
       e.preventDefault();
       const val = input.value.trim();
@@ -517,6 +561,67 @@ ${linesText.replace(/</g, '&lt;')}</pre>
       status.textContent = 'Saved! Reload the voice app to apply lipsync changes.';
       status.className = 'status ok';
     };
+  </script>
+  <script type="module">
+    import { TommyAvatar, DEFAULT_AVATAR, DEFAULT_LIPSYNC, normalizeLipsync } from "/visme/avatar.js";
+
+    const canvas = document.getElementById("avatar-preview-canvas");
+    const statusEl = document.getElementById("avatar-preview-status");
+
+    let previewAvatar = null;
+
+    window.addEventListener("lipsync-fields-updated", (e) => {
+      if (!previewAvatar) return;
+      previewAvatar.applyLipsyncSettings(e.detail);
+    });
+
+    window.addEventListener("lipsync-preview-requested", () => {
+      if (!previewAvatar?.loaded) {
+        statusEl.textContent = "Avatar not ready for lipsync preview.";
+        return;
+      }
+      previewAvatar.applyLipsyncSettings(readLipsyncFromDom());
+      previewAvatar.playLipsyncPreview("Hello from Visme");
+    });
+
+    function readLipsyncFromDom() {
+      return normalizeLipsync({
+        exaggerate: document.getElementById("lipsync-exaggerate").value,
+        msPerPhone: document.getElementById("lipsync-speed").value,
+        crossfadeMs: document.getElementById("lipsync-crossfade").value,
+      });
+    }
+
+    function writeLipsyncToDom(lipsync) {
+      const l = normalizeLipsync(lipsync);
+      document.getElementById("lipsync-exaggerate").value = l.exaggerate;
+      document.getElementById("lipsync-speed").value = l.msPerPhone;
+      document.getElementById("lipsync-crossfade").value = l.crossfadeMs;
+      window.dispatchEvent(new CustomEvent("lipsync-labels-sync"));
+    }
+
+    async function initPreview() {
+      let lipsync = DEFAULT_LIPSYNC;
+      try {
+        const res = await fetch("/api/config");
+        if (res.ok) {
+          const cfg = await res.json();
+          lipsync = normalizeLipsync(cfg.lipsync);
+          writeLipsyncToDom(lipsync);
+        }
+      } catch {}
+
+      previewAvatar = new TommyAvatar(canvas, {
+        ...DEFAULT_AVATAR,
+        lipsync,
+        interactiveCamera: false,
+      });
+      previewAvatar.onStatus = (msg) => { statusEl.textContent = msg; };
+      await previewAvatar.load();
+      previewAvatar.refreshAfterVisible();
+    }
+
+    initPreview();
   </script>
 </body>
 </html>
