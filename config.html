@@ -166,45 +166,6 @@
       font-size: 0.8125rem;
       text-align: center;
     }
-    .avatar-preview-wrap {
-      margin-bottom: 1rem;
-      border: 1px solid #2a2f3a;
-      border-radius: 10px;
-      overflow: hidden;
-      background: #0b1222;
-    }
-    #avatar-preview-canvas {
-      display: block;
-      width: 100%;
-      height: 280px;
-      touch-action: none;
-      cursor: grab;
-    }
-    #avatar-preview-canvas:active { cursor: grabbing; }
-    .avatar-preview-hint {
-      margin: 0;
-      padding: 0.5rem 0.75rem;
-      font-size: 0.75rem;
-      color: #5f6368;
-      border-top: 1px solid #2a2f3a;
-    }
-    .camera-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 0.625rem;
-    }
-    .camera-grid label {
-      font-size: 0.75rem;
-      margin-bottom: 0.25rem;
-      color: #9aa0a6;
-    }
-    .camera-grid input { font-size: 0.8125rem; padding: 0.5rem; }
-    .camera-group-title {
-      margin: 0 0 0.5rem;
-      font-size: 0.8125rem;
-      font-weight: 500;
-      color: #c4c7c5;
-    }
     button.secondary {
       flex: 0 0 auto;
       background: transparent;
@@ -245,17 +206,6 @@
       accent-color: #6c8cff;
     }
   </style>
-  <script type="importmap">
-    {
-      "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
-        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/",
-        "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.3.4/lib/three-vrm.module.js",
-        "@pixiv/three-vrm-animation": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm-animation@3.3.4/lib/three-vrm-animation.module.js",
-        "vrm-mixamo-retarget": "https://cdn.jsdelivr.net/npm/vrm-mixamo-retarget@1.0.3/dist/index.esm.js"
-      }
-    }
-  </script>
 </head>
 <body>
   <div class="card wide">
@@ -281,50 +231,8 @@
         <p class="field-hint">Provider/model pair, e.g. <code>openai/gpt-4o-mini</code> or <code>openai/gpt-4.1-nano</code>.</p>
       </div>
       <hr class="section-divider" style="margin: 1.5rem 0 1.25rem">
-      <h2 style="margin: 0 0 0.375rem; font-size: 1rem">Avatar framing</h2>
-      <p style="margin: 0 0 1rem">Drag to position the avatar on screen. Pinch or scroll to change its size. Values update live below.</p>
-      <div class="avatar-preview-wrap">
-        <canvas id="avatar-preview-canvas"></canvas>
-        <p class="avatar-preview-hint">Drag to center · pinch / scroll to scale · saved settings apply after reload</p>
-      </div>
-      <p id="avatar-preview-status" class="field-hint" style="margin-bottom: 1rem">Loading preview…</p>
-      <p class="camera-group-title">Camera position</p>
-      <div class="camera-grid field">
-        <div>
-          <label for="avatar-camera-x">X</label>
-          <input id="avatar-camera-x" type="number" step="0.01" placeholder="0">
-        </div>
-        <div>
-          <label for="avatar-camera-y">Y (height)</label>
-          <input id="avatar-camera-y" type="number" step="0.01" placeholder="1.3">
-        </div>
-        <div>
-          <label for="avatar-camera-z">Z (distance)</label>
-          <input id="avatar-camera-z" type="number" step="0.01" placeholder="1.6">
-        </div>
-      </div>
-      <p class="camera-group-title">Look-at target</p>
-      <div class="camera-grid field">
-        <div>
-          <label for="avatar-target-x">X</label>
-          <input id="avatar-target-x" type="number" step="0.01" placeholder="0">
-        </div>
-        <div>
-          <label for="avatar-target-y">Y (face height)</label>
-          <input id="avatar-target-y" type="number" step="0.01" placeholder="1.42">
-        </div>
-        <div>
-          <label for="avatar-target-z">Z</label>
-          <input id="avatar-target-z" type="number" step="0.01" placeholder="0">
-        </div>
-      </div>
-      <div class="actions" style="margin-bottom: 1rem">
-        <button type="button" id="btn-save-camera" class="secondary">Save camera only</button>
-        <button type="button" id="btn-reset-camera" class="secondary">Reset defaults</button>
-      </div>
-      <hr class="section-divider" style="margin: 1.5rem 0 1.25rem">
       <h2 style="margin: 0 0 0.375rem; font-size: 1rem">Lipsync (Visme)</h2>
-      <p style="margin: 0 0 1rem">Tune mouth movement sensitivity. Use <strong>Test lipsync</strong> on the preview above to hear-free check viseme strength and timing.</p>
+      <p style="margin: 0 0 1rem">Tune mouth movement sensitivity. Reload the voice app after saving to hear the changes.</p>
       <div class="slider-field">
         <div class="slider-label">
           <label for="lipsync-exaggerate">Mouth strength</label>
@@ -359,7 +267,6 @@
         </div>
       </div>
       <div class="actions" style="margin-bottom: 1rem">
-        <button type="button" id="btn-test-lipsync" class="secondary">Test lipsync</button>
         <button type="button" id="btn-reset-lipsync" class="secondary">Reset lipsync defaults</button>
       </div>
       <div class="actions">
@@ -393,12 +300,7 @@
     const PROMPT_KEY = 'inworld_system_prompt';
     const VOICE_KEY = 'inworld_voice_id';
     const MODEL_KEY = 'inworld_model';
-    const AVATAR_KEY = 'inworld_avatar';
     const LIPSYNC_KEY = 'inworld_lipsync';
-    const DEFAULT_AVATAR = {
-      cameraX: 0, cameraY: 1.3, cameraZ: 1.6,
-      targetX: 0, targetY: 1.42, targetZ: 0,
-    };
     const DEFAULT_LIPSYNC = {
       exaggerate: 1,
       msPerPhone: 120,
@@ -408,27 +310,13 @@
     const prompt = document.getElementById('prompt');
     const voice = document.getElementById('voice');
     const model = document.getElementById('model');
-    const avatarCameraX = document.getElementById('avatar-camera-x');
-    const avatarCameraY = document.getElementById('avatar-camera-y');
-    const avatarCameraZ = document.getElementById('avatar-camera-z');
-    const avatarTargetX = document.getElementById('avatar-target-x');
-    const avatarTargetY = document.getElementById('avatar-target-y');
-    const avatarTargetZ = document.getElementById('avatar-target-z');
-    const btnSaveCamera = document.getElementById('btn-save-camera');
-    const btnResetCamera = document.getElementById('btn-reset-camera');
     const lipsyncExaggerate = document.getElementById('lipsync-exaggerate');
     const lipsyncSpeed = document.getElementById('lipsync-speed');
     const lipsyncCrossfade = document.getElementById('lipsync-crossfade');
     const lipsyncExaggerateValue = document.getElementById('lipsync-exaggerate-value');
     const lipsyncSpeedValue = document.getElementById('lipsync-speed-value');
     const lipsyncCrossfadeValue = document.getElementById('lipsync-crossfade-value');
-    const btnTestLipsync = document.getElementById('btn-test-lipsync');
     const btnResetLipsync = document.getElementById('btn-reset-lipsync');
-    const avatarPreviewStatus = document.getElementById('avatar-preview-status');
-    const avatarFieldInputs = [
-      avatarCameraX, avatarCameraY, avatarCameraZ,
-      avatarTargetX, avatarTargetY, avatarTargetZ,
-    ];
     const status = document.getElementById('status');
     const debugReportsEl = document.getElementById('debug-reports');
     const btnRefreshLogs = document.getElementById('btn-refresh-logs');
@@ -521,61 +409,12 @@ ${linesText.replace(/</g, '&lt;')}</pre>
       lipsyncSpeed.value = l.msPerPhone;
       lipsyncCrossfade.value = l.crossfadeMs;
       updateLipsyncLabels();
-      window.dispatchEvent(new CustomEvent('lipsync-fields-updated', { detail: l }));
     }
 
     lipsyncExaggerate.addEventListener('input', updateLipsyncLabels);
     lipsyncSpeed.addEventListener('input', updateLipsyncLabels);
     lipsyncCrossfade.addEventListener('input', updateLipsyncLabels);
-    lipsyncExaggerate.addEventListener('input', () => {
-      window.dispatchEvent(new CustomEvent('lipsync-fields-updated', { detail: readLipsyncFromForm() }));
-    });
-    lipsyncSpeed.addEventListener('input', () => {
-      window.dispatchEvent(new CustomEvent('lipsync-fields-updated', { detail: readLipsyncFromForm() }));
-    });
-    lipsyncCrossfade.addEventListener('input', () => {
-      window.dispatchEvent(new CustomEvent('lipsync-fields-updated', { detail: readLipsyncFromForm() }));
-    });
-    window.addEventListener('lipsync-labels-sync', updateLipsyncLabels);
     updateLipsyncLabels();
-
-    function normalizeAvatar(raw) {
-      const a = raw && typeof raw === 'object' ? raw : {};
-      const num = (v, fallback) => {
-        const n = Number(v);
-        return Number.isFinite(n) ? n : fallback;
-      };
-      return {
-        cameraX: num(a.cameraX, DEFAULT_AVATAR.cameraX),
-        cameraY: num(a.cameraY, DEFAULT_AVATAR.cameraY),
-        cameraZ: num(a.cameraZ, DEFAULT_AVATAR.cameraZ),
-        targetX: num(a.targetX, DEFAULT_AVATAR.targetX),
-        targetY: num(a.targetY, DEFAULT_AVATAR.targetY),
-        targetZ: num(a.targetZ, DEFAULT_AVATAR.targetZ),
-      };
-    }
-
-    function readAvatarFromForm() {
-      return normalizeAvatar({
-        cameraX: avatarCameraX.value,
-        cameraY: avatarCameraY.value,
-        cameraZ: avatarCameraZ.value,
-        targetX: avatarTargetX.value,
-        targetY: avatarTargetY.value,
-        targetZ: avatarTargetZ.value,
-      });
-    }
-
-    function applyAvatarFields(avatar) {
-      const a = normalizeAvatar(avatar);
-      avatarCameraX.value = a.cameraX;
-      avatarCameraY.value = a.cameraY;
-      avatarCameraZ.value = a.cameraZ;
-      avatarTargetX.value = a.targetX;
-      avatarTargetY.value = a.targetY;
-      avatarTargetZ.value = a.targetZ;
-      window.dispatchEvent(new CustomEvent('avatar-fields-updated', { detail: a }));
-    }
 
     function syncLocalStorage(cfg) {
       if (cfg.apiKey) localStorage.setItem(KEY, cfg.apiKey);
@@ -589,7 +428,6 @@ ${linesText.replace(/</g, '&lt;')}</pre>
         if (v) localStorage.setItem(k, v);
         else localStorage.removeItem(k);
       }
-      localStorage.setItem(AVATAR_KEY, JSON.stringify(normalizeAvatar(cfg.avatar)));
       localStorage.setItem(LIPSYNC_KEY, JSON.stringify(normalizeLipsync(cfg.lipsync)));
     }
 
@@ -598,7 +436,6 @@ ${linesText.replace(/</g, '&lt;')}</pre>
       prompt.value = cfg.instructions ?? '';
       voice.value = cfg.voice ?? '';
       model.value = cfg.model ?? '';
-      applyAvatarFields(cfg.avatar);
       applyLipsyncFields(cfg.lipsync);
       if (cfg.apiKey) {
         status.textContent = 'Settings saved.';
@@ -607,11 +444,7 @@ ${linesText.replace(/</g, '&lt;')}</pre>
     }
 
     function loadFromLocalStorage() {
-      let avatar = DEFAULT_AVATAR;
       let lipsync = DEFAULT_LIPSYNC;
-      try {
-        avatar = normalizeAvatar(JSON.parse(localStorage.getItem(AVATAR_KEY) || '{}'));
-      } catch {}
       try {
         lipsync = normalizeLipsync(JSON.parse(localStorage.getItem(LIPSYNC_KEY) || '{}'));
       } catch {}
@@ -620,7 +453,6 @@ ${linesText.replace(/</g, '&lt;')}</pre>
         instructions: localStorage.getItem(PROMPT_KEY) ?? '',
         voice: localStorage.getItem(VOICE_KEY) ?? '',
         model: localStorage.getItem(MODEL_KEY) ?? '',
-        avatar,
         lipsync,
       });
     }
@@ -639,59 +471,8 @@ ${linesText.replace(/</g, '&lt;')}</pre>
 
     loadConfig();
 
-    async function saveCameraToServer() {
-      const val = input.value.trim();
-      if (!val) {
-        status.textContent = 'Enter an API key first, then save camera settings.';
-        status.className = 'status err';
-        return false;
-      }
-      const payload = {
-        apiKey: val,
-        instructions: prompt.value.trim(),
-        voice: voice.value.trim(),
-        model: model.value.trim(),
-        avatar: readAvatarFromForm(),
-        lipsync: readLipsyncFromForm(),
-      };
-      try {
-        const res = await fetch('/api/config', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          status.textContent = data.error || 'Could not save camera settings.';
-          status.className = 'status err';
-          return false;
-        }
-      } catch {
-        status.textContent = 'Could not reach server. Camera settings not saved.';
-        status.className = 'status err';
-        return false;
-      }
-      syncLocalStorage(payload);
-      status.textContent = 'Camera saved! Reload the voice app to apply.';
-      status.className = 'status ok';
-      return true;
-    }
-
-    btnSaveCamera.addEventListener('click', () => {
-      window.dispatchEvent(new CustomEvent('avatar-save-requested'));
-      saveCameraToServer();
-    });
-
-    btnResetCamera.addEventListener('click', () => {
-      applyAvatarFields(DEFAULT_AVATAR);
-    });
-
     btnResetLipsync.addEventListener('click', () => {
       applyLipsyncFields(DEFAULT_LIPSYNC);
-    });
-
-    btnTestLipsync.addEventListener('click', () => {
-      window.dispatchEvent(new CustomEvent('lipsync-preview-requested'));
     });
 
     document.getElementById('form').onsubmit = async (e) => {
@@ -711,7 +492,6 @@ ${linesText.replace(/</g, '&lt;')}</pre>
         instructions: promptVal,
         voice: voiceVal,
         model: modelVal,
-        avatar: readAvatarFromForm(),
         lipsync: readLipsyncFromForm(),
       };
 
@@ -734,115 +514,9 @@ ${linesText.replace(/</g, '&lt;')}</pre>
       }
 
       syncLocalStorage(payload);
-      status.textContent = 'Saved! Reload the voice app to apply avatar and lipsync changes.';
+      status.textContent = 'Saved! Reload the voice app to apply lipsync changes.';
       status.className = 'status ok';
     };
-  </script>
-  <script type="module">
-    import { TommyAvatar, DEFAULT_AVATAR, DEFAULT_LIPSYNC, normalizeAvatar, normalizeLipsync } from "/visme/avatar.js";
-
-    const canvas = document.getElementById("avatar-preview-canvas");
-    const statusEl = document.getElementById("avatar-preview-status");
-    const fieldIds = [
-      "avatar-camera-x", "avatar-camera-y", "avatar-camera-z",
-      "avatar-target-x", "avatar-target-y", "avatar-target-z",
-    ];
-    const keys = ["cameraX", "cameraY", "cameraZ", "targetX", "targetY", "targetZ"];
-
-    let previewAvatar = null;
-    let syncingFromPreview = false;
-
-    function readFieldsFromDom() {
-      const raw = {};
-      keys.forEach((key, i) => {
-        raw[key] = document.getElementById(fieldIds[i]).value;
-      });
-      return normalizeAvatar(raw);
-    }
-
-    function writeFieldsToDom(settings) {
-      const av = normalizeAvatar(settings);
-      syncingFromPreview = true;
-      keys.forEach((key, i) => {
-        document.getElementById(fieldIds[i]).value = av[key];
-      });
-      syncingFromPreview = false;
-    }
-
-    function bindFieldInputs() {
-      for (const id of fieldIds) {
-        document.getElementById(id).addEventListener("input", () => {
-          if (syncingFromPreview || !previewAvatar) return;
-          previewAvatar.applyCameraSettings(readFieldsFromDom());
-        });
-      }
-    }
-
-    window.addEventListener("avatar-fields-updated", (e) => {
-      if (!previewAvatar || syncingFromPreview) return;
-      previewAvatar.applyCameraSettings(e.detail);
-    });
-
-    window.addEventListener("avatar-save-requested", () => {
-      if (previewAvatar) writeFieldsToDom(previewAvatar.getCameraSettings());
-    });
-
-    window.addEventListener("lipsync-fields-updated", (e) => {
-      if (!previewAvatar) return;
-      previewAvatar.applyLipsyncSettings(e.detail);
-    });
-
-    window.addEventListener("lipsync-preview-requested", () => {
-      if (!previewAvatar?.loaded) {
-        statusEl.textContent = "Avatar not ready for lipsync preview.";
-        return;
-      }
-      previewAvatar.applyLipsyncSettings(readLipsyncFromDom());
-      previewAvatar.playLipsyncPreview("Hello from Visme");
-    });
-
-    function readLipsyncFromDom() {
-      return normalizeLipsync({
-        exaggerate: document.getElementById("lipsync-exaggerate").value,
-        msPerPhone: document.getElementById("lipsync-speed").value,
-        crossfadeMs: document.getElementById("lipsync-crossfade").value,
-      });
-    }
-
-    function writeLipsyncToDom(lipsync) {
-      const l = normalizeLipsync(lipsync);
-      document.getElementById("lipsync-exaggerate").value = l.exaggerate;
-      document.getElementById("lipsync-speed").value = l.msPerPhone;
-      document.getElementById("lipsync-crossfade").value = l.crossfadeMs;
-      window.dispatchEvent(new CustomEvent("lipsync-labels-sync"));
-    }
-
-    async function initPreview() {
-      bindFieldInputs();
-      let av = DEFAULT_AVATAR;
-      let lipsync = DEFAULT_LIPSYNC;
-      try {
-        const res = await fetch("/api/config");
-        if (res.ok) {
-          const cfg = await res.json();
-          av = normalizeAvatar(cfg.avatar);
-          lipsync = normalizeLipsync(cfg.lipsync);
-          writeFieldsToDom(av);
-          writeLipsyncToDom(lipsync);
-        }
-      } catch {}
-
-      previewAvatar = new TommyAvatar(canvas, { ...av, lipsync });
-      previewAvatar.onStatus = (msg) => { statusEl.textContent = msg; };
-      previewAvatar.onCameraChange = (settings) => {
-        if (syncingFromPreview) return;
-        writeFieldsToDom(settings);
-      };
-      await previewAvatar.load();
-      previewAvatar.refreshAfterVisible();
-    }
-
-    initPreview();
   </script>
 </body>
 </html>

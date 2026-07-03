@@ -138,12 +138,15 @@ const server = createServer((req, res) => {
           sendJson(res, 400, { error: 'API key is required.' });
           return;
         }
+        const existing = loadConfig();
         saveConfig({
           apiKey,
           instructions: parsed.instructions?.trim() || '',
           voice: parsed.voice?.trim() || '',
           model: parsed.model?.trim() || '',
-          avatar: normalizeAvatar(parsed.avatar),
+          avatar: parsed.avatar != null
+            ? normalizeAvatar(parsed.avatar)
+            : normalizeAvatar(existing.avatar),
           lipsync: normalizeLipsync(parsed.lipsync),
         });
         sendJson(res, 200, { ok: true });
