@@ -439,8 +439,42 @@
     let goodbyeNudged = false;
     const pendingFunctionCalls = new Map();
 
+    // Client-side fallback: Inworld's idle_timeout_ms is not firing, so we
+    // nudge the AI ourselves after the user stays silent post-response.
     const IDLE_NUDGE_MS = 15000;
+    const MAX_IDLE_NUDGES = 2;
     let idleNudgeTimer = null;
+    let idleNudgeCount = 0;
+
+    function cancelIdleNudge() {
+      if (idleNudgeTimer) { clearTimeout(idleNudgeTimer); idleNudgeTimer = null; }
+    }
+
+    function scheduleIdleNudge() {
+      cancelIdleNudge();
+      if (!active || pendingEndConversation || ws?.readyState !== WebSocket.OPEN) return;
+      if (idleNudgeCount >= MAX_IDLE_NUDGES) {
+        uiLog("idle", `nudge cap reached (${MAX_IDLE_NUDGES}) — not rescheduling`, "warn");
+        return;
+      }
+      idleNudgeTimer = setTimeout(() => {
+        idleNudgeTimer = null;
+        if (!active || pendingEndConversation || ws?.readyState !== WebSocket.OPEN) return;
+        if (playing || queue.length > 0) return;
+        idleNudgeCount++;
+        uiLog("idle", `user silent ${IDLE_NUDGE_MS / 1000}s → nudge #${idleNudgeCount}`, "hello");
+        setStatus("No speech detected — Uncle Tommy is checking in", true);
+        ws.send(JSON.stringify({
+          type: "conversation.item.create",
+          item: {
+            type: "message",
+            role: "user",
+            content: [{ type: "input_text", text: "[The user has been silent for 15 seconds. Briefly and warmly check in and encourage them to keep talking.]" }],
+          },
+        }));
+        ws.send(JSON.stringify({ type: "response.create" }));
+      }, IDLE_NUDGE_MS);
+    }
 
     function wsStateLabel() {
       if (!ws) return "null";
@@ -698,7 +732,8 @@
       pendingEndConversation = false;
       pendingFunctionCalls.clear();
       goodbyeNudged = false;
-      clearIdleNudge();
+      cancelIdleNudge();
+      idleNudgeCount = 0;
       if (endConversationCloseTimer) {
         clearTimeout(endConversationCloseTimer);
         endConversationCloseTimer = null;
@@ -807,30 +842,6 @@
       ws.send(JSON.stringify({ type: "response.create" }));
     }
 
-    function clearIdleNudge() {
-      if (idleNudgeTimer) { clearTimeout(idleNudgeTimer); idleNudgeTimer = null; }
-    }
-
-    function scheduleIdleNudge() {
-      clearIdleNudge();
-      if (!active || pendingEndConversation || ws?.readyState !== WebSocket.OPEN) return;
-      idleNudgeTimer = setTimeout(() => {
-        idleNudgeTimer = null;
-        if (!active || pendingEndConversation || ws?.readyState !== WebSocket.OPEN) return;
-        if (playing || queue.length > 0) { scheduleIdleNudge(); return; }
-        uiLog("idle", "user silent 15s → nudge Uncle Tommy to check in", "hello");
-        ws.send(JSON.stringify({
-          type: "conversation.item.create",
-          item: {
-            type: "message",
-            role: "user",
-            content: [{ type: "input_text", text: "[The user has been silent for a while. Give a single brief, friendly check-in or prompt to keep the conversation going. Do not repeat yourself.]" }],
-          },
-        }));
-        ws.send(JSON.stringify({ type: "response.create" }));
-      }, IDLE_NUDGE_MS);
-    }
-
     function hideFootballIcon() {
       footballEl.classList.remove("visible");
       if (footballHideTimer) { clearTimeout(footballHideTimer); footballHideTimer = null; }
@@ -876,7 +887,6 @@
     function beginAvatarSpeech() {
       if (speechStarted || !avatar) return;
       speechStarted = true;
-      clearIdleNudge();
       speechPlaybackStart = Math.max(ctx.currentTime, nextPlayTime);
       syncLipsyncTimeline();
       avatar.beginSpeech();
@@ -889,7 +899,6 @@
         stopLipsyncClock();
         avatar.endSpeech();
         speechStarted = false;
-        scheduleIdleNudge();
       }
     }
 
@@ -1241,6 +1250,7 @@
         if (e.response_id) handleNewResponse(e.response_id);
 
         if (e.type === "response.created") {
+          cancelIdleNudge();
           handleNewResponse(e.response?.id || e.response_id);
         }
 
@@ -1272,7 +1282,8 @@
           avatar?.refreshAfterVisible();
         } else if (e.type === "input_audio_buffer.speech_started") {
           goodbyeNudged = false;
-          clearIdleNudge();
+          idleNudgeCount = 0;
+          cancelIdleNudge();
           stopAudio();
           stopAvatarSpeech();
           resetResponseState(null);
@@ -1282,10 +1293,12 @@
           audioDone = true;
           maybeEndAvatarSpeech();
           closeAfterToolEnd();
+          if (!playing && queue.length === 0) scheduleIdleNudge();
         } else if (e.type === "response.done") {
           audioDone = true;
           maybeEndAvatarSpeech();
           closeAfterToolEnd();
+          if (!playing && queue.length === 0) scheduleIdleNudge();
         } else if (e.type === "response.function_call_arguments.done") {
           handleFunctionCall(e);
         }
@@ -1317,6 +1330,7 @@
         playing = false;
         maybeEndAvatarSpeech();
         closeAfterToolEnd();
+        if (audioDone) scheduleIdleNudge();
         return;
       }
 
