@@ -328,9 +328,19 @@ function connectToInworld(apiKey, browser, session) {
     try { parsed = JSON.parse(raw.toString()); } catch { parsed = null; }
     const t = parsed?.type;
     if (setup < 2) {
-      if (t === 'session.created') { console.log('[session.created] sending session.update'); api.send(sessionCfg); setup = 1; }
-      else if (t === 'session.updated' && setup === 1) { console.log('[session.updated] sending greet + response.create'); api.send(GREET); api.send('{"type":"response.create"}'); setup = 2; }
+      if (t === 'session.created') {
+        console.log('[session.created] sending session.update:', sessionCfg);
+        api.send(sessionCfg);
+        setup = 1;
+      }
+      else if (t === 'session.updated' && setup === 1) {
+        console.log('[session.updated] config accepted; sending greet + response.create');
+        api.send(GREET); api.send('{"type":"response.create"}'); setup = 2;
+      }
       else if (t === 'error' || t === 'session.error') { console.error('[setup error]', raw.toString()); }
+    } else {
+      if (t === 'error' || t === 'session.error') console.error('[inworld error]', raw.toString());
+      if (t === 'input_audio_buffer.timeout_triggered') console.log('[IDLE TIMEOUT] user silent — nudge should follow:', raw.toString());
     }
     if (t && t !== 'response.output_audio.delta') console.log('[inworld ->]', t);
     if (t === 'response.function_call_arguments.done') {

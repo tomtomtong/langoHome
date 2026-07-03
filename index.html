@@ -439,6 +439,9 @@
     let goodbyeNudged = false;
     const pendingFunctionCalls = new Map();
 
+    const IDLE_NUDGE_MS = 15000;
+    let idleNudgeTimer = null;
+
     function wsStateLabel() {
       if (!ws) return "null";
       return ["CONNECTING", "OPEN", "CLOSING", "CLOSED"][ws.readyState] ?? String(ws.readyState);
@@ -695,6 +698,7 @@
       pendingEndConversation = false;
       pendingFunctionCalls.clear();
       goodbyeNudged = false;
+      clearIdleNudge();
       if (endConversationCloseTimer) {
         clearTimeout(endConversationCloseTimer);
         endConversationCloseTimer = null;
@@ -803,6 +807,30 @@
       ws.send(JSON.stringify({ type: "response.create" }));
     }
 
+    function clearIdleNudge() {
+      if (idleNudgeTimer) { clearTimeout(idleNudgeTimer); idleNudgeTimer = null; }
+    }
+
+    function scheduleIdleNudge() {
+      clearIdleNudge();
+      if (!active || pendingEndConversation || ws?.readyState !== WebSocket.OPEN) return;
+      idleNudgeTimer = setTimeout(() => {
+        idleNudgeTimer = null;
+        if (!active || pendingEndConversation || ws?.readyState !== WebSocket.OPEN) return;
+        if (playing || queue.length > 0) { scheduleIdleNudge(); return; }
+        uiLog("idle", "user silent 15s → nudge Uncle Tommy to check in", "hello");
+        ws.send(JSON.stringify({
+          type: "conversation.item.create",
+          item: {
+            type: "message",
+            role: "user",
+            content: [{ type: "input_text", text: "[The user has been silent for a while. Give a single brief, friendly check-in or prompt to keep the conversation going. Do not repeat yourself.]" }],
+          },
+        }));
+        ws.send(JSON.stringify({ type: "response.create" }));
+      }, IDLE_NUDGE_MS);
+    }
+
     function hideFootballIcon() {
       footballEl.classList.remove("visible");
       if (footballHideTimer) { clearTimeout(footballHideTimer); footballHideTimer = null; }
@@ -848,6 +876,7 @@
     function beginAvatarSpeech() {
       if (speechStarted || !avatar) return;
       speechStarted = true;
+      clearIdleNudge();
       speechPlaybackStart = Math.max(ctx.currentTime, nextPlayTime);
       syncLipsyncTimeline();
       avatar.beginSpeech();
@@ -860,6 +889,7 @@
         stopLipsyncClock();
         avatar.endSpeech();
         speechStarted = false;
+        scheduleIdleNudge();
       }
     }
 
@@ -1242,6 +1272,7 @@
           avatar?.refreshAfterVisible();
         } else if (e.type === "input_audio_buffer.speech_started") {
           goodbyeNudged = false;
+          clearIdleNudge();
           stopAudio();
           stopAvatarSpeech();
           resetResponseState(null);
