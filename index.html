@@ -12,7 +12,8 @@
         "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
         "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/",
         "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.3.4/lib/three-vrm.module.js",
-        "@pixiv/three-vrm-animation": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm-animation@3.3.4/lib/three-vrm-animation.module.js"
+        "@pixiv/three-vrm-animation": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm-animation@3.3.4/lib/three-vrm-animation.module.js",
+        "vrm-mixamo-retarget": "https://cdn.jsdelivr.net/npm/vrm-mixamo-retarget@1.0.3/dist/index.esm.js"
       }
     }
   </script>
@@ -247,6 +248,7 @@
     }
 
     #btn-save-camera {
+      display: none;
       padding: 0.35rem 0.65rem;
       font-size: 0.75rem;
       background: rgba(255, 255, 255, 0.1);
@@ -254,13 +256,26 @@
       backdrop-filter: blur(8px);
     }
 
+    body.camera-edit-mode #btn-save-camera {
+      display: inline-block;
+    }
+
+    body.camera-edit-mode #avatar-status {
+      color: #c4c7c5;
+    }
+
     #btn-save-camera:hover:not(:disabled) { background: rgba(255, 255, 255, 0.18); }
 
     #camera-save-status {
+      display: none;
       font-size: 0.6875rem;
       color: #81c995;
       min-width: 4rem;
       text-align: right;
+    }
+
+    body.camera-edit-mode #camera-save-status {
+      display: block;
     }
 
     #camera-save-status.err { color: #f28b82; }
@@ -332,7 +347,7 @@
 
     <div id="session-overlay">
       <div class="overlay-top">
-        <span id="avatar-status">Drag to position · pinch to scale</span>
+        <span id="avatar-status"></span>
         <div class="overlay-top-actions">
           <span id="camera-save-status" aria-live="polite"></span>
           <button id="btn-save-camera" type="button">Save camera</button>
@@ -381,6 +396,11 @@
 
     let avatar = null;
     let avatarLoading = null;
+    let cameraEditMode = false;
+    let avatarReadyMessage = "";
+    let tripleClickCount = 0;
+    let tripleClickTimer = null;
+    const TRIPLE_CLICK_MS = 500;
     let footballHideTimer = null;
     let ws, ctx, src, proc, source, stream;
     let active = false, inSession = false, playing = false, nextPlayTime = 0;
@@ -559,15 +579,58 @@
 
     btnSaveCamera.addEventListener("click", saveCameraSettings);
 
+    function updateAvatarStatusDisplay() {
+      if (cameraEditMode) {
+        avatarStatusEl.textContent = "Camera edit · drag to position · pinch to scale";
+      } else if (avatarReadyMessage) {
+        avatarStatusEl.textContent = avatarReadyMessage;
+      } else {
+        avatarStatusEl.textContent = "";
+      }
+    }
+
+    function setCameraEditMode(enabled) {
+      cameraEditMode = enabled;
+      document.body.classList.toggle("camera-edit-mode", enabled);
+      avatar?.setInteractiveCamera(enabled);
+      if (!enabled) cameraSaveStatusEl.textContent = "";
+      updateAvatarStatusDisplay();
+    }
+
+    function handleTripleClick() {
+      setCameraEditMode(!cameraEditMode);
+    }
+
+    function onAvatarStageClick(e) {
+      if (e?.target?.closest?.("button, a, input, select, textarea")) return;
+      tripleClickCount += 1;
+      clearTimeout(tripleClickTimer);
+      if (tripleClickCount >= 3) {
+        tripleClickCount = 0;
+        handleTripleClick();
+        return;
+      }
+      tripleClickTimer = setTimeout(() => {
+        tripleClickCount = 0;
+      }, TRIPLE_CLICK_MS);
+    }
+
+    document.getElementById("session-overlay").addEventListener("click", onAvatarStageClick);
+    document.getElementById("vrm-canvas").addEventListener("click", onAvatarStageClick);
+
     async function ensureAvatar() {
       if (avatar) return avatar;
       if (avatarLoading) return avatarLoading;
       avatarLoading = (async () => {
         const cfg = await getConfig();
         const av = normalizeAvatar(cfg.avatar);
-        avatar = new TommyAvatar(document.getElementById("vrm-canvas"), av);
+        avatar = new TommyAvatar(document.getElementById("vrm-canvas"), {
+          ...av,
+          interactiveCamera: false,
+        });
         avatar.onStatus = (msg) => {
-          avatarStatusEl.textContent = msg === "Avatar ready" ? `${msg} · drag to position, pinch to scale` : msg;
+          avatarReadyMessage = msg === "Avatar ready" ? "" : msg;
+          updateAvatarStatusDisplay();
         };
         await avatar.load();
         return avatar;
@@ -601,6 +664,7 @@
     function exitSessionView() {
       if (!inSession) return;
       inSession = false;
+      setCameraEditMode(false);
       document.body.classList.remove("in-session");
       try { screen.orientation?.unlock?.(); } catch {}
     }

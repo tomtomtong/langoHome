@@ -30,6 +30,7 @@ const MIME = {
   '.css': 'text/css; charset=utf-8',
   '.vrm': 'model/gltf-binary',
   '.vrma': 'model/gltf-binary',
+  '.fbx': 'application/octet-stream',
 };
 
 function loadConfig() {

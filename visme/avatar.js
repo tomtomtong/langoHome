@@ -3,6 +3,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
 import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from "@pixiv/three-vrm-animation";
 import { LipsyncPlayer } from "./lipsync.js";
+import { loadMixamoIdleClip } from "./mixamo-idle.js";
 
 // Default framing — face/upper body centered higher in the viewport.
 export const DEFAULT_AVATAR = {
@@ -37,7 +38,7 @@ export function normalizeAvatar(raw) {
 export class TommyAvatar {
   constructor(canvas, {
     vrmUrl = "/visme/Tommyv4.vrm",
-    idleAnimationUrl = "/visme/idle.vrma",
+    idleAnimationUrl = "/visme/Idle.fbx",
     interactiveCamera = true,
     ...settings
   } = {}) {
@@ -85,7 +86,7 @@ export class TommyAvatar {
     dir.position.set(1, 2, 2);
     this.scene.add(dir);
 
-    if (interactiveCamera) this._bindFramingGestures();
+    this._bindFramingGestures();
 
     this.lastFrameT = performance.now();
     this._onResize = () => this._resize();
@@ -96,6 +97,16 @@ export class TommyAvatar {
 
   setStatus(msg) {
     if (this.onStatus) this.onStatus(msg);
+  }
+
+  setInteractiveCamera(enabled) {
+    this.interactiveCamera = !!enabled;
+    if (!this.interactiveCamera) {
+      this._pointers.clear();
+      this._pan.active = false;
+      this._pinch.active = false;
+      this._pinch.lastDistance = 0;
+    }
   }
 
   _emitCameraChange() {
@@ -237,18 +248,30 @@ export class TommyAvatar {
   async _loadIdleAnimation(vrm) {
     if (!this.idleAnimationUrl) return;
 
-    const loader = new GLTFLoader();
-    loader.register((parser) => new VRMAnimationLoaderPlugin(parser));
-
     try {
-      const vrmaGltf = await loader.loadAsync(this.idleAnimationUrl);
-      const vrmAnimation = vrmaGltf.userData.vrmAnimations?.[0];
-      if (!vrmAnimation) {
-        console.warn("No VRMA animation data found in", this.idleAnimationUrl);
+      const url = this.idleAnimationUrl;
+      const isFbx = url.toLowerCase().endsWith(".fbx");
+      let clip = null;
+
+      if (isFbx) {
+        clip = await loadMixamoIdleClip(url, vrm);
+      } else {
+        const loader = new GLTFLoader();
+        loader.register((parser) => new VRMAnimationLoaderPlugin(parser));
+        const vrmaGltf = await loader.loadAsync(url);
+        const vrmAnimation = vrmaGltf.userData.vrmAnimations?.[0];
+        if (!vrmAnimation) {
+          console.warn("No VRMA animation data found in", url);
+          return;
+        }
+        clip = createVRMAnimationClip(vrmAnimation, vrm);
+      }
+
+      if (!clip) {
+        console.warn("Failed to create idle animation clip from", url);
         return;
       }
 
-      const clip = createVRMAnimationClip(vrmAnimation, vrm);
       this.mixer = new THREE.AnimationMixer(vrm.scene);
       this.idleAction = this.mixer.clipAction(clip);
       this.idleAction.setLoop(THREE.LoopRepeat);
