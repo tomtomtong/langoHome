@@ -29,6 +29,7 @@ const MIME = {
   '.json': 'application/json; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.vrm': 'model/gltf-binary',
+  '.vrma': 'model/gltf-binary',
 };
 
 function loadConfig() {

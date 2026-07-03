@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
+import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from "@pixiv/three-vrm-animation";
 import { LipsyncPlayer } from "./lipsync.js";
 
 // Default framing — face/upper body centered higher in the viewport.
@@ -36,14 +37,18 @@ export function normalizeAvatar(raw) {
 export class TommyAvatar {
   constructor(canvas, {
     vrmUrl = "/visme/Tommyv4.vrm",
+    idleAnimationUrl = "/visme/idle.vrma",
     interactiveCamera = true,
     ...settings
   } = {}) {
     const av = normalizeAvatar(settings);
     this.canvas = canvas;
     this.vrmUrl = vrmUrl;
+    this.idleAnimationUrl = idleAnimationUrl;
     this.morphMeshes = [];
     this.lipsync = null;
+    this.mixer = null;
+    this.idleAction = null;
     this.loaded = false;
     this.speaking = false;
     this.speechElapsedMs = 0;
@@ -229,6 +234,30 @@ export class TommyAvatar {
     canvas.addEventListener("wheel", this._onWheel, { passive: false });
   }
 
+  async _loadIdleAnimation(vrm) {
+    if (!this.idleAnimationUrl) return;
+
+    const loader = new GLTFLoader();
+    loader.register((parser) => new VRMAnimationLoaderPlugin(parser));
+
+    try {
+      const vrmaGltf = await loader.loadAsync(this.idleAnimationUrl);
+      const vrmAnimation = vrmaGltf.userData.vrmAnimations?.[0];
+      if (!vrmAnimation) {
+        console.warn("No VRMA animation data found in", this.idleAnimationUrl);
+        return;
+      }
+
+      const clip = createVRMAnimationClip(vrmAnimation, vrm);
+      this.mixer = new THREE.AnimationMixer(vrm.scene);
+      this.idleAction = this.mixer.clipAction(clip);
+      this.idleAction.setLoop(THREE.LoopRepeat);
+      this.idleAction.play();
+    } catch (e) {
+      console.warn("Failed to load idle animation:", e);
+    }
+  }
+
   async load() {
     this.setStatus("Loading Tommyv4.vrm…");
 
@@ -260,6 +289,7 @@ export class TommyAvatar {
       }
 
       this.lipsync = new LipsyncPlayer(this.morphMeshes);
+      await this._loadIdleAnimation(vrm);
       this.loaded = true;
       this.setStatus("Avatar ready");
       return true;
@@ -342,6 +372,10 @@ export class TommyAvatar {
       this.lipsync.update(this.speechElapsedMs);
     }
 
+    if (this.mixer) {
+      this.mixer.update(dtSec);
+    }
+
     if (this.vrm) {
       this.vrm.update(dtSec);
     }
@@ -359,5 +393,7 @@ export class TommyAvatar {
       this.canvas.removeEventListener("wheel", this._onWheel);
     }
     this.lipsync?.stop();
+    this.idleAction?.stop();
+    this.mixer?.stopAllAction();
   }
 }
