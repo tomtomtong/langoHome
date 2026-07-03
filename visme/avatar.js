@@ -13,12 +13,9 @@ export const DEFAULT_AVATAR = {
   targetZ: 0,
 };
 
-const CAMERA_Y_MIN = 0.4;
-const CAMERA_Y_MAX = 2.8;
-const CAMERA_Z_MIN = 0.8;
-const CAMERA_Z_MAX = 3.5;
-const HEIGHT_DRAG_SENSITIVITY = 0.004;
-const ZOOM_WHEEL_SENSITIVITY = 0.002;
+const DISTANCE_MIN = 0.8;
+const DISTANCE_MAX = 3.5;
+const ZOOM_WHEEL_SENSITIVITY = 0.0012;
 
 export function normalizeAvatar(raw) {
   const a = raw && typeof raw === "object" ? raw : {};
@@ -67,7 +64,15 @@ export class TommyAvatar {
     this.camera = new THREE.PerspectiveCamera(30, w / h, 0.1, 100);
     this.lookAtTarget = new THREE.Vector3(av.targetX, av.targetY, av.targetZ);
     this.interactiveCamera = interactiveCamera;
-    this._heightDrag = { active: false, lastY: 0 };
+    this._pointers = new Map();
+    this._pan = { active: false, lastX: 0, lastY: 0 };
+    this._pinch = { active: false, lastDistance: 0 };
+    this._scratch = {
+      forward: new THREE.Vector3(),
+      right: new THREE.Vector3(),
+      up: new THREE.Vector3(),
+      offset: new THREE.Vector3(),
+    };
     this.applyCameraSettings(av);
 
     this.scene.add(new THREE.HemisphereLight(0xffffff, 0x444466, 1.1));
@@ -75,7 +80,7 @@ export class TommyAvatar {
     dir.position.set(1, 2, 2);
     this.scene.add(dir);
 
-    if (interactiveCamera) this._bindHeightDrag();
+    if (interactiveCamera) this._bindFramingGestures();
 
     this.lastFrameT = performance.now();
     this._onResize = () => this._resize();
@@ -96,46 +101,124 @@ export class TommyAvatar {
     this.camera.lookAt(this.lookAtTarget);
   }
 
-  _bindHeightDrag() {
+  _cameraDistance() {
+    return this.camera.position.distanceTo(this.lookAtTarget);
+  }
+
+  _panSensitivity() {
+    const h = Math.max(1, this.canvas.clientHeight || 1);
+    const fovRad = (this.camera.fov * Math.PI) / 180;
+    return (this._cameraDistance() * Math.tan(fovRad / 2) * 2) / h;
+  }
+
+  _panByScreenDelta(deltaX, deltaY) {
+    const sens = this._panSensitivity();
+    const { forward, right, up, offset } = this._scratch;
+
+    this.camera.getWorldDirection(forward);
+    right.crossVectors(forward, this.camera.up).normalize();
+    up.copy(this.camera.up).normalize();
+
+    offset.copy(right).multiplyScalar(-deltaX * sens);
+    offset.addScaledVector(up, deltaY * sens);
+
+    this.camera.position.add(offset);
+    this.lookAtTarget.add(offset);
+    this._syncCameraLookAt();
+  }
+
+  _zoomByFactor(factor) {
+    const { offset } = this._scratch;
+    offset.subVectors(this.camera.position, this.lookAtTarget);
+    const distance = THREE.MathUtils.clamp(
+      offset.length() * factor,
+      DISTANCE_MIN,
+      DISTANCE_MAX,
+    );
+    offset.normalize().multiplyScalar(distance);
+    this.camera.position.copy(this.lookAtTarget).add(offset);
+    this._syncCameraLookAt();
+  }
+
+  _pinchDistance() {
+    const pts = [...this._pointers.values()];
+    if (pts.length < 2) return 0;
+    const dx = pts[1].x - pts[0].x;
+    const dy = pts[1].y - pts[0].y;
+    return Math.hypot(dx, dy);
+  }
+
+  _bindFramingGestures() {
     const canvas = this.canvas;
 
     this._onPointerDown = (e) => {
       if (!this.interactiveCamera) return;
-      this._heightDrag.active = true;
-      this._heightDrag.lastY = e.clientY;
+      this._pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      if (this._pointers.size === 1) {
+        this._pan.active = true;
+        this._pan.lastX = e.clientX;
+        this._pan.lastY = e.clientY;
+      } else if (this._pointers.size === 2) {
+        this._pan.active = false;
+        this._pinch.active = true;
+        this._pinch.lastDistance = this._pinchDistance();
+      }
+
       canvas.setPointerCapture(e.pointerId);
     };
 
     this._onPointerMove = (e) => {
-      if (!this._heightDrag.active) return;
-      const deltaY = e.clientY - this._heightDrag.lastY;
-      this._heightDrag.lastY = e.clientY;
-      this.camera.position.y = THREE.MathUtils.clamp(
-        this.camera.position.y - deltaY * HEIGHT_DRAG_SENSITIVITY,
-        CAMERA_Y_MIN,
-        CAMERA_Y_MAX,
-      );
-      this._syncCameraLookAt();
-      this._emitCameraChange();
+      if (!this.interactiveCamera || !this._pointers.has(e.pointerId)) return;
+      this._pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      if (this._pointers.size >= 2 && this._pinch.active) {
+        const dist = this._pinchDistance();
+        if (this._pinch.lastDistance > 0 && dist > 0) {
+          this._zoomByFactor(this._pinch.lastDistance / dist);
+        }
+        this._pinch.lastDistance = dist;
+        this._emitCameraChange();
+        return;
+      }
+
+      if (this._pointers.size === 1 && this._pan.active) {
+        const deltaX = e.clientX - this._pan.lastX;
+        const deltaY = e.clientY - this._pan.lastY;
+        this._pan.lastX = e.clientX;
+        this._pan.lastY = e.clientY;
+        if (deltaX !== 0 || deltaY !== 0) {
+          this._panByScreenDelta(deltaX, deltaY);
+          this._emitCameraChange();
+        }
+      }
     };
 
     this._onPointerUp = (e) => {
-      if (!this._heightDrag.active) return;
-      this._heightDrag.active = false;
+      this._pointers.delete(e.pointerId);
       try {
         canvas.releasePointerCapture(e.pointerId);
       } catch {}
+
+      if (this._pointers.size < 2) {
+        this._pinch.active = false;
+        this._pinch.lastDistance = 0;
+      }
+
+      if (this._pointers.size === 1) {
+        const pt = [...this._pointers.values()][0];
+        this._pan.active = true;
+        this._pan.lastX = pt.x;
+        this._pan.lastY = pt.y;
+      } else {
+        this._pan.active = false;
+      }
     };
 
     this._onWheel = (e) => {
       if (!this.interactiveCamera) return;
       e.preventDefault();
-      this.camera.position.z = THREE.MathUtils.clamp(
-        this.camera.position.z + e.deltaY * ZOOM_WHEEL_SENSITIVITY,
-        CAMERA_Z_MIN,
-        CAMERA_Z_MAX,
-      );
-      this._syncCameraLookAt();
+      this._zoomByFactor(1 + e.deltaY * ZOOM_WHEEL_SENSITIVITY);
       this._emitCameraChange();
     };
 

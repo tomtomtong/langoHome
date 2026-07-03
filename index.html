@@ -331,7 +331,7 @@
 
     <div id="session-overlay">
       <div class="overlay-top">
-        <span id="avatar-status">Drag up/down to adjust camera height</span>
+        <span id="avatar-status">Drag to position · pinch to scale</span>
         <div class="overlay-top-actions">
           <span id="camera-save-status" aria-live="polite"></span>
           <button id="btn-save-camera" type="button">Save camera</button>
@@ -566,7 +566,7 @@
         const av = normalizeAvatar(cfg.avatar);
         avatar = new TommyAvatar(document.getElementById("vrm-canvas"), av);
         avatar.onStatus = (msg) => {
-          avatarStatusEl.textContent = msg === "Avatar ready" ? `${msg} · drag up/down for height` : msg;
+          avatarStatusEl.textContent = msg === "Avatar ready" ? `${msg} · drag to position, pinch to scale` : msg;
         };
         await avatar.load();
         return avatar;
