@@ -194,9 +194,12 @@ const DEFAULT_INSTRUCTIONS = 'You are Uncle Tommy, a friendly voice assistant. K
 const DEFAULT_MODEL = 'openai/gpt-4o-mini';
 
 const DEFAULT_AVATAR = {
+  cameraX: 0,
   cameraY: 1.3,
   cameraZ: 1.6,
+  targetX: 0,
   targetY: 1.42,
+  targetZ: 0,
 };
 
 function parseAvatarNumber(value, fallback) {
@@ -207,9 +210,12 @@ function parseAvatarNumber(value, fallback) {
 function normalizeAvatar(raw) {
   const a = raw && typeof raw === 'object' ? raw : {};
   return {
+    cameraX: parseAvatarNumber(a.cameraX, DEFAULT_AVATAR.cameraX),
     cameraY: parseAvatarNumber(a.cameraY, DEFAULT_AVATAR.cameraY),
     cameraZ: parseAvatarNumber(a.cameraZ, DEFAULT_AVATAR.cameraZ),
+    targetX: parseAvatarNumber(a.targetX, DEFAULT_AVATAR.targetX),
     targetY: parseAvatarNumber(a.targetY, DEFAULT_AVATAR.targetY),
+    targetZ: parseAvatarNumber(a.targetZ, DEFAULT_AVATAR.targetZ),
   };
 }
 

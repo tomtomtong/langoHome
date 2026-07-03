@@ -239,6 +239,31 @@
       text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
     }
 
+    .overlay-top-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    #btn-save-camera {
+      padding: 0.35rem 0.65rem;
+      font-size: 0.75rem;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(8px);
+    }
+
+    #btn-save-camera:hover:not(:disabled) { background: rgba(255, 255, 255, 0.18); }
+
+    #camera-save-status {
+      font-size: 0.6875rem;
+      color: #81c995;
+      min-width: 4rem;
+      text-align: right;
+    }
+
+    #camera-save-status.err { color: #f28b82; }
+
     a {
       color: #9aa0a6;
       font-size: 0.8125rem;
@@ -306,8 +331,12 @@
 
     <div id="session-overlay">
       <div class="overlay-top">
-        <span id="avatar-status"></span>
-        <a href="/config">Settings</a>
+        <span id="avatar-status">Drag canvas to adjust camera</span>
+        <div class="overlay-top-actions">
+          <span id="camera-save-status" aria-live="polite"></span>
+          <button id="btn-save-camera" type="button">Save camera</button>
+          <a href="/config">Settings</a>
+        </div>
       </div>
       <div class="football-wrap">
         <div id="football-icon" aria-hidden="true" title="Football mentioned">⚽</div>
@@ -321,14 +350,13 @@
   </div>
 
   <script type="module">
-    import { TommyAvatar } from "/visme/avatar.js";
+    import { TommyAvatar, normalizeAvatar, DEFAULT_AVATAR } from "/visme/avatar.js";
 
     const KEY = "inworld_api_key";
     const PROMPT_KEY = "inworld_system_prompt";
     const VOICE_KEY = "inworld_voice_id";
     const MODEL_KEY = "inworld_model";
     const AVATAR_KEY = "inworld_avatar";
-    const DEFAULT_AVATAR = { cameraY: 1.3, cameraZ: 1.6, targetY: 1.42 };
     const DEFAULT_PROMPT = "You are Uncle Tommy, a friendly voice assistant. Keep responses brief.";
     const DEFAULT_VOICE = "default-zylgts2tamenvybeti3z0w__uncle_tommy";
     const DEFAULT_MODEL = "openai/gpt-4o-mini";
@@ -341,6 +369,8 @@
     const errIdleEl = document.getElementById("err-idle");
     const footballEl = document.getElementById("football-icon");
     const avatarStatusEl = document.getElementById("avatar-status");
+    const btnSaveCamera = document.getElementById("btn-save-camera");
+    const cameraSaveStatusEl = document.getElementById("camera-save-status");
     const btnSendLog = document.getElementById("btn-send-log");
     const debugUploadStatusEl = document.getElementById("debug-upload-status");
     const SHOW_FOOTBALL_ICON = "show_football_icon";
@@ -469,19 +499,6 @@
       statusIdleEl.textContent = msg;
     }
 
-    function normalizeAvatar(raw) {
-      const a = raw && typeof raw === "object" ? raw : {};
-      const num = (v, fallback) => {
-        const n = Number(v);
-        return Number.isFinite(n) ? n : fallback;
-      };
-      return {
-        cameraY: num(a.cameraY, DEFAULT_AVATAR.cameraY),
-        cameraZ: num(a.cameraZ, DEFAULT_AVATAR.cameraZ),
-        targetY: num(a.targetY, DEFAULT_AVATAR.targetY),
-      };
-    }
-
     function loadAvatarFromLocalStorage() {
       try {
         return normalizeAvatar(JSON.parse(localStorage.getItem(AVATAR_KEY) || "{}"));
@@ -490,6 +507,57 @@
       }
     }
 
+    async function saveCameraSettings() {
+      if (!avatar?.loaded) {
+        cameraSaveStatusEl.textContent = "Avatar not ready";
+        cameraSaveStatusEl.className = "err";
+        return;
+      }
+      const cameraSettings = normalizeAvatar(avatar.getCameraSettings());
+      btnSaveCamera.disabled = true;
+      cameraSaveStatusEl.textContent = "Saving…";
+      cameraSaveStatusEl.className = "";
+
+      const cfg = await getConfig();
+      const payload = {
+        apiKey: cfg.apiKey?.trim() || localStorage.getItem(KEY)?.trim() || "",
+        instructions: cfg.instructions ?? localStorage.getItem(PROMPT_KEY) ?? "",
+        voice: cfg.voice ?? localStorage.getItem(VOICE_KEY) ?? "",
+        model: cfg.model ?? localStorage.getItem(MODEL_KEY) ?? "",
+        avatar: cameraSettings,
+      };
+
+      if (!payload.apiKey) {
+        cameraSaveStatusEl.textContent = "Set API key in Settings";
+        cameraSaveStatusEl.className = "err";
+        btnSaveCamera.disabled = false;
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/config", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error("save failed");
+        localStorage.setItem(AVATAR_KEY, JSON.stringify(cameraSettings));
+        cameraSaveStatusEl.textContent = "Saved";
+        cameraSaveStatusEl.className = "";
+        setTimeout(() => {
+          if (cameraSaveStatusEl.textContent === "Saved") cameraSaveStatusEl.textContent = "";
+        }, 2500);
+      } catch {
+        localStorage.setItem(AVATAR_KEY, JSON.stringify(cameraSettings));
+        cameraSaveStatusEl.textContent = "Saved locally";
+        cameraSaveStatusEl.className = "";
+      } finally {
+        btnSaveCamera.disabled = false;
+      }
+    }
+
+    btnSaveCamera.addEventListener("click", saveCameraSettings);
+
     async function ensureAvatar() {
       if (avatar) return avatar;
       if (avatarLoading) return avatarLoading;
@@ -497,7 +565,9 @@
         const cfg = await getConfig();
         const av = normalizeAvatar(cfg.avatar);
         avatar = new TommyAvatar(document.getElementById("vrm-canvas"), av);
-        avatar.onStatus = (msg) => { avatarStatusEl.textContent = msg; };
+        avatar.onStatus = (msg) => {
+          avatarStatusEl.textContent = msg === "Avatar ready" ? `${msg} · drag to frame` : msg;
+        };
         await avatar.load();
         return avatar;
       })();

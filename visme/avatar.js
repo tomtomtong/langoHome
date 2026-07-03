@@ -5,17 +5,38 @@ import { VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
 import { LipsyncPlayer } from "./lipsync.js";
 
 // Default framing — face/upper body centered higher in the viewport.
-const DEFAULT_CAMERA_Y = 1.3;
-const DEFAULT_CAMERA_Z = 1.6;
-const DEFAULT_TARGET_Y = 1.42;
+export const DEFAULT_AVATAR = {
+  cameraX: 0,
+  cameraY: 1.3,
+  cameraZ: 1.6,
+  targetX: 0,
+  targetY: 1.42,
+  targetZ: 0,
+};
+
+export function normalizeAvatar(raw) {
+  const a = raw && typeof raw === "object" ? raw : {};
+  const num = (v, fallback) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : fallback;
+  };
+  return {
+    cameraX: num(a.cameraX, DEFAULT_AVATAR.cameraX),
+    cameraY: num(a.cameraY, DEFAULT_AVATAR.cameraY),
+    cameraZ: num(a.cameraZ, DEFAULT_AVATAR.cameraZ),
+    targetX: num(a.targetX, DEFAULT_AVATAR.targetX),
+    targetY: num(a.targetY, DEFAULT_AVATAR.targetY),
+    targetZ: num(a.targetZ, DEFAULT_AVATAR.targetZ),
+  };
+}
 
 export class TommyAvatar {
   constructor(canvas, {
     vrmUrl = "/visme/Tommyv4.vrm",
-    cameraY = DEFAULT_CAMERA_Y,
-    cameraZ = DEFAULT_CAMERA_Z,
-    targetY = DEFAULT_TARGET_Y,
+    interactiveCamera = true,
+    ...settings
   } = {}) {
+    const av = normalizeAvatar(settings);
     this.canvas = canvas;
     this.vrmUrl = vrmUrl;
     this.morphMeshes = [];
@@ -24,6 +45,7 @@ export class TommyAvatar {
     this.speaking = false;
     this.speechElapsedMs = 0;
     this.onStatus = null;
+    this.onCameraChange = null;
 
     const w = Math.max(1, canvas.clientWidth || window.innerWidth);
     const h = Math.max(1, canvas.clientHeight || window.innerHeight);
@@ -37,7 +59,7 @@ export class TommyAvatar {
     this.scene.background = new THREE.Color(0x0b1222);
 
     this.camera = new THREE.PerspectiveCamera(30, w / h, 0.1, 100);
-    this.camera.position.set(0, cameraY, cameraZ);
+    this.camera.position.set(av.cameraX, av.cameraY, av.cameraZ);
 
     this.scene.add(new THREE.HemisphereLight(0xffffff, 0x444466, 1.1));
     const dir = new THREE.DirectionalLight(0xffffff, 0.85);
@@ -45,8 +67,14 @@ export class TommyAvatar {
     this.scene.add(dir);
 
     this.controls = new OrbitControls(this.camera, canvas);
-    this.controls.target.set(0, targetY, 0);
+    this.controls.target.set(av.targetX, av.targetY, av.targetZ);
     this.controls.enablePan = false;
+    this.controls.enableDamping = true;
+    this.controls.dampingFactor = 0.08;
+    this.controls.enabled = interactiveCamera;
+    this.controls.addEventListener("change", () => {
+      if (this.onCameraChange) this.onCameraChange(this.getCameraSettings());
+    });
     this.controls.update();
 
     this.lastFrameT = performance.now();
@@ -133,6 +161,25 @@ export class TommyAvatar {
 
   resize() {
     this._resize();
+  }
+
+  getCameraSettings() {
+    return {
+      cameraX: this.camera.position.x,
+      cameraY: this.camera.position.y,
+      cameraZ: this.camera.position.z,
+      targetX: this.controls.target.x,
+      targetY: this.controls.target.y,
+      targetZ: this.controls.target.z,
+    };
+  }
+
+  applyCameraSettings(raw) {
+    const av = normalizeAvatar(raw);
+    this.camera.position.set(av.cameraX, av.cameraY, av.cameraZ);
+    this.controls.target.set(av.targetX, av.targetY, av.targetZ);
+    this.controls.update();
+    if (this.onCameraChange) this.onCameraChange(this.getCameraSettings());
   }
 
   /** Call after the canvas becomes visible so WebGL gets real dimensions. */
