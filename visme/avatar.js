@@ -1,5 +1,4 @@
 import * as THREE from "three";
-import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
 import { LipsyncPlayer } from "./lipsync.js";
@@ -13,6 +12,13 @@ export const DEFAULT_AVATAR = {
   targetY: 1.42,
   targetZ: 0,
 };
+
+const CAMERA_Y_MIN = 0.4;
+const CAMERA_Y_MAX = 2.8;
+const CAMERA_Z_MIN = 0.8;
+const CAMERA_Z_MAX = 3.5;
+const HEIGHT_DRAG_SENSITIVITY = 0.004;
+const ZOOM_WHEEL_SENSITIVITY = 0.002;
 
 export function normalizeAvatar(raw) {
   const a = raw && typeof raw === "object" ? raw : {};
@@ -59,23 +65,17 @@ export class TommyAvatar {
     this.scene.background = new THREE.Color(0x0b1222);
 
     this.camera = new THREE.PerspectiveCamera(30, w / h, 0.1, 100);
-    this.camera.position.set(av.cameraX, av.cameraY, av.cameraZ);
+    this.lookAtTarget = new THREE.Vector3(av.targetX, av.targetY, av.targetZ);
+    this.interactiveCamera = interactiveCamera;
+    this._heightDrag = { active: false, lastY: 0 };
+    this.applyCameraSettings(av);
 
     this.scene.add(new THREE.HemisphereLight(0xffffff, 0x444466, 1.1));
     const dir = new THREE.DirectionalLight(0xffffff, 0.85);
     dir.position.set(1, 2, 2);
     this.scene.add(dir);
 
-    this.controls = new OrbitControls(this.camera, canvas);
-    this.controls.target.set(av.targetX, av.targetY, av.targetZ);
-    this.controls.enablePan = false;
-    this.controls.enableDamping = true;
-    this.controls.dampingFactor = 0.08;
-    this.controls.enabled = interactiveCamera;
-    this.controls.addEventListener("change", () => {
-      if (this.onCameraChange) this.onCameraChange(this.getCameraSettings());
-    });
-    this.controls.update();
+    if (interactiveCamera) this._bindHeightDrag();
 
     this.lastFrameT = performance.now();
     this._onResize = () => this._resize();
@@ -86,6 +86,64 @@ export class TommyAvatar {
 
   setStatus(msg) {
     if (this.onStatus) this.onStatus(msg);
+  }
+
+  _emitCameraChange() {
+    if (this.onCameraChange) this.onCameraChange(this.getCameraSettings());
+  }
+
+  _syncCameraLookAt() {
+    this.camera.lookAt(this.lookAtTarget);
+  }
+
+  _bindHeightDrag() {
+    const canvas = this.canvas;
+
+    this._onPointerDown = (e) => {
+      if (!this.interactiveCamera) return;
+      this._heightDrag.active = true;
+      this._heightDrag.lastY = e.clientY;
+      canvas.setPointerCapture(e.pointerId);
+    };
+
+    this._onPointerMove = (e) => {
+      if (!this._heightDrag.active) return;
+      const deltaY = e.clientY - this._heightDrag.lastY;
+      this._heightDrag.lastY = e.clientY;
+      this.camera.position.y = THREE.MathUtils.clamp(
+        this.camera.position.y - deltaY * HEIGHT_DRAG_SENSITIVITY,
+        CAMERA_Y_MIN,
+        CAMERA_Y_MAX,
+      );
+      this._syncCameraLookAt();
+      this._emitCameraChange();
+    };
+
+    this._onPointerUp = (e) => {
+      if (!this._heightDrag.active) return;
+      this._heightDrag.active = false;
+      try {
+        canvas.releasePointerCapture(e.pointerId);
+      } catch {}
+    };
+
+    this._onWheel = (e) => {
+      if (!this.interactiveCamera) return;
+      e.preventDefault();
+      this.camera.position.z = THREE.MathUtils.clamp(
+        this.camera.position.z + e.deltaY * ZOOM_WHEEL_SENSITIVITY,
+        CAMERA_Z_MIN,
+        CAMERA_Z_MAX,
+      );
+      this._syncCameraLookAt();
+      this._emitCameraChange();
+    };
+
+    canvas.addEventListener("pointerdown", this._onPointerDown);
+    canvas.addEventListener("pointermove", this._onPointerMove);
+    canvas.addEventListener("pointerup", this._onPointerUp);
+    canvas.addEventListener("pointercancel", this._onPointerUp);
+    canvas.addEventListener("wheel", this._onWheel, { passive: false });
   }
 
   async load() {
@@ -168,18 +226,18 @@ export class TommyAvatar {
       cameraX: this.camera.position.x,
       cameraY: this.camera.position.y,
       cameraZ: this.camera.position.z,
-      targetX: this.controls.target.x,
-      targetY: this.controls.target.y,
-      targetZ: this.controls.target.z,
+      targetX: this.lookAtTarget.x,
+      targetY: this.lookAtTarget.y,
+      targetZ: this.lookAtTarget.z,
     };
   }
 
   applyCameraSettings(raw) {
     const av = normalizeAvatar(raw);
     this.camera.position.set(av.cameraX, av.cameraY, av.cameraZ);
-    this.controls.target.set(av.targetX, av.targetY, av.targetZ);
-    this.controls.update();
-    if (this.onCameraChange) this.onCameraChange(this.getCameraSettings());
+    this.lookAtTarget.set(av.targetX, av.targetY, av.targetZ);
+    this._syncCameraLookAt();
+    this._emitCameraChange();
   }
 
   /** Call after the canvas becomes visible so WebGL gets real dimensions. */
@@ -205,12 +263,18 @@ export class TommyAvatar {
       this.vrm.update(dtSec);
     }
 
-    this.controls.update();
     this.renderer.render(this.scene, this.camera);
   }
 
   dispose() {
     window.removeEventListener("resize", this._onResize);
+    if (this._onPointerDown) {
+      this.canvas.removeEventListener("pointerdown", this._onPointerDown);
+      this.canvas.removeEventListener("pointermove", this._onPointerMove);
+      this.canvas.removeEventListener("pointerup", this._onPointerUp);
+      this.canvas.removeEventListener("pointercancel", this._onPointerUp);
+      this.canvas.removeEventListener("wheel", this._onWheel);
+    }
     this.lipsync?.stop();
   }
 }
