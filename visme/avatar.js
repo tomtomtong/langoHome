@@ -541,6 +541,40 @@ export class TommyAvatar {
     this._emitCameraChange();
   }
 
+  /** Frame head and shoulders in view — for the settings-page lipsync preview. */
+  frameForLipsyncPreview() {
+    if (!this.vrm) return;
+    this._resize();
+
+    const box = new THREE.Box3().setFromObject(this.vrm.scene);
+    if (box.isEmpty()) return;
+
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+
+    let faceY = box.max.y - size.y * 0.1;
+    const head = this.vrm.humanoid?.getNormalizedBoneNode?.("head");
+    if (head) {
+      const headWorld = new THREE.Vector3();
+      head.getWorldPosition(headWorld);
+      faceY = headWorld.y - size.y * 0.05;
+    }
+
+    const target = new THREE.Vector3(center.x, faceY, center.z);
+    this.lookAtTarget.copy(target);
+
+    const frameHeight = size.y * 0.45;
+    const fovRad = (this.camera.fov * Math.PI) / 180;
+    const distance = THREE.MathUtils.clamp(
+      (frameHeight * 0.52) / Math.tan(fovRad / 2),
+      DISTANCE_MIN,
+      DISTANCE_MAX,
+    );
+
+    this.camera.position.set(target.x, target.y + size.y * 0.03, target.z + distance);
+    this._syncCameraLookAt();
+  }
+
   _syncGpuTextures() {
     if (!this.vrm) return;
 

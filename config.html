@@ -176,7 +176,7 @@
     #avatar-preview-canvas {
       display: block;
       width: 100%;
-      height: 280px;
+      height: 340px;
     }
     button.secondary {
       flex: 0 0 auto;
@@ -619,6 +619,9 @@ ${linesText.replace(/</g, '&lt;')}</pre>
       previewAvatar.onStatus = (msg) => { statusEl.textContent = msg; };
       await previewAvatar.load();
       previewAvatar.refreshAfterVisible();
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => previewAvatar.frameForLipsyncPreview());
+      });
     }
 
     initPreview();
