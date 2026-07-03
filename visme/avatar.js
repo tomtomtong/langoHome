@@ -51,6 +51,7 @@ export class TommyAvatar {
   constructor(canvas, {
     vrmUrl = "/visme/Tommyv4.vrm",
     idleAnimationUrl = "/visme/Idle.fbx",
+    backgroundUrl = "/bg.png",
     interactiveCamera = true,
     ...settings
   } = {}) {
@@ -58,6 +59,9 @@ export class TommyAvatar {
     this.canvas = canvas;
     this.vrmUrl = vrmUrl;
     this.idleAnimationUrl = idleAnimationUrl;
+    this.backgroundUrl = backgroundUrl;
+    this.backgroundTexture = null;
+    this.defaultBackground = new THREE.Color(0x0b1222);
     this.morphMeshes = [];
     this.lipsync = null;
     this.mixer = null;
@@ -85,7 +89,7 @@ export class TommyAvatar {
     canvas.addEventListener("webglcontextrestored", () => this._syncGpuTextures(), false);
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x0b1222);
+    this.scene.background = this.defaultBackground;
 
     this.camera = new THREE.PerspectiveCamera(30, w / h, 0.1, 100);
     this.lookAtTarget = new THREE.Vector3(av.targetX, av.targetY, av.targetZ);
@@ -265,6 +269,26 @@ export class TommyAvatar {
     canvas.addEventListener("wheel", this._onWheel, { passive: false });
   }
 
+  async _loadBackgroundTexture() {
+    if (!this.backgroundUrl) return;
+    try {
+      const loader = new THREE.TextureLoader();
+      const texture = await loader.loadAsync(this.backgroundUrl);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      this.backgroundTexture = texture;
+    } catch (e) {
+      console.warn("Failed to load speech background:", e);
+    }
+  }
+
+  _applySpeechBackground(active) {
+    if (active && this.backgroundTexture) {
+      this.scene.background = this.backgroundTexture;
+    } else {
+      this.scene.background = this.defaultBackground;
+    }
+  }
+
   async _loadIdleAnimation(vrm) {
     if (!this.idleAnimationUrl) return;
 
@@ -308,7 +332,10 @@ export class TommyAvatar {
     loader.register((parser) => new VRMLoaderPlugin(parser));
 
     try {
-      const gltf = await loader.loadAsync(this.vrmUrl);
+      const [, gltf] = await Promise.all([
+        this._loadBackgroundTexture(),
+        loader.loadAsync(this.vrmUrl),
+      ]);
       const vrm = gltf.userData.vrm;
       if (!vrm) {
         this.setStatus("No VRM data found in file.");
@@ -347,6 +374,7 @@ export class TommyAvatar {
   beginSpeech() {
     this.speaking = true;
     this.speechElapsedMs = 0;
+    this._applySpeechBackground(true);
     this.lipsync?.start();
   }
 
@@ -361,6 +389,7 @@ export class TommyAvatar {
 
   endSpeech() {
     this.speaking = false;
+    this._applySpeechBackground(false);
     this.lipsync?.stop();
   }
 

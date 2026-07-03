@@ -31,6 +31,10 @@ const MIME = {
   '.vrm': 'model/gltf-binary',
   '.vrma': 'model/gltf-binary',
   '.fbx': 'application/octet-stream',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
 };
 
 function loadConfig() {
@@ -187,6 +191,12 @@ const server = createServer((req, res) => {
 
   if (url === '/ChickenDance.fbx') {
     serveFile(res, join(ROOT, 'ChickenDance.fbx'));
+    return;
+  }
+
+  const rootAsset = url.match(/^\/[^/]+\.(png|jpe?g|webp|fbx)$/i);
+  if (rootAsset) {
+    serveFile(res, join(ROOT, url.slice(1)));
     return;
   }
 
