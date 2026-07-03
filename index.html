@@ -390,7 +390,9 @@
     const btnSendLog = document.getElementById("btn-send-log");
     const debugUploadStatusEl = document.getElementById("debug-upload-status");
     const SHOW_FOOTBALL_ICON = "show_football_icon";
+    const HAPPY = "happy";
     const END_CONVERSATION = "end_conversation";
+    const CHICKEN_DANCE_URL = "/ChickenDance.fbx";
     const DEBUG_LOG_MAX = 80;
     const debugLogLines = [];
 
@@ -928,6 +930,18 @@
           if (args.topic) topic = args.topic;
         } catch {}
         sendFunctionOutput(callId, { success: true, topic });
+        ws.send(JSON.stringify({ type: "response.create" }));
+        return;
+      }
+
+      if (name === HAPPY) {
+        let reason = "user is happy";
+        try {
+          const args = JSON.parse(argsJson || "{}");
+          if (args.reason) reason = args.reason;
+        } catch {}
+        avatar?.playMixamoAnimation(CHICKEN_DANCE_URL);
+        sendFunctionOutput(callId, { success: true, reason, animation: "chicken_dance" });
         ws.send(JSON.stringify({ type: "response.create" }));
         return;
       }

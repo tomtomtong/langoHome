@@ -50,6 +50,9 @@ export class TommyAvatar {
     this.lipsync = null;
     this.mixer = null;
     this.idleAction = null;
+    this.danceAction = null;
+    this._danceFinishedHandler = null;
+    this._clipCache = new Map();
     this.loaded = false;
     this.speaking = false;
     this.speechElapsedMs = 0;
@@ -343,6 +346,61 @@ export class TommyAvatar {
     this.lipsync?.stop();
   }
 
+  async _getMixamoClip(url) {
+    if (this._clipCache.has(url)) return this._clipCache.get(url);
+    const clip = await loadMixamoIdleClip(url, this.vrm);
+    if (clip) this._clipCache.set(url, clip);
+    return clip;
+  }
+
+  _stopDanceAnimation() {
+    if (this._danceFinishedHandler) {
+      this.mixer.removeEventListener("finished", this._danceFinishedHandler);
+      this._danceFinishedHandler = null;
+    }
+    if (this.danceAction) {
+      this.danceAction.stop();
+      this.danceAction = null;
+    }
+  }
+
+  _resumeIdleAfterDance() {
+    this._stopDanceAnimation();
+    if (this.idleAction) {
+      this.idleAction.reset().fadeIn(0.3).play();
+    }
+  }
+
+  async playMixamoAnimation(url) {
+    if (!this.vrm || !this.mixer) return false;
+
+    try {
+      const clip = await this._getMixamoClip(url);
+      if (!clip) return false;
+
+      this._stopDanceAnimation();
+
+      const action = this.mixer.clipAction(clip);
+      action.setLoop(THREE.LoopOnce);
+      action.clampWhenFinished = true;
+
+      if (this.idleAction) this.idleAction.fadeOut(0.3);
+
+      action.reset().fadeIn(0.3).play();
+      this.danceAction = action;
+
+      this._danceFinishedHandler = (e) => {
+        if (e.action !== action) return;
+        this._resumeIdleAfterDance();
+      };
+      this.mixer.addEventListener("finished", this._danceFinishedHandler);
+      return true;
+    } catch (e) {
+      console.warn("Failed to play animation:", e);
+      return false;
+    }
+  }
+
   _resize() {
     const rect = this.canvas.getBoundingClientRect();
     const cw = Math.max(1, Math.round(rect.width) || window.innerWidth);
@@ -416,6 +474,7 @@ export class TommyAvatar {
       this.canvas.removeEventListener("wheel", this._onWheel);
     }
     this.lipsync?.stop();
+    this._stopDanceAnimation?.();
     this.idleAction?.stop();
     this.mixer?.stopAllAction();
   }

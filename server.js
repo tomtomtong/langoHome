@@ -185,6 +185,11 @@ const server = createServer((req, res) => {
     return;
   }
 
+  if (url === '/ChickenDance.fbx') {
+    serveFile(res, join(ROOT, 'ChickenDance.fbx'));
+    return;
+  }
+
   const file = pages[url] ?? pages['/'];
   serveFile(res, join(ROOT, file));
 });
@@ -224,6 +229,9 @@ function normalizeAvatar(raw) {
 const FOOTBALL_TOOL_INSTRUCTION =
   ' When the user mentions football, soccer, or related topics, call the show_football_icon tool.';
 
+const HAPPY_TOOL_INSTRUCTION =
+  ' When the user expresses happiness, joy, excitement, asks you to dance, do the chicken dance, or wants to celebrate, call the happy tool in the same turn so Uncle Tommy performs his chicken dance.';
+
 const LEAVE_TOOL_INSTRUCTION =
   ' When the user says goodbye, bye, see you, see you later, I have to go, or otherwise indicates they want to end the conversation, respond with a brief farewell and immediately call the end_conversation tool in the same turn. Always call end_conversation when the user is done talking — do not keep chatting after a goodbye.';
 
@@ -237,6 +245,22 @@ const SHOW_FOOTBALL_ICON_TOOL = {
       topic: {
         type: 'string',
         description: 'Brief description of the football-related topic the user mentioned',
+      },
+    },
+  },
+};
+
+const HAPPY_TOOL = {
+  type: 'function',
+  name: 'happy',
+  description:
+    'Makes Uncle Tommy perform his happy chicken dance animation when the user is joyful, excited, or asks to dance or celebrate.',
+  parameters: {
+    type: 'object',
+    properties: {
+      reason: {
+        type: 'string',
+        description: 'What made the user happy or why the dance was triggered',
       },
     },
   },
@@ -263,9 +287,9 @@ function buildSessionCfg({ instructions, voice, model } = {}) {
   const session = {
     type: 'realtime',
     model: model || DEFAULT_MODEL,
-    instructions: (instructions || DEFAULT_INSTRUCTIONS) + FOOTBALL_TOOL_INSTRUCTION + LEAVE_TOOL_INSTRUCTION,
+    instructions: (instructions || DEFAULT_INSTRUCTIONS) + FOOTBALL_TOOL_INSTRUCTION + HAPPY_TOOL_INSTRUCTION + LEAVE_TOOL_INSTRUCTION,
     output_modalities: ['audio', 'text'],
-    tools: [SHOW_FOOTBALL_ICON_TOOL, END_CONVERSATION_TOOL],
+    tools: [SHOW_FOOTBALL_ICON_TOOL, HAPPY_TOOL, END_CONVERSATION_TOOL],
     tool_choice: 'auto',
     audio: {
       input: {
