@@ -127,6 +127,7 @@ const server = createServer((req, res) => {
         voice: cfg.voice ?? '',
         model: cfg.model ?? '',
         avatar: normalizeAvatar(cfg.avatar),
+        lipsync: normalizeLipsync(cfg.lipsync),
       });
       return;
     }
@@ -143,6 +144,7 @@ const server = createServer((req, res) => {
           voice: parsed.voice?.trim() || '',
           model: parsed.model?.trim() || '',
           avatar: normalizeAvatar(parsed.avatar),
+          lipsync: normalizeLipsync(parsed.lipsync),
         });
         sendJson(res, 200, { ok: true });
       });
@@ -233,6 +235,27 @@ function normalizeAvatar(raw) {
     targetX: parseAvatarNumber(a.targetX, DEFAULT_AVATAR.targetX),
     targetY: parseAvatarNumber(a.targetY, DEFAULT_AVATAR.targetY),
     targetZ: parseAvatarNumber(a.targetZ, DEFAULT_AVATAR.targetZ),
+  };
+}
+
+const DEFAULT_LIPSYNC = {
+  exaggerate: 1,
+  msPerPhone: 120,
+  crossfadeMs: 50,
+};
+
+function parseLipsyncNumber(value, min, max, fallback) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
+}
+
+function normalizeLipsync(raw) {
+  const l = raw && typeof raw === 'object' ? raw : {};
+  return {
+    exaggerate: parseLipsyncNumber(l.exaggerate, 0.2, 1.8, DEFAULT_LIPSYNC.exaggerate),
+    msPerPhone: parseLipsyncNumber(l.msPerPhone, 50, 280, DEFAULT_LIPSYNC.msPerPhone),
+    crossfadeMs: parseLipsyncNumber(l.crossfadeMs, 0, 120, DEFAULT_LIPSYNC.crossfadeMs),
   };
 }
 

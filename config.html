@@ -212,6 +212,38 @@
       color: #c4c7c5;
     }
     button.secondary:hover { border-color: #5f6368; color: #e8eaed; background: transparent; }
+    .slider-field { margin-bottom: 1.25rem; }
+    .slider-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 0.5rem;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: #c4c7c5;
+    }
+    .slider-label output {
+      font-size: 0.75rem;
+      font-weight: 400;
+      color: #9aa0a6;
+      font-variant-numeric: tabular-nums;
+    }
+    .slider-wrap {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    .slider-end {
+      font-size: 0.6875rem;
+      color: #5f6368;
+      white-space: nowrap;
+    }
+    input[type="range"] {
+      width: 100%;
+      margin: 0;
+      accent-color: #6c8cff;
+    }
   </style>
   <script type="importmap">
     {
@@ -290,6 +322,46 @@
         <button type="button" id="btn-save-camera" class="secondary">Save camera only</button>
         <button type="button" id="btn-reset-camera" class="secondary">Reset defaults</button>
       </div>
+      <hr class="section-divider" style="margin: 1.5rem 0 1.25rem">
+      <h2 style="margin: 0 0 0.375rem; font-size: 1rem">Lipsync (Visme)</h2>
+      <p style="margin: 0 0 1rem">Tune mouth movement sensitivity. Use <strong>Test lipsync</strong> on the preview above to hear-free check viseme strength and timing.</p>
+      <div class="slider-field">
+        <div class="slider-label">
+          <label for="lipsync-exaggerate">Mouth strength</label>
+          <output id="lipsync-exaggerate-value" for="lipsync-exaggerate">1.00×</output>
+        </div>
+        <div class="slider-wrap">
+          <span class="slider-end">Subtle</span>
+          <input id="lipsync-exaggerate" type="range" min="0.2" max="1.8" value="1" step="0.05">
+          <span class="slider-end">Strong</span>
+        </div>
+      </div>
+      <div class="slider-field">
+        <div class="slider-label">
+          <label for="lipsync-speed">Speaking speed</label>
+          <output id="lipsync-speed-value" for="lipsync-speed">120 ms</output>
+        </div>
+        <div class="slider-wrap">
+          <span class="slider-end">Faster</span>
+          <input id="lipsync-speed" type="range" min="50" max="280" value="120" step="5">
+          <span class="slider-end">Slower</span>
+        </div>
+      </div>
+      <div class="slider-field">
+        <div class="slider-label">
+          <label for="lipsync-crossfade">Viseme crossfade</label>
+          <output id="lipsync-crossfade-value" for="lipsync-crossfade">50 ms</output>
+        </div>
+        <div class="slider-wrap">
+          <span class="slider-end">Snap</span>
+          <input id="lipsync-crossfade" type="range" min="0" max="120" value="50" step="5">
+          <span class="slider-end">Smooth</span>
+        </div>
+      </div>
+      <div class="actions" style="margin-bottom: 1rem">
+        <button type="button" id="btn-test-lipsync" class="secondary">Test lipsync</button>
+        <button type="button" id="btn-reset-lipsync" class="secondary">Reset lipsync defaults</button>
+      </div>
       <div class="actions">
         <button type="submit">Save</button>
         <a class="btn" href="/">Back to Voice</a>
@@ -322,9 +394,15 @@
     const VOICE_KEY = 'inworld_voice_id';
     const MODEL_KEY = 'inworld_model';
     const AVATAR_KEY = 'inworld_avatar';
+    const LIPSYNC_KEY = 'inworld_lipsync';
     const DEFAULT_AVATAR = {
       cameraX: 0, cameraY: 1.3, cameraZ: 1.6,
       targetX: 0, targetY: 1.42, targetZ: 0,
+    };
+    const DEFAULT_LIPSYNC = {
+      exaggerate: 1,
+      msPerPhone: 120,
+      crossfadeMs: 50,
     };
     const input = document.getElementById('key');
     const prompt = document.getElementById('prompt');
@@ -338,6 +416,14 @@
     const avatarTargetZ = document.getElementById('avatar-target-z');
     const btnSaveCamera = document.getElementById('btn-save-camera');
     const btnResetCamera = document.getElementById('btn-reset-camera');
+    const lipsyncExaggerate = document.getElementById('lipsync-exaggerate');
+    const lipsyncSpeed = document.getElementById('lipsync-speed');
+    const lipsyncCrossfade = document.getElementById('lipsync-crossfade');
+    const lipsyncExaggerateValue = document.getElementById('lipsync-exaggerate-value');
+    const lipsyncSpeedValue = document.getElementById('lipsync-speed-value');
+    const lipsyncCrossfadeValue = document.getElementById('lipsync-crossfade-value');
+    const btnTestLipsync = document.getElementById('btn-test-lipsync');
+    const btnResetLipsync = document.getElementById('btn-reset-lipsync');
     const avatarPreviewStatus = document.getElementById('avatar-preview-status');
     const avatarFieldInputs = [
       avatarCameraX, avatarCameraY, avatarCameraZ,
@@ -400,6 +486,59 @@ ${linesText.replace(/</g, '&lt;')}</pre>
     btnRefreshLogs.addEventListener('click', loadDebugReports);
     loadDebugReports();
 
+    function normalizeLipsync(raw) {
+      const l = raw && typeof raw === 'object' ? raw : {};
+      const num = (v, min, max, fallback) => {
+        const n = Number(v);
+        if (!Number.isFinite(n)) return fallback;
+        return Math.min(max, Math.max(min, n));
+      };
+      return {
+        exaggerate: num(l.exaggerate, 0.2, 1.8, DEFAULT_LIPSYNC.exaggerate),
+        msPerPhone: num(l.msPerPhone, 50, 280, DEFAULT_LIPSYNC.msPerPhone),
+        crossfadeMs: num(l.crossfadeMs, 0, 120, DEFAULT_LIPSYNC.crossfadeMs),
+      };
+    }
+
+    function updateLipsyncLabels() {
+      lipsyncExaggerateValue.textContent = `${Number(lipsyncExaggerate.value).toFixed(2)}×`;
+      lipsyncSpeedValue.textContent = `${lipsyncSpeed.value} ms`;
+      const crossfade = Number(lipsyncCrossfade.value);
+      lipsyncCrossfadeValue.textContent = crossfade === 0 ? 'Off (snap)' : `${crossfade} ms`;
+    }
+
+    function readLipsyncFromForm() {
+      return normalizeLipsync({
+        exaggerate: lipsyncExaggerate.value,
+        msPerPhone: lipsyncSpeed.value,
+        crossfadeMs: lipsyncCrossfade.value,
+      });
+    }
+
+    function applyLipsyncFields(lipsync) {
+      const l = normalizeLipsync(lipsync);
+      lipsyncExaggerate.value = l.exaggerate;
+      lipsyncSpeed.value = l.msPerPhone;
+      lipsyncCrossfade.value = l.crossfadeMs;
+      updateLipsyncLabels();
+      window.dispatchEvent(new CustomEvent('lipsync-fields-updated', { detail: l }));
+    }
+
+    lipsyncExaggerate.addEventListener('input', updateLipsyncLabels);
+    lipsyncSpeed.addEventListener('input', updateLipsyncLabels);
+    lipsyncCrossfade.addEventListener('input', updateLipsyncLabels);
+    lipsyncExaggerate.addEventListener('input', () => {
+      window.dispatchEvent(new CustomEvent('lipsync-fields-updated', { detail: readLipsyncFromForm() }));
+    });
+    lipsyncSpeed.addEventListener('input', () => {
+      window.dispatchEvent(new CustomEvent('lipsync-fields-updated', { detail: readLipsyncFromForm() }));
+    });
+    lipsyncCrossfade.addEventListener('input', () => {
+      window.dispatchEvent(new CustomEvent('lipsync-fields-updated', { detail: readLipsyncFromForm() }));
+    });
+    window.addEventListener('lipsync-labels-sync', updateLipsyncLabels);
+    updateLipsyncLabels();
+
     function normalizeAvatar(raw) {
       const a = raw && typeof raw === 'object' ? raw : {};
       const num = (v, fallback) => {
@@ -451,6 +590,7 @@ ${linesText.replace(/</g, '&lt;')}</pre>
         else localStorage.removeItem(k);
       }
       localStorage.setItem(AVATAR_KEY, JSON.stringify(normalizeAvatar(cfg.avatar)));
+      localStorage.setItem(LIPSYNC_KEY, JSON.stringify(normalizeLipsync(cfg.lipsync)));
     }
 
     function applyConfig(cfg) {
@@ -459,6 +599,7 @@ ${linesText.replace(/</g, '&lt;')}</pre>
       voice.value = cfg.voice ?? '';
       model.value = cfg.model ?? '';
       applyAvatarFields(cfg.avatar);
+      applyLipsyncFields(cfg.lipsync);
       if (cfg.apiKey) {
         status.textContent = 'Settings saved.';
         status.className = 'status ok';
@@ -467,8 +608,12 @@ ${linesText.replace(/</g, '&lt;')}</pre>
 
     function loadFromLocalStorage() {
       let avatar = DEFAULT_AVATAR;
+      let lipsync = DEFAULT_LIPSYNC;
       try {
         avatar = normalizeAvatar(JSON.parse(localStorage.getItem(AVATAR_KEY) || '{}'));
+      } catch {}
+      try {
+        lipsync = normalizeLipsync(JSON.parse(localStorage.getItem(LIPSYNC_KEY) || '{}'));
       } catch {}
       applyConfig({
         apiKey: localStorage.getItem(KEY) ?? '',
@@ -476,6 +621,7 @@ ${linesText.replace(/</g, '&lt;')}</pre>
         voice: localStorage.getItem(VOICE_KEY) ?? '',
         model: localStorage.getItem(MODEL_KEY) ?? '',
         avatar,
+        lipsync,
       });
     }
 
@@ -506,6 +652,7 @@ ${linesText.replace(/</g, '&lt;')}</pre>
         voice: voice.value.trim(),
         model: model.value.trim(),
         avatar: readAvatarFromForm(),
+        lipsync: readLipsyncFromForm(),
       };
       try {
         const res = await fetch('/api/config', {
@@ -539,6 +686,14 @@ ${linesText.replace(/</g, '&lt;')}</pre>
       applyAvatarFields(DEFAULT_AVATAR);
     });
 
+    btnResetLipsync.addEventListener('click', () => {
+      applyLipsyncFields(DEFAULT_LIPSYNC);
+    });
+
+    btnTestLipsync.addEventListener('click', () => {
+      window.dispatchEvent(new CustomEvent('lipsync-preview-requested'));
+    });
+
     document.getElementById('form').onsubmit = async (e) => {
       e.preventDefault();
       const val = input.value.trim();
@@ -557,6 +712,7 @@ ${linesText.replace(/</g, '&lt;')}</pre>
         voice: voiceVal,
         model: modelVal,
         avatar: readAvatarFromForm(),
+        lipsync: readLipsyncFromForm(),
       };
 
       try {
@@ -578,12 +734,12 @@ ${linesText.replace(/</g, '&lt;')}</pre>
       }
 
       syncLocalStorage(payload);
-      status.textContent = 'Saved! Reload the voice app to apply avatar framing changes.';
+      status.textContent = 'Saved! Reload the voice app to apply avatar and lipsync changes.';
       status.className = 'status ok';
     };
   </script>
   <script type="module">
-    import { TommyAvatar, DEFAULT_AVATAR, normalizeAvatar } from "/visme/avatar.js";
+    import { TommyAvatar, DEFAULT_AVATAR, DEFAULT_LIPSYNC, normalizeAvatar, normalizeLipsync } from "/visme/avatar.js";
 
     const canvas = document.getElementById("avatar-preview-canvas");
     const statusEl = document.getElementById("avatar-preview-status");
@@ -631,19 +787,52 @@ ${linesText.replace(/</g, '&lt;')}</pre>
       if (previewAvatar) writeFieldsToDom(previewAvatar.getCameraSettings());
     });
 
+    window.addEventListener("lipsync-fields-updated", (e) => {
+      if (!previewAvatar) return;
+      previewAvatar.applyLipsyncSettings(e.detail);
+    });
+
+    window.addEventListener("lipsync-preview-requested", () => {
+      if (!previewAvatar?.loaded) {
+        statusEl.textContent = "Avatar not ready for lipsync preview.";
+        return;
+      }
+      previewAvatar.applyLipsyncSettings(readLipsyncFromDom());
+      previewAvatar.playLipsyncPreview("Hello from Visme");
+    });
+
+    function readLipsyncFromDom() {
+      return normalizeLipsync({
+        exaggerate: document.getElementById("lipsync-exaggerate").value,
+        msPerPhone: document.getElementById("lipsync-speed").value,
+        crossfadeMs: document.getElementById("lipsync-crossfade").value,
+      });
+    }
+
+    function writeLipsyncToDom(lipsync) {
+      const l = normalizeLipsync(lipsync);
+      document.getElementById("lipsync-exaggerate").value = l.exaggerate;
+      document.getElementById("lipsync-speed").value = l.msPerPhone;
+      document.getElementById("lipsync-crossfade").value = l.crossfadeMs;
+      window.dispatchEvent(new CustomEvent("lipsync-labels-sync"));
+    }
+
     async function initPreview() {
       bindFieldInputs();
       let av = DEFAULT_AVATAR;
+      let lipsync = DEFAULT_LIPSYNC;
       try {
         const res = await fetch("/api/config");
         if (res.ok) {
           const cfg = await res.json();
           av = normalizeAvatar(cfg.avatar);
+          lipsync = normalizeLipsync(cfg.lipsync);
           writeFieldsToDom(av);
+          writeLipsyncToDom(lipsync);
         }
       } catch {}
 
-      previewAvatar = new TommyAvatar(canvas, av);
+      previewAvatar = new TommyAvatar(canvas, { ...av, lipsync });
       previewAvatar.onStatus = (msg) => { statusEl.textContent = msg; };
       previewAvatar.onCameraChange = (settings) => {
         if (syncingFromPreview) return;

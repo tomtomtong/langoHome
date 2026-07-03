@@ -47,15 +47,37 @@ export function normalizeAvatar(raw) {
   };
 }
 
+export const DEFAULT_LIPSYNC = {
+  exaggerate: 1,
+  msPerPhone: 120,
+  crossfadeMs: 50,
+};
+
+export function normalizeLipsync(raw) {
+  const l = raw && typeof raw === "object" ? raw : {};
+  const num = (v, min, max, fallback) => {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.min(max, Math.max(min, n));
+  };
+  return {
+    exaggerate: num(l.exaggerate, 0.2, 1.8, DEFAULT_LIPSYNC.exaggerate),
+    msPerPhone: num(l.msPerPhone, 50, 280, DEFAULT_LIPSYNC.msPerPhone),
+    crossfadeMs: num(l.crossfadeMs, 0, 120, DEFAULT_LIPSYNC.crossfadeMs),
+  };
+}
+
 export class TommyAvatar {
   constructor(canvas, {
     vrmUrl = "/visme/Tommyv4.vrm",
     idleAnimationUrl = "/visme/Idle.fbx",
     backgroundUrl = "/bg.png",
     interactiveCamera = true,
+    lipsync: lipsyncRaw,
     ...settings
   } = {}) {
     const av = normalizeAvatar(settings);
+    this.lipsyncSettings = normalizeLipsync(lipsyncRaw);
     this.canvas = canvas;
     this.vrmUrl = vrmUrl;
     this.idleAnimationUrl = idleAnimationUrl;
@@ -71,6 +93,8 @@ export class TommyAvatar {
     this._clipCache = new Map();
     this.loaded = false;
     this.speaking = false;
+    this._previewPlaying = false;
+    this._previewRaf = null;
     this.speechElapsedMs = 0;
     this.onStatus = null;
     this.onCameraChange = null;
@@ -276,16 +300,9 @@ export class TommyAvatar {
       const texture = await loader.loadAsync(this.backgroundUrl);
       texture.colorSpace = THREE.SRGBColorSpace;
       this.backgroundTexture = texture;
+      this.scene.background = texture;
     } catch (e) {
-      console.warn("Failed to load speech background:", e);
-    }
-  }
-
-  _applySpeechBackground(active) {
-    if (active && this.backgroundTexture) {
-      this.scene.background = this.backgroundTexture;
-    } else {
-      this.scene.background = this.defaultBackground;
+      console.warn("Failed to load background:", e);
     }
   }
 
@@ -359,7 +376,7 @@ export class TommyAvatar {
         return false;
       }
 
-      this.lipsync = new LipsyncPlayer(this.morphMeshes);
+      this.lipsync = new LipsyncPlayer(this.morphMeshes, this.lipsyncSettings);
       await this._loadIdleAnimation(vrm);
       this.loaded = true;
       this.setStatus("Avatar ready");
@@ -371,10 +388,54 @@ export class TommyAvatar {
     }
   }
 
+  applyLipsyncSettings(settings) {
+    this.lipsyncSettings = normalizeLipsync(settings);
+    if (!this.lipsync) return;
+    this.lipsync.exaggerate = this.lipsyncSettings.exaggerate;
+    this.lipsync.msPerPhone = this.lipsyncSettings.msPerPhone;
+    this.lipsync.crossfadeMs = this.lipsyncSettings.crossfadeMs;
+  }
+
+  getLipsyncSettings() {
+    return { ...this.lipsyncSettings };
+  }
+
+  _stopLipsyncPreview() {
+    this._previewPlaying = false;
+    if (this._previewRaf) {
+      cancelAnimationFrame(this._previewRaf);
+      this._previewRaf = null;
+    }
+    this.lipsync?.stop();
+    this.speechElapsedMs = 0;
+  }
+
+  playLipsyncPreview(text = "Hello from Visme") {
+    if (!this.lipsync || this._previewPlaying) return;
+    this._stopLipsyncPreview();
+    this.lipsync.setText(text, 0);
+    const duration = this.lipsync.timeline[this.lipsync.timeline.length - 1]?.end ?? 0;
+    if (!duration) return;
+
+    this._previewPlaying = true;
+    this.lipsync.start();
+    const t0 = performance.now();
+    const tick = () => {
+      if (!this._previewPlaying) return;
+      this.speechElapsedMs = performance.now() - t0;
+      if (this.speechElapsedMs >= duration) {
+        this._stopLipsyncPreview();
+        return;
+      }
+      this._previewRaf = requestAnimationFrame(tick);
+    };
+    this._previewRaf = requestAnimationFrame(tick);
+  }
+
   beginSpeech() {
+    this._stopLipsyncPreview();
     this.speaking = true;
     this.speechElapsedMs = 0;
-    this._applySpeechBackground(true);
     this.lipsync?.start();
   }
 
@@ -389,7 +450,6 @@ export class TommyAvatar {
 
   endSpeech() {
     this.speaking = false;
-    this._applySpeechBackground(false);
     this.lipsync?.stop();
   }
 
@@ -530,7 +590,7 @@ export class TommyAvatar {
     const dtSec = Math.min(0.1, (now - this.lastFrameT) / 1000);
     this.lastFrameT = now;
 
-    if (this.speaking && this.lipsync) {
+    if ((this.speaking || this._previewPlaying) && this.lipsync) {
       this.lipsync.update(this.speechElapsedMs);
     }
 
@@ -554,6 +614,7 @@ export class TommyAvatar {
       this.canvas.removeEventListener("pointercancel", this._onPointerUp);
       this.canvas.removeEventListener("wheel", this._onWheel);
     }
+    this._stopLipsyncPreview();
     this.lipsync?.stop();
     this._stopDanceAnimation?.();
     this.idleAction?.stop();
