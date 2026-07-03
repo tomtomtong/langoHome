@@ -69,6 +69,8 @@
 
     /* ── Idle screen (before Inworld session) ── */
     #idle-screen {
+      position: relative;
+      z-index: 2;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -112,7 +114,9 @@
 
     /* ── Fullscreen avatar (only during session) ── */
     #avatar-stage {
-      display: none;
+      /* Keep in layout (not display:none) so WebGL can upload textures while preloading. */
+      visibility: hidden;
+      pointer-events: none;
       position: fixed;
       inset: 0;
       width: 100%;
@@ -122,7 +126,8 @@
     }
 
     body.in-session #avatar-stage {
-      display: block;
+      visibility: visible;
+      pointer-events: auto;
     }
 
     body.in-session #idle-screen {
@@ -1364,6 +1369,8 @@
 
     async function init() {
       setStatus("Loading avatar…");
+      // Let the hidden avatar stage get layout dimensions before WebGL init.
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       try {
         await ensureAvatar();
       } catch (e) {

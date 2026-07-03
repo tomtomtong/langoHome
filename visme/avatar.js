@@ -19,6 +19,18 @@ const DISTANCE_MIN = 0.8;
 const DISTANCE_MAX = 3.5;
 const ZOOM_WHEEL_SENSITIVITY = 0.0012;
 
+// Non-color data maps must stay in linear/no color space.
+const NON_COLOR_TEXTURE_KEYS = new Set([
+  "normalMap",
+  "bumpMap",
+  "roughnessMap",
+  "metalnessMap",
+  "aoMap",
+  "displacementMap",
+  "lightMap",
+  "uvAnimationMaskTexture",
+]);
+
 export function normalizeAvatar(raw) {
   const a = raw && typeof raw === "object" ? raw : {};
   const num = (v, fallback) => {
@@ -66,6 +78,11 @@ export class TommyAvatar {
     this.renderer.setSize(w, h, false);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.0;
+
+    canvas.addEventListener("webglcontextlost", (e) => e.preventDefault(), false);
+    canvas.addEventListener("webglcontextrestored", () => this._syncGpuTextures(), false);
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x0b1222);
@@ -301,6 +318,7 @@ export class TommyAvatar {
       VRMUtils.rotateVRM0(vrm);
       this.scene.add(vrm.scene);
       this.vrm = vrm;
+      this._syncGpuTextures();
 
       vrm.scene.traverse((o) => {
         if ((!o.isSkinnedMesh && !o.isMesh) || !o.morphTargetDictionary) return;
@@ -434,11 +452,45 @@ export class TommyAvatar {
     this._emitCameraChange();
   }
 
+  _syncGpuTextures() {
+    if (!this.vrm) return;
+
+    this.vrm.scene.traverse((obj) => {
+      if (!obj.isMesh) return;
+
+      const materials = Array.isArray(obj.material) ? obj.material : [obj.material];
+      for (const material of materials) {
+        if (!material) continue;
+
+        for (const key of Object.keys(material)) {
+          const value = material[key];
+          if (!value?.isTexture || !value.image) continue;
+
+          if (!NON_COLOR_TEXTURE_KEYS.has(key)) {
+            value.colorSpace = THREE.SRGBColorSpace;
+          }
+          this.renderer.initTexture(value);
+        }
+
+        material.needsUpdate = true;
+      }
+    });
+  }
+
   /** Call after the canvas becomes visible so WebGL gets real dimensions. */
   refreshAfterVisible() {
-    requestAnimationFrame(() => {
+    const sync = () => {
       this._resize();
-      requestAnimationFrame(() => this._resize());
+      this._syncGpuTextures();
+      if (this.vrm) {
+        this.vrm.update(0);
+        this.renderer.render(this.scene, this.camera);
+      }
+    };
+
+    requestAnimationFrame(() => {
+      sync();
+      requestAnimationFrame(sync);
     });
   }
 
