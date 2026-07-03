@@ -268,18 +268,6 @@
 
     #btn-send-log:hover:not(:disabled) { background: rgba(255, 255, 255, 0.16); }
 
-    #btn-enable-mic {
-      display: none;
-      width: 100%;
-      background: #81c995;
-      color: #0f1117;
-      font-weight: 600;
-    }
-
-    #btn-enable-mic.visible { display: block; }
-
-    #btn-enable-mic:hover:not(:disabled) { background: #6fb888; }
-
     #debug-upload-status {
       margin-top: 0.375rem;
       font-size: 0.75rem;
@@ -304,7 +292,6 @@
     <div id="idle-screen">
       <h1>Uncle Tommy</h1>
       <div class="idle-controls">
-        <button id="btn-enable-mic" type="button">Tap to listen for &quot;Hello&quot;</button>
         <button id="btn-start">Start Conversation</button>
         <div id="status-idle">Say &quot;Hello&quot; to start a conversation</div>
         <div id="err-idle"></div>
@@ -347,7 +334,6 @@
     const DEFAULT_MODEL = "openai/gpt-4o-mini";
 
     const btnStart = document.getElementById("btn-start");
-    const btnEnableMic = document.getElementById("btn-enable-mic");
     const btnStop = document.getElementById("btn-stop");
     const statusEl = document.getElementById("status");
     const statusIdleEl = document.getElementById("status-idle");
@@ -368,8 +354,6 @@
     let ws, ctx, src, proc, source, stream;
     let active = false, inSession = false, playing = false, nextPlayTime = 0;
     let recognition = null, wakeWordEnabled = true, listeningForWakeWord = false;
-    let needsWakeGesture = false;
-    let iosResumeWakeFromGesture = false;
     let wakeWordRestartTimer = null;
     let wakeWordRestartAttempts = 0;
     let recognitionWatchdog = null;
@@ -409,7 +393,6 @@
         listeningForWakeWord,
         wakeWordRestartAttempts,
         wakeWordRestartTimer: !!wakeWordRestartTimer,
-        needsWakeGesture,
         pendingEndConversation,
         goodbyeNudged,
         playing,
@@ -584,48 +567,12 @@
       uiLog("cleanup", "done — ready for hello cycle", "hello");
     }
 
-    function showWakeGesturePrompt() {
-      if (!IS_IOS) return;
-      needsWakeGesture = true;
-      btnEnableMic.classList.add("visible");
-      setStatus('Tap "Listen for Hello" below to re-enable the microphone');
-      uiLog("hello", "waiting for user tap to re-enable mic (iOS)", "hello");
-    }
-
-    function hideWakeGesturePrompt() {
-      needsWakeGesture = false;
-      btnEnableMic.classList.remove("visible");
-    }
-
-    function enableWakeWordWithGesture() {
-      if (!wakeWordEnabled || active) return;
-      hideWakeGesturePrompt();
-      wakeWordRestartAttempts = 0;
-      if (wakeWordRestartTimer) {
-        clearTimeout(wakeWordRestartTimer);
-        wakeWordRestartTimer = null;
-      }
-      uiLog("hello", "user tap — starting wake word listening", "hello");
-      startWakeWordListening();
-    }
-
     function returnToHelloCycle() {
       uiLog("hello", "returnToHelloCycle", "hello");
       showErr("");
       wakeWordEnabled = true;
       wakeWordRestartAttempts = 0;
-      if (IS_IOS && iosResumeWakeFromGesture) {
-        iosResumeWakeFromGesture = false;
-        hideWakeGesturePrompt();
-        setStatus('Listening for "Hello"…');
-        uiLog("hello", "wake word kept from End button gesture", "hello");
-        return;
-      }
       stopWakeWordListening();
-      if (IS_IOS) {
-        showWakeGesturePrompt();
-        return;
-      }
       setStatus('Say "Hello" to start a conversation');
       if (wakeWordRestartTimer) clearTimeout(wakeWordRestartTimer);
       wakeWordRestartTimer = setTimeout(() => {
@@ -930,11 +877,6 @@
         setStatus("Tap Start to begin a conversation");
         return;
       }
-      if (IS_IOS && needsWakeGesture) {
-        uiLog("hello", "startWakeWordListening blocked — needs user tap", "warn");
-        showWakeGesturePrompt();
-        return;
-      }
       if (active || listeningForWakeWord || !wakeWordEnabled) {
         uiLog("hello", "startWakeWordListening skipped", "warn", snapshotHelloCycleState());
         return;
@@ -1006,11 +948,6 @@
     function scheduleWakeWordRestart(reason = "unknown") {
       if (!wakeWordEnabled || active) {
         uiLog("hello", `scheduleWakeWordRestart skipped (${reason})`, "warn", snapshotHelloCycleState());
-        return;
-      }
-      if (IS_IOS && needsWakeGesture) {
-        uiLog("hello", `scheduleWakeWordRestart deferred — needs user tap (${reason})`, "hello");
-        showWakeGesturePrompt();
         return;
       }
       if (wakeWordRestartTimer) clearTimeout(wakeWordRestartTimer);
@@ -1185,19 +1122,6 @@
         uiLog("end", "End Conversation ignored — not active", "warn");
         return;
       }
-      // iOS Safari only grants mic access inside a real user gesture — simulated
-      // clicks/dispatchEvent do not count. Reuse this button tap to restart wake word.
-      if (IS_IOS) {
-        try { stopAudio(); } catch {}
-        releaseMicSync();
-        hideWakeGesturePrompt();
-        wakeWordEnabled = true;
-        wakeWordRestartAttempts = 0;
-        stopWakeWordListening();
-        iosResumeWakeFromGesture = true;
-        uiLog("hello", "End button gesture — starting wake word immediately", "hello");
-        startWakeWordListening();
-      }
       ws.close();
     }
 
@@ -1252,14 +1176,11 @@
 
     btnStart.addEventListener("click", () => {
       uiLog("hello", "Start button clicked", "hello");
-      hideWakeGesturePrompt();
       wakeWordEnabled = false;
       wakeWordRestartAttempts = 0;
       stopWakeWordListening();
       connectConversation();
     });
-
-    btnEnableMic.addEventListener("click", enableWakeWordWithGesture);
 
     btnStop.addEventListener("click", endConversation);
     btnSendLog.addEventListener("click", sendDebugLogToServer);
@@ -1308,7 +1229,6 @@
     // can fail to restart after getUserMedia released the mic), make
     // sure it gets restarted.
     setInterval(() => {
-      if (IS_IOS && needsWakeGesture) return;
       if (wakeWordEnabled && !active && !listeningForWakeWord && !wakeWordRestartTimer) {
         uiLog("hello", "safety net restart (idle but not listening)", "warn", snapshotHelloCycleState());
         wakeWordRestartAttempts = 0;
