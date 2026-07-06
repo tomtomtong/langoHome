@@ -4,9 +4,22 @@ import { VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
 import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from "@pixiv/three-vrm-animation";
 import { LipsyncPlayer, clearBlend } from "./lipsync.js";
 import { loadMixamoIdleClip } from "./mixamo-idle.js";
-import { BLENDSHAPE_COUNT, BLENDSHAPE_LABELS, buildBlendshapeTestTimeline } from "./phonetics.js";
+import {
+  BLENDSHAPE_COUNT,
+  BLENDSHAPE_LABELS,
+  FACE_BLENDSHAPE_NAMES,
+  buildBlendshapeTestTimeline,
+  defaultBlendshapeWeights,
+  hasFaceMorphTargets,
+  normalizeBlendshapes,
+} from "./blendshapes.js";
 
-export { BLENDSHAPE_COUNT, BLENDSHAPE_LABELS };
+export {
+  BLENDSHAPE_COUNT,
+  BLENDSHAPE_LABELS,
+  FACE_BLENDSHAPE_NAMES,
+  normalizeBlendshapes,
+};
 
 // Default framing — face/upper body centered higher in the viewport.
 export const DEFAULT_AVATAR = {
@@ -54,18 +67,8 @@ export const DEFAULT_LIPSYNC = {
   exaggerate: 1,
   msPerPhone: 120,
   crossfadeMs: 50,
-  blendshapes: Array(BLENDSHAPE_COUNT).fill(1),
+  blendshapes: defaultBlendshapeWeights(),
 };
-
-export function normalizeBlendshapes(raw) {
-  const weights = Array(BLENDSHAPE_COUNT).fill(1);
-  if (!Array.isArray(raw)) return weights;
-  for (let i = 0; i < BLENDSHAPE_COUNT; i++) {
-    const n = Number(raw[i]);
-    weights[i] = Number.isFinite(n) ? Math.min(2, Math.max(0, n)) : 1;
-  }
-  return weights;
-}
 
 export function normalizeLipsync(raw) {
   const l = raw && typeof raw === "object" ? raw : {};
@@ -385,13 +388,13 @@ export class TommyAvatar {
 
       vrm.scene.traverse((o) => {
         if ((!o.isSkinnedMesh && !o.isMesh) || !o.morphTargetDictionary) return;
-        if (o.morphTargetDictionary["0"] !== undefined && o.morphTargetDictionary["21"] !== undefined) {
+        if (hasFaceMorphTargets(o.morphTargetDictionary)) {
           this.morphMeshes.push(o);
         }
       });
 
       if (this.morphMeshes.length === 0) {
-        this.setStatus("VRM loaded but no viseme morph targets found.");
+        this.setStatus("VRM loaded but no face morph targets found.");
         return false;
       }
 
@@ -425,6 +428,8 @@ export class TommyAvatar {
 
   previewBlendshape(index, value) {
     if (!this.morphMeshes.length) return;
+    const morphName = FACE_BLENDSHAPE_NAMES[index];
+    if (!morphName) return;
     this._manualBlendIndex = index;
     this._manualBlendValue = Math.min(2, Math.max(0, Number(value) || 0));
     this._applyManualBlendshape();
@@ -434,17 +439,17 @@ export class TommyAvatar {
     this._manualBlendIndex = null;
     this._manualBlendValue = 0;
     if (!this.speaking && !this._previewPlaying) {
-      clearBlend(this.morphMeshes);
+      clearBlend(this.morphMeshes, FACE_BLENDSHAPE_NAMES);
     }
   }
 
   _applyManualBlendshape() {
     if (this._manualBlendIndex == null || !this.morphMeshes.length) return;
-    clearBlend(this.morphMeshes);
-    const idx = this._manualBlendIndex;
+    clearBlend(this.morphMeshes, FACE_BLENDSHAPE_NAMES);
+    const morphName = FACE_BLENDSHAPE_NAMES[this._manualBlendIndex];
     const val = this._manualBlendValue;
     for (const mesh of this.morphMeshes) {
-      const mi = mesh.morphTargetDictionary[String(idx)];
+      const mi = mesh.morphTargetDictionary[morphName];
       if (mi !== undefined) mesh.morphTargetInfluences[mi] = val;
     }
   }

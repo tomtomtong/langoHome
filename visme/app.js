@@ -4,6 +4,12 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
 import { textToPhonemeTimeline, timelineToIpaString } from "./phonetics.js";
 import { clearBlend, smoothMorphTowardTargets } from "./lipsync.js";
+import {
+  FACE_BLENDSHAPE_NAMES,
+  defaultBlendshapeWeights,
+  hasFaceMorphTargets,
+  morphNameToIndex,
+} from "./blendshapes.js";
 
 const canvas = document.getElementById("vrm-canvas");
 const form = document.getElementById("speak-form");
@@ -102,13 +108,13 @@ async function loadVrm() {
 
     vrm.scene.traverse((o) => {
       if ((!o.isSkinnedMesh && !o.isMesh) || !o.morphTargetDictionary) return;
-      if (o.morphTargetDictionary["0"] !== undefined && o.morphTargetDictionary["21"] !== undefined) {
+      if (hasFaceMorphTargets(o.morphTargetDictionary)) {
         morphMeshes.push(o);
       }
     });
 
     if (morphMeshes.length === 0) {
-      statusEl.textContent = "VRM loaded but no 0–21 morph targets found.";
+      statusEl.textContent = "VRM loaded but no face morph targets found.";
     } else {
       statusEl.textContent = `Ready — ${morphMeshes.length} mesh(es). Type a word and hit Speak.`;
     }
@@ -161,7 +167,7 @@ form.addEventListener("submit", async (e) => {
   const t0 = performance.now();
   const totalDuration = timeline[timeline.length - 1].end;
   let lastStepT = performance.now();
-  const target22 = new Array(22).fill(0);
+  const targetValues = defaultBlendshapeWeights().fill(0);
 
   await new Promise((resolve) => {
     function step() {
@@ -183,11 +189,12 @@ form.addEventListener("submit", async (e) => {
         if (elapsed >= entry.start && elapsed < entry.end) { activeEntry = entry; break; }
       }
 
-      for (let i = 0; i < 22; i++) target22[i] = 0;
+      targetValues.fill(0);
       if (activeEntry) {
-        target22[activeEntry.blendId] = exaggerate;
+        const index = morphNameToIndex(activeEntry.morphName ?? "mouthClose");
+        if (index >= 0) targetValues[index] = exaggerate;
       }
-      smoothMorphTowardTargets(morphMeshes, target22, dtSec, crossfadeMs);
+      smoothMorphTowardTargets(morphMeshes, targetValues, FACE_BLENDSHAPE_NAMES, dtSec, crossfadeMs);
 
       // highlight pill
       for (const p of pills) {

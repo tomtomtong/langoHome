@@ -351,7 +351,7 @@
       </div>
       <div class="blendshape-section">
         <h3>Blendshape weights</h3>
-        <p>Per-viseme strength multipliers (0–2×). Default is 1.00. Drag a slider to preview that shape on the avatar.</p>
+        <p>Per-viseme strength multipliers (0–2×) for each ARKit face morph on TommyOrignial.vrm. Default is 1.00. Drag a slider to preview that shape on the avatar.</p>
         <div class="blendshape-toolbar">
           <button type="button" id="btn-reset-blendshapes" class="secondary">Reset blendshapes</button>
           <button type="button" id="btn-export-blendshapes" class="secondary">Export blendshapes</button>
@@ -400,7 +400,7 @@
       exaggerate: 1,
       msPerPhone: 120,
       crossfadeMs: 50,
-      blendshapes: Array(22).fill(1),
+      blendshapes: Array(50).fill(1),
     };
     const input = document.getElementById('key');
     const prompt = document.getElementById('prompt');
@@ -472,9 +472,9 @@ ${linesText.replace(/</g, '&lt;')}</pre>
     loadDebugReports();
 
     function normalizeBlendshapes(raw) {
-      const weights = Array(22).fill(1);
+      const weights = Array(50).fill(1);
       if (!Array.isArray(raw)) return weights;
-      for (let i = 0; i < 22; i++) {
+      for (let i = 0; i < 50; i++) {
         const n = Number(raw[i]);
         weights[i] = Number.isFinite(n) ? Math.min(2, Math.max(0, n)) : 1;
       }
@@ -604,7 +604,7 @@ ${linesText.replace(/</g, '&lt;')}</pre>
     });
 
     document.getElementById('btn-reset-blendshapes').addEventListener('click', () => {
-      window.setBlendshapeWeights?.(Array(22).fill(1));
+      window.setBlendshapeWeights?.(Array(50).fill(1));
       window.dispatchEvent(new CustomEvent('blendshapes-preview-clear'));
       window.dispatchEvent(new CustomEvent('lipsync-fields-updated', { detail: readLipsyncFromForm() }));
     });
@@ -727,10 +727,10 @@ ${linesText.replace(/</g, '&lt;')}</pre>
     function buildBlendshapeExportText() {
       const weights = window.getBlendshapeWeights();
       const header = [
-        "Visme blendshape list (22 viseme morph targets)",
+        "TommyOrignial.vrm face blendshapes (ARKit)",
         `Exported: ${new Date().toISOString()}`,
         "",
-        "ID\tLabel\tWeight",
+        "ID\tMorph name\tWeight",
       ];
       const rows = BLENDSHAPE_LABELS.map((label, i) =>
         `${i}\t${label}\t${weights[i].toFixed(2)}`

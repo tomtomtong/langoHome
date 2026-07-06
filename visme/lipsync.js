@@ -1,22 +1,28 @@
 import { textToPhonemeTimeline } from "./phonetics.js";
+import {
+  BLENDSHAPE_COUNT,
+  FACE_BLENDSHAPE_NAMES,
+  defaultBlendshapeWeights,
+  morphNameToIndex,
+} from "./blendshapes.js";
 
-export function smoothMorphTowardTargets(morphMeshes, target22, dtSec, tauMs) {
+export function smoothMorphTowardTargets(morphMeshes, targets, morphNames, dtSec, tauMs) {
   const tauSec = tauMs / 1000;
   const k = tauSec <= 0 ? 1 : 1 - Math.exp(-dtSec / tauSec);
   for (const mesh of morphMeshes) {
-    for (let i = 0; i < 22; i++) {
-      const mi = mesh.morphTargetDictionary[String(i)];
+    for (let i = 0; i < morphNames.length; i++) {
+      const mi = mesh.morphTargetDictionary[morphNames[i]];
       if (mi === undefined) continue;
       const cur = mesh.morphTargetInfluences[mi];
-      mesh.morphTargetInfluences[mi] = cur + (target22[i] - cur) * k;
+      mesh.morphTargetInfluences[mi] = cur + (targets[i] - cur) * k;
     }
   }
 }
 
-export function clearBlend(morphMeshes) {
+export function clearBlend(morphMeshes, morphNames = FACE_BLENDSHAPE_NAMES) {
   for (const mesh of morphMeshes) {
-    for (let i = 0; i < 22; i++) {
-      const mi = mesh.morphTargetDictionary[String(i)];
+    for (const name of morphNames) {
+      const mi = mesh.morphTargetDictionary[name];
       if (mi !== undefined) mesh.morphTargetInfluences[mi] = 0;
     }
   }
@@ -37,13 +43,14 @@ export function scaleTimeline(timeline, targetDurationMs) {
 export class LipsyncPlayer {
   constructor(morphMeshes, options = {}) {
     this.morphMeshes = morphMeshes;
+    this.morphNames = FACE_BLENDSHAPE_NAMES;
     this.exaggerate = options.exaggerate ?? 1;
     this.crossfadeMs = options.crossfadeMs ?? 50;
     this.msPerPhone = options.msPerPhone ?? 120;
-    this.blendshapeWeights = options.blendshapes?.slice?.() ?? new Array(22).fill(1);
+    this.blendshapeWeights = options.blendshapes?.slice?.() ?? defaultBlendshapeWeights();
     this.active = false;
     this.timeline = [];
-    this.target22 = new Array(22).fill(0);
+    this.targets = new Array(BLENDSHAPE_COUNT).fill(0);
     this.lastStepT = 0;
   }
 
@@ -65,7 +72,7 @@ export class LipsyncPlayer {
   stop() {
     this.active = false;
     this.timeline = [];
-    clearBlend(this.morphMeshes);
+    clearBlend(this.morphMeshes, this.morphNames);
   }
 
   update(elapsedMs) {
@@ -75,7 +82,7 @@ export class LipsyncPlayer {
     const dtSec = Math.min(0.1, (now - this.lastStepT) / 1000);
     this.lastStepT = now;
 
-    for (let i = 0; i < 22; i++) this.target22[i] = 0;
+    this.targets.fill(0);
 
     if (this.timeline.length) {
       let activeEntry = null;
@@ -86,11 +93,21 @@ export class LipsyncPlayer {
         }
       }
       if (activeEntry) {
-        const w = this.blendshapeWeights[activeEntry.blendId] ?? 1;
-        this.target22[activeEntry.blendId] = this.exaggerate * w;
+        const morphName = activeEntry.morphName ?? "mouthClose";
+        const index = morphNameToIndex(morphName);
+        if (index >= 0) {
+          const w = this.blendshapeWeights[index] ?? 1;
+          this.targets[index] = this.exaggerate * w;
+        }
       }
     }
 
-    smoothMorphTowardTargets(this.morphMeshes, this.target22, dtSec, this.crossfadeMs);
+    smoothMorphTowardTargets(
+      this.morphMeshes,
+      this.targets,
+      this.morphNames,
+      dtSec,
+      this.crossfadeMs
+    );
   }
 }
