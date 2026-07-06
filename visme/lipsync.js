@@ -40,6 +40,7 @@ export class LipsyncPlayer {
     this.exaggerate = options.exaggerate ?? 1;
     this.crossfadeMs = options.crossfadeMs ?? 50;
     this.msPerPhone = options.msPerPhone ?? 120;
+    this.blendshapeWeights = options.blendshapes?.slice?.() ?? new Array(22).fill(1);
     this.active = false;
     this.timeline = [];
     this.target22 = new Array(22).fill(0);
@@ -85,7 +86,8 @@ export class LipsyncPlayer {
         }
       }
       if (activeEntry) {
-        this.target22[activeEntry.blendId] = this.exaggerate;
+        const w = this.blendshapeWeights[activeEntry.blendId] ?? 1;
+        this.target22[activeEntry.blendId] = this.exaggerate * w;
       }
     }
 

@@ -2,11 +2,11 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
 import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from "@pixiv/three-vrm-animation";
-import { LipsyncPlayer } from "./lipsync.js";
+import { LipsyncPlayer, clearBlend } from "./lipsync.js";
+import { loadMixamoIdleClip } from "./mixamo-idle.js";
 import { BLENDSHAPE_COUNT, BLENDSHAPE_LABELS, buildBlendshapeTestTimeline } from "./phonetics.js";
 
 export { BLENDSHAPE_COUNT, BLENDSHAPE_LABELS };
-import { loadMixamoIdleClip } from "./mixamo-idle.js";
 
 // Default framing — face/upper body centered higher in the viewport.
 export const DEFAULT_AVATAR = {
@@ -54,7 +54,18 @@ export const DEFAULT_LIPSYNC = {
   exaggerate: 1,
   msPerPhone: 120,
   crossfadeMs: 50,
+  blendshapes: Array(BLENDSHAPE_COUNT).fill(1),
 };
+
+export function normalizeBlendshapes(raw) {
+  const weights = Array(BLENDSHAPE_COUNT).fill(1);
+  if (!Array.isArray(raw)) return weights;
+  for (let i = 0; i < BLENDSHAPE_COUNT; i++) {
+    const n = Number(raw[i]);
+    weights[i] = Number.isFinite(n) ? Math.min(2, Math.max(0, n)) : 1;
+  }
+  return weights;
+}
 
 export function normalizeLipsync(raw) {
   const l = raw && typeof raw === "object" ? raw : {};
@@ -67,6 +78,7 @@ export function normalizeLipsync(raw) {
     exaggerate: num(l.exaggerate, 0.2, 1.8, DEFAULT_LIPSYNC.exaggerate),
     msPerPhone: num(l.msPerPhone, 50, 280, DEFAULT_LIPSYNC.msPerPhone),
     crossfadeMs: num(l.crossfadeMs, 0, 120, DEFAULT_LIPSYNC.crossfadeMs),
+    blendshapes: normalizeBlendshapes(l.blendshapes),
   };
 }
 
@@ -100,6 +112,8 @@ export class TommyAvatar {
     this._previewRaf = null;
     this._blendshapeTestStep = null;
     this._lastBlendshapeIndex = -1;
+    this._manualBlendIndex = null;
+    this._manualBlendValue = 0;
     this.speechElapsedMs = 0;
     this.onStatus = null;
     this.onCameraChange = null;
@@ -399,10 +413,40 @@ export class TommyAvatar {
     this.lipsync.exaggerate = this.lipsyncSettings.exaggerate;
     this.lipsync.msPerPhone = this.lipsyncSettings.msPerPhone;
     this.lipsync.crossfadeMs = this.lipsyncSettings.crossfadeMs;
+    this.lipsync.blendshapeWeights = this.lipsyncSettings.blendshapes.slice();
   }
 
   getLipsyncSettings() {
-    return { ...this.lipsyncSettings };
+    return {
+      ...this.lipsyncSettings,
+      blendshapes: this.lipsyncSettings.blendshapes.slice(),
+    };
+  }
+
+  previewBlendshape(index, value) {
+    if (!this.morphMeshes.length) return;
+    this._manualBlendIndex = index;
+    this._manualBlendValue = Math.min(2, Math.max(0, Number(value) || 0));
+    this._applyManualBlendshape();
+  }
+
+  clearManualBlendshapePreview() {
+    this._manualBlendIndex = null;
+    this._manualBlendValue = 0;
+    if (!this.speaking && !this._previewPlaying) {
+      clearBlend(this.morphMeshes);
+    }
+  }
+
+  _applyManualBlendshape() {
+    if (this._manualBlendIndex == null || !this.morphMeshes.length) return;
+    clearBlend(this.morphMeshes);
+    const idx = this._manualBlendIndex;
+    const val = this._manualBlendValue;
+    for (const mesh of this.morphMeshes) {
+      const mi = mesh.morphTargetDictionary[String(idx)];
+      if (mi !== undefined) mesh.morphTargetInfluences[mi] = val;
+    }
   }
 
   _stopLipsyncPreview() {
@@ -432,6 +476,7 @@ export class TommyAvatar {
     const duration = timeline[timeline.length - 1]?.end ?? 0;
     if (!duration) return false;
 
+    this.clearManualBlendshapePreview();
     this._stopLipsyncPreview();
     this._blendshapeTestStep = onStep ?? null;
     this._lastBlendshapeIndex = -1;
@@ -472,6 +517,7 @@ export class TommyAvatar {
   }
 
   beginSpeech() {
+    this.clearManualBlendshapePreview();
     this._stopLipsyncPreview();
     this.speaking = true;
     this.speechElapsedMs = 0;

@@ -245,6 +245,7 @@ const DEFAULT_LIPSYNC = {
   exaggerate: 1,
   msPerPhone: 120,
   crossfadeMs: 50,
+  blendshapes: Array(22).fill(1),
 };
 
 function parseLipsyncNumber(value, min, max, fallback) {
@@ -253,12 +254,22 @@ function parseLipsyncNumber(value, min, max, fallback) {
   return Math.min(max, Math.max(min, n));
 }
 
+function normalizeBlendshapes(raw) {
+  const weights = Array(22).fill(1);
+  if (!Array.isArray(raw)) return weights;
+  for (let i = 0; i < 22; i++) {
+    weights[i] = parseLipsyncNumber(raw[i], 0, 2, 1);
+  }
+  return weights;
+}
+
 function normalizeLipsync(raw) {
   const l = raw && typeof raw === 'object' ? raw : {};
   return {
     exaggerate: parseLipsyncNumber(l.exaggerate, 0.2, 1.8, DEFAULT_LIPSYNC.exaggerate),
     msPerPhone: parseLipsyncNumber(l.msPerPhone, 50, 280, DEFAULT_LIPSYNC.msPerPhone),
     crossfadeMs: parseLipsyncNumber(l.crossfadeMs, 0, 120, DEFAULT_LIPSYNC.crossfadeMs),
+    blendshapes: normalizeBlendshapes(l.blendshapes),
   };
 }
 

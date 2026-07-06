@@ -23,7 +23,7 @@
       border-radius: 12px;
       border: 1px solid #2a2f3a;
     }
-    .card.wide { max-width: 720px; }
+    .card.wide { max-width: 900px; }
     h1 { margin: 0 0 0.25rem; font-size: 1.25rem; }
     p { margin: 0 0 1.5rem; color: #9aa0a6; font-size: 0.875rem; line-height: 1.5; }
     label { display: block; margin-bottom: 0.5rem; font-size: 0.875rem; font-weight: 500; }
@@ -217,6 +217,48 @@
       margin: 0;
       accent-color: #6c8cff;
     }
+    .blendshape-section { margin-bottom: 1.25rem; }
+    .blendshape-section h3 {
+      margin: 0 0 0.375rem;
+      font-size: 0.9375rem;
+    }
+    .blendshape-section > p {
+      margin: 0 0 0.75rem;
+      font-size: 0.8125rem;
+      color: #9aa0a6;
+      line-height: 1.45;
+    }
+    .blendshape-toolbar {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+    .blendshape-toolbar button {
+      flex: 0 0 auto;
+      padding: 0.5rem 0.875rem;
+    }
+    .blendshape-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.625rem 1rem;
+      max-height: 380px;
+      overflow-y: auto;
+      padding: 0.75rem;
+      border: 1px solid #2a2f3a;
+      border-radius: 8px;
+      background: #0f1117;
+    }
+    .blendshape-grid .slider-field { margin-bottom: 0; }
+    .blendshape-grid .slider-label {
+      font-size: 0.75rem;
+      margin-bottom: 0.375rem;
+    }
+    .blendshape-grid .slider-label label { font-weight: 400; }
+    .blendshape-grid .slider-wrap { gap: 0.375rem; }
+    .blendshape-grid .slider-end { display: none; }
+    @media (max-width: 640px) {
+      .blendshape-grid { grid-template-columns: 1fr; }
+    }
   </style>
   <script type="importmap">
     {
@@ -255,7 +297,7 @@
       </div>
       <hr class="section-divider" style="margin: 1.5rem 0 1.25rem">
       <h2 style="margin: 0 0 0.375rem; font-size: 1rem">Lipsync (Visme)</h2>
-      <p style="margin: 0 0 1rem">Tune mouth movement sensitivity. Use <strong>Test lipsync</strong> for speech timing, or <strong>Test all blendshapes</strong> to cycle through each viseme morph target (0–21).</p>
+      <p style="margin: 0 0 1rem">Tune mouth movement sensitivity. Drag each blendshape slider to preview it on the avatar, or use the test buttons below.</p>
       <div class="avatar-preview-wrap">
         <canvas id="avatar-preview-canvas"></canvas>
       </div>
@@ -292,6 +334,14 @@
           <input id="lipsync-crossfade" type="range" min="0" max="120" value="50" step="5">
           <span class="slider-end">Smooth</span>
         </div>
+      </div>
+      <div class="blendshape-section">
+        <h3>Blendshape weights</h3>
+        <p>Per-viseme strength multipliers (0–2×). Default is 1.00. Drag a slider to preview that shape on the avatar.</p>
+        <div class="blendshape-toolbar">
+          <button type="button" id="btn-reset-blendshapes" class="secondary">Reset blendshapes</button>
+        </div>
+        <div id="blendshape-sliders" class="blendshape-grid"></div>
       </div>
       <div class="actions" style="margin-bottom: 1rem">
         <button type="button" id="btn-test-lipsync" class="secondary">Test lipsync</button>
@@ -334,6 +384,7 @@
       exaggerate: 1,
       msPerPhone: 120,
       crossfadeMs: 50,
+      blendshapes: Array(22).fill(1),
     };
     const input = document.getElementById('key');
     const prompt = document.getElementById('prompt');
@@ -404,6 +455,16 @@ ${linesText.replace(/</g, '&lt;')}</pre>
     btnRefreshLogs.addEventListener('click', loadDebugReports);
     loadDebugReports();
 
+    function normalizeBlendshapes(raw) {
+      const weights = Array(22).fill(1);
+      if (!Array.isArray(raw)) return weights;
+      for (let i = 0; i < 22; i++) {
+        const n = Number(raw[i]);
+        weights[i] = Number.isFinite(n) ? Math.min(2, Math.max(0, n)) : 1;
+      }
+      return weights;
+    }
+
     function normalizeLipsync(raw) {
       const l = raw && typeof raw === 'object' ? raw : {};
       const num = (v, min, max, fallback) => {
@@ -415,6 +476,7 @@ ${linesText.replace(/</g, '&lt;')}</pre>
         exaggerate: num(l.exaggerate, 0.2, 1.8, DEFAULT_LIPSYNC.exaggerate),
         msPerPhone: num(l.msPerPhone, 50, 280, DEFAULT_LIPSYNC.msPerPhone),
         crossfadeMs: num(l.crossfadeMs, 0, 120, DEFAULT_LIPSYNC.crossfadeMs),
+        blendshapes: normalizeBlendshapes(l.blendshapes),
       };
     }
 
@@ -430,6 +492,7 @@ ${linesText.replace(/</g, '&lt;')}</pre>
         exaggerate: lipsyncExaggerate.value,
         msPerPhone: lipsyncSpeed.value,
         crossfadeMs: lipsyncCrossfade.value,
+        blendshapes: window.getBlendshapeWeights?.(),
       });
     }
 
@@ -438,6 +501,8 @@ ${linesText.replace(/</g, '&lt;')}</pre>
       lipsyncExaggerate.value = l.exaggerate;
       lipsyncSpeed.value = l.msPerPhone;
       lipsyncCrossfade.value = l.crossfadeMs;
+      if (window.setBlendshapeWeights) window.setBlendshapeWeights(l.blendshapes);
+      else window.__pendingBlendshapes = l.blendshapes;
       updateLipsyncLabels();
       window.dispatchEvent(new CustomEvent('lipsync-fields-updated', { detail: l }));
     }
@@ -513,7 +578,19 @@ ${linesText.replace(/</g, '&lt;')}</pre>
     loadConfig();
 
     btnResetLipsync.addEventListener('click', () => {
-      applyLipsyncFields(DEFAULT_LIPSYNC);
+      const current = readLipsyncFromForm();
+      applyLipsyncFields({
+        ...current,
+        exaggerate: DEFAULT_LIPSYNC.exaggerate,
+        msPerPhone: DEFAULT_LIPSYNC.msPerPhone,
+        crossfadeMs: DEFAULT_LIPSYNC.crossfadeMs,
+      });
+    });
+
+    document.getElementById('btn-reset-blendshapes').addEventListener('click', () => {
+      window.setBlendshapeWeights?.(Array(22).fill(1));
+      window.dispatchEvent(new CustomEvent('blendshapes-preview-clear'));
+      window.dispatchEvent(new CustomEvent('lipsync-fields-updated', { detail: readLipsyncFromForm() }));
     });
 
     btnTestLipsync.addEventListener('click', () => {
@@ -568,16 +645,83 @@ ${linesText.replace(/</g, '&lt;')}</pre>
     };
   </script>
   <script type="module">
-    import { TommyAvatar, DEFAULT_AVATAR, DEFAULT_LIPSYNC, normalizeLipsync } from "/visme/avatar.js";
+    import {
+      TommyAvatar,
+      DEFAULT_AVATAR,
+      DEFAULT_LIPSYNC,
+      BLENDSHAPE_COUNT,
+      BLENDSHAPE_LABELS,
+      normalizeLipsync,
+      normalizeBlendshapes,
+    } from "/visme/avatar.js";
 
     const canvas = document.getElementById("avatar-preview-canvas");
     const statusEl = document.getElementById("avatar-preview-status");
+    const blendshapeGrid = document.getElementById("blendshape-sliders");
 
     let previewAvatar = null;
+
+    function buildBlendshapeSliders() {
+      blendshapeGrid.innerHTML = BLENDSHAPE_LABELS.map((label, i) => `
+        <div class="slider-field">
+          <div class="slider-label">
+            <label for="blendshape-${i}">${i} · ${label}</label>
+            <output id="blendshape-${i}-value" for="blendshape-${i}">1.00×</output>
+          </div>
+          <div class="slider-wrap">
+            <span class="slider-end">0</span>
+            <input id="blendshape-${i}" type="range" min="0" max="2" value="1" step="0.05" data-index="${i}">
+            <span class="slider-end">2×</span>
+          </div>
+        </div>
+      `).join("");
+
+      blendshapeGrid.addEventListener("input", (e) => {
+        const input = e.target;
+        if (!input.matches('input[type="range"][data-index]')) return;
+        const index = Number(input.dataset.index);
+        const value = Number(input.value);
+        document.getElementById(`blendshape-${index}-value`).textContent = `${value.toFixed(2)}×`;
+        previewAvatar?.previewBlendshape(index, value);
+        const settings = readLipsyncFromDom();
+        previewAvatar?.applyLipsyncSettings(settings);
+        statusEl.textContent = `Previewing blendshape ${index}: ${BLENDSHAPE_LABELS[index]}`;
+      });
+    }
+
+    window.getBlendshapeWeights = () => {
+      const weights = [];
+      for (let i = 0; i < BLENDSHAPE_COUNT; i++) {
+        weights.push(Number(document.getElementById(`blendshape-${i}`)?.value ?? 1));
+      }
+      return normalizeBlendshapes(weights);
+    };
+
+    window.setBlendshapeWeights = (weights) => {
+      const w = normalizeBlendshapes(weights);
+      for (let i = 0; i < BLENDSHAPE_COUNT; i++) {
+        const el = document.getElementById(`blendshape-${i}`);
+        const out = document.getElementById(`blendshape-${i}-value`);
+        if (!el) continue;
+        el.value = w[i];
+        if (out) out.textContent = `${w[i].toFixed(2)}×`;
+      }
+    };
+
+    buildBlendshapeSliders();
+    if (window.__pendingBlendshapes) {
+      window.setBlendshapeWeights(window.__pendingBlendshapes);
+      delete window.__pendingBlendshapes;
+    }
 
     window.addEventListener("lipsync-fields-updated", (e) => {
       if (!previewAvatar) return;
       previewAvatar.applyLipsyncSettings(e.detail);
+    });
+
+    window.addEventListener("blendshapes-preview-clear", () => {
+      previewAvatar?.clearManualBlendshapePreview();
+      statusEl.textContent = previewAvatar?.loaded ? "Blendshapes reset to 1.00×" : statusEl.textContent;
     });
 
     window.addEventListener("lipsync-preview-requested", () => {
@@ -612,6 +756,7 @@ ${linesText.replace(/</g, '&lt;')}</pre>
         exaggerate: document.getElementById("lipsync-exaggerate").value,
         msPerPhone: document.getElementById("lipsync-speed").value,
         crossfadeMs: document.getElementById("lipsync-crossfade").value,
+        blendshapes: window.getBlendshapeWeights?.(),
       });
     }
 
@@ -620,6 +765,7 @@ ${linesText.replace(/</g, '&lt;')}</pre>
       document.getElementById("lipsync-exaggerate").value = l.exaggerate;
       document.getElementById("lipsync-speed").value = l.msPerPhone;
       document.getElementById("lipsync-crossfade").value = l.crossfadeMs;
+      window.setBlendshapeWeights?.(l.blendshapes);
       window.dispatchEvent(new CustomEvent("lipsync-labels-sync"));
     }
 
