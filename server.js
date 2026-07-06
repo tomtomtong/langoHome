@@ -199,7 +199,7 @@ const server = createServer((req, res) => {
     return;
   }
 
-  const rootAsset = url.match(/^\/[^/]+\.(png|jpe?g|webp|fbx)$/i);
+  const rootAsset = url.match(/^\/[^/]+\.(png|jpe?g|webp|fbx|vrm)$/i);
   if (rootAsset) {
     serveFile(res, join(ROOT, url.slice(1)));
     return;

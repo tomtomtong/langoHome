@@ -237,6 +237,20 @@
       flex: 0 0 auto;
       padding: 0.5rem 0.875rem;
     }
+    .blendshape-export {
+      width: 100%;
+      min-height: 220px;
+      margin-bottom: 0.75rem;
+      padding: 0.625rem 0.75rem;
+      border: 1px solid #2a2f3a;
+      border-radius: 8px;
+      background: #0f1117;
+      color: #c4c7c5;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.75rem;
+      line-height: 1.45;
+      resize: vertical;
+    }
     .blendshape-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -340,7 +354,9 @@
         <p>Per-viseme strength multipliers (0–2×). Default is 1.00. Drag a slider to preview that shape on the avatar.</p>
         <div class="blendshape-toolbar">
           <button type="button" id="btn-reset-blendshapes" class="secondary">Reset blendshapes</button>
+          <button type="button" id="btn-export-blendshapes" class="secondary">Export blendshapes</button>
         </div>
+        <textarea id="blendshape-export" class="blendshape-export" readonly hidden placeholder="Exported blendshape list will appear here…"></textarea>
         <div id="blendshape-sliders" class="blendshape-grid"></div>
       </div>
       <div class="actions" style="margin-bottom: 1rem">
@@ -707,6 +723,49 @@ ${linesText.replace(/</g, '&lt;')}</pre>
         if (out) out.textContent = `${w[i].toFixed(2)}×`;
       }
     };
+
+    function buildBlendshapeExportText() {
+      const weights = window.getBlendshapeWeights();
+      const header = [
+        "Visme blendshape list (22 viseme morph targets)",
+        `Exported: ${new Date().toISOString()}`,
+        "",
+        "ID\tLabel\tWeight",
+      ];
+      const rows = BLENDSHAPE_LABELS.map((label, i) =>
+        `${i}\t${label}\t${weights[i].toFixed(2)}`
+      );
+      return [...header, ...rows].join("\n");
+    }
+
+    window.buildBlendshapeExportText = buildBlendshapeExportText;
+
+    document.getElementById("btn-export-blendshapes").addEventListener("click", async () => {
+      const text = buildBlendshapeExportText();
+      const exportEl = document.getElementById("blendshape-export");
+      exportEl.hidden = false;
+      exportEl.value = text;
+
+      let copied = false;
+      try {
+        await navigator.clipboard.writeText(text);
+        copied = true;
+      } catch {}
+
+      const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "blendshapes.txt";
+      a.click();
+      URL.revokeObjectURL(url);
+
+      statusEl.textContent = copied
+        ? "Blendshape list exported, copied to clipboard, and saved as blendshapes.txt."
+        : "Blendshape list exported below and saved as blendshapes.txt.";
+      exportEl.focus();
+      exportEl.select();
+    });
 
     buildBlendshapeSliders();
     if (window.__pendingBlendshapes) {

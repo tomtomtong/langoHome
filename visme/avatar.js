@@ -84,7 +84,7 @@ export function normalizeLipsync(raw) {
 
 export class TommyAvatar {
   constructor(canvas, {
-    vrmUrl = "/visme/Tommyv4.vrm",
+    vrmUrl = "/TommyOrignial.vrm",
     idleAnimationUrl = "/visme/Idle.fbx",
     backgroundUrl = "/bg.png",
     interactiveCamera = true,
@@ -362,7 +362,7 @@ export class TommyAvatar {
   }
 
   async load() {
-    this.setStatus("Loading Tommyv4.vrm…");
+    this.setStatus("Loading TommyOrignial.vrm…");
 
     const loader = new GLTFLoader();
     loader.register((parser) => new VRMLoaderPlugin(parser));

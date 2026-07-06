@@ -87,13 +87,13 @@ window.addEventListener("resize", () => {
 
 // ── Load VRM on page open ──
 async function loadVrm() {
-  statusEl.textContent = "Loading Tommyv4.vrm…";
+  statusEl.textContent = "Loading TommyOrignial.vrm…";
 
   const loader = new GLTFLoader();
   loader.register((parser) => new VRMLoaderPlugin(parser));
 
   try {
-    const gltf = await loader.loadAsync("./Tommyv4.vrm");
+    const gltf = await loader.loadAsync("/TommyOrignial.vrm");
     const vrm = gltf.userData.vrm;
     if (!vrm) { statusEl.textContent = "No VRM data found in file."; return; }
 
