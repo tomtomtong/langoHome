@@ -1,8 +1,11 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { createServer } from 'http';
+import { createRequire } from 'module';
 import { join, dirname, extname } from 'path';
 import { fileURLToPath } from 'url';
 import { WebSocketServer, WebSocket } from 'ws';
+
+const require = createRequire(import.meta.url);
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 
@@ -11,6 +14,14 @@ const CONFIG_DIR = process.env.CONFIG_DIR || process.env.RAILWAY_VOLUME_MOUNT_PA
 const CONFIG_PATH = join(CONFIG_DIR, 'config.json');
 const DEBUG_LOG_PATH = join(CONFIG_DIR, 'hello-debug-log.json');
 const DEBUG_LOG_MAX_REPORTS = 20;
+
+if (!process.env.GAME_DATA_DIR) {
+  process.env.GAME_DATA_DIR =
+    CONFIG_DIR === ROOT ? join(ROOT, 'newGame', 'data') : join(CONFIG_DIR, 'game-data');
+}
+
+const gameApp = require('./newGame/server.js');
+const GAME_DB_PATH = gameApp.DB_PATH;
 
 function ensureConfigDir() {
   if (CONFIG_DIR === ROOT || existsSync(CONFIG_DIR)) return;
@@ -115,8 +126,47 @@ const pages = {
   '/visme': 'visme/index.html',
 };
 
+const GAME_API_PREFIXES = [
+  '/api/images',
+  '/api/findgame',
+  '/api/settings/inworld',
+  '/api/inworld/tts',
+  '/api/game-data',
+];
+
+function isGameApiRoute(url) {
+  return GAME_API_PREFIXES.some((prefix) => url === prefix || url.startsWith(`${prefix}/`));
+}
+
+function isGameStaticRoute(url) {
+  return url === '/games' || url.startsWith('/games/');
+}
+
+function delegateToGameApp(req, res, pathname, query) {
+  const savedUrl = req.url;
+  req.url = `${pathname}${query}`;
+  gameApp(req, res, () => {
+    req.url = savedUrl;
+    res.writeHead(404, SECURITY_HEADERS).end();
+  });
+}
+
 const server = createServer((req, res) => {
-  const url = req.url?.split('?')[0] ?? '/';
+  const rawUrl = req.url ?? '/';
+  const qIndex = rawUrl.indexOf('?');
+  const url = qIndex === -1 ? rawUrl : rawUrl.slice(0, qIndex);
+  const query = qIndex === -1 ? '' : rawUrl.slice(qIndex);
+
+  if (isGameApiRoute(url)) {
+    delegateToGameApp(req, res, url, query);
+    return;
+  }
+
+  if (isGameStaticRoute(url)) {
+    const gamePath = url === '/games' ? '/index.html' : url.slice('/games'.length) || '/index.html';
+    delegateToGameApp(req, res, gamePath, query);
+    return;
+  }
 
   if (url === '/api/config') {
     if (req.method === 'GET') {
@@ -451,5 +501,7 @@ wss.on('connection', (browser) => {
 const port = Number(process.env.PORT) || 4000;
 server.listen(port, '0.0.0.0', () => {
   console.log(`Listening on http://0.0.0.0:${port}  (config: /config)`);
+  console.log(`Games hub:  http://0.0.0.0:${port}/games/`);
+  console.log(`Game database: ${GAME_DB_PATH}`);
   if (CONFIG_DIR !== ROOT) console.log(`Config stored at ${CONFIG_PATH}`);
 });

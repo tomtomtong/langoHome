@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="110" height="130" viewBox="0 0 110 130">
+  <ellipse cx="55" cy="85" rx="46" ry="44" fill="#b5764a" stroke="#3a2410" stroke-width="4"/>
+  <circle cx="38" cy="68" r="8" fill="#fff" stroke="#2a1a08" stroke-width="2"/>
+  <circle cx="72" cy="68" r="8" fill="#fff" stroke="#2a1a08" stroke-width="2"/>
+  <circle cx="40" cy="70" r="3" fill="#2a1a08"/>
+  <circle cx="74" cy="70" r="3" fill="#2a1a08"/>
+  <ellipse cx="55" cy="82" rx="10" ry="7" fill="#ff9aa8" stroke="#2a1a08" stroke-width="2"/>
+  <rect x="47" y="92" width="16" height="10" rx="3" fill="#fff" stroke="#2a1a08" stroke-width="2"/>
+  <text x="55" y="30" text-anchor="middle" font-family="Arial,sans-serif" font-size="9" fill="#fff" opacity="0.6">MOLE</text>
+</svg>

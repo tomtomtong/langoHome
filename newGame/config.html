@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Image Config — Games</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/config.css" />
+</head>
+<body>
+  <div class="config-wrap">
+    <header class="config-header">
+      <div>
+        <h1>Image Config</h1>
+        <p>Replace game artwork. Each game has its own images — changes save to the server database.</p>
+        <p class="config-hint">
+          On Railway, attach a volume mounted at <code>/app/data</code> so the SQLite database
+          (<code>game-data/game.db</code>) survives redeploys, alongside voice config.
+        </p>
+      </div>
+      <div class="nav-links">
+        <a class="nav-link" id="backToGameLink" href="index.html">← Back to Game</a>
+        <button type="button" class="btn-reset-all" id="resetAllBtn">Reset All to Defaults</button>
+      </div>
+    </header>
+
+    <div class="game-tabs" role="tablist">
+      <button type="button" class="game-tab active" data-game="wordwhack" role="tab" aria-selected="true">Word-Whack Blitz</button>
+      <button type="button" class="game-tab" data-game="cardgame" role="tab" aria-selected="false">Card Game</button>
+      <button type="button" class="game-tab" data-game="findgame" role="tab" aria-selected="false">Find the Object</button>
+    </div>
+
+    <div class="notice" id="serverNotice">
+      Upload PNG, JPG, SVG, WebP, or GIF for any slot. Custom images are stored in the
+      <strong>server database</strong> (<code>data/game.db</code>) and apply to everyone who loads the game.
+      Run <code>npm start</code> to start the server.
+    </div>
+
+    <section class="inworld-section hidden" id="inworldSection">
+      <div class="inworld-header">
+        <div>
+          <h2 class="inworld-heading">Inworld voice (Find the Object)</h2>
+          <p class="inworld-desc">Questions are spoken aloud instead of shown as text. Set your Inworld API key from the <a href="https://platform.inworld.ai/" target="_blank" rel="noopener">Inworld Portal</a>.</p>
+        </div>
+        <span class="inworld-badge" id="inworldStatusBadge">Not configured</span>
+      </div>
+      <div class="inworld-fields">
+        <label class="inworld-field">
+          <span>API key</span>
+          <input type="password" id="inworldApiKey" autocomplete="off" placeholder="Paste Inworld API key" />
+          <small class="inworld-hint" id="inworldKeyHint"></small>
+        </label>
+        <label class="inworld-field">
+          <span>Voice ID</span>
+          <input type="text" id="inworldVoiceId" placeholder="default-zylgts2tamenvybeti3z0w__uncle_tommy" />
+        </label>
+        <button type="button" class="btn-inworld-save" id="saveInworldBtn">Save voice settings</button>
+      </div>
+    </section>
+
+    <div class="loading" id="loading">Loading images from server…</div>
+
+    <section class="levels-section hidden" id="levelsSection">
+      <div class="levels-header">
+        <div>
+          <h2 class="levels-heading">Level config</h2>
+          <p class="levels-desc">Add tap positions, drag them on the preview, then pick the correct answer from the dropdown. Changes save automatically.</p>
+        </div>
+        <div class="levels-actions">
+          <button type="button" class="btn-level-add" id="addLevelBtn">+ Add level</button>
+          <button type="button" class="btn-level-reset" id="resetLevelsBtn">Reset to defaults</button>
+        </div>
+      </div>
+      <div class="levels-layout">
+        <div class="levels-preview-wrap">
+          <p class="preview-label">Drag markers to move · drag the blue handle to resize</p>
+          <div class="levels-scene-frame" id="levelsSceneFrame">
+            <img id="levelsSceneImg" class="levels-scene-img" src="FindGame/assets/images/scene.svg" alt="Scene preview" />
+            <div id="levelsHotspotMarkers" class="levels-hotspot-markers"></div>
+          </div>
+        </div>
+        <div class="levels-list" id="levelsList"></div>
+      </div>
+    </section>
+
+    <div class="slot-grid" id="slotGrid"></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="js/imageConfig.js"></script>
+  <script src="CardGame/js/imageConfig.js"></script>
+  <script src="FindGame/js/imageConfig.js"></script>
+  <script>
+    (() => {
+      "use strict";
+
+      const GAMES = {
+        wordwhack: {
+          label: "Word-Whack Blitz",
+          config: ImageConfig,
+          backLink: "index.html",
+        },
+        cardgame: {
+          label: "Card Game",
+          config: CardImageConfig,
+          backLink: "CardGame/index.html",
+        },
+        findgame: {
+          label: "Find the Object",
+          config: FindImageConfig,
+          backLink: "FindGame/index.html",
+        },
+      };
+
+      let activeGame = "wordwhack";
+      const grid = document.getElementById("slotGrid");
+      const toast = document.getElementById("toast");
+      let toastTimer = null;
+      const levelSaveTimers = new Map();
+      const levelSaveState = new Map();
+      const scaleSaveTimers = new Map();
+
+      function currentConfig() {
+        return GAMES[activeGame].config;
+      }
+
+      function debounceSave(map, key, fn, delay = 500) {
+        clearTimeout(map.get(key));
+        map.set(key, setTimeout(fn, delay));
+      }
+
+      function showToast(msg) {
+        toast.textContent = msg;
+        toast.classList.add("show");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toast.classList.remove("show"), 2200);
+      }
+
+      function isCustomized(slotKey) {
+        return currentConfig().isCustomized(slotKey);
+      }
+
+      function previewUrl(slotKey, meta) {
+        const cfg = currentConfig();
+        const url = cfg.getUrl(slotKey);
+        if (activeGame === "cardgame" && !cfg.isCustomized(slotKey)) {
+          return "CardGame/" + meta.default;
+        }
+        if (activeGame === "findgame" && !cfg.isCustomized(slotKey)) {
+          return "FindGame/" + meta.default;
+        }
+        return url;
+      }
+
+      function defaultPreviewUrl(meta) {
+        if (activeGame === "cardgame") return "CardGame/" + meta.default;
+        if (activeGame === "findgame") return "FindGame/" + meta.default;
+        return meta.default;
+      }
+
+      function renderCard(slotKey, meta) {
+        const cfg = currentConfig();
+        const card = document.createElement("article");
+        card.className = "slot-card" + (isCustomized(slotKey) ? " customized" : "");
+        card.dataset.slot = slotKey;
+
+        const preview = document.createElement("div");
+        preview.className = "slot-preview";
+        const img = document.createElement("img");
+        img.alt = meta.label;
+        img.src = previewUrl(slotKey, meta);
+        preview.appendChild(img);
+
+        const scalable = meta.scalable !== false;
+
+        function updatePreviewScale(scale) {
+          img.style.transform = scale === 1 ? "" : `scale(${scale})`;
+        }
+
+        updatePreviewScale(cfg.getScale(slotKey));
+
+        const title = document.createElement("h2");
+        title.className = "slot-title";
+        title.textContent = meta.label;
+
+        const desc = document.createElement("p");
+        desc.className = "slot-desc";
+        desc.textContent = meta.description;
+
+        const status = document.createElement("p");
+        status.className = "slot-status " + (isCustomized(slotKey) ? "custom" : "default");
+        status.textContent = isCustomized(slotKey) ? "● Custom image (saved on server)" : "○ Using default dummy image";
+
+        let scaleRow = null;
+        let scaleInput = null;
+        let scaleVal = null;
+
+        if (scalable) {
+          scaleRow = document.createElement("div");
+          scaleRow.className = "slot-scale";
+
+          const scaleLabel = document.createElement("label");
+          scaleLabel.className = "slot-scale-label";
+          scaleLabel.textContent = "Scale ";
+
+          scaleVal = document.createElement("span");
+          scaleVal.className = "scale-val";
+          scaleVal.textContent = `${Math.round(cfg.getScale(slotKey) * 100)}%`;
+          scaleLabel.appendChild(scaleVal);
+
+          scaleInput = document.createElement("input");
+          scaleInput.type = "range";
+          scaleInput.className = "scale-input";
+          scaleInput.min = "25";
+          scaleInput.max = "200";
+          scaleInput.step = "5";
+          scaleInput.value = String(Math.round(cfg.getScale(slotKey) * 100));
+          scaleInput.addEventListener("input", () => {
+            const scale = Number(scaleInput.value) / 100;
+            scaleVal.textContent = `${scaleInput.value}%`;
+            updatePreviewScale(scale);
+            debounceSave(scaleSaveTimers, slotKey, async () => {
+              try {
+                await cfg.setScale(slotKey, scale);
+                showToast(`${meta.label} scale saved (${scaleInput.value}%)`);
+              } catch (err) {
+                showToast(err.message || "Scale save failed");
+                scaleInput.value = String(Math.round(cfg.getScale(slotKey) * 100));
+                scaleVal.textContent = `${scaleInput.value}%`;
+                updatePreviewScale(cfg.getScale(slotKey));
+              }
+            }, 400);
+          });
+
+          scaleRow.append(scaleLabel, scaleInput);
+        }
+
+        const actions = document.createElement("div");
+        actions.className = "slot-actions";
+
+        const label = document.createElement("label");
+        label.className = "file-label";
+        label.textContent = "Upload image";
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = "image/*";
+        input.addEventListener("change", async () => {
+          const file = input.files[0];
+          if (!file) return;
+          try {
+            const dataUrl = await cfg.uploadImage(slotKey, file);
+            img.src = dataUrl;
+            card.classList.add("customized");
+            status.className = "slot-status custom";
+            status.textContent = "● Custom image (saved on server)";
+            resetBtn.disabled = false;
+            showToast(`${meta.label} saved!`);
+          } catch (err) {
+            showToast(err.message || "Upload failed");
+          }
+          input.value = "";
+        });
+        label.appendChild(input);
+
+        const resetBtn = document.createElement("button");
+        resetBtn.type = "button";
+        resetBtn.className = "btn-slot-reset";
+        resetBtn.textContent = "Reset default";
+        resetBtn.disabled = !isCustomized(slotKey);
+        resetBtn.addEventListener("click", async () => {
+          try {
+            await cfg.resetImage(slotKey);
+            img.src = defaultPreviewUrl(meta);
+            card.classList.remove("customized");
+            status.className = "slot-status default";
+            status.textContent = "○ Using default dummy image";
+            resetBtn.disabled = true;
+            if (scaleInput) {
+              scaleInput.value = "100";
+              scaleVal.textContent = "100%";
+              updatePreviewScale(1);
+            }
+            showToast(`${meta.label} reset to default`);
+          } catch (err) {
+            showToast(err.message || "Reset failed");
+          }
+        });
+
+        actions.appendChild(label);
+        actions.appendChild(resetBtn);
+
+        const parts = [preview, title, desc, status];
+        if (scaleRow) parts.push(scaleRow);
+        parts.push(actions);
+        card.append(...parts);
+        return card;
+      }
+
+      function buildGrid() {
+        grid.innerHTML = "";
+        const cfg = currentConfig();
+        for (const [key, meta] of Object.entries(cfg.SLOTS)) {
+          grid.appendChild(renderCard(key, meta));
+        }
+      }
+
+      function setActiveGame(gameId) {
+        if (!GAMES[gameId]) return;
+        activeGame = gameId;
+        document.querySelectorAll(".game-tab").forEach((tab) => {
+          const isActive = tab.dataset.game === gameId;
+          tab.classList.toggle("active", isActive);
+          tab.setAttribute("aria-selected", isActive ? "true" : "false");
+        });
+        document.getElementById("backToGameLink").href = GAMES[gameId].backLink;
+        document.getElementById("levelsSection").classList.toggle("hidden", gameId !== "findgame");
+        document.getElementById("inworldSection").classList.toggle("hidden", gameId !== "findgame");
+        if (gameId === "findgame") {
+          loadLevelsConfig();
+          loadInworldSettings();
+        }
+        buildGrid();
+      }
+
+      document.querySelectorAll(".game-tab").forEach((tab) => {
+        tab.addEventListener("click", () => setActiveGame(tab.dataset.game));
+      });
+
+      document.getElementById("resetAllBtn").addEventListener("click", async () => {
+        const gameLabel = GAMES[activeGame].label;
+        if (!confirm(`Reset ALL ${gameLabel} images to defaults? Custom uploads for this game will be removed from the server.`)) return;
+        try {
+          await currentConfig().resetAll();
+          buildGrid();
+          if (activeGame === "findgame") updateLevelsScenePreview();
+          showToast(`${gameLabel} images reset to defaults`);
+        } catch (err) {
+          showToast(err.message || "Reset failed");
+        }
+      });
+
+      /* ---- Find Game level config ---- */
+      let findLevels = [];
+      let selectedLevelId = null;
+      let selectedHotspotIndex = 0;
+      let dragState = null;
+
+      const levelsList = document.getElementById("levelsList");
+      const levelsSceneImg = document.getElementById("levelsSceneImg");
+      const levelsHotspotMarkers = document.getElementById("levelsHotspotMarkers");
+      const levelsSceneFrame = document.getElementById("levelsSceneFrame");
+
+      function levelHotspots(lv) {
+        if (Array.isArray(lv?.hotspots) && lv.hotspots.length) return lv.hotspots;
+        if (lv?.hotspot) return [lv.hotspot];
+        return [{ x: 0.5, y: 0.5, radius: 0.08 }];
+      }
+
+      function scenePointFromEvent(e) {
+        const rect = levelsSceneImg.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return {
+          x: Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)),
+          y: Math.max(0, Math.min(1, (clientY - rect.top) / rect.height)),
+        };
+      }
+
+      function selectHotspot(levelId, index) {
+        selectedLevelId = levelId;
+        selectedHotspotIndex = index;
+        const lv = findLevels.find((l) => l.id === levelId);
+        renderLevelsList();
+        updateLevelsScenePreview(lv);
+        updateHotspotMarkers(lv);
+      }
+
+      function defaultSceneUrl() {
+        return FindImageConfig.isCustomized("find_scene")
+          ? FindImageConfig.getUrl("find_scene")
+          : "FindGame/assets/images/scene.svg";
+      }
+
+      function levelScenePreviewUrl(lv) {
+        return lv?.sceneUrl || defaultSceneUrl();
+      }
+
+      function updateLevelsScenePreview(level) {
+        const lv = level || findLevels.find((l) => l.id === selectedLevelId);
+        levelsSceneImg.src = lv ? levelScenePreviewUrl(lv) : defaultSceneUrl();
+      }
+
+      function updateHotspotMarkers(level) {
+        levelsHotspotMarkers.innerHTML = "";
+        if (!level || selectedLevelId !== level.id) return;
+
+        levelHotspots(level).forEach((hs, index) => {
+          const marker = document.createElement("div");
+          marker.className =
+            "levels-hotspot-marker" +
+            (index === selectedHotspotIndex ? " selected" : "");
+          marker.style.left = `${hs.x * 100}%`;
+          marker.style.top = `${hs.y * 100}%`;
+          marker.style.width = `${hs.radius * 200}%`;
+          marker.style.height = `${hs.radius * 200}%`;
+          marker.title = `Position ${index + 1} — drag to move`;
+
+          const label = document.createElement("span");
+          label.className = "levels-hotspot-label";
+          label.textContent = String(index + 1);
+          marker.appendChild(label);
+
+          const handle = document.createElement("span");
+          handle.className = "levels-hotspot-resize";
+          handle.title = "Drag to resize";
+          marker.appendChild(handle);
+          handle.addEventListener("mousedown", (e) => startMarkerDrag(e, level.id, index, "resize"));
+          handle.addEventListener("touchstart", (e) => startMarkerDrag(e, level.id, index, "resize"), { passive: false });
+
+          marker.addEventListener("mousedown", (e) => {
+            if (e.target.classList.contains("levels-hotspot-resize")) return;
+            startMarkerDrag(e, level.id, index, "move");
+          });
+          marker.addEventListener("touchstart", (e) => {
+            if (e.target.classList.contains("levels-hotspot-resize")) return;
+            startMarkerDrag(e, level.id, index, "move");
+          }, { passive: false });
+
+          levelsHotspotMarkers.appendChild(marker);
+        });
+      }
+
+      function startMarkerDrag(e, levelId, index, mode) {
+        e.preventDefault();
+        e.stopPropagation();
+        selectedLevelId = levelId;
+        selectedHotspotIndex = index;
+        dragState = { mode, levelId, index, moved: false };
+        levelsSceneFrame.classList.add("dragging");
+        document.body.classList.add("hotspot-dragging");
+      }
+
+      function onMarkerDragMove(e) {
+        if (!dragState) return;
+        e.preventDefault();
+        const lv = findLevels.find((l) => l.id === dragState.levelId);
+        if (!lv) return;
+        lv.hotspots = levelHotspots(lv);
+        const hs = lv.hotspots[dragState.index];
+        if (!hs) return;
+
+        const pt = scenePointFromEvent(e);
+        dragState.moved = true;
+
+        if (dragState.mode === "move") {
+          hs.x = Math.round(pt.x * 1000) / 1000;
+          hs.y = Math.round(pt.y * 1000) / 1000;
+        } else {
+          const dx = pt.x - hs.x;
+          const dy = pt.y - hs.y;
+          hs.radius = Math.round(Math.max(0.03, Math.min(0.3, Math.sqrt(dx * dx + dy * dy))) * 100) / 100;
+        }
+
+        updateHotspotMarkers(lv);
+      }
+
+      function endMarkerDrag() {
+        if (!dragState) return;
+        const moved = dragState.moved;
+        const levelId = dragState.levelId;
+        dragState = null;
+        levelsSceneFrame.classList.remove("dragging");
+        document.body.classList.remove("hotspot-dragging");
+        if (moved) {
+          renderLevelsList();
+          updateHotspotMarkers(findLevels.find((l) => l.id === levelId));
+          scheduleLevelSave(levelId, 300);
+        }
+      }
+
+      document.addEventListener("mousemove", onMarkerDragMove);
+      document.addEventListener("mouseup", endMarkerDrag);
+      document.addEventListener("touchmove", onMarkerDragMove, { passive: false });
+      document.addEventListener("touchend", endMarkerDrag);
+      document.addEventListener("touchcancel", endMarkerDrag);
+
+      async function loadLevelsConfig() {
+        try {
+          const res = await fetch("/api/findgame/levels");
+          const data = await res.json();
+          findLevels = (data.levels || []).map((lv) => ({
+            ...lv,
+            hotspots: levelHotspots(lv),
+          }));
+          if (findLevels.length && !selectedLevelId) {
+            selectedLevelId = findLevels[0].id;
+          }
+          selectedHotspotIndex = 0;
+          renderLevelsList();
+          updateHotspotMarkers(findLevels.find((l) => l.id === selectedLevelId));
+        } catch (err) {
+          showToast("Failed to load levels");
+        }
+      }
+
+      async function uploadLevelScene(levelId, file) {
+        const form = new FormData();
+        form.append("image", file);
+        const res = await fetch(`/api/findgame/levels/${levelId}/scene`, {
+          method: "PUT",
+          body: form,
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Upload failed");
+        return data.level;
+      }
+
+      async function resetLevelScene(levelId) {
+        const res = await fetch(`/api/findgame/levels/${levelId}/scene`, {
+          method: "DELETE",
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Reset failed");
+        return data.level;
+      }
+
+      function correctIndexForLevel(lv) {
+        const hotspots = levelHotspots(lv);
+        const idx = Number(lv.target);
+        if (Number.isInteger(idx) && idx >= 0 && idx < hotspots.length) return idx;
+        const legacy = hotspots.findIndex(
+          (h) =>
+            String(h.target || "").trim().toLowerCase() ===
+            String(lv.target || "").trim().toLowerCase()
+        );
+        return legacy >= 0 ? legacy : 0;
+      }
+
+      function renderCorrectAnswerSelect(lv) {
+        const hotspots = levelHotspots(lv);
+        const selected = correctIndexForLevel(lv);
+        if (!hotspots.length) {
+          return `<select class="level-correct-pos" data-id="${lv.id}" disabled><option>Add a position first</option></select>`;
+        }
+        return `<select class="level-correct-pos" data-id="${lv.id}">${hotspots
+          .map(
+            (_, i) =>
+              `<option value="${i}"${i === selected ? " selected" : ""}>Pos ${i + 1}</option>`
+          )
+          .join("")}</select>`;
+      }
+
+      function clampCorrectIndex(lv) {
+        const hotspots = levelHotspots(lv);
+        if (!hotspots.length) return;
+        const idx = correctIndexForLevel(lv);
+        lv.target = String(Math.min(idx, hotspots.length - 1));
+      }
+      function renderHotspotRows(lv) {
+        return levelHotspots(lv)
+          .map(
+            (hs, index) => `
+          <div class="hotspot-row${index === selectedHotspotIndex && lv.id === selectedLevelId ? " selected" : ""}" data-index="${index}">
+            <button type="button" class="hotspot-row-select" data-id="${lv.id}" data-index="${index}">Pos ${index + 1}</button>
+            <span class="hotspot-drag-hint">Drag on preview to adjust</span>
+            <button type="button" class="btn-hotspot-remove" data-id="${lv.id}" data-index="${index}" title="Remove position">×</button>
+          </div>
+        `
+          )
+          .join("");
+      }
+
+      function renderLevelsList() {
+        levelsList.innerHTML = "";
+        findLevels.forEach((lv, idx) => {
+          const card = document.createElement("article");
+          card.className = "level-card" + (lv.id === selectedLevelId ? " selected" : "");
+          card.innerHTML = `
+            <div class="level-card-head">
+              <span class="level-num">Level ${idx + 1}</span>
+              <button type="button" class="btn-level-delete" data-id="${lv.id}" title="Delete level">×</button>
+            </div>
+            <label class="level-field">
+              <span>Sentence</span>
+              <input type="text" class="level-sentence" data-id="${lv.id}" value="${escapeAttr(lv.sentence)}" />
+            </label>
+            <div class="level-scene-block">
+              <div class="level-scene-head">
+                <span class="level-scene-label">Scene image</span>
+                <span class="level-scene-status">${lv.hasCustomScene ? "Custom" : "Default fallback"}</span>
+              </div>
+              <div class="level-scene-actions">
+                <label class="file-label file-label--small">
+                  Upload scene
+                  <input type="file" class="level-scene-upload" data-id="${lv.id}" accept="image/*" />
+                </label>
+                <button type="button" class="btn-scene-reset" data-id="${lv.id}" ${lv.hasCustomScene ? "" : "disabled"}>Reset scene</button>
+              </div>
+            </div>
+            <div class="level-positions-head">
+              <span class="level-positions-label">Tap positions</span>
+              <button type="button" class="btn-hotspot-add" data-id="${lv.id}">+ Add position</button>
+            </div>
+            <div class="hotspot-rows">${renderHotspotRows(lv)}</div>
+            <label class="level-field">
+              <span>Correct answer</span>
+              ${renderCorrectAnswerSelect(lv)}
+            </label>
+            <p class="level-save-status" data-id="${lv.id}">${levelSaveStatusText(lv.id)}</p>
+          `;
+          card.addEventListener("click", (e) => {
+            if (e.target.closest("button, input, select, textarea, label")) return;
+            selectedLevelId = lv.id;
+            selectedHotspotIndex = 0;
+            renderLevelsList();
+            updateLevelsScenePreview(lv);
+            updateHotspotMarkers(lv);
+          });
+          levelsList.appendChild(card);
+        });
+
+        levelsList.querySelectorAll(".level-scene-upload").forEach((input) => {
+          input.addEventListener("change", async () => {
+            const file = input.files[0];
+            if (!file) return;
+            const id = Number(input.dataset.id);
+            try {
+              const level = await uploadLevelScene(id, file);
+              const idx = findLevels.findIndex((l) => l.id === id);
+              if (idx >= 0) findLevels[idx] = { ...findLevels[idx], ...level, hotspots: levelHotspots(level) };
+              selectedLevelId = id;
+              renderLevelsList();
+              updateLevelsScenePreview(level);
+              updateHotspotMarkers(findLevels.find((l) => l.id === id));
+              showToast("Scene image saved");
+            } catch (err) {
+              showToast(err.message || "Upload failed");
+            }
+            input.value = "";
+          });
+        });
+
+        levelsList.querySelectorAll(".btn-scene-reset").forEach((btn) => {
+          btn.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            const id = Number(btn.dataset.id);
+            try {
+              const level = await resetLevelScene(id);
+              const idx = findLevels.findIndex((l) => l.id === id);
+              if (idx >= 0) findLevels[idx] = { ...findLevels[idx], ...level, hotspots: levelHotspots(level) };
+              renderLevelsList();
+              updateLevelsScenePreview(level);
+              showToast("Scene reset to default");
+            } catch (err) {
+              showToast(err.message || "Reset failed");
+            }
+          });
+        });
+
+        levelsList.querySelectorAll(".level-sentence").forEach((input) => {
+          input.addEventListener("input", () => {
+            const id = Number(input.dataset.id);
+            const lv = findLevels.find((l) => l.id === id);
+            if (lv) lv.sentence = input.value;
+            scheduleLevelSave(id);
+          });
+        });
+
+        levelsList.querySelectorAll(".btn-level-delete").forEach((btn) => {
+          btn.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            const id = Number(btn.dataset.id);
+            if (!confirm("Delete this level?")) return;
+            try {
+              await fetch(`/api/findgame/levels/${id}`, { method: "DELETE" });
+              findLevels = findLevels.filter((l) => l.id !== id);
+              if (selectedLevelId === id) {
+                selectedLevelId = findLevels[0]?.id ?? null;
+                selectedHotspotIndex = 0;
+              }
+              renderLevelsList();
+              updateLevelsScenePreview(findLevels.find((l) => l.id === selectedLevelId));
+              updateHotspotMarkers(findLevels.find((l) => l.id === selectedLevelId));
+              showToast("Level deleted");
+            } catch {
+              showToast("Delete failed");
+            }
+          });
+        });
+
+        levelsList.querySelectorAll(".btn-hotspot-add").forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const id = Number(btn.dataset.id);
+            const lv = findLevels.find((l) => l.id === id);
+            if (!lv) return;
+            lv.hotspots = levelHotspots(lv);
+            lv.hotspots.push({ x: 0.5, y: 0.5, radius: 0.08 });
+            clampCorrectIndex(lv);
+            selectedLevelId = id;
+            selectedHotspotIndex = lv.hotspots.length - 1;
+            renderLevelsList();
+            updateHotspotMarkers(lv);
+            scheduleLevelSave(id);
+          });
+        });
+
+        levelsList.querySelectorAll(".btn-hotspot-remove").forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const id = Number(btn.dataset.id);
+            const index = Number(btn.dataset.index);
+            const lv = findLevels.find((l) => l.id === id);
+            if (!lv) return;
+            lv.hotspots = levelHotspots(lv);
+            if (lv.hotspots.length <= 1) {
+              showToast("Each level needs at least one position");
+              return;
+            }
+            lv.hotspots.splice(index, 1);
+            if (selectedLevelId === id) {
+              selectedHotspotIndex = Math.min(selectedHotspotIndex, lv.hotspots.length - 1);
+            }
+            clampCorrectIndex(lv);
+            renderLevelsList();
+            updateHotspotMarkers(lv);
+            scheduleLevelSave(id);
+          });
+        });
+
+        levelsList.querySelectorAll(".hotspot-row-select").forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            selectHotspot(Number(btn.dataset.id), Number(btn.dataset.index));
+          });
+        });
+
+        levelsList.querySelectorAll(".level-correct-pos").forEach((select) => {
+          select.addEventListener("change", () => {
+            const id = Number(select.dataset.id);
+            const lv = findLevels.find((l) => l.id === id);
+            if (lv) lv.target = select.value;
+            scheduleLevelSave(id);
+          });
+        });
+      }
+
+      function levelSaveStatusText(id) {
+        const state = levelSaveState.get(id);
+        if (state === "saving") return "Saving…";
+        if (state === "saved") return "Saved";
+        if (state === "error") return "Save failed — check fields";
+        return "Changes save automatically";
+      }
+
+      function updateLevelSaveStatus(id) {
+        const el = levelsList.querySelector(`.level-save-status[data-id="${id}"]`);
+        if (el) el.textContent = levelSaveStatusText(id);
+      }
+
+      function scheduleLevelSave(id, delay = 500) {
+        levelSaveState.set(id, "pending");
+        updateLevelSaveStatus(id);
+        debounceSave(levelSaveTimers, id, () => saveLevel(id), delay);
+      }
+
+      function escapeAttr(str) {
+        return String(str).replace(/"/g, "&quot;");
+      }
+
+      async function saveLevel(id) {
+        const lv = findLevels.find((l) => l.id === id);
+        if (!lv) return;
+
+        const card = levelsList.querySelector(`.level-save-status[data-id="${id}"]`)?.closest(".level-card");
+        const sentenceInput = card?.querySelector(".level-sentence");
+        const sentence = (sentenceInput?.value ?? lv.sentence ?? "").trim();
+        const correctSelect = card?.querySelector(".level-correct-pos");
+        const hotspots = levelHotspots(lv);
+
+        if (sentenceInput) lv.sentence = sentenceInput.value;
+
+        if (!sentence) {
+          levelSaveState.set(id, "error");
+          updateLevelSaveStatus(id);
+          showToast("Sentence is required");
+          return;
+        }
+        if (!hotspots.length) {
+          levelSaveState.set(id, "error");
+          updateLevelSaveStatus(id);
+          showToast("Add at least one tap position");
+          return;
+        }
+        if (!correctSelect || correctSelect.disabled) {
+          levelSaveState.set(id, "error");
+          updateLevelSaveStatus(id);
+          showToast("Choose a correct answer position");
+          return;
+        }
+
+        const target = correctSelect.value;
+        lv.target = target;
+
+        levelSaveState.set(id, "saving");
+        updateLevelSaveStatus(id);
+
+        try {
+          const res = await fetch(`/api/findgame/levels/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sentence, target, hotspots }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Save failed");
+          const idx = findLevels.findIndex((l) => l.id === id);
+          if (idx >= 0) {
+            findLevels[idx] = { ...findLevels[idx], ...data.level, hotspots: levelHotspots(data.level) };
+          }
+          if (selectedLevelId === id) updateHotspotMarkers(findLevels.find((l) => l.id === id));
+          levelSaveState.set(id, "saved");
+          updateLevelSaveStatus(id);
+        } catch (err) {
+          levelSaveState.set(id, "error");
+          updateLevelSaveStatus(id);
+          showToast(err.message || "Save failed");
+        }
+      }
+
+      document.getElementById("addLevelBtn").addEventListener("click", async () => {
+        try {
+          const res = await fetch("/api/findgame/levels", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sentence: "Find the object!",
+              target: "0",
+              hotspots: [{ x: 0.5, y: 0.5, radius: 0.08 }],
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Add level failed");
+          findLevels.push(data.level);
+          selectedLevelId = data.level.id;
+          selectedHotspotIndex = 0;
+          renderLevelsList();
+          updateLevelsScenePreview(data.level);
+          updateHotspotMarkers(data.level);
+          showToast("Level added");
+        } catch (err) {
+          showToast(err.message || "Add level failed");
+        }
+      });
+
+      document.getElementById("resetLevelsBtn").addEventListener("click", async () => {
+        if (!confirm("Reset all Find Game levels to defaults?")) return;
+        try {
+          const res = await fetch("/api/findgame/levels/reset", { method: "POST" });
+          const data = await res.json();
+          findLevels = (data.levels || []).map((lv) => ({
+            ...lv,
+            hotspots: levelHotspots(lv),
+          }));
+          selectedLevelId = findLevels[0]?.id ?? null;
+          selectedHotspotIndex = 0;
+          renderLevelsList();
+          updateLevelsScenePreview(findLevels[0]);
+          updateHotspotMarkers(findLevels[0]);
+          showToast("Levels reset to defaults");
+        } catch {
+          showToast("Reset failed");
+        }
+      });
+
+      /* ---- Inworld voice config ---- */
+      const inworldApiKeyInput = document.getElementById("inworldApiKey");
+      const inworldVoiceIdInput = document.getElementById("inworldVoiceId");
+      const inworldStatusBadge = document.getElementById("inworldStatusBadge");
+      const inworldKeyHint = document.getElementById("inworldKeyHint");
+
+      async function parseJsonResponse(res) {
+        const contentType = res.headers.get("content-type") || "";
+        if (!contentType.includes("application/json")) {
+          throw new Error(
+            "Server API not found. Run npm start, then open http://localhost:3000/config.html (not the file directly)."
+          );
+        }
+        return res.json();
+      }
+
+      async function loadInworldSettings() {
+        try {
+          const res = await fetch("/api/settings/inworld");
+          const data = await parseJsonResponse(res);
+          if (!res.ok) throw new Error(data.error || "Load failed");
+          inworldVoiceIdInput.value = data.voiceId || "";
+          inworldKeyHint.textContent = data.configured
+            ? `Saved key ending in ${data.apiKeyPreview.slice(-4)} — leave blank to keep it`
+            : "No API key saved yet";
+          inworldStatusBadge.textContent = data.configured ? "Configured" : "Not configured";
+          inworldStatusBadge.classList.toggle("configured", data.configured);
+        } catch (err) {
+          inworldKeyHint.textContent = err.message || "Could not load settings — is the server running?";
+        }
+      }
+
+      document.getElementById("saveInworldBtn").addEventListener("click", async () => {
+        const payload = {};
+        const apiKey = inworldApiKeyInput.value.trim();
+        const voiceId = inworldVoiceIdInput.value.trim();
+        if (apiKey) payload.apiKey = apiKey;
+        if (voiceId) payload.voiceId = voiceId;
+        if (!apiKey && !voiceId) {
+          showToast("Enter an API key or voice ID to save");
+          return;
+        }
+        try {
+          const res = await fetch("/api/settings/inworld", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const data = await parseJsonResponse(res);
+          if (!res.ok) throw new Error(data.error || "Save failed");
+          inworldApiKeyInput.value = "";
+          inworldVoiceIdInput.value = data.voiceId || "";
+          inworldKeyHint.textContent = data.configured
+            ? `Saved key ending in ${data.apiKeyPreview.slice(-4)} — leave blank to keep it`
+            : "No API key saved yet";
+          inworldStatusBadge.textContent = data.configured ? "Configured" : "Not configured";
+          inworldStatusBadge.classList.toggle("configured", data.configured);
+          showToast("Inworld voice settings saved");
+        } catch (err) {
+          showToast(err.message || "Save failed");
+        }
+      });
+
+      async function init() {
+        const loading = document.getElementById("loading");
+        const notice = document.getElementById("serverNotice");
+
+        const hash = location.hash.replace("#", "");
+        if (hash === "cardgame" || hash === "wordwhack" || hash === "findgame") {
+          activeGame = hash;
+        }
+
+        try {
+          await Promise.all([
+            ImageConfig.loadFromServer(),
+            CardImageConfig.loadFromServer(),
+            FindImageConfig.loadFromServer(),
+          ]);
+          const serverOk =
+            ImageConfig.isServerAvailable() ||
+            CardImageConfig.isServerAvailable() ||
+            FindImageConfig.isServerAvailable();
+          if (!serverOk) {
+            notice.textContent = "Server not reachable. Start the server with npm start, then refresh this page.";
+            notice.style.background = "#ffd6d6";
+          }
+        } catch (err) {
+          notice.textContent = "Failed to connect to image server. Run npm start and refresh.";
+          notice.style.background = "#ffd6d6";
+        } finally {
+          loading.style.display = "none";
+          setActiveGame(activeGame);
+        }
+      }
+
+      init();
+    })();
+  </script>
+</body>
+</html>

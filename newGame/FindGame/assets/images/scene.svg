@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
+  <defs>
+    <linearGradient id="wall" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#87CEEB"/>
+      <stop offset="100%" stop-color="#B0E0E6"/>
+    </linearGradient>
+    <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#DEB887"/>
+      <stop offset="100%" stop-color="#C4A574"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Room -->
+  <rect width="800" height="380" fill="url(#wall)"/>
+  <rect y="380" width="800" height="220" fill="url(#floor)"/>
+  <line x1="0" y1="380" x2="800" y2="380" stroke="#A08060" stroke-width="4"/>
+
+  <!-- Shelf -->
+  <rect x="300" y="100" width="200" height="12" fill="#8B6914" rx="2"/>
+  <rect x="295" y="95" width="8" height="80" fill="#6B4F10"/>
+  <rect x="497" y="95" width="8" height="80" fill="#6B4F10"/>
+
+  <!-- Book (target: book) -->
+  <g id="book">
+    <rect x="370" y="72" width="36" height="28" fill="#4169E1" rx="2"/>
+    <rect x="374" y="76" width="28" height="3" fill="#FFD700" opacity="0.7"/>
+    <text x="388" y="92" text-anchor="middle" font-family="Arial,sans-serif" font-size="8" fill="#fff">BOOK</text>
+  </g>
+
+  <!-- Star on wall (target: star) -->
+  <g id="star" transform="translate(660,150)">
+    <polygon points="0,-22 6,-6 22,-6 9,4 14,20 0,10 -14,20 -9,4 -22,-6 -6,-6" fill="#FFD700" stroke="#DAA520" stroke-width="2"/>
+    <text x="0" y="38" text-anchor="middle" font-family="Arial,sans-serif" font-size="10" fill="#555">STAR</text>
+  </g>
+
+  <!-- Table -->
+  <rect x="180" y="320" width="200" height="14" fill="#8B4513" rx="3"/>
+  <rect x="200" y="334" width="12" height="80" fill="#6B3410"/>
+  <rect x="348" y="334" width="12" height="80" fill="#6B3410"/>
+
+  <!-- Apple on table (target: apple) -->
+  <g id="apple">
+    <circle cx="280" cy="310" r="22" fill="#E53935"/>
+    <circle cx="272" cy="302" r="6" fill="#FF6659" opacity="0.5"/>
+    <rect x="277" y="286" width="6" height="10" fill="#5D4037" rx="2"/>
+    <ellipse cx="290" cy="288" rx="10" ry="5" fill="#66BB6A" transform="rotate(30 290 288)"/>
+    <text x="280" y="350" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="#333">APPLE</text>
+  </g>
+
+  <!-- Plant -->
+  <rect x="620" y="300" width="40" height="50" fill="#CD853F" rx="4"/>
+  <ellipse cx="640" cy="295" rx="30" ry="20" fill="#228B22"/>
+  <ellipse cx="625" cy="285" rx="18" ry="14" fill="#32CD32"/>
+  <ellipse cx="655" cy="288" rx="16" ry="12" fill="#2E8B2E"/>
+
+  <!-- Cat on floor (target: cat) -->
+  <g id="cat">
+    <ellipse cx="560" cy="455" rx="35" ry="25" fill="#FF9800"/>
+    <circle cx="590" cy="440" r="22" fill="#FF9800"/>
+    <polygon points="575,425 580,410 590,422" fill="#FF9800"/>
+    <polygon points="600,425 610,410 605,422" fill="#FF9800"/>
+    <circle cx="596" cy="436" r="4" fill="#333"/>
+    <circle cx="608" cy="436" r="4" fill="#333"/>
+    <path d="M598 445 Q605 450 612 445" stroke="#333" fill="none" stroke-width="2"/>
+    <ellipse cx="545" cy="470" rx="8" ry="20" fill="#FF9800" transform="rotate(-20 545 470)"/>
+    <ellipse cx="575" cy="475" rx="8" ry="20" fill="#FF9800" transform="rotate(20 575 475)"/>
+    <text x="560" y="505" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="#333">CAT</text>
+  </g>
+
+  <!-- Ball (target: ball) -->
+  <g id="ball">
+    <circle cx="120" cy="480" r="28" fill="#FFEB3B" stroke="#FBC02D" stroke-width="3"/>
+    <path d="M105 470 Q120 490 135 470" stroke="#F9A825" fill="none" stroke-width="2"/>
+    <text x="120" y="525" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="#333">BALL</text>
+  </g>
+
+  <!-- Window -->
+  <rect x="50" y="80" width="100" height="120" fill="#E0F7FA" stroke="#8D6E63" stroke-width="6" rx="2"/>
+  <line x1="100" y1="80" x2="100" y2="200" stroke="#8D6E63" stroke-width="3"/>
+  <line x1="50" y1="140" x2="150" y2="140" stroke="#8D6E63" stroke-width="3"/>
+
+  <!-- Picture frame -->
+  <rect x="480" y="60" width="80" height="60" fill="#FFF8E1" stroke="#795548" stroke-width="4" rx="2"/>
+  <circle cx="520" cy="85" r="12" fill="#FF7043"/>
+  <rect x="505" y="100" width="30" height="8" fill="#66BB6A" rx="2"/>
+</svg>

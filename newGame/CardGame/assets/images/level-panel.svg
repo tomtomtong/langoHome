@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200" viewBox="0 0 320 200">
+  <rect x="4" y="4" width="312" height="192" rx="16" fill="#fff9e6" stroke="#5e3a18" stroke-width="4"/>
+  <text x="160" y="80" text-anchor="middle" font-family="Arial,sans-serif" font-size="24" font-weight="bold" fill="#333">B�0</text>
+  <text x="160" y="120" text-anchor="middle" font-family="Arial,sans-serif" font-size="28" fill="#f0a500"></text>
+  <text x="160" y="160" text-anchor="middle" font-family="Arial,sans-serif" font-size="14" fill="#666" opacity="0.5">LEVEL PANEL</text>
+</svg>

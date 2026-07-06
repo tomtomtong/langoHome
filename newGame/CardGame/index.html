@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Picture-Word Memory Match</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="../css/gamePicker.css">
+</head>
+<body>
+<div id="bga-custom-background" aria-hidden="true"></div>
+
+<div id="game">
+  <button id="return-btn" onclick="startGame()">
+    <img src="assets/images/return-btn.svg" alt="Return" class="return-icon">
+  </button>
+  <h1 class="title-text">Picture-Word Memory Match</h1>
+  <div id="status-row">
+    <div id="timer-display">
+      <img src="assets/images/timer.svg" alt="timer" class="timer-icon">
+      <span id="timer-text">90</span>
+    </div>
+    <div id="pairs-display"><span id="pairs-found">0/6</span> Pairs Found</div>
+    <div id="score-display">Score: <span id="score-text">0</span></div>
+  </div>
+  <div id="hud">
+    <span id="timer" style="display:none;">90</span>
+  </div>
+  <div id="board"></div>
+  <footer class="footer">
+    <div class="progress-frame">
+      <div id="progressFill" class="progress-fill"></div>
+      <div class="star-milestone s1" data-milestone="1">★</div>
+      <div class="star-milestone s2" data-milestone="2">★</div>
+      <div class="star-milestone s3" data-milestone="3">★</div>
+    </div>
+  </footer>
+  <div id="level-complete" class="hidden" aria-live="polite">
+    <div class="level-complete-inner">
+      <p class="level-complete-title">Time's up!</p>
+      <p class="level-complete-stars" id="complete-stars"></p>
+      <p class="level-complete-score">Score: <span id="complete-score">0</span></p>
+    </div>
+  </div>
+</div>
+<script src="js/imageConfig.js"></script>
+<script src="../js/gamePicker.js"></script>
+<script src="game.js"></script>
+</body>
+</html>

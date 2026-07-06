@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Word-Whack Blitz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/gamePicker.css" />
+</head>
+<body>
+  <div id="game" class="scene">
+    <!-- Sky / clouds decor -->
+    <div class="sky-decor">
+      <div class="cloud cloud-1"></div>
+      <div class="cloud cloud-2"></div>
+      <div class="cloud cloud-3"></div>
+    </div>
+
+    <!-- Hills -->
+    <div class="hills">
+      <div class="hill hill-back"></div>
+      <div class="hill hill-front"></div>
+    </div>
+
+    <!-- Header -->
+    <header class="hud">
+      <button type="button" class="return-btn" id="returnBtn" title="Return" aria-label="Return"></button>
+
+      <div class="sign-wrap">
+        <div class="rope rope-left"></div>
+        <div class="rope rope-right"></div>
+        <div class="sign">
+          <div class="sign-label">Complete the sentence</div>
+          <div id="sentence" class="sentence">Loading…</div>
+        </div>
+      </div>
+
+      <div class="timer-wrap">
+        <div class="stopwatch">
+          <div class="sw-top"></div>
+          <div class="sw-face">
+            <span id="timerVal" class="timer-num">90</span>
+            <span class="timer-unit">sec</span>
+          </div>
+          <div class="sw-button"></div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Play area -->
+    <main class="play-area">
+      <div id="grid" class="grid"></div>
+    </main>
+
+    <!-- Footer progress -->
+    <footer class="footer">
+      <div class="progress-frame">
+        <div id="progressFill" class="progress-fill"></div>
+        <div class="star-milestone s1" data-milestone="1">★</div>
+        <div class="star-milestone s2" data-milestone="2">★</div>
+        <div class="star-milestone s3" data-milestone="3">★</div>
+      </div>
+      <div class="footer-meta">
+        <div class="level-chip">Question <span id="questionVal">0</span></div>
+        <div class="combo-chip" id="comboChip">Combo x<span id="comboVal">0</span></div>
+      </div>
+    </footer>
+
+    <!-- Game-over overlay (shown after time runs out) -->
+    <div id="overlay" class="overlay hidden">
+      <div class="panel"></div>
+    </div>
+
+    <!-- Floating feedback layer -->
+    <div id="fx" class="fx-layer"></div>
+  </div>
+
+  <script src="js/imageConfig.js"></script>
+  <script src="js/gamePicker.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>

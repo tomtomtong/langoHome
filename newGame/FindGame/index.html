@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Find the Object</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="../css/gamePicker.css" />
+</head>
+<body>
+  <div id="bga-custom-background" aria-hidden="true"></div>
+
+  <div id="game" class="scene">
+    <header class="hud">
+      <button type="button" class="return-btn" id="returnBtn" title="Restart" aria-label="Restart">
+        <img src="assets/images/return-btn.svg" alt="" class="return-icon" />
+      </button>
+
+      <div class="sign-wrap">
+        <div class="sign">
+          <div class="sign-label">Find it!</div>
+          <div id="questionVoice" class="question-voice" aria-live="polite">
+            <span class="speaker-icon" id="speakerIcon" aria-hidden="true">🔊</span>
+            <span class="voice-status" id="voiceStatus">Tap 🔁 to listen</span>
+            <button type="button" class="replay-btn" id="replayBtn" title="Replay question" aria-label="Replay question">🔁</button>
+          </div>
+          <div id="sentence" class="sentence visually-hidden" aria-hidden="true">Loading…</div>
+        </div>
+      </div>
+
+      <div class="hud-meta">
+        <div class="timer-chip" id="timerWrap">
+          <span id="timerVal" class="timer-num">90</span>
+          <span class="timer-unit">sec</span>
+        </div>
+        <div class="level-chip">Found <span id="foundVal">0</span></div>
+      </div>
+    </header>
+
+    <main class="play-area">
+      <div class="scene-frame">
+        <div id="sceneWrap" class="scene-wrap">
+          <img id="sceneImg" class="scene-img" src="assets/images/scene.svg" alt="Scene — tap the object described above" />
+          <div id="hotspotHints" class="hotspot-hints hidden" aria-hidden="true"></div>
+          <div id="clickFx" class="click-fx"></div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="score-chip">Score: <span id="scoreVal">0</span></div>
+    </footer>
+
+    <div id="overlay" class="overlay hidden">
+      <div class="panel">
+        <h2 id="overlayTitle">Great job!</h2>
+        <p id="overlayMsg">You found them all.</p>
+        <button type="button" class="btn" id="overlayBtn">Play again</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/imageConfig.js"></script>
+  <script src="../js/gamePicker.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>

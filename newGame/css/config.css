@@ -1,0 +1,802 @@
+/* ===========================================================
+   Image Config page
+   =========================================================== */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  min-height: 100vh;
+  font-family: "Fredoka", system-ui, sans-serif;
+  color: #3a2410;
+  background: linear-gradient(180deg, #8ed6ff 0%, #5bb7ff 40%, #6fbf3b 100%);
+  padding: 24px;
+}
+
+.config-wrap {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.config-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.config-header h1 {
+  font-family: "Baloo 2", sans-serif;
+  font-size: 2rem;
+  color: #5a2da0;
+  text-shadow: 0 2px 0 #fff;
+}
+
+.config-header p {
+  margin-top: 4px;
+  color: #5e3a18;
+  font-size: 0.95rem;
+}
+
+.config-hint {
+  margin-top: 8px;
+  font-size: 0.85rem;
+  opacity: 0.9;
+}
+
+.config-hint code {
+  background: rgba(255, 255, 255, 0.45);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+
+.game-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.game-tab {
+  font-family: "Baloo 2", sans-serif;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #5e3a18;
+  background: #fff6df;
+  border: 3px solid #5e3a18;
+  border-radius: 999px;
+  padding: 8px 20px;
+  cursor: pointer;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.12);
+}
+
+.game-tab.active {
+  color: #fff;
+  background: linear-gradient(180deg, #8a4fd0, #5a2da0);
+  box-shadow: 0 4px 0 #5e3a18;
+}
+
+.game-tab:hover:not(.active) {
+  transform: translateY(-1px);
+}
+
+.nav-links {
+  display: flex;
+  gap: 10px;
+}
+
+.nav-link, .btn-reset-all {
+  font-family: "Baloo 2", sans-serif;
+  font-weight: 700;
+  font-size: 0.95rem;
+  text-decoration: none;
+  color: #fff;
+  background: linear-gradient(180deg, #8a4fd0, #5a2da0);
+  border: 3px solid #5e3a18;
+  border-radius: 999px;
+  padding: 8px 18px;
+  cursor: pointer;
+  box-shadow: 0 4px 0 #5e3a18;
+}
+
+.btn-reset-all {
+  background: linear-gradient(180deg, #ff8a3d, #ef5f23);
+}
+
+.nav-link:hover, .btn-reset-all:hover { transform: translateY(-1px); }
+
+.notice {
+  background: #fff6df;
+  border: 3px solid #5e3a18;
+  border-radius: 14px;
+  padding: 14px 18px;
+  margin-bottom: 22px;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: #5e3a18;
+}
+
+.slot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 18px;
+}
+
+.slot-card {
+  background: #fff6df;
+  border: 4px solid #5e3a18;
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.12);
+}
+
+.slot-card.customized {
+  border-color: #5a2da0;
+  box-shadow: 0 0 0 2px rgba(138, 79, 208, 0.25), 0 6px 0 rgba(0, 0, 0, 0.12);
+}
+
+.slot-preview {
+  width: 100%;
+  height: 120px;
+  background: #e8f4ff;
+  border: 2px dashed #c9a06a;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.slot-preview img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  transform-origin: center center;
+  transition: transform 0.12s ease;
+}
+
+.slot-title {
+  font-family: "Baloo 2", sans-serif;
+  font-weight: 800;
+  font-size: 1.1rem;
+  color: #5a2da0;
+}
+
+.slot-desc {
+  font-size: 0.82rem;
+  color: #6b4626;
+  margin: 4px 0 12px;
+}
+
+.slot-status {
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.slot-status.default { color: #6b4626; }
+.slot-status.custom  { color: #5a2da0; }
+
+.slot-scale {
+  margin-bottom: 12px;
+}
+
+.slot-scale-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: "Baloo 2", sans-serif;
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: #5e3a18;
+  margin-bottom: 6px;
+}
+
+.scale-val {
+  color: #5a2da0;
+  font-variant-numeric: tabular-nums;
+}
+
+.scale-input {
+  width: 100%;
+  accent-color: #5a2da0;
+  cursor: pointer;
+}
+
+.slot-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.file-label {
+  font-family: "Baloo 2", sans-serif;
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: #fff;
+  background: linear-gradient(180deg, #6fbf3b, #4f9e22);
+  border: 3px solid #5e3a18;
+  border-radius: 999px;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+
+.file-label input { display: none; }
+
+.btn-slot-reset {
+  font-family: "Baloo 2", sans-serif;
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: #5e3a18;
+  background: #fff;
+  border: 3px solid #5e3a18;
+  border-radius: 999px;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+
+.btn-slot-reset:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: #5a2da0;
+  color: #fff;
+  border: 3px solid #5e3a18;
+  border-radius: 12px;
+  padding: 12px 18px;
+  font-family: "Baloo 2", sans-serif;
+  font-weight: 700;
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  pointer-events: none;
+  z-index: 100;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.loading {
+  text-align: center;
+  font-family: "Baloo 2", sans-serif;
+  font-weight: 700;
+  color: #5a2da0;
+  padding: 24px;
+}
+
+.notice code {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.88em;
+}
+
+.hidden { display: none !important; }
+
+/* Find Game level config */
+.levels-section {
+  background: #fff6df;
+  border: 4px solid #5e3a18;
+  border-radius: 18px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.levels-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.levels-heading {
+  font-family: "Baloo 2", sans-serif;
+  font-size: 1.4rem;
+  color: #1a5276;
+}
+
+.levels-desc {
+  font-size: 0.88rem;
+  color: #6b4626;
+  margin-top: 4px;
+}
+
+.levels-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-level-add, .btn-level-reset {
+  font-family: "Baloo 2", sans-serif;
+  font-weight: 700;
+  font-size: 0.88rem;
+  border: 3px solid #5e3a18;
+  border-radius: 999px;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+
+.btn-level-add {
+  color: #fff;
+  background: linear-gradient(180deg, #48cae4, #2e86ab);
+}
+
+.btn-level-reset {
+  color: #5e3a18;
+  background: #fff;
+}
+
+.levels-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 400px) 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 800px) {
+  .levels-layout { grid-template-columns: 1fr; }
+}
+
+.preview-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #6b4626;
+  margin-bottom: 8px;
+}
+
+.levels-scene-frame {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: #e8f4ff;
+  border: 3px solid #5e3a18;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: default;
+}
+
+.levels-scene-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.levels-hotspot-markers {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.levels-scene-frame.dragging {
+  cursor: grabbing;
+}
+
+body.hotspot-dragging {
+  user-select: none;
+  cursor: grabbing;
+}
+
+.levels-hotspot-marker {
+  position: absolute;
+  border: 3px dashed #4caf50;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  cursor: grab;
+  background: rgba(76, 175, 80, 0.12);
+  padding: 0;
+  touch-action: none;
+}
+
+.levels-hotspot-marker.selected {
+  border-color: #2e86ab;
+  border-style: solid;
+  background: rgba(46, 134, 171, 0.2);
+  box-shadow: 0 0 0 3px rgba(46, 134, 171, 0.25);
+}
+
+.levels-hotspot-marker.dragging,
+.levels-scene-frame.dragging .levels-hotspot-marker {
+  cursor: grabbing;
+}
+
+.levels-hotspot-resize {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #2e86ab;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  cursor: nwse-resize;
+  pointer-events: auto;
+  touch-action: none;
+  z-index: 2;
+}
+
+.levels-hotspot-marker:not(.selected) .levels-hotspot-resize {
+  background: #4caf50;
+  width: 12px;
+  height: 12px;
+}
+
+.level-positions-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 8px 0 6px;
+}
+
+.level-positions-label {
+  font-family: "Baloo 2", sans-serif;
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: #1a5276;
+}
+
+.btn-hotspot-add {
+  font-family: "Baloo 2", sans-serif;
+  font-weight: 700;
+  font-size: 0.75rem;
+  color: #fff;
+  background: linear-gradient(180deg, #48cae4, #2e86ab);
+  border: 2px solid #5e3a18;
+  border-radius: 999px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.hotspot-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.hotspot-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: #f7fbff;
+  border: 2px solid transparent;
+}
+
+.hotspot-drag-hint {
+  font-size: 0.75rem;
+  color: #6b4626;
+}
+
+.level-correct-pos {
+  width: 100%;
+  font-family: inherit;
+  font-size: 0.9rem;
+  padding: 8px 10px;
+  border: 2px solid #c9a06a;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.levels-hotspot-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Baloo 2", sans-serif;
+  font-weight: 800;
+  font-size: 0.85rem;
+  color: #1a5276;
+  pointer-events: none;
+}
+
+.hotspot-row.selected {
+  border-color: #2e86ab;
+  background: #eef7fb;
+}
+
+.hotspot-row-select {
+  font-family: "Baloo 2", sans-serif;
+  font-weight: 700;
+  font-size: 0.72rem;
+  color: #1a5276;
+  background: #fff;
+  border: 2px solid #c9a06a;
+  border-radius: 8px;
+  padding: 6px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.level-field.tiny span {
+  font-size: 0.68rem;
+}
+
+.level-field.tiny input {
+  font-size: 0.78rem;
+  padding: 5px 6px;
+}
+
+.btn-hotspot-remove {
+  width: 28px;
+  height: 28px;
+  border: 2px solid #5e3a18;
+  border-radius: 50%;
+  background: #fff;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #c62828;
+}
+
+.levels-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 520px;
+  overflow-y: auto;
+}
+
+.level-card {
+  background: #fff;
+  border: 3px solid #c9a06a;
+  border-radius: 12px;
+  padding: 12px;
+  cursor: pointer;
+}
+
+.level-card.selected {
+  border-color: #2e86ab;
+  box-shadow: 0 0 0 2px rgba(46, 134, 171, 0.25);
+}
+
+.level-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.level-num {
+  font-family: "Baloo 2", sans-serif;
+  font-weight: 700;
+  color: #1a5276;
+}
+
+.btn-level-delete {
+  width: 28px;
+  height: 28px;
+  border: 2px solid #5e3a18;
+  border-radius: 50%;
+  background: #fff;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #c62828;
+}
+
+.level-field {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.level-field span {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b4626;
+  margin-bottom: 2px;
+}
+
+.level-field input {
+  width: 100%;
+  font-family: inherit;
+  font-size: 0.9rem;
+  padding: 6px 10px;
+  border: 2px solid #c9a06a;
+  border-radius: 8px;
+}
+
+.level-field.small input {
+  font-size: 0.82rem;
+}
+
+.level-hotspot-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.btn-level-save {
+  font-family: "Baloo 2", sans-serif;
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: #fff;
+  background: linear-gradient(180deg, #6fbf3b, #4f9e22);
+  border: 2px solid #5e3a18;
+  border-radius: 999px;
+  padding: 5px 14px;
+  cursor: pointer;
+  margin-top: 4px;
+}
+
+.level-save-status {
+  margin: 6px 0 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #6b7280;
+  min-height: 1.1em;
+}
+
+.level-scene-block {
+  margin: 8px 0 10px;
+  padding: 10px;
+  border-radius: 10px;
+  background: #f7fbff;
+  border: 2px solid #c9dcef;
+}
+
+.level-scene-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.level-scene-label {
+  font-family: "Baloo 2", sans-serif;
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: #1a5276;
+}
+
+.level-scene-status {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #6b4626;
+}
+
+.level-scene-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.file-label--small {
+  font-size: 0.75rem;
+  padding: 5px 12px;
+}
+
+.btn-scene-reset {
+  font-family: "Baloo 2", sans-serif;
+  font-weight: 700;
+  font-size: 0.75rem;
+  color: #5e3a18;
+  background: #fff;
+  border: 2px solid #5e3a18;
+  border-radius: 999px;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+
+.btn-scene-reset:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.inworld-section {
+  background: #fff6df;
+  border: 3px solid #5e3a18;
+  border-radius: 16px;
+  padding: 20px 24px;
+  margin-bottom: 20px;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.1);
+}
+
+.inworld-section.hidden {
+  display: none;
+}
+
+.inworld-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.inworld-heading {
+  font-family: "Baloo 2", sans-serif;
+  font-size: 1.35rem;
+  color: #5a2da0;
+  margin-bottom: 4px;
+}
+
+.inworld-desc {
+  font-size: 0.9rem;
+  color: #5e3a18;
+  max-width: 640px;
+}
+
+.inworld-desc a {
+  color: #5a2da0;
+}
+
+.inworld-badge {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #ffd6d6;
+  color: #8b1a1a;
+  white-space: nowrap;
+}
+
+.inworld-badge.configured {
+  background: #d4edda;
+  color: #1e6b3a;
+}
+
+.inworld-fields {
+  display: grid;
+  gap: 14px;
+  max-width: 560px;
+}
+
+.inworld-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #5e3a18;
+}
+
+.inworld-field input {
+  font-family: inherit;
+  font-size: 0.95rem;
+  padding: 10px 12px;
+  border: 2px solid #5e3a18;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.inworld-hint {
+  font-weight: 500;
+  font-size: 0.8rem;
+  color: #7a5a30;
+}
+
+.btn-inworld-save {
+  justify-self: start;
+  font-family: "Baloo 2", sans-serif;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #fff;
+  background: linear-gradient(180deg, #8a4fd0, #5a2da0);
+  border: none;
+  border-radius: 999px;
+  padding: 10px 22px;
+  cursor: pointer;
+  box-shadow: 0 4px 0 #5e3a18;
+}

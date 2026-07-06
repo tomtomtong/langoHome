@@ -1,0 +1,196 @@
+/* ===========================================================
+   Game picker — shared overlay for all games
+   =========================================================== */
+
+.game-picker {
+  position: fixed;
+  top: 10px;
+  right: 12px;
+  z-index: 100;
+}
+
+.game-picker-btn {
+  font-family: "Baloo 2", "Fredoka", system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+  border-radius: 999px;
+  padding: 6px 14px;
+  transition: transform 0.1s ease, background 0.15s ease;
+}
+
+.game-picker-btn:hover {
+  transform: translateY(-1px);
+}
+
+.game-picker--wordwhack .game-picker-btn {
+  color: #5e3a18;
+  background: #fff6df;
+  border: 2px solid #5e3a18;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.12);
+}
+
+.game-picker--wordwhack .game-picker-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.12);
+}
+
+.game-picker--cardgame .game-picker-btn {
+  color: #fff;
+  background: rgba(43, 88, 118, 0.9);
+  border: 2px solid rgba(255, 255, 255, 0.45);
+}
+
+.game-picker--cardgame .game-picker-btn:hover {
+  background: rgba(78, 67, 118, 0.95);
+}
+
+.game-picker-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 101;
+  background: rgba(20, 12, 8, 0.45);
+  backdrop-filter: blur(2px);
+}
+
+.game-picker-panel {
+  position: fixed;
+  z-index: 102;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(92vw, 360px);
+}
+
+.game-picker-panel-inner {
+  font-family: "Fredoka", system-ui, sans-serif;
+  background: #fff6df;
+  border: 3px solid #5e3a18;
+  border-radius: 18px;
+  padding: 20px 18px 16px;
+  box-shadow: 0 12px 0 rgba(0, 0, 0, 0.18);
+}
+
+.game-picker--cardgame .game-picker-panel-inner {
+  background: linear-gradient(160deg, #f5f8ff 0%, #e8eef8 100%);
+  border-color: rgba(43, 88, 118, 0.65);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+
+.game-picker-heading {
+  font-family: "Baloo 2", sans-serif;
+  font-size: 1.25rem;
+  color: #5a2da0;
+  text-align: center;
+  margin-bottom: 14px;
+}
+
+.game-picker--cardgame .game-picker-heading {
+  color: #2b5876;
+}
+
+.game-picker-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.game-picker-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  text-decoration: none;
+  color: #3a2410;
+  background: #fff;
+  border: 2px solid #c9a06a;
+  border-radius: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: transform 0.1s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+a.game-picker-item:hover {
+  transform: translateY(-1px);
+  border-color: #8a4fd0;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.1);
+}
+
+.game-picker-item--current {
+  cursor: default;
+  background: linear-gradient(180deg, #8a4fd0, #5a2da0);
+  border-color: #5e3a18;
+  color: #fff;
+}
+
+.game-picker--cardgame .game-picker-item--current {
+  background: linear-gradient(180deg, #4e7a9e, #2b5876);
+  border-color: rgba(43, 88, 118, 0.8);
+}
+
+.game-picker-item-label {
+  font-family: "Baloo 2", sans-serif;
+  font-weight: 700;
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.game-picker-item-sub {
+  font-size: 0.82rem;
+  opacity: 0.85;
+}
+
+.game-picker-item-badge {
+  align-self: flex-start;
+  margin-top: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.game-picker-close {
+  display: block;
+  width: 100%;
+  font-family: "Baloo 2", sans-serif;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #5e3a18;
+  background: #ffd34d;
+  border: 2px solid #5e3a18;
+  border-radius: 999px;
+  padding: 8px 16px;
+  cursor: pointer;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.12);
+}
+
+.game-picker-close:hover {
+  transform: translateY(-1px);
+}
+
+.game-picker-close:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
+.hidden {
+  display: none !important;
+}
+
+@media (max-width: 520px) {
+  .game-picker {
+    top: 8px;
+    right: 8px;
+  }
+
+  .game-picker-btn {
+    font-size: 0.75rem;
+    padding: 5px 11px;
+  }
+}
