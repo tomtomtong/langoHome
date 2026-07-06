@@ -219,3 +219,44 @@ const PHONE_TO_BLEND = {
   JH: 16, K: 20, L: 14, M: 21, N: 19, NG: 20, P: 21,
   R: 13, S: 15, SH: 16, T: 19, TH: 19, V: 18, W: 7, Y: 6, Z: 15, ZH: 16,
 };
+
+export const BLENDSHAPE_COUNT = 22;
+
+/** Human-readable labels for morph targets 0–21 (IPA viseme slots). */
+export const BLENDSHAPE_LABELS = [
+  "Neutral / silence",
+  "æ ʌ (AE, AH)",
+  "ɑ (AA)",
+  "ɔ (AO)",
+  "e ʊ (EH, UH)",
+  "ɝ (ER)",
+  "ɪ i j (IH, IY, Y)",
+  "u w (UW, W)",
+  "oʊ (OW)",
+  "aʊ (AW)",
+  "ɔɪ (OY)",
+  "aɪ eɪ (AY, EY)",
+  "h (HH)",
+  "ɹ (R)",
+  "l (L)",
+  "s z (S, Z)",
+  "tʃ ʃ ʒ (CH, SH, JH, ZH)",
+  "ð (DH)",
+  "f v (F, V)",
+  "d n t θ (D, N, T, TH)",
+  "g k ŋ (G, K, NG)",
+  "b m p (B, M, P)",
+];
+
+export function buildBlendshapeTestTimeline(holdMs = 700) {
+  const timeline = [];
+  for (let i = 0; i < BLENDSHAPE_COUNT; i++) {
+    timeline.push({
+      phoneme: String(i),
+      start: i * holdMs,
+      end: (i + 1) * holdMs,
+      blendId: i,
+    });
+  }
+  return timeline;
+}

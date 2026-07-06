@@ -255,7 +255,7 @@
       </div>
       <hr class="section-divider" style="margin: 1.5rem 0 1.25rem">
       <h2 style="margin: 0 0 0.375rem; font-size: 1rem">Lipsync (Visme)</h2>
-      <p style="margin: 0 0 1rem">Tune mouth movement sensitivity. Use <strong>Test lipsync</strong> below to check viseme strength and timing on the preview.</p>
+      <p style="margin: 0 0 1rem">Tune mouth movement sensitivity. Use <strong>Test lipsync</strong> for speech timing, or <strong>Test all blendshapes</strong> to cycle through each viseme morph target (0–21).</p>
       <div class="avatar-preview-wrap">
         <canvas id="avatar-preview-canvas"></canvas>
       </div>
@@ -295,6 +295,7 @@
       </div>
       <div class="actions" style="margin-bottom: 1rem">
         <button type="button" id="btn-test-lipsync" class="secondary">Test lipsync</button>
+        <button type="button" id="btn-test-blendshapes" class="secondary">Test all blendshapes</button>
         <button type="button" id="btn-reset-lipsync" class="secondary">Reset lipsync defaults</button>
       </div>
       <div class="actions">
@@ -519,6 +520,10 @@ ${linesText.replace(/</g, '&lt;')}</pre>
       window.dispatchEvent(new CustomEvent('lipsync-preview-requested'));
     });
 
+    document.getElementById('btn-test-blendshapes').addEventListener('click', () => {
+      window.dispatchEvent(new CustomEvent('blendshape-test-requested'));
+    });
+
     document.getElementById('form').onsubmit = async (e) => {
       e.preventDefault();
       const val = input.value.trim();
@@ -582,6 +587,24 @@ ${linesText.replace(/</g, '&lt;')}</pre>
       }
       previewAvatar.applyLipsyncSettings(readLipsyncFromDom());
       previewAvatar.playLipsyncPreview("Hello from Visme");
+      statusEl.textContent = "Playing lipsync preview…";
+    });
+
+    window.addEventListener("blendshape-test-requested", () => {
+      if (!previewAvatar?.loaded) {
+        statusEl.textContent = "Avatar not ready for blendshape test.";
+        return;
+      }
+      previewAvatar.applyLipsyncSettings(readLipsyncFromDom());
+      const started = previewAvatar.playBlendshapeTest({
+        onStep: ({ index, total, label }) => {
+          statusEl.textContent = `Blendshape ${index + 1}/${total}: ${label}`;
+        },
+        onDone: () => {
+          statusEl.textContent = "Blendshape test complete.";
+        },
+      });
+      if (!started) statusEl.textContent = "Blendshape test already running.";
     });
 
     function readLipsyncFromDom() {

@@ -3,6 +3,9 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
 import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from "@pixiv/three-vrm-animation";
 import { LipsyncPlayer } from "./lipsync.js";
+import { BLENDSHAPE_COUNT, BLENDSHAPE_LABELS, buildBlendshapeTestTimeline } from "./phonetics.js";
+
+export { BLENDSHAPE_COUNT, BLENDSHAPE_LABELS };
 import { loadMixamoIdleClip } from "./mixamo-idle.js";
 
 // Default framing — face/upper body centered higher in the viewport.
@@ -95,6 +98,8 @@ export class TommyAvatar {
     this.speaking = false;
     this._previewPlaying = false;
     this._previewRaf = null;
+    this._blendshapeTestStep = null;
+    this._lastBlendshapeIndex = -1;
     this.speechElapsedMs = 0;
     this.onStatus = null;
     this.onCameraChange = null;
@@ -402,6 +407,8 @@ export class TommyAvatar {
 
   _stopLipsyncPreview() {
     this._previewPlaying = false;
+    this._blendshapeTestStep = null;
+    this._lastBlendshapeIndex = -1;
     if (this._previewRaf) {
       cancelAnimationFrame(this._previewRaf);
       this._previewRaf = null;
@@ -410,26 +417,58 @@ export class TommyAvatar {
     this.speechElapsedMs = 0;
   }
 
-  playLipsyncPreview(text = "Hello from Visme") {
-    if (!this.lipsync || this._previewPlaying) return;
-    this._stopLipsyncPreview();
-    this.lipsync.setText(text, 0);
-    const duration = this.lipsync.timeline[this.lipsync.timeline.length - 1]?.end ?? 0;
-    if (!duration) return;
+  _emitBlendshapeStep(index) {
+    if (index === this._lastBlendshapeIndex) return;
+    this._lastBlendshapeIndex = index;
+    this._blendshapeTestStep?.({
+      index,
+      total: BLENDSHAPE_COUNT,
+      label: BLENDSHAPE_LABELS[index] ?? String(index),
+    });
+  }
 
+  _startPreviewTimeline(timeline, { onStep, onDone } = {}) {
+    if (!this.lipsync || this._previewPlaying) return false;
+    const duration = timeline[timeline.length - 1]?.end ?? 0;
+    if (!duration) return false;
+
+    this._stopLipsyncPreview();
+    this._blendshapeTestStep = onStep ?? null;
+    this._lastBlendshapeIndex = -1;
+    this.lipsync.timeline = timeline;
     this._previewPlaying = true;
     this.lipsync.start();
+    if (onStep) this._emitBlendshapeStep(0);
+
     const t0 = performance.now();
     const tick = () => {
       if (!this._previewPlaying) return;
       this.speechElapsedMs = performance.now() - t0;
+      if (onStep) {
+        const holdMs = timeline[1]?.start ?? timeline[0]?.end ?? 1;
+        const index = Math.min(BLENDSHAPE_COUNT - 1, Math.floor(this.speechElapsedMs / holdMs));
+        this._emitBlendshapeStep(index);
+      }
       if (this.speechElapsedMs >= duration) {
         this._stopLipsyncPreview();
+        onDone?.();
         return;
       }
       this._previewRaf = requestAnimationFrame(tick);
     };
     this._previewRaf = requestAnimationFrame(tick);
+    return true;
+  }
+
+  playBlendshapeTest({ holdMs = 700, onStep, onDone } = {}) {
+    if (!this.lipsync) return false;
+    return this._startPreviewTimeline(buildBlendshapeTestTimeline(holdMs), { onStep, onDone });
+  }
+
+  playLipsyncPreview(text = "Hello from Visme") {
+    if (!this.lipsync) return;
+    this.lipsync.setText(text, 0);
+    this._startPreviewTimeline(this.lipsync.timeline);
   }
 
   beginSpeech() {
