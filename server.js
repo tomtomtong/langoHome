@@ -1,9 +1,10 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync, readdirSync, statSync } from 'fs';
 import { createServer } from 'http';
 import { createRequire } from 'module';
 import { join, dirname, extname } from 'path';
 import { fileURLToPath } from 'url';
 import { WebSocketServer, WebSocket } from 'ws';
+import multer from 'multer';
 
 const require = createRequire(import.meta.url);
 
@@ -14,6 +15,9 @@ const CONFIG_DIR = process.env.CONFIG_DIR || process.env.RAILWAY_VOLUME_MOUNT_PA
 const CONFIG_PATH = join(CONFIG_DIR, 'config.json');
 const DEBUG_LOG_PATH = join(CONFIG_DIR, 'hello-debug-log.json');
 const DEBUG_LOG_MAX_REPORTS = 20;
+const IDLE_VIDEO_DIR = join(CONFIG_DIR, 'idle-video');
+const IDLE_VIDEO_BASENAME = 'idle';
+const IDLE_VIDEO_MAX_BYTES = 100 * 1024 * 1024;
 
 if (!process.env.GAME_DATA_DIR) {
   process.env.GAME_DATA_DIR =
@@ -46,7 +50,60 @@ const MIME = {
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
   '.webp': 'image/webp',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
+  '.mov': 'video/quicktime',
 };
+
+function ensureIdleVideoDir() {
+  if (!existsSync(IDLE_VIDEO_DIR)) mkdirSync(IDLE_VIDEO_DIR, { recursive: true });
+}
+
+function listIdleVideoFiles() {
+  ensureIdleVideoDir();
+  return readdirSync(IDLE_VIDEO_DIR).filter((name) => name.startsWith(`${IDLE_VIDEO_BASENAME}.`));
+}
+
+function getIdleVideoInfo() {
+  const files = listIdleVideoFiles();
+  if (!files.length) return null;
+  const filename = files[0];
+  const filePath = join(IDLE_VIDEO_DIR, filename);
+  if (!existsSync(filePath)) return null;
+  const updatedAt = statSync(filePath).mtimeMs || Date.now();
+  return {
+    filename,
+    url: `/api/idle-video?v=${updatedAt}`,
+    updatedAt,
+  };
+}
+
+function clearIdleVideoFiles() {
+  for (const name of listIdleVideoFiles()) {
+    try { unlinkSync(join(IDLE_VIDEO_DIR, name)); } catch {}
+  }
+}
+
+const idleVideoUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => {
+      ensureIdleVideoDir();
+      cb(null, IDLE_VIDEO_DIR);
+    },
+    filename: (_req, file, cb) => {
+      const ext = extname(file.originalname || '').toLowerCase() || '.mp4';
+      cb(null, `${IDLE_VIDEO_BASENAME}${ext}`);
+    },
+  }),
+  limits: { fileSize: IDLE_VIDEO_MAX_BYTES },
+  fileFilter: (_req, file, cb) => {
+    const ext = extname(file.originalname || '').toLowerCase();
+    const okExt = ['.mp4', '.webm', '.mov'].includes(ext);
+    const okMime = /^video\/(mp4|webm|quicktime|x-m4v)$/i.test(file.mimetype || '');
+    if (okExt || okMime) cb(null, true);
+    else cb(new Error('Only MP4, WebM, or MOV videos are allowed.'));
+  },
+}).single('video');
 
 function loadConfig() {
   try {
@@ -178,6 +235,7 @@ const server = createServer((req, res) => {
         model: cfg.model ?? '',
         avatar: normalizeAvatar(cfg.avatar),
         lipsync: normalizeLipsync(cfg.lipsync),
+        idleVideo: getIdleVideoInfo(),
       });
       return;
     }
@@ -239,6 +297,44 @@ const server = createServer((req, res) => {
     return;
   }
 
+  if (url === '/api/idle-video') {
+    if (req.method === 'GET') {
+      const info = getIdleVideoInfo();
+      if (!info) {
+        sendJson(res, 404, { error: 'No idle video uploaded.' });
+        return;
+      }
+      serveFile(res, join(IDLE_VIDEO_DIR, info.filename));
+      return;
+    }
+    if (req.method === 'PUT' || req.method === 'POST') {
+      clearIdleVideoFiles();
+      idleVideoUpload(req, res, (err) => {
+        if (err) {
+          const message = err.code === 'LIMIT_FILE_SIZE'
+            ? `Video must be under ${Math.round(IDLE_VIDEO_MAX_BYTES / (1024 * 1024))} MB.`
+            : (err.message || 'Upload failed.');
+          sendJson(res, 400, { error: message });
+          return;
+        }
+        if (!req.file) {
+          sendJson(res, 400, { error: 'No video file provided.' });
+          return;
+        }
+        const info = getIdleVideoInfo();
+        sendJson(res, 200, { ok: true, idleVideo: info });
+      });
+      return;
+    }
+    if (req.method === 'DELETE') {
+      clearIdleVideoFiles();
+      sendJson(res, 200, { ok: true });
+      return;
+    }
+    sendJson(res, 405, { error: 'Method not allowed.' });
+    return;
+  }
+
   if (url.startsWith('/visme/')) {
     serveFile(res, join(ROOT, url.slice(1)));
     return;
@@ -249,7 +345,7 @@ const server = createServer((req, res) => {
     return;
   }
 
-  const rootAsset = url.match(/^\/[^/]+\.(png|jpe?g|webp|fbx|vrm)$/i);
+  const rootAsset = url.match(/^\/[^/]+\.(png|jpe?g|webp|fbx|vrm|mp4|webm|mov)$/i);
   if (rootAsset) {
     serveFile(res, join(ROOT, url.slice(1)));
     return;
@@ -327,7 +423,7 @@ const FOOTBALL_TOOL_INSTRUCTION =
   ' When the user mentions football, soccer, or related topics, call the show_football_icon tool.';
 
 const HAPPY_TOOL_INSTRUCTION =
-  ' When the user expresses happiness, joy, excitement, asks you to dance, do the chicken dance, or wants to celebrate, call the happy tool in the same turn so Uncle Tommy performs his chicken dance.';
+  ' When the user explicitly asks you to dance or do the chicken dance, call the happy tool in the same turn so Uncle Tommy performs his chicken dance. Do not call it just because the user sounds happy, excited, or celebratory.';
 
 const LEAVE_TOOL_INSTRUCTION =
   ' When the user says goodbye, bye, see you, see you later, I have to go, or otherwise indicates they want to end the conversation, respond with a brief farewell and immediately call the end_conversation tool in the same turn. Always call end_conversation when the user is done talking — do not keep chatting after a goodbye.';
@@ -351,13 +447,13 @@ const HAPPY_TOOL = {
   type: 'function',
   name: 'happy',
   description:
-    'Makes Uncle Tommy perform his happy chicken dance animation when the user is joyful, excited, or asks to dance or celebrate.',
+    'Makes Uncle Tommy perform his chicken dance animation when the user explicitly asks him to dance.',
   parameters: {
     type: 'object',
     properties: {
       reason: {
         type: 'string',
-        description: 'What made the user happy or why the dance was triggered',
+        description: 'How the user asked to dance, e.g. "do the chicken dance"',
       },
     },
   },

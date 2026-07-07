@@ -323,6 +323,57 @@
     }
 
     #debug-upload-status.err { color: #f28b82; }
+
+    /* ── Idle loop video (before conversation) ── */
+    #idle-video-screen {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 3;
+      background: #000;
+      cursor: pointer;
+    }
+
+    body.has-idle-video #idle-video-screen {
+      display: block;
+    }
+
+    body.has-idle-video.in-session #idle-video-screen {
+      display: none;
+    }
+
+    body.has-idle-video #idle-screen {
+      display: none;
+    }
+
+    #idle-video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      pointer-events: none;
+    }
+
+    #idle-video-hint {
+      position: absolute;
+      left: 50%;
+      bottom: max(1.5rem, env(safe-area-inset-bottom));
+      transform: translateX(-50%);
+      padding: 0.625rem 1rem;
+      border-radius: 999px;
+      background: rgba(15, 17, 23, 0.72);
+      color: #e8eaed;
+      font-size: 0.9375rem;
+      letter-spacing: 0.01em;
+      pointer-events: none;
+      backdrop-filter: blur(8px);
+      animation: idle-hint-pulse 2.4s ease-in-out infinite;
+    }
+
+    @keyframes idle-hint-pulse {
+      0%, 100% { opacity: 0.85; }
+      50% { opacity: 1; }
+    }
   </style>
 </head>
 <body>
@@ -335,6 +386,11 @@
   </div>
 
   <div id="app">
+    <div id="idle-video-screen" aria-label="Tap to start conversation">
+      <video id="idle-video" loop muted playsinline autoplay></video>
+      <div id="idle-video-hint">Tap to start conversation</div>
+    </div>
+
     <div id="idle-screen">
       <h1>Uncle Tommy</h1>
       <div class="idle-controls">
@@ -395,6 +451,8 @@
     const cameraSaveStatusEl = document.getElementById("camera-save-status");
     const btnSendLog = document.getElementById("btn-send-log");
     const debugUploadStatusEl = document.getElementById("debug-upload-status");
+    const idleVideoScreen = document.getElementById("idle-video-screen");
+    const idleVideoEl = document.getElementById("idle-video");
     const SHOW_FOOTBALL_ICON = "show_football_icon";
     const HAPPY = "happy";
     const END_CONVERSATION = "end_conversation";
@@ -402,6 +460,8 @@
     const DEBUG_LOG_MAX = 80;
     const debugLogLines = [];
 
+    let idleVideoUrl = null;
+    let idleVideoStarting = false;
     let avatar = null;
     let avatarLoading = null;
     let cameraEditMode = false;
@@ -583,6 +643,54 @@
       statusEl.textContent = msg;
       statusEl.classList.toggle("active", isActive);
       statusIdleEl.textContent = msg;
+    }
+
+    function setIdleVideoMode(enabled) {
+      document.body.classList.toggle("has-idle-video", enabled);
+    }
+
+    async function setupIdleVideo(idleVideo) {
+      if (!idleVideo?.url) {
+        idleVideoUrl = null;
+        setIdleVideoMode(false);
+        idleVideoEl.removeAttribute("src");
+        return false;
+      }
+
+      idleVideoUrl = idleVideo.url;
+      setIdleVideoMode(true);
+      idleVideoEl.src = idleVideo.url;
+      idleVideoEl.load();
+      try {
+        await idleVideoEl.play();
+      } catch {}
+      return true;
+    }
+
+    async function startConversationFromIdleTap() {
+      if (active || idleVideoStarting) return;
+      idleVideoStarting = true;
+      uiLog("hello", "idle video tapped → connectConversation", "hello");
+      idleVideoEl.pause();
+      wakeWordEnabled = false;
+      wakeWordRestartAttempts = 0;
+      stopWakeWordListening();
+      try {
+        await connectConversation();
+      } finally {
+        idleVideoStarting = false;
+      }
+    }
+
+    idleVideoScreen.addEventListener("click", (e) => {
+      if (e.target.closest("button, a, input, select, textarea")) return;
+      startConversationFromIdleTap();
+    });
+
+    function resumeIdleVideo() {
+      if (!idleVideoUrl || inSession || active) return;
+      idleVideoEl.currentTime = 0;
+      idleVideoEl.play().catch(() => {});
     }
 
     function loadAvatarFromLocalStorage() {
@@ -783,6 +891,7 @@
     function returnToHelloCycle() {
       uiLog("hello", "returnToHelloCycle", "hello");
       showErr("");
+      resumeIdleVideo();
       wakeWordEnabled = ENABLE_WAKE_WORD;
       wakeWordRestartAttempts = 0;
       stopWakeWordListening();
@@ -1012,7 +1121,7 @@
       }
 
       if (name === HAPPY) {
-        let reason = "user is happy";
+        let reason = "user asked to dance";
         try {
           const args = JSON.parse(argsJson || "{}");
           if (args.reason) reason = args.reason;
@@ -1450,7 +1559,11 @@
     }
 
     async function init() {
-      setStatus("Loading avatar…");
+      const cfg = await getConfig();
+      const hasIdleVideo = await setupIdleVideo(cfg.idleVideo);
+      if (!hasIdleVideo) {
+        setStatus("Loading avatar…");
+      }
       // Let the hidden avatar stage get layout dimensions before WebGL init.
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       try {
@@ -1459,7 +1572,9 @@
         console.error(e);
         showErr(`Avatar failed to load: ${e.message}`);
       }
-      if (ENABLE_WAKE_WORD) {
+      if (hasIdleVideo) {
+        setStatus('Tap the screen to begin a conversation');
+      } else if (ENABLE_WAKE_WORD) {
         startWakeWordListening();
       } else {
         setStatus('Tap "Start" to begin a conversation');
