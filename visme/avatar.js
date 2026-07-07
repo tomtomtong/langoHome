@@ -3,6 +3,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
 import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from "@pixiv/three-vrm-animation";
 import { LipsyncPlayer, clearBlend } from "./lipsync.js";
+import { FacialIdleController } from "./facial-idle.js";
 import { loadMixamoIdleClip } from "./mixamo-idle.js";
 import {
   BLENDSHAPE_COUNT,
@@ -121,6 +122,7 @@ export class TommyAvatar {
     this._lastExpressionIndex = -1;
     this._manualExpressionName = null;
     this._manualExpressionValue = 0;
+    this.facialIdle = null;
     this.speechElapsedMs = 0;
     this.onStatus = null;
     this.onCameraChange = null;
@@ -406,6 +408,7 @@ export class TommyAvatar {
       }
 
       this.lipsync = new LipsyncPlayer(this.morphMeshes, this.lipsyncSettings);
+      this.facialIdle = new FacialIdleController(vrm);
       await this._loadIdleAnimation(vrm);
       this.loaded = true;
       this.setStatus("Avatar ready");
@@ -458,6 +461,11 @@ export class TommyAvatar {
       em.setValue(exprName, 0);
     }
     em.update();
+    this.facialIdle?.reset();
+  }
+
+  _canRunFacialIdle() {
+    return !this._expressionTestPlaying && !this._manualExpressionName;
   }
 
   _applyManualExpression() {
@@ -827,6 +835,10 @@ export class TommyAvatar {
       this.mixer.update(dtSec);
     }
 
+    if (this.facialIdle?.hasExpressions() && this._canRunFacialIdle()) {
+      this.facialIdle.update(dtSec);
+    }
+
     if (this.vrm) {
       this.vrm.update(dtSec);
     }
@@ -846,6 +858,7 @@ export class TommyAvatar {
     this._stopLipsyncPreview();
     this._stopExpressionTest();
     this.clearExpressionPreview();
+    this.facialIdle?.setEnabled(false);
     this.lipsync?.stop();
     this._stopDanceAnimation?.();
     this.idleAction?.stop();
