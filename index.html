@@ -206,6 +206,56 @@
       pointer-events: none;
     }
 
+    .overlay-games {
+      position: absolute;
+      right: max(0.75rem, env(safe-area-inset-right));
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      gap: 0.625rem;
+      pointer-events: auto;
+    }
+
+    .game-shortcut {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: clamp(2.75rem, 7vw, 3.35rem);
+      height: clamp(2.75rem, 7vw, 3.35rem);
+      border-radius: 14px;
+      background: rgba(15, 17, 23, 0.78);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+      text-decoration: none;
+      transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+    }
+
+    .game-shortcut:hover {
+      transform: scale(1.06);
+      background: rgba(32, 38, 52, 0.92);
+      border-color: rgba(108, 140, 255, 0.45);
+    }
+
+    .game-shortcut img {
+      width: 62%;
+      height: 62%;
+      object-fit: contain;
+      pointer-events: none;
+    }
+
+    .game-shortcut--card img {
+      width: 72%;
+      height: 72%;
+    }
+
+    .game-shortcut--find img {
+      width: 78%;
+      height: 78%;
+      border-radius: 6px;
+    }
+
     button {
       padding: 0.65rem 1.25rem;
       border: none;
@@ -330,8 +380,58 @@
       position: fixed;
       inset: 0;
       z-index: 3;
-      background: #000;
+      background: #0b1222;
       cursor: pointer;
+    }
+
+    .screen-video {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      pointer-events: none;
+      background: #0b1222;
+    }
+
+    #transition-video {
+      opacity: 0;
+      visibility: hidden;
+      z-index: 1;
+    }
+
+    body.playing-transition-video #idle-video {
+      visibility: hidden;
+    }
+
+    body.playing-transition-video #transition-video {
+      opacity: 1;
+      visibility: visible;
+      z-index: 2;
+    }
+
+    #idle-video-loading {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: #0b1222;
+      color: #9aa0a6;
+      font-size: 0.9375rem;
+      pointer-events: none;
+    }
+
+    body.has-idle-video.videos-loading #idle-video-loading {
+      display: flex;
+    }
+
+    body.has-idle-video.videos-loading #idle-video,
+    body.has-idle-video.videos-loading #transition-video,
+    body.has-idle-video.videos-loading #idle-video-hint {
+      visibility: hidden;
     }
 
     body.has-idle-video #idle-video-screen {
@@ -356,11 +456,7 @@
     }
 
     #idle-video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-      pointer-events: none;
+      z-index: 0;
     }
 
     #idle-video-hint {
@@ -396,7 +492,9 @@
 
   <div id="app">
     <div id="idle-video-screen" aria-label="Tap to start conversation">
-      <video id="idle-video" loop muted playsinline autoplay></video>
+      <video id="idle-video" class="screen-video" loop muted playsinline preload="auto"></video>
+      <video id="transition-video" class="screen-video" playsinline preload="auto"></video>
+      <div id="idle-video-loading">Loading videos…</div>
       <div id="idle-video-hint">Tap to start conversation</div>
     </div>
 
@@ -427,6 +525,17 @@
       <div class="football-wrap">
         <div id="football-icon" aria-hidden="true" title="Football mentioned">⚽</div>
       </div>
+      <nav class="overlay-games" aria-label="Games">
+        <a class="game-shortcut game-shortcut--wordwhack" href="/games/" title="Word-Whack Blitz">
+          <img src="/games/assets/images/mole.svg" alt="Word-Whack Blitz">
+        </a>
+        <a class="game-shortcut game-shortcut--card" href="/games/CardGame/" title="Picture-Word Memory Match">
+          <img src="/games/CardGame/assets/images/card-back.svg" alt="Picture-Word Memory Match">
+        </a>
+        <a class="game-shortcut game-shortcut--find" href="/games/FindGame/" title="Find the Object">
+          <img src="/games/FindGame/assets/images/scene.svg" alt="Find the Object">
+        </a>
+      </nav>
       <div class="overlay-bottom">
         <div id="status">Connecting…</div>
         <div id="err"></div>
@@ -463,6 +572,8 @@
     const debugUploadStatusEl = document.getElementById("debug-upload-status");
     const idleVideoScreen = document.getElementById("idle-video-screen");
     const idleVideoEl = document.getElementById("idle-video");
+    const transitionVideoEl = document.getElementById("transition-video");
+    const idleVideoLoadingEl = document.getElementById("idle-video-loading");
     const idleVideoHint = document.getElementById("idle-video-hint");
     const avatarStageEl = document.getElementById("avatar-stage");
     const SHOW_FOOTBALL_ICON = "show_football_icon";
@@ -474,6 +585,7 @@
 
     let idleVideoUrl = null;
     let transitionVideoUrl = null;
+    let idleVideosReady = false;
     let idleVideoStarting = false;
     let playingTransitionVideo = false;
     let avatar = null;
@@ -679,22 +791,87 @@
       document.body.classList.toggle("playing-transition-video", enabled);
     }
 
+    function setVideosLoading(loading) {
+      document.body.classList.toggle("videos-loading", loading);
+    }
+
+    function preloadVideoElement(video, url) {
+      if (!url) return Promise.resolve(false);
+
+      return new Promise((resolve, reject) => {
+        const cleanup = () => {
+          video.removeEventListener("canplaythrough", onReady);
+          video.removeEventListener("error", onError);
+        };
+
+        const onReady = () => {
+          cleanup();
+          resolve(true);
+        };
+
+        const onError = () => {
+          cleanup();
+          reject(new Error(`Failed to preload video: ${url}`));
+        };
+
+        video.preload = "auto";
+        if (video.dataset.preloadUrl !== url) {
+          video.dataset.preloadUrl = url;
+          video.src = url;
+          video.load();
+        }
+
+        if (video.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) {
+          onReady();
+          return;
+        }
+
+        video.addEventListener("canplaythrough", onReady, { once: true });
+        video.addEventListener("error", onError, { once: true });
+      });
+    }
+
     async function setupIdleVideos(idleVideo, transitionVideo) {
       transitionVideoUrl = transitionVideo?.url || null;
+      idleVideosReady = false;
 
       if (!idleVideo?.url) {
         idleVideoUrl = null;
         setIdleVideoMode(false);
+        setVideosLoading(false);
         idleVideoEl.removeAttribute("src");
+        transitionVideoEl.removeAttribute("src");
         return false;
       }
 
       idleVideoUrl = idleVideo.url;
       setIdleVideoMode(true);
+      setVideosLoading(true);
+      if (idleVideoLoadingEl) idleVideoLoadingEl.textContent = "Loading videos…";
+
       idleVideoEl.loop = true;
       idleVideoEl.muted = true;
-      idleVideoEl.src = idleVideo.url;
-      idleVideoEl.load();
+      transitionVideoEl.loop = false;
+      transitionVideoEl.muted = true;
+      transitionVideoEl.pause();
+
+      const preloadTasks = [preloadVideoElement(idleVideoEl, idleVideo.url)];
+      if (transitionVideoUrl) {
+        preloadTasks.push(preloadVideoElement(transitionVideoEl, transitionVideoUrl));
+      }
+
+      try {
+        await Promise.all(preloadTasks);
+      } catch (e) {
+        console.warn("Video preload failed:", e);
+        uiLog("hello", `video preload warning: ${e.message}`, "warn");
+      }
+
+      idleVideosReady = true;
+      setVideosLoading(false);
+      transitionVideoEl.pause();
+      transitionVideoEl.currentTime = 0;
+
       try {
         await idleVideoEl.play();
       } catch {}
@@ -705,11 +882,10 @@
       if (!idleVideoUrl) return;
       playingTransitionVideo = false;
       setTransitionVideoMode(false);
-      idleVideoEl.onended = null;
-      idleVideoEl.loop = true;
-      idleVideoEl.muted = true;
-      idleVideoEl.src = idleVideoUrl;
-      idleVideoEl.load();
+      transitionVideoEl.onended = null;
+      transitionVideoEl.onerror = null;
+      transitionVideoEl.pause();
+      transitionVideoEl.currentTime = 0;
       idleVideoHint.hidden = false;
       idleVideoScreen.style.cursor = "pointer";
     }
@@ -722,22 +898,22 @@
         idleVideoScreen.style.cursor = "default";
 
         idleVideoEl.pause();
-        idleVideoEl.loop = false;
-        idleVideoEl.muted = false;
-        idleVideoEl.src = transitionVideoUrl;
-        idleVideoEl.load();
+        transitionVideoEl.currentTime = 0;
+        transitionVideoEl.muted = false;
 
-        idleVideoEl.onended = () => {
-          idleVideoEl.onended = null;
+        transitionVideoEl.onended = () => {
+          transitionVideoEl.onended = null;
+          transitionVideoEl.onerror = null;
+          transitionVideoEl.pause();
           resolve();
         };
-        idleVideoEl.onerror = () => {
-          idleVideoEl.onended = null;
-          idleVideoEl.onerror = null;
+        transitionVideoEl.onerror = () => {
+          transitionVideoEl.onended = null;
+          transitionVideoEl.onerror = null;
           reject(new Error("Transition video failed to play."));
         };
 
-        idleVideoEl.play().catch(reject);
+        transitionVideoEl.play().catch(reject);
       });
     }
 
@@ -749,7 +925,7 @@
     }
 
     async function startConversationFromIdleTap() {
-      if (active || idleVideoStarting || playingTransitionVideo) return;
+      if (active || idleVideoStarting || playingTransitionVideo || !idleVideosReady) return;
       idleVideoStarting = true;
       uiLog("hello", "idle video tapped", "hello");
 
@@ -1654,8 +1830,12 @@
     async function init() {
       const cfg = await getConfig();
       applyAvatarStageBackground(getAvatarBackgroundUrl(cfg));
-      const hasIdleVideo = await setupIdleVideos(cfg.idleVideo, cfg.transitionVideo);
-      if (!hasIdleVideo) {
+      const hasIdleVideo = cfg.idleVideo?.url;
+      if (hasIdleVideo) {
+        setStatus("Loading videos…");
+      }
+      const idleVideoReady = await setupIdleVideos(cfg.idleVideo, cfg.transitionVideo);
+      if (!idleVideoReady) {
         setStatus("Loading avatar…");
       }
       // Let the hidden avatar stage get layout dimensions before WebGL init.
@@ -1666,7 +1846,7 @@
         console.error(e);
         showErr(`Avatar failed to load: ${e.message}`);
       }
-      if (hasIdleVideo) {
+      if (idleVideoReady) {
         setStatus('Tap the screen to begin a conversation');
       } else if (ENABLE_WAKE_WORD) {
         startWakeWordListening();
