@@ -280,8 +280,6 @@ function seedFindGameLevelsIfEmpty() {
   });
 }
 
-seedFindGameLevelsIfEmpty();
-
 function normalizeHotspot(h, fallbackTarget = "") {
   return {
     x: Number(h.x),

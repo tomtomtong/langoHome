@@ -5,40 +5,10 @@
 (() => {
   "use strict";
 
-  const DEFAULT_LEVELS = [
-    {
-      sentence: "Find the red apple on the table!",
-      target: "0",
-      hotspots: [
-        { x: 0.35, y: 0.517, radius: 0.08, target: "apple" },
-        { x: 0.7, y: 0.758, radius: 0.09, target: "cat" },
-      ],
-    },
-    {
-      sentence: "Where is the orange cat?",
-      target: "0",
-      hotspots: [{ x: 0.7, y: 0.758, radius: 0.09, target: "cat" }],
-    },
-    {
-      sentence: "Tap the yellow ball!",
-      target: "0",
-      hotspots: [{ x: 0.15, y: 0.8, radius: 0.08, target: "ball" }],
-    },
-    {
-      sentence: "Can you find the blue book?",
-      target: "0",
-      hotspots: [{ x: 0.485, y: 0.153, radius: 0.07, target: "book" }],
-    },
-    {
-      sentence: "Look for the gold star on the wall!",
-      target: "0",
-      hotspots: [{ x: 0.825, y: 0.25, radius: 0.07, target: "star" }],
-    },
-  ];
-
   const POINTS_PER_LEVEL = 100;
   const ROUND_TIME = 90;
   const MAX_WRONG_ATTEMPTS = 2;
+  const ANSWER_REVEAL_MS = 10000;
   const SHOW_DEBUG_HINTS = new URLSearchParams(location.search).has("hints");
 
   let levels = [];
@@ -102,44 +72,39 @@
     return [];
   }
 
-  function defaultSceneUrl() {
+  function levelSceneUrl(lv) {
+    if (lv?.sceneUrl) return lv.sceneUrl;
     if (typeof FindImageConfig !== "undefined" && FindImageConfig.isCustomized("find_scene")) {
       return FindImageConfig.getUrl("find_scene");
     }
-    return "assets/images/scene.svg";
-  }
-
-  function levelSceneUrl(lv) {
-    return lv?.sceneUrl || defaultSceneUrl();
+    return null;
   }
 
   function applyLevelScene(lv) {
-    sceneImg.src = levelSceneUrl(lv);
+    const url = levelSceneUrl(lv);
+    if (url) {
+      sceneImg.src = url;
+    } else {
+      sceneImg.removeAttribute("src");
+    }
     sceneImg.style.transform = "";
     sceneImg.style.transformOrigin = "";
   }
 
   async function loadLevels() {
+    levels = [];
     try {
       const res = await fetch("/api/findgame/levels");
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data.levels) && data.levels.length > 0) {
-          levels = data.levels.map((lv) => ({
-            ...lv,
-            hotspots: levelHotspots(lv),
-          }));
-          return;
-        }
-      }
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!Array.isArray(data.levels) || !data.levels.length) return;
+      levels = data.levels.map((lv) => ({
+        ...lv,
+        hotspots: levelHotspots(lv),
+      }));
     } catch {
-      /* fall through to defaults */
+      /* leave levels empty */
     }
-    levels = DEFAULT_LEVELS.map((lv, i) => ({
-      id: i + 1,
-      ...lv,
-      hotspots: levelHotspots(lv),
-    }));
   }
 
   function currentLevel() {
@@ -226,11 +191,15 @@
     el.className = "position-marker position-marker--answer";
     el.style.left = `${hs.x * 100}%`;
     el.style.top = `${hs.y * 100}%`;
-    el.style.width = `${hs.radius * 200}%`;
-    el.style.height = `${hs.radius * 200}%`;
+    el.style.width = `${hs.radius * 320}%`;
+    el.style.height = `${hs.radius * 320}%`;
     el.innerHTML = `
+      <span class="position-marker-label" aria-hidden="true">HERE!</span>
       <span class="position-marker-ripple"></span>
+      <span class="position-marker-ripple position-marker-ripple--late"></span>
+      <span class="position-marker-ripple position-marker-ripple--answer"></span>
       <span class="position-marker-glow"></span>
+      <span class="position-marker-ring"></span>
       <span class="position-marker-check">✓</span>
     `;
     hotspotHints.appendChild(el);
@@ -240,9 +209,10 @@
   function revealCorrectAnswer() {
     locked = true;
     const lv = currentLevel();
+    sceneWrap.classList.add("answer-reveal");
     renderCorrectAnswer(lv);
-    setVoiceStatus("Here's the answer!", { speaking: false });
-    setTimeout(advanceLevel, 1800);
+    setVoiceStatus("Look here — this is the answer!", { speaking: false });
+    setTimeout(advanceLevel, ANSWER_REVEAL_MS);
   }
 
   function stopQuestionSpeech() {
@@ -374,6 +344,7 @@
   function updateHud() {
     const lv = currentLevel();
     if (!lv) return;
+    sceneWrap.classList.remove("answer-reveal");
     wrongAttempts = 0;
     sentenceEl.textContent = lv.sentence;
     foundValEl.textContent = String(foundCount);

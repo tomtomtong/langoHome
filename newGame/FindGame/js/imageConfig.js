@@ -105,7 +105,7 @@ const FindImageConfig = (() => {
       scales = data.scales || {};
       serverAvailable = true;
     } catch (err) {
-      console.warn("Image server unavailable, using default images.", err);
+      console.warn("Image server unavailable; only configured images will be shown.", err);
       customized = {};
       scales = {};
       serverAvailable = false;
@@ -131,21 +131,14 @@ const FindImageConfig = (() => {
 
   function applySlot(slotKey) {
     const meta = SLOTS[slotKey];
-    if (!meta) return;
-    const url = isCustomized(slotKey) ? getUrl(slotKey) : meta.default;
+    if (!meta || !isCustomized(slotKey)) return;
+    const url = getUrl(slotKey);
     const scale = meta.scalable === false ? DEFAULT_SCALE : getScale(slotKey);
     meta.apply(url, scale);
   }
 
-  function applyDefaults() {
-    for (const key of Object.keys(SLOTS)) {
-      SLOTS[key].apply(SLOTS[key].default, DEFAULT_SCALE);
-    }
-  }
-
   async function applyAll() {
     await loadFromServer();
-    applyDefaults();
     for (const key of Object.keys(SLOTS)) {
       applySlot(key);
     }
@@ -203,7 +196,6 @@ const FindImageConfig = (() => {
     await apiFetch(`/api/images/${slotKey}`, { method: "DELETE" });
     delete customized[slotKey];
     delete scales[slotKey];
-    SLOTS[slotKey].apply(SLOTS[slotKey].default, DEFAULT_SCALE);
     return true;
   }
 
@@ -211,7 +203,6 @@ const FindImageConfig = (() => {
     await apiFetch(`/api/images?game=${GAME_ID}`, { method: "DELETE" });
     customized = {};
     scales = {};
-    applyDefaults();
   }
 
   return {

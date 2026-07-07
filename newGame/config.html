@@ -94,7 +94,7 @@
         <div class="levels-preview-wrap">
           <p class="preview-label">Drag markers to move · drag the blue handle to resize</p>
           <div class="levels-scene-frame" id="levelsSceneFrame">
-            <img id="levelsSceneImg" class="levels-scene-img" src="FindGame/assets/images/scene.svg" alt="Scene preview" />
+            <img id="levelsSceneImg" class="levels-scene-img" alt="Scene preview" />
             <div id="levelsHotspotMarkers" class="levels-hotspot-markers"></div>
           </div>
         </div>
@@ -398,7 +398,7 @@
       function defaultSceneUrl() {
         return FindImageConfig.isCustomized("find_scene")
           ? FindImageConfig.getUrl("find_scene")
-          : "FindGame/assets/images/scene.svg";
+          : null;
       }
 
       function levelScenePreviewUrl(lv) {
@@ -407,7 +407,12 @@
 
       function updateLevelsScenePreview(level) {
         const lv = level || findLevels.find((l) => l.id === selectedLevelId);
-        levelsSceneImg.src = lv ? levelScenePreviewUrl(lv) : defaultSceneUrl();
+        const url = lv ? levelScenePreviewUrl(lv) : defaultSceneUrl();
+        if (url) {
+          levelsSceneImg.src = url;
+        } else {
+          levelsSceneImg.removeAttribute("src");
+        }
       }
 
       function updateHotspotMarkers(level) {
