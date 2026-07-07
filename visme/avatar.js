@@ -127,7 +127,7 @@ export class TommyAvatar {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.0;
+    this.renderer.toneMappingExposure = 1.35;
 
     canvas.addEventListener("webglcontextlost", (e) => e.preventDefault(), false);
     canvas.addEventListener("webglcontextrestored", () => this._syncGpuTextures(), false);
@@ -149,10 +149,13 @@ export class TommyAvatar {
     };
     this.applyCameraSettings(av);
 
-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x444466, 1.1));
-    const dir = new THREE.DirectionalLight(0xffffff, 0.85);
+    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x666688, 1.6));
+    const dir = new THREE.DirectionalLight(0xffffff, 1.25);
     dir.position.set(1, 2, 2);
     this.scene.add(dir);
+    const fill = new THREE.DirectionalLight(0xffffff, 0.5);
+    fill.position.set(-1.2, 1.4, 1.5);
+    this.scene.add(fill);
 
     this._bindFramingGestures();
 

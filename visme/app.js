@@ -63,10 +63,13 @@ scene.background = new THREE.Color(0x0b1222);
 const camera = new THREE.PerspectiveCamera(30, w / h, 0.1, 100);
 camera.position.set(0, 1.3, 1.6);
 
-scene.add(new THREE.HemisphereLight(0xffffff, 0x444466, 1.1));
-const dir = new THREE.DirectionalLight(0xffffff, 0.85);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x666688, 1.6));
+const dir = new THREE.DirectionalLight(0xffffff, 1.25);
 dir.position.set(1, 2, 2);
 scene.add(dir);
+const fill = new THREE.DirectionalLight(0xffffff, 0.5);
+fill.position.set(-1.2, 1.4, 1.5);
+scene.add(fill);
 
 const controls = new OrbitControls(camera, canvas);
 controls.target.set(0, 1.42, 0);
