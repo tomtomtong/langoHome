@@ -115,6 +115,12 @@ export class TommyAvatar {
     this._lastBlendshapeIndex = -1;
     this._manualBlendIndex = null;
     this._manualBlendValue = 0;
+    this._expressionTestPlaying = false;
+    this._expressionTestRaf = null;
+    this._expressionTestStep = null;
+    this._lastExpressionIndex = -1;
+    this._manualExpressionName = null;
+    this._manualExpressionValue = 0;
     this.speechElapsedMs = 0;
     this.onStatus = null;
     this.onCameraChange = null;
@@ -427,8 +433,106 @@ export class TommyAvatar {
     };
   }
 
+  getExpressionNames() {
+    const em = this.vrm?.expressionManager;
+    if (!em?.expressionMap) return [];
+    return Object.keys(em.expressionMap).sort((a, b) => a.localeCompare(b));
+  }
+
+  previewExpression(name, value) {
+    const em = this.vrm?.expressionManager;
+    if (!em || !name) return;
+    this.clearManualBlendshapePreview();
+    this._stopExpressionTest();
+    this._manualExpressionName = name;
+    this._manualExpressionValue = Math.min(1, Math.max(0, Number(value) || 0));
+    this._applyManualExpression();
+  }
+
+  clearExpressionPreview() {
+    this._manualExpressionName = null;
+    this._manualExpressionValue = 0;
+    const em = this.vrm?.expressionManager;
+    if (!em) return;
+    for (const exprName of Object.keys(em.expressionMap)) {
+      em.setValue(exprName, 0);
+    }
+    em.update();
+  }
+
+  _applyManualExpression() {
+    const em = this.vrm?.expressionManager;
+    if (!em || !this._manualExpressionName) return;
+    for (const exprName of Object.keys(em.expressionMap)) {
+      em.setValue(exprName, 0);
+    }
+    em.setValue(this._manualExpressionName, this._manualExpressionValue);
+    em.update();
+  }
+
+  _stopExpressionTest() {
+    this._expressionTestPlaying = false;
+    this._expressionTestStep = null;
+    this._lastExpressionIndex = -1;
+    if (this._expressionTestRaf) {
+      cancelAnimationFrame(this._expressionTestRaf);
+      this._expressionTestRaf = null;
+    }
+  }
+
+  _emitExpressionStep(index, names) {
+    if (index === this._lastExpressionIndex) return;
+    this._lastExpressionIndex = index;
+    this._expressionTestStep?.({
+      index,
+      total: names.length,
+      name: names[index] ?? String(index),
+    });
+  }
+
+  playExpressionTest({ holdMs = 700, onStep, onDone } = {}) {
+    const em = this.vrm?.expressionManager;
+    const names = this.getExpressionNames();
+    if (!em || !names.length || this._expressionTestPlaying) return false;
+
+    this.clearManualBlendshapePreview();
+    this._stopLipsyncPreview();
+    this._stopExpressionTest();
+    this._expressionTestPlaying = true;
+    this._expressionTestStep = onStep ?? null;
+    this._lastExpressionIndex = -1;
+
+    const duration = names.length * holdMs;
+    const t0 = performance.now();
+    if (onStep) this._emitExpressionStep(0, names);
+
+    const tick = () => {
+      if (!this._expressionTestPlaying) return;
+      const elapsed = performance.now() - t0;
+      const index = Math.min(names.length - 1, Math.floor(elapsed / holdMs));
+      if (onStep) this._emitExpressionStep(index, names);
+
+      for (const exprName of names) em.setValue(exprName, 0);
+      em.setValue(names[index], 1);
+      em.update();
+
+      if (elapsed >= duration) {
+        this._stopExpressionTest();
+        this.clearExpressionPreview();
+        onDone?.();
+        return;
+      }
+      this._expressionTestRaf = requestAnimationFrame(tick);
+    };
+
+    this._expressionTestRaf = requestAnimationFrame(tick);
+    return true;
+  }
+
   previewBlendshape(index, value) {
     if (!this.morphMeshes.length) return;
+    this._stopExpressionTest();
+    this.clearExpressionPreview();
     this._manualBlendIndex = index;
     this._manualBlendValue = Math.min(2, Math.max(0, Number(value) || 0));
     this._applyManualBlendshape();
@@ -481,6 +585,8 @@ export class TommyAvatar {
     if (!duration) return false;
 
     this.clearManualBlendshapePreview();
+    this._stopExpressionTest();
+    this.clearExpressionPreview();
     this._stopLipsyncPreview();
     this._blendshapeTestStep = onStep ?? null;
     this._lastBlendshapeIndex = -1;
@@ -738,6 +844,8 @@ export class TommyAvatar {
       this.canvas.removeEventListener("wheel", this._onWheel);
     }
     this._stopLipsyncPreview();
+    this._stopExpressionTest();
+    this.clearExpressionPreview();
     this.lipsync?.stop();
     this._stopDanceAnimation?.();
     this.idleAction?.stop();

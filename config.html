@@ -273,6 +273,7 @@
     @media (max-width: 640px) {
       .blendshape-grid { grid-template-columns: 1fr; }
     }
+    .expression-grid { max-height: 420px; }
   </style>
   <script type="importmap">
     {
@@ -358,6 +359,17 @@
         </div>
         <textarea id="blendshape-export" class="blendshape-export" readonly hidden placeholder="Exported blendshape list will appear here…"></textarea>
         <div id="blendshape-sliders" class="blendshape-grid"></div>
+      </div>
+      <div class="blendshape-section">
+        <h3>VRM expressions</h3>
+        <p>Preview VRM blendShapeGroups (Joy, Blink, ARKit face shapes, etc.). Drag a slider to 0–1. These are separate from the lipsync visemes above.</p>
+        <div class="blendshape-toolbar">
+          <button type="button" id="btn-reset-expressions" class="secondary">Reset expressions</button>
+          <button type="button" id="btn-test-expressions" class="secondary">Test all expressions</button>
+        </div>
+        <div id="expression-sliders" class="blendshape-grid expression-grid">
+          <p class="field-hint" style="margin:0;grid-column:1/-1">Loading expression list from Tommyv4.vrm…</p>
+        </div>
       </div>
       <div class="actions" style="margin-bottom: 1rem">
         <button type="button" id="btn-test-lipsync" class="secondary">Test lipsync</button>
@@ -617,6 +629,14 @@ ${linesText.replace(/</g, '&lt;')}</pre>
       window.dispatchEvent(new CustomEvent('blendshape-test-requested'));
     });
 
+    document.getElementById('btn-reset-expressions').addEventListener('click', () => {
+      window.dispatchEvent(new CustomEvent('expressions-preview-clear'));
+    });
+
+    document.getElementById('btn-test-expressions').addEventListener('click', () => {
+      window.dispatchEvent(new CustomEvent('expression-test-requested'));
+    });
+
     document.getElementById('form').onsubmit = async (e) => {
       e.preventDefault();
       const val = input.value.trim();
@@ -674,8 +694,55 @@ ${linesText.replace(/</g, '&lt;')}</pre>
     const canvas = document.getElementById("avatar-preview-canvas");
     const statusEl = document.getElementById("avatar-preview-status");
     const blendshapeGrid = document.getElementById("blendshape-sliders");
+    const expressionGrid = document.getElementById("expression-sliders");
 
     let previewAvatar = null;
+    let expressionNames = [];
+
+    function buildExpressionSliders(names) {
+      expressionNames = names.slice();
+      if (!names.length) {
+        expressionGrid.innerHTML = '<p class="field-hint" style="margin:0">No VRM expressions found on this model.</p>';
+        return;
+      }
+
+      expressionGrid.innerHTML = names.map((name, i) => `
+        <div class="slider-field">
+          <div class="slider-label">
+            <label for="expression-${i}">${name.replace(/</g, "&lt;")}</label>
+            <output id="expression-${i}-value" for="expression-${i}">0.00</output>
+          </div>
+          <div class="slider-wrap">
+            <span class="slider-end">0</span>
+            <input id="expression-${i}" type="range" min="0" max="1" value="0" step="0.05" data-index="${i}">
+            <span class="slider-end">1</span>
+          </div>
+        </div>
+      `).join("");
+
+      expressionGrid.addEventListener("input", (e) => {
+        const input = e.target;
+        if (!input.matches('input[type="range"][data-index]')) return;
+        const index = Number(input.dataset.index);
+        const name = expressionNames[index];
+        if (!name) return;
+        const value = Number(input.value);
+        const out = document.getElementById(`expression-${input.id.split("-")[1]}-value`);
+        if (out) out.textContent = value.toFixed(2);
+        previewAvatar?.previewExpression(name, value);
+        statusEl.textContent = `Previewing expression: ${name} (${value.toFixed(2)})`;
+      });
+    }
+
+    function resetExpressionSliders() {
+      for (let i = 0; i < expressionNames.length; i++) {
+        const el = document.getElementById(`expression-${i}`);
+        const out = document.getElementById(`expression-${i}-value`);
+        if (!el) continue;
+        el.value = 0;
+        if (out) out.textContent = "0.00";
+      }
+    }
 
     function buildBlendshapeSliders() {
       blendshapeGrid.innerHTML = BLENDSHAPE_LABELS.map((label, i) => `
@@ -810,6 +877,40 @@ ${linesText.replace(/</g, '&lt;')}</pre>
       if (!started) statusEl.textContent = "Blendshape test already running.";
     });
 
+    window.addEventListener("expressions-preview-clear", () => {
+      resetExpressionSliders();
+      previewAvatar?.clearExpressionPreview();
+      statusEl.textContent = previewAvatar?.loaded ? "Expressions reset." : statusEl.textContent;
+    });
+
+    window.addEventListener("expression-test-requested", () => {
+      if (!previewAvatar?.loaded) {
+        statusEl.textContent = "Avatar not ready for expression test.";
+        return;
+      }
+      resetExpressionSliders();
+      const started = previewAvatar.playExpressionTest({
+        onStep: ({ index, total, name }) => {
+          statusEl.textContent = `Expression ${index + 1}/${total}: ${name}`;
+          const el = document.getElementById(`expression-${index}`);
+          const out = document.getElementById(`expression-${index}-value`);
+          if (el) el.value = 1;
+          if (out) out.textContent = "1.00";
+          for (let i = 0; i < index; i++) {
+            const prev = document.getElementById(`expression-${i}`);
+            const prevOut = document.getElementById(`expression-${i}-value`);
+            if (prev) prev.value = 0;
+            if (prevOut) prevOut.textContent = "0.00";
+          }
+        },
+        onDone: () => {
+          resetExpressionSliders();
+          statusEl.textContent = "Expression test complete.";
+        },
+      });
+      if (!started) statusEl.textContent = "Expression test already running.";
+    });
+
     function readLipsyncFromDom() {
       return normalizeLipsync({
         exaggerate: document.getElementById("lipsync-exaggerate").value,
@@ -846,6 +947,7 @@ ${linesText.replace(/</g, '&lt;')}</pre>
       });
       previewAvatar.onStatus = (msg) => { statusEl.textContent = msg; };
       await previewAvatar.load();
+      buildExpressionSliders(previewAvatar.getExpressionNames());
       previewAvatar.refreshAfterVisible();
       requestAnimationFrame(() => {
         requestAnimationFrame(() => previewAvatar.frameForLipsyncPreview());
