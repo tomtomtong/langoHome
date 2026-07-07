@@ -16,8 +16,10 @@ const CONFIG_PATH = join(CONFIG_DIR, 'config.json');
 const DEBUG_LOG_PATH = join(CONFIG_DIR, 'hello-debug-log.json');
 const DEBUG_LOG_MAX_REPORTS = 20;
 const IDLE_VIDEO_DIR = join(CONFIG_DIR, 'idle-video');
-const IDLE_VIDEO_BASENAME = 'idle';
-const IDLE_VIDEO_MAX_BYTES = 100 * 1024 * 1024;
+const TRANSITION_VIDEO_DIR = join(CONFIG_DIR, 'transition-video');
+const AVATAR_BG_DIR = join(CONFIG_DIR, 'avatar-background');
+const VIDEO_MAX_BYTES = 100 * 1024 * 1024;
+const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 
 if (!process.env.GAME_DATA_DIR) {
   process.env.GAME_DATA_DIR =
@@ -55,55 +57,133 @@ const MIME = {
   '.mov': 'video/quicktime',
 };
 
-function ensureIdleVideoDir() {
-  if (!existsSync(IDLE_VIDEO_DIR)) mkdirSync(IDLE_VIDEO_DIR, { recursive: true });
+function videoFileFilter(_req, file, cb) {
+  const ext = extname(file.originalname || '').toLowerCase();
+  const okExt = ['.mp4', '.webm', '.mov'].includes(ext);
+  const okMime = /^video\/(mp4|webm|quicktime|x-m4v)$/i.test(file.mimetype || '');
+  if (okExt || okMime) cb(null, true);
+  else cb(new Error('Only MP4, WebM, or MOV videos are allowed.'));
 }
 
-function listIdleVideoFiles() {
-  ensureIdleVideoDir();
-  return readdirSync(IDLE_VIDEO_DIR).filter((name) => name.startsWith(`${IDLE_VIDEO_BASENAME}.`));
+function imageFileFilter(_req, file, cb) {
+  const ext = extname(file.originalname || '').toLowerCase();
+  const okExt = ['.png', '.jpg', '.jpeg', '.webp'].includes(ext);
+  const okMime = /^image\/(png|jpe?g|webp)$/i.test(file.mimetype || '');
+  if (okExt || okMime) cb(null, true);
+  else cb(new Error('Only PNG, JPG, or WebP images are allowed.'));
 }
 
-function getIdleVideoInfo() {
-  const files = listIdleVideoFiles();
-  if (!files.length) return null;
-  const filename = files[0];
-  const filePath = join(IDLE_VIDEO_DIR, filename);
-  if (!existsSync(filePath)) return null;
-  const updatedAt = statSync(filePath).mtimeMs || Date.now();
-  return {
-    filename,
-    url: `/api/idle-video?v=${updatedAt}`,
-    updatedAt,
-  };
-}
-
-function clearIdleVideoFiles() {
-  for (const name of listIdleVideoFiles()) {
-    try { unlinkSync(join(IDLE_VIDEO_DIR, name)); } catch {}
+function createUploadStore({ dir, basename, apiPath, fieldName, maxBytes, fileFilter, defaultExt }) {
+  function ensureDir() {
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   }
+
+  function listFiles() {
+    ensureDir();
+    return readdirSync(dir).filter((name) => name.startsWith(`${basename}.`));
+  }
+
+  function getInfo() {
+    const files = listFiles();
+    if (!files.length) return null;
+    const filename = files[0];
+    const filePath = join(dir, filename);
+    if (!existsSync(filePath)) return null;
+    const updatedAt = statSync(filePath).mtimeMs || Date.now();
+    return {
+      filename,
+      url: `${apiPath}?v=${updatedAt}`,
+      updatedAt,
+    };
+  }
+
+  function clear() {
+    for (const name of listFiles()) {
+      try { unlinkSync(join(dir, name)); } catch {}
+    }
+  }
+
+  const upload = multer({
+    storage: multer.diskStorage({
+      destination: (_req, _file, cb) => {
+        ensureDir();
+        cb(null, dir);
+      },
+      filename: (_req, file, cb) => {
+        const ext = extname(file.originalname || '').toLowerCase() || defaultExt;
+        cb(null, `${basename}${ext}`);
+      },
+    }),
+    limits: { fileSize: maxBytes },
+    fileFilter,
+  }).single(fieldName);
+
+  return { dir, getInfo, clear, upload };
 }
 
-const idleVideoUpload = multer({
-  storage: multer.diskStorage({
-    destination: (_req, _file, cb) => {
-      ensureIdleVideoDir();
-      cb(null, IDLE_VIDEO_DIR);
-    },
-    filename: (_req, file, cb) => {
-      const ext = extname(file.originalname || '').toLowerCase() || '.mp4';
-      cb(null, `${IDLE_VIDEO_BASENAME}${ext}`);
-    },
-  }),
-  limits: { fileSize: IDLE_VIDEO_MAX_BYTES },
-  fileFilter: (_req, file, cb) => {
-    const ext = extname(file.originalname || '').toLowerCase();
-    const okExt = ['.mp4', '.webm', '.mov'].includes(ext);
-    const okMime = /^video\/(mp4|webm|quicktime|x-m4v)$/i.test(file.mimetype || '');
-    if (okExt || okMime) cb(null, true);
-    else cb(new Error('Only MP4, WebM, or MOV videos are allowed.'));
-  },
-}).single('video');
+function createVideoStore(dir, basename, apiPath) {
+  return createUploadStore({
+    dir,
+    basename,
+    apiPath,
+    fieldName: 'video',
+    maxBytes: VIDEO_MAX_BYTES,
+    fileFilter: videoFileFilter,
+    defaultExt: '.mp4',
+  });
+}
+
+function createImageStore(dir, basename, apiPath) {
+  return createUploadStore({
+    dir,
+    basename,
+    apiPath,
+    fieldName: 'image',
+    maxBytes: IMAGE_MAX_BYTES,
+    fileFilter: imageFileFilter,
+    defaultExt: '.png',
+  });
+}
+
+const idleVideos = createVideoStore(IDLE_VIDEO_DIR, 'idle', '/api/idle-video');
+const transitionVideos = createVideoStore(TRANSITION_VIDEO_DIR, 'transition', '/api/transition-video');
+const avatarBackgrounds = createImageStore(AVATAR_BG_DIR, 'background', '/api/avatar-background');
+
+function handleUploadApi(store, resKey, req, res, maxBytes) {
+  if (req.method === 'GET') {
+    const info = store.getInfo();
+    if (!info) {
+      sendJson(res, 404, { error: `No ${resKey} uploaded.` });
+      return;
+    }
+    serveFile(res, join(store.dir, info.filename));
+    return;
+  }
+  if (req.method === 'PUT' || req.method === 'POST') {
+    store.clear();
+    store.upload(req, res, (err) => {
+      if (err) {
+        const message = err.code === 'LIMIT_FILE_SIZE'
+          ? `File must be under ${Math.round(maxBytes / (1024 * 1024))} MB.`
+          : (err.message || 'Upload failed.');
+        sendJson(res, 400, { error: message });
+        return;
+      }
+      if (!req.file) {
+        sendJson(res, 400, { error: 'No file provided.' });
+        return;
+      }
+      sendJson(res, 200, { ok: true, [resKey]: store.getInfo() });
+    });
+    return;
+  }
+  if (req.method === 'DELETE') {
+    store.clear();
+    sendJson(res, 200, { ok: true });
+    return;
+  }
+  sendJson(res, 405, { error: 'Method not allowed.' });
+}
 
 function loadConfig() {
   try {
@@ -235,7 +315,9 @@ const server = createServer((req, res) => {
         model: cfg.model ?? '',
         avatar: normalizeAvatar(cfg.avatar),
         lipsync: normalizeLipsync(cfg.lipsync),
-        idleVideo: getIdleVideoInfo(),
+        idleVideo: idleVideos.getInfo(),
+        transitionVideo: transitionVideos.getInfo(),
+        avatarBackground: avatarBackgrounds.getInfo(),
       });
       return;
     }
@@ -298,40 +380,17 @@ const server = createServer((req, res) => {
   }
 
   if (url === '/api/idle-video') {
-    if (req.method === 'GET') {
-      const info = getIdleVideoInfo();
-      if (!info) {
-        sendJson(res, 404, { error: 'No idle video uploaded.' });
-        return;
-      }
-      serveFile(res, join(IDLE_VIDEO_DIR, info.filename));
-      return;
-    }
-    if (req.method === 'PUT' || req.method === 'POST') {
-      clearIdleVideoFiles();
-      idleVideoUpload(req, res, (err) => {
-        if (err) {
-          const message = err.code === 'LIMIT_FILE_SIZE'
-            ? `Video must be under ${Math.round(IDLE_VIDEO_MAX_BYTES / (1024 * 1024))} MB.`
-            : (err.message || 'Upload failed.');
-          sendJson(res, 400, { error: message });
-          return;
-        }
-        if (!req.file) {
-          sendJson(res, 400, { error: 'No video file provided.' });
-          return;
-        }
-        const info = getIdleVideoInfo();
-        sendJson(res, 200, { ok: true, idleVideo: info });
-      });
-      return;
-    }
-    if (req.method === 'DELETE') {
-      clearIdleVideoFiles();
-      sendJson(res, 200, { ok: true });
-      return;
-    }
-    sendJson(res, 405, { error: 'Method not allowed.' });
+    handleUploadApi(idleVideos, 'idleVideo', req, res, VIDEO_MAX_BYTES);
+    return;
+  }
+
+  if (url === '/api/transition-video') {
+    handleUploadApi(transitionVideos, 'transitionVideo', req, res, VIDEO_MAX_BYTES);
+    return;
+  }
+
+  if (url === '/api/avatar-background') {
+    handleUploadApi(avatarBackgrounds, 'avatarBackground', req, res, IMAGE_MAX_BYTES);
     return;
   }
 

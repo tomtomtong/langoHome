@@ -3,3 +3,5 @@ node_modules/
 config.json
 hello-debug-log.json
 idle-video/
+transition-video/
+avatar-background/

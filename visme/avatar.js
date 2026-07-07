@@ -324,6 +324,19 @@ export class TommyAvatar {
     canvas.addEventListener("wheel", this._onWheel, { passive: false });
   }
 
+  async setBackgroundUrl(url) {
+    this.backgroundUrl = url || null;
+    if (this.backgroundTexture) {
+      this.backgroundTexture.dispose();
+      this.backgroundTexture = null;
+    }
+    if (this.backgroundUrl) {
+      await this._loadBackgroundTexture();
+      return;
+    }
+    this.scene.background = this.defaultBackground;
+  }
+
   async _loadBackgroundTexture() {
     if (!this.backgroundUrl) return;
     try {

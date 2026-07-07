@@ -346,6 +346,15 @@
       display: none;
     }
 
+    body.playing-transition-video #idle-video-screen {
+      cursor: default;
+      pointer-events: none;
+    }
+
+    body.playing-transition-video #idle-video-hint {
+      display: none;
+    }
+
     #idle-video {
       width: 100%;
       height: 100%;
@@ -438,6 +447,7 @@
     const DEFAULT_PROMPT = "You are Uncle Tommy, a friendly voice assistant. Keep responses brief.";
     const DEFAULT_VOICE = "default-zylgts2tamenvybeti3z0w__uncle_tommy";
     const DEFAULT_MODEL = "openai/gpt-4o-mini";
+    const DEFAULT_AVATAR_BG = "/bg.png";
 
     const btnStart = document.getElementById("btn-start");
     const btnStop = document.getElementById("btn-stop");
@@ -453,6 +463,8 @@
     const debugUploadStatusEl = document.getElementById("debug-upload-status");
     const idleVideoScreen = document.getElementById("idle-video-screen");
     const idleVideoEl = document.getElementById("idle-video");
+    const idleVideoHint = document.getElementById("idle-video-hint");
+    const avatarStageEl = document.getElementById("avatar-stage");
     const SHOW_FOOTBALL_ICON = "show_football_icon";
     const HAPPY = "happy";
     const END_CONVERSATION = "end_conversation";
@@ -461,7 +473,9 @@
     const debugLogLines = [];
 
     let idleVideoUrl = null;
+    let transitionVideoUrl = null;
     let idleVideoStarting = false;
+    let playingTransitionVideo = false;
     let avatar = null;
     let avatarLoading = null;
     let cameraEditMode = false;
@@ -645,11 +659,29 @@
       statusIdleEl.textContent = msg;
     }
 
+    function getAvatarBackgroundUrl(cfg) {
+      return cfg?.avatarBackground?.url || DEFAULT_AVATAR_BG;
+    }
+
+    function applyAvatarStageBackground(url) {
+      avatarStageEl.style.backgroundColor = "#0b1222";
+      avatarStageEl.style.backgroundImage = `url("${url}")`;
+      avatarStageEl.style.backgroundSize = "cover";
+      avatarStageEl.style.backgroundPosition = "center";
+      avatarStageEl.style.backgroundRepeat = "no-repeat";
+    }
+
     function setIdleVideoMode(enabled) {
       document.body.classList.toggle("has-idle-video", enabled);
     }
 
-    async function setupIdleVideo(idleVideo) {
+    function setTransitionVideoMode(enabled) {
+      document.body.classList.toggle("playing-transition-video", enabled);
+    }
+
+    async function setupIdleVideos(idleVideo, transitionVideo) {
+      transitionVideoUrl = transitionVideo?.url || null;
+
       if (!idleVideo?.url) {
         idleVideoUrl = null;
         setIdleVideoMode(false);
@@ -659,6 +691,8 @@
 
       idleVideoUrl = idleVideo.url;
       setIdleVideoMode(true);
+      idleVideoEl.loop = true;
+      idleVideoEl.muted = true;
       idleVideoEl.src = idleVideo.url;
       idleVideoEl.load();
       try {
@@ -667,28 +701,84 @@
       return true;
     }
 
-    async function startConversationFromIdleTap() {
-      if (active || idleVideoStarting) return;
-      idleVideoStarting = true;
-      uiLog("hello", "idle video tapped → connectConversation", "hello");
-      idleVideoEl.pause();
+    function resetIdleVideoElement() {
+      if (!idleVideoUrl) return;
+      playingTransitionVideo = false;
+      setTransitionVideoMode(false);
+      idleVideoEl.onended = null;
+      idleVideoEl.loop = true;
+      idleVideoEl.muted = true;
+      idleVideoEl.src = idleVideoUrl;
+      idleVideoEl.load();
+      idleVideoHint.hidden = false;
+      idleVideoScreen.style.cursor = "pointer";
+    }
+
+    async function playTransitionVideo() {
+      return new Promise((resolve, reject) => {
+        playingTransitionVideo = true;
+        setTransitionVideoMode(true);
+        idleVideoHint.hidden = true;
+        idleVideoScreen.style.cursor = "default";
+
+        idleVideoEl.pause();
+        idleVideoEl.loop = false;
+        idleVideoEl.muted = false;
+        idleVideoEl.src = transitionVideoUrl;
+        idleVideoEl.load();
+
+        idleVideoEl.onended = () => {
+          idleVideoEl.onended = null;
+          resolve();
+        };
+        idleVideoEl.onerror = () => {
+          idleVideoEl.onended = null;
+          idleVideoEl.onerror = null;
+          reject(new Error("Transition video failed to play."));
+        };
+
+        idleVideoEl.play().catch(reject);
+      });
+    }
+
+    async function connectConversationAfterVideos() {
       wakeWordEnabled = false;
       wakeWordRestartAttempts = 0;
       stopWakeWordListening();
+      await connectConversation();
+    }
+
+    async function startConversationFromIdleTap() {
+      if (active || idleVideoStarting || playingTransitionVideo) return;
+      idleVideoStarting = true;
+      uiLog("hello", "idle video tapped", "hello");
+
       try {
-        await connectConversation();
+        if (transitionVideoUrl) {
+          uiLog("hello", "playing transition video", "hello");
+          try {
+            await playTransitionVideo();
+          } catch (e) {
+            uiLog("hello", `transition video error: ${e.message}`, "warn");
+          }
+        }
+        uiLog("hello", "transition complete → connectConversation", "hello");
+        await connectConversationAfterVideos();
       } finally {
+        playingTransitionVideo = false;
+        setTransitionVideoMode(false);
         idleVideoStarting = false;
       }
     }
 
     idleVideoScreen.addEventListener("click", (e) => {
-      if (e.target.closest("button, a, input, select, textarea")) return;
+      if (playingTransitionVideo || e.target.closest("button, a, input, select, textarea")) return;
       startConversationFromIdleTap();
     });
 
     function resumeIdleVideo() {
       if (!idleVideoUrl || inSession || active) return;
+      resetIdleVideoElement();
       idleVideoEl.currentTime = 0;
       idleVideoEl.play().catch(() => {});
     }
@@ -807,9 +897,12 @@
         const cfg = await getConfig();
         const av = normalizeAvatar(cfg.avatar);
         const lipsync = normalizeLipsync(cfg.lipsync);
+        const backgroundUrl = getAvatarBackgroundUrl(cfg);
+        applyAvatarStageBackground(backgroundUrl);
         avatar = new TommyAvatar(document.getElementById("vrm-canvas"), {
           ...av,
           lipsync,
+          backgroundUrl,
           interactiveCamera: false,
         });
         avatar.onStatus = (msg) => {
@@ -1560,7 +1653,8 @@
 
     async function init() {
       const cfg = await getConfig();
-      const hasIdleVideo = await setupIdleVideo(cfg.idleVideo);
+      applyAvatarStageBackground(getAvatarBackgroundUrl(cfg));
+      const hasIdleVideo = await setupIdleVideos(cfg.idleVideo, cfg.transitionVideo);
       if (!hasIdleVideo) {
         setStatus("Loading avatar…");
       }

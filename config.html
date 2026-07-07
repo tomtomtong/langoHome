@@ -340,14 +340,37 @@
       </div>
       <hr class="section-divider" style="margin: 1.5rem 0 1.25rem">
       <h2 style="margin: 0 0 0.375rem; font-size: 1rem">Idle screen video</h2>
-      <p style="margin: 0 0 1rem">Upload a video that loops on the home screen. Visitors tap anywhere on the video to start a conversation.</p>
+      <p style="margin: 0 0 1rem">Upload a video that loops on the home screen. Visitors tap anywhere on the video to continue.</p>
       <div class="video-upload-wrap">
         <video id="idle-video-preview" class="video-preview" controls loop muted playsinline hidden></video>
         <p id="idle-video-status" class="field-hint" style="margin:0">No idle video uploaded.</p>
         <input id="idle-video-file" type="file" accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov">
         <div class="video-upload-actions">
-          <button type="button" id="btn-upload-idle-video" class="secondary">Upload video</button>
-          <button type="button" id="btn-remove-idle-video" class="secondary" hidden>Remove video</button>
+          <button type="button" id="btn-upload-idle-video" class="secondary">Upload loop video</button>
+          <button type="button" id="btn-remove-idle-video" class="secondary" hidden>Remove loop video</button>
+        </div>
+      </div>
+      <h2 style="margin: 1.5rem 0 0.375rem; font-size: 1rem">Transition video</h2>
+      <p style="margin: 0 0 1rem">Optional video that plays once after a tap, before the conversation starts. If omitted, tapping goes straight into the conversation.</p>
+      <div class="video-upload-wrap">
+        <video id="transition-video-preview" class="video-preview" controls muted playsinline hidden></video>
+        <p id="transition-video-status" class="field-hint" style="margin:0">No transition video uploaded.</p>
+        <input id="transition-video-file" type="file" accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov">
+        <div class="video-upload-actions">
+          <button type="button" id="btn-upload-transition-video" class="secondary">Upload transition video</button>
+          <button type="button" id="btn-remove-transition-video" class="secondary" hidden>Remove transition video</button>
+        </div>
+      </div>
+      <hr class="section-divider" style="margin: 1.5rem 0 1.25rem">
+      <h2 style="margin: 0 0 0.375rem; font-size: 1rem">Avatar background</h2>
+      <p style="margin: 0 0 1rem">Background image behind Uncle Tommy during conversations. Leave empty to use the default <code>bg.png</code>.</p>
+      <div class="video-upload-wrap">
+        <img id="avatar-bg-preview" class="video-preview" alt="Avatar background preview" hidden>
+        <p id="avatar-bg-status" class="field-hint" style="margin:0">No custom background uploaded.</p>
+        <input id="avatar-bg-file" type="file" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp">
+        <div class="video-upload-actions">
+          <button type="button" id="btn-upload-avatar-bg" class="secondary">Upload background</button>
+          <button type="button" id="btn-remove-avatar-bg" class="secondary" hidden>Remove background</button>
         </div>
       </div>
       <hr class="section-divider" style="margin: 1.5rem 0 1.25rem">
@@ -474,41 +497,94 @@
     const idleVideoFile = document.getElementById('idle-video-file');
     const btnUploadIdleVideo = document.getElementById('btn-upload-idle-video');
     const btnRemoveIdleVideo = document.getElementById('btn-remove-idle-video');
+    const transitionVideoPreview = document.getElementById('transition-video-preview');
+    const transitionVideoStatus = document.getElementById('transition-video-status');
+    const transitionVideoFile = document.getElementById('transition-video-file');
+    const btnUploadTransitionVideo = document.getElementById('btn-upload-transition-video');
+    const btnRemoveTransitionVideo = document.getElementById('btn-remove-transition-video');
+    const avatarBgPreview = document.getElementById('avatar-bg-preview');
+    const avatarBgStatus = document.getElementById('avatar-bg-status');
+    const avatarBgFile = document.getElementById('avatar-bg-file');
+    const btnUploadAvatarBg = document.getElementById('btn-upload-avatar-bg');
+    const btnRemoveAvatarBg = document.getElementById('btn-remove-avatar-bg');
 
-    function applyIdleVideo(idleVideo) {
-      if (idleVideo?.url) {
-        idleVideoPreview.src = idleVideo.url;
-        idleVideoPreview.hidden = false;
-        idleVideoStatus.textContent = `Uploaded: ${idleVideo.filename || 'idle video'}`;
-        btnRemoveIdleVideo.hidden = false;
-        idleVideoPreview.load();
+    function applyVideoPreview(previewEl, statusEl, removeBtn, video, emptyLabel) {
+      if (video?.url) {
+        previewEl.src = video.url;
+        previewEl.hidden = false;
+        statusEl.textContent = `Uploaded: ${video.filename || 'video'}`;
+        removeBtn.hidden = false;
+        previewEl.load();
       } else {
-        idleVideoPreview.removeAttribute('src');
-        idleVideoPreview.hidden = true;
-        idleVideoStatus.textContent = 'No idle video uploaded.';
-        btnRemoveIdleVideo.hidden = true;
+        previewEl.removeAttribute('src');
+        previewEl.hidden = true;
+        statusEl.textContent = emptyLabel;
+        removeBtn.hidden = true;
       }
     }
 
-    async function uploadIdleVideo(file) {
-      const form = new FormData();
-      form.append('video', file);
-      const res = await fetch('/api/idle-video', { method: 'PUT', body: form });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Upload failed.');
-      applyIdleVideo(data.idleVideo);
-      idleVideoFile.value = '';
-      return data;
+    function applyIdleVideo(idleVideo) {
+      applyVideoPreview(
+        idleVideoPreview,
+        idleVideoStatus,
+        btnRemoveIdleVideo,
+        idleVideo,
+        'No idle video uploaded.',
+      );
     }
 
-    async function removeIdleVideo() {
-      const res = await fetch('/api/idle-video', { method: 'DELETE' });
+    function applyTransitionVideo(transitionVideo) {
+      applyVideoPreview(
+        transitionVideoPreview,
+        transitionVideoStatus,
+        btnRemoveTransitionVideo,
+        transitionVideo,
+        'No transition video uploaded.',
+      );
+    }
+
+    function applyAvatarBackground(avatarBackground) {
+      applyImagePreview(
+        avatarBgPreview,
+        avatarBgStatus,
+        btnRemoveAvatarBg,
+        avatarBackground,
+        'No custom background uploaded.',
+      );
+      if (window.__previewAvatar) {
+        window.__previewAvatar.setBackgroundUrl(avatarBackground?.url || '/bg.png');
+      }
+    }
+
+    async function uploadAssetFile(apiPath, responseKey, file, fieldName) {
+      const form = new FormData();
+      form.append(fieldName, file);
+      const res = await fetch(apiPath, { method: 'PUT', body: form });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Upload failed.');
+      return data[responseKey];
+    }
+
+    function applyImagePreview(previewEl, statusEl, removeBtn, image, emptyLabel) {
+      if (image?.url) {
+        previewEl.src = image.url;
+        previewEl.hidden = false;
+        statusEl.textContent = `Uploaded: ${image.filename || 'image'}`;
+        removeBtn.hidden = false;
+      } else {
+        previewEl.removeAttribute('src');
+        previewEl.hidden = true;
+        statusEl.textContent = emptyLabel;
+        removeBtn.hidden = true;
+      }
+    }
+
+    async function removeVideoFile(apiPath) {
+      const res = await fetch(apiPath, { method: 'DELETE' });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || 'Remove failed.');
       }
-      applyIdleVideo(null);
-      idleVideoFile.value = '';
     }
 
     btnUploadIdleVideo.addEventListener('click', async () => {
@@ -522,7 +598,8 @@
       status.textContent = 'Uploading video…';
       status.className = 'status ok';
       try {
-        await uploadIdleVideo(file);
+        applyIdleVideo(await uploadAssetFile('/api/idle-video', 'idleVideo', file, 'video'));
+        idleVideoFile.value = '';
         status.textContent = 'Idle video uploaded.';
         status.className = 'status ok';
       } catch (e) {
@@ -537,7 +614,9 @@
       if (!confirm('Remove the idle screen video?')) return;
       btnRemoveIdleVideo.disabled = true;
       try {
-        await removeIdleVideo();
+        await removeVideoFile('/api/idle-video');
+        applyIdleVideo(null);
+        idleVideoFile.value = '';
         status.textContent = 'Idle video removed.';
         status.className = 'status ok';
       } catch (e) {
@@ -545,6 +624,86 @@
         status.className = 'status err';
       } finally {
         btnRemoveIdleVideo.disabled = false;
+      }
+    });
+
+    btnUploadTransitionVideo.addEventListener('click', async () => {
+      const file = transitionVideoFile.files?.[0];
+      if (!file) {
+        status.textContent = 'Choose a transition video file first.';
+        status.className = 'status err';
+        return;
+      }
+      btnUploadTransitionVideo.disabled = true;
+      status.textContent = 'Uploading transition video…';
+      status.className = 'status ok';
+      try {
+        applyTransitionVideo(await uploadAssetFile('/api/transition-video', 'transitionVideo', file, 'video'));
+        transitionVideoFile.value = '';
+        status.textContent = 'Transition video uploaded.';
+        status.className = 'status ok';
+      } catch (e) {
+        status.textContent = e.message || 'Could not upload transition video.';
+        status.className = 'status err';
+      } finally {
+        btnUploadTransitionVideo.disabled = false;
+      }
+    });
+
+    btnRemoveTransitionVideo.addEventListener('click', async () => {
+      if (!confirm('Remove the transition video?')) return;
+      btnRemoveTransitionVideo.disabled = true;
+      try {
+        await removeVideoFile('/api/transition-video');
+        applyTransitionVideo(null);
+        transitionVideoFile.value = '';
+        status.textContent = 'Transition video removed.';
+        status.className = 'status ok';
+      } catch (e) {
+        status.textContent = e.message || 'Could not remove transition video.';
+        status.className = 'status err';
+      } finally {
+        btnRemoveTransitionVideo.disabled = false;
+      }
+    });
+
+    btnUploadAvatarBg.addEventListener('click', async () => {
+      const file = avatarBgFile.files?.[0];
+      if (!file) {
+        status.textContent = 'Choose a background image first.';
+        status.className = 'status err';
+        return;
+      }
+      btnUploadAvatarBg.disabled = true;
+      status.textContent = 'Uploading background…';
+      status.className = 'status ok';
+      try {
+        applyAvatarBackground(await uploadAssetFile('/api/avatar-background', 'avatarBackground', file, 'image'));
+        avatarBgFile.value = '';
+        status.textContent = 'Avatar background uploaded.';
+        status.className = 'status ok';
+      } catch (e) {
+        status.textContent = e.message || 'Could not upload background.';
+        status.className = 'status err';
+      } finally {
+        btnUploadAvatarBg.disabled = false;
+      }
+    });
+
+    btnRemoveAvatarBg.addEventListener('click', async () => {
+      if (!confirm('Remove the custom avatar background?')) return;
+      btnRemoveAvatarBg.disabled = true;
+      try {
+        await removeVideoFile('/api/avatar-background');
+        applyAvatarBackground(null);
+        avatarBgFile.value = '';
+        status.textContent = 'Avatar background removed.';
+        status.className = 'status ok';
+      } catch (e) {
+        status.textContent = e.message || 'Could not remove background.';
+        status.className = 'status err';
+      } finally {
+        btnRemoveAvatarBg.disabled = false;
       }
     });
 
@@ -690,6 +849,8 @@ ${linesText.replace(/</g, '&lt;')}</pre>
       model.value = cfg.model ?? '';
       applyLipsyncFields(cfg.lipsync);
       applyIdleVideo(cfg.idleVideo);
+      applyTransitionVideo(cfg.transitionVideo);
+      applyAvatarBackground(cfg.avatarBackground);
       if (cfg.apiKey) {
         status.textContent = 'Settings saved.';
         status.className = 'status ok';
@@ -1050,20 +1211,24 @@ ${linesText.replace(/</g, '&lt;')}</pre>
 
     async function initPreview() {
       let lipsync = DEFAULT_LIPSYNC;
+      let backgroundUrl = '/bg.png';
       try {
         const res = await fetch("/api/config");
         if (res.ok) {
           const cfg = await res.json();
           lipsync = normalizeLipsync(cfg.lipsync);
           writeLipsyncToDom(lipsync);
+          if (cfg.avatarBackground?.url) backgroundUrl = cfg.avatarBackground.url;
         }
       } catch {}
 
       previewAvatar = new TommyAvatar(canvas, {
         ...DEFAULT_AVATAR,
         lipsync,
+        backgroundUrl,
         interactiveCamera: false,
       });
+      window.__previewAvatar = previewAvatar;
       previewAvatar.onStatus = (msg) => { statusEl.textContent = msg; };
       await previewAvatar.load();
       buildExpressionSliders(previewAvatar.getExpressionNames());
