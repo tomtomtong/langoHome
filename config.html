@@ -302,6 +302,53 @@
       color: #9aa0a6;
       font-size: 0.8125rem;
     }
+    .game-icons-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      margin-bottom: 0.5rem;
+    }
+    .game-icon-card {
+      display: flex;
+      flex-direction: column;
+      gap: 0.625rem;
+      padding: 0.875rem;
+      border: 1px solid #2a2f3a;
+      border-radius: 10px;
+      background: #171a21;
+    }
+    .game-icon-card h3 {
+      margin: 0;
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #e8eaed;
+    }
+    .game-icon-preview-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      aspect-ratio: 1;
+      border-radius: 16px;
+      border: 1px solid #2a2f3a;
+      background: rgba(15, 17, 23, 0.85);
+      overflow: hidden;
+    }
+    .game-icon-preview {
+      width: 62%;
+      height: 62%;
+      object-fit: contain;
+    }
+    .game-icon-preview--default {
+      opacity: 0.85;
+    }
+    .game-icon-card .field-hint {
+      margin: 0;
+      min-height: 2.5em;
+    }
+    .game-icon-card .video-upload-actions {
+      margin-top: 0.25rem;
+    }
   </style>
   <script type="importmap">
     {
@@ -373,6 +420,10 @@
           <button type="button" id="btn-remove-avatar-bg" class="secondary" hidden>Remove background</button>
         </div>
       </div>
+      <hr class="section-divider" style="margin: 1.5rem 0 1.25rem">
+      <h2 style="margin: 0 0 0.375rem; font-size: 1rem">Conversation game icons</h2>
+      <p style="margin: 0 0 1rem">Icons on the game shortcuts during a conversation. Upload a custom image per game, or leave empty to use the built-in default. Square PNG or WebP works best.</p>
+      <div id="game-icons-grid" class="game-icons-grid"></div>
       <hr class="section-divider" style="margin: 1.5rem 0 1.25rem">
       <h2 style="margin: 0 0 0.375rem; font-size: 1rem">Lipsync (Visme)</h2>
       <p style="margin: 0 0 1rem">Tune mouth movement sensitivity. Drag each blendshape slider to preview it on the avatar, or use the test buttons below.</p>
@@ -507,6 +558,130 @@
     const avatarBgFile = document.getElementById('avatar-bg-file');
     const btnUploadAvatarBg = document.getElementById('btn-upload-avatar-bg');
     const btnRemoveAvatarBg = document.getElementById('btn-remove-avatar-bg');
+    const gameIconsGrid = document.getElementById('game-icons-grid');
+
+    const GAME_ICON_DEFS = [
+      {
+        id: 'wordwhack',
+        label: 'Word-Whack Blitz',
+        defaultIcon: '/games/assets/images/mole.svg',
+      },
+      {
+        id: 'cardgame',
+        label: 'Picture-Word Memory Match',
+        defaultIcon: '/games/CardGame/assets/images/card-back.svg',
+      },
+      {
+        id: 'findgame',
+        label: 'Find the Object',
+        defaultIcon: '/games/FindGame/assets/images/scene.svg',
+      },
+    ];
+
+    const gameIconEls = {};
+
+    function renderGameIconCards() {
+      gameIconsGrid.innerHTML = GAME_ICON_DEFS.map((def) => `
+        <div class="game-icon-card" data-game-id="${def.id}">
+          <h3>${def.label}</h3>
+          <div class="game-icon-preview-wrap">
+            <img
+              id="game-icon-preview-${def.id}"
+              class="game-icon-preview game-icon-preview--default"
+              src="${def.defaultIcon}"
+              alt="${def.label} icon preview"
+            >
+          </div>
+          <p id="game-icon-status-${def.id}" class="field-hint">Using default icon.</p>
+          <input id="game-icon-file-${def.id}" type="file" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp">
+          <div class="video-upload-actions">
+            <button type="button" id="btn-upload-game-icon-${def.id}" class="secondary">Upload icon</button>
+            <button type="button" id="btn-remove-game-icon-${def.id}" class="secondary" hidden>Remove icon</button>
+          </div>
+        </div>
+      `).join('');
+
+      GAME_ICON_DEFS.forEach((def) => {
+        gameIconEls[def.id] = {
+          preview: document.getElementById(`game-icon-preview-${def.id}`),
+          status: document.getElementById(`game-icon-status-${def.id}`),
+          file: document.getElementById(`game-icon-file-${def.id}`),
+          upload: document.getElementById(`btn-upload-game-icon-${def.id}`),
+          remove: document.getElementById(`btn-remove-game-icon-${def.id}`),
+          defaultIcon: def.defaultIcon,
+        };
+      });
+    }
+
+    function applyGameIcon(gameId, iconInfo) {
+      const els = gameIconEls[gameId];
+      if (!els) return;
+      if (iconInfo?.url) {
+        els.preview.src = iconInfo.url;
+        els.preview.classList.remove('game-icon-preview--default');
+        els.status.textContent = `Uploaded: ${iconInfo.filename || 'icon'}`;
+        els.remove.hidden = false;
+      } else {
+        els.preview.src = els.defaultIcon;
+        els.preview.classList.add('game-icon-preview--default');
+        els.status.textContent = 'Using default icon.';
+        els.remove.hidden = true;
+      }
+    }
+
+    function applyGameIcons(gameIcons) {
+      GAME_ICON_DEFS.forEach((def) => {
+        applyGameIcon(def.id, gameIcons?.[def.id] || null);
+      });
+    }
+
+    function wireGameIconUploads() {
+      GAME_ICON_DEFS.forEach((def) => {
+        const els = gameIconEls[def.id];
+        els.upload.addEventListener('click', async () => {
+          const file = els.file.files?.[0];
+          if (!file) {
+            status.textContent = `Choose an icon image for ${def.label} first.`;
+            status.className = 'status err';
+            return;
+          }
+          els.upload.disabled = true;
+          status.textContent = `Uploading ${def.label} icon…`;
+          status.className = 'status ok';
+          try {
+            applyGameIcon(def.id, await uploadAssetFile(`/api/game-icons/${def.id}`, 'gameIcon', file, 'image'));
+            els.file.value = '';
+            status.textContent = `${def.label} icon uploaded.`;
+            status.className = 'status ok';
+          } catch (e) {
+            status.textContent = e.message || `Could not upload ${def.label} icon.`;
+            status.className = 'status err';
+          } finally {
+            els.upload.disabled = false;
+          }
+        });
+
+        els.remove.addEventListener('click', async () => {
+          if (!confirm(`Remove the custom icon for ${def.label}?`)) return;
+          els.remove.disabled = true;
+          try {
+            await removeVideoFile(`/api/game-icons/${def.id}`);
+            applyGameIcon(def.id, null);
+            els.file.value = '';
+            status.textContent = `${def.label} icon removed.`;
+            status.className = 'status ok';
+          } catch (e) {
+            status.textContent = e.message || `Could not remove ${def.label} icon.`;
+            status.className = 'status err';
+          } finally {
+            els.remove.disabled = false;
+          }
+        });
+      });
+    }
+
+    renderGameIconCards();
+    wireGameIconUploads();
 
     function applyVideoPreview(previewEl, statusEl, removeBtn, video, emptyLabel) {
       if (video?.url) {
@@ -851,6 +1026,7 @@ ${linesText.replace(/</g, '&lt;')}</pre>
       applyIdleVideo(cfg.idleVideo);
       applyTransitionVideo(cfg.transitionVideo);
       applyAvatarBackground(cfg.avatarBackground);
+      applyGameIcons(cfg.gameIcons);
       if (cfg.apiKey) {
         status.textContent = 'Settings saved.';
         status.className = 'status ok';

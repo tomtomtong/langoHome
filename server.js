@@ -18,6 +18,8 @@ const DEBUG_LOG_MAX_REPORTS = 20;
 const IDLE_VIDEO_DIR = join(CONFIG_DIR, 'idle-video');
 const TRANSITION_VIDEO_DIR = join(CONFIG_DIR, 'transition-video');
 const AVATAR_BG_DIR = join(CONFIG_DIR, 'avatar-background');
+const GAME_ICONS_DIR = join(CONFIG_DIR, 'game-icons');
+const GAME_ICON_IDS = ['wordwhack', 'cardgame', 'findgame'];
 const VIDEO_MAX_BYTES = 100 * 1024 * 1024;
 const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 
@@ -148,6 +150,18 @@ function createImageStore(dir, basename, apiPath) {
 const idleVideos = createVideoStore(IDLE_VIDEO_DIR, 'idle', '/api/idle-video');
 const transitionVideos = createVideoStore(TRANSITION_VIDEO_DIR, 'transition', '/api/transition-video');
 const avatarBackgrounds = createImageStore(AVATAR_BG_DIR, 'background', '/api/avatar-background');
+const gameIconStores = Object.fromEntries(
+  GAME_ICON_IDS.map((id) => [
+    id,
+    createImageStore(join(GAME_ICONS_DIR, id), 'icon', `/api/game-icons/${id}`),
+  ]),
+);
+
+function getGameIconsInfo() {
+  const icons = {};
+  for (const id of GAME_ICON_IDS) icons[id] = gameIconStores[id].getInfo();
+  return icons;
+}
 
 function handleUploadApi(store, resKey, req, res, maxBytes) {
   if (req.method === 'GET') {
@@ -318,6 +332,7 @@ const server = createServer((req, res) => {
         idleVideo: idleVideos.getInfo(),
         transitionVideo: transitionVideos.getInfo(),
         avatarBackground: avatarBackgrounds.getInfo(),
+        gameIcons: getGameIconsInfo(),
       });
       return;
     }
@@ -391,6 +406,12 @@ const server = createServer((req, res) => {
 
   if (url === '/api/avatar-background') {
     handleUploadApi(avatarBackgrounds, 'avatarBackground', req, res, IMAGE_MAX_BYTES);
+    return;
+  }
+
+  const gameIconMatch = url.match(/^\/api\/game-icons\/(wordwhack|cardgame|findgame)$/);
+  if (gameIconMatch) {
+    handleUploadApi(gameIconStores[gameIconMatch[1]], 'gameIcon', req, res, IMAGE_MAX_BYTES);
     return;
   }
 

@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="screen-orientation" content="landscape">
   <title>Uncle Tommy — Voice Agent</title>
+  <script>
+    if (new URLSearchParams(location.search).has("connect")) {
+      document.documentElement.classList.add("game-return-connect");
+    }
+  </script>
   <link rel="preload" href="/visme/Tommyv4.vrm" as="fetch" crossorigin>
   <script type="importmap">
     {
@@ -132,6 +137,21 @@
 
     body.in-session #idle-screen {
       display: none;
+    }
+
+    /* Game return (?connect=1): skip idle / transition / start UI — show avatar immediately */
+    html.game-return-connect #idle-screen,
+    html.game-return-connect #idle-video-screen {
+      display: none !important;
+    }
+
+    html.game-return-connect #avatar-stage {
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+    html.game-return-connect #session-overlay {
+      display: block;
     }
 
     #vrm-canvas {
@@ -348,6 +368,68 @@
     }
 
     #debug-upload-status.err { color: #f28b82; }
+
+    /* ── Conversation captions (what avatar hears / says) ── */
+    #conversation-captions {
+      position: absolute;
+      left: max(1rem, env(safe-area-inset-left));
+      bottom: calc(5.75rem + env(safe-area-inset-bottom));
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      width: min(420px, calc(100vw - 8rem - env(safe-area-inset-left) - env(safe-area-inset-right)));
+      max-height: 38vh;
+      overflow-y: auto;
+      pointer-events: none;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+    }
+
+    .caption-line {
+      display: none;
+      padding: 0.55rem 0.8rem;
+      border-radius: 12px;
+      font-size: 0.875rem;
+      line-height: 1.35;
+      backdrop-filter: blur(10px);
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+      animation: caption-in 0.22s ease;
+    }
+
+    .caption-line.visible {
+      display: block;
+    }
+
+    .caption-line--user {
+      background: rgba(108, 140, 255, 0.22);
+      border: 1px solid rgba(108, 140, 255, 0.35);
+    }
+
+    .caption-line--agent {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+    }
+
+    .caption-line--listening {
+      color: #c4c7c5;
+      font-style: italic;
+    }
+
+    .caption-label {
+      display: block;
+      margin-bottom: 0.2rem;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #9aa0a6;
+    }
+
+    @keyframes caption-in {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
 
     /* ── Idle screen video (before conversation) ── */
     #idle-video-screen {
@@ -682,16 +764,26 @@
         </div>
       </div>
       <nav class="overlay-games" aria-label="Games">
-        <a class="game-shortcut game-shortcut--wordwhack" href="/games/" title="Word-Whack Blitz">
-          <img src="/games/assets/images/mole.svg" alt="Word-Whack Blitz">
+        <a class="game-shortcut game-shortcut--wordwhack" data-game-id="wordwhack" href="/games/" title="Word-Whack Blitz">
+          <img data-game-icon="wordwhack" src="/games/assets/images/mole.svg" alt="Word-Whack Blitz">
         </a>
-        <a class="game-shortcut game-shortcut--card" href="/games/CardGame/" title="Picture-Word Memory Match">
-          <img src="/games/CardGame/assets/images/card-back.svg" alt="Picture-Word Memory Match">
+        <a class="game-shortcut game-shortcut--card" data-game-id="cardgame" href="/games/CardGame/" title="Picture-Word Memory Match">
+          <img data-game-icon="cardgame" src="/games/CardGame/assets/images/card-back.svg" alt="Picture-Word Memory Match">
         </a>
-        <a class="game-shortcut game-shortcut--find" href="/games/FindGame/" title="Find the Object">
-          <img src="/games/FindGame/assets/images/scene.svg" alt="Find the Object">
+        <a class="game-shortcut game-shortcut--find" data-game-id="findgame" href="/games/FindGame/" title="Find the Object">
+          <img data-game-icon="findgame" src="/games/FindGame/assets/images/scene.svg" alt="Find the Object">
         </a>
       </nav>
+      <div id="conversation-captions" aria-live="polite" aria-relevant="additions text">
+        <div id="caption-user" class="caption-line caption-line--user" hidden>
+          <span class="caption-label">You</span>
+          <span id="caption-user-text"></span>
+        </div>
+        <div id="caption-agent" class="caption-line caption-line--agent" hidden>
+          <span class="caption-label">Uncle Tommy</span>
+          <span id="caption-agent-text"></span>
+        </div>
+      </div>
       <div class="overlay-bottom">
         <div id="status">Connecting…</div>
         <div id="err"></div>
@@ -757,6 +849,10 @@
     const gameLaunchSub = document.getElementById("game-launch-sub");
     const gameLaunchProgress = document.getElementById("game-launch-progress");
     const gameLaunchConfetti = document.getElementById("game-launch-confetti");
+    const captionUserEl = document.getElementById("caption-user");
+    const captionUserTextEl = document.getElementById("caption-user-text");
+    const captionAgentEl = document.getElementById("caption-agent");
+    const captionAgentTextEl = document.getElementById("caption-agent-text");
     const HAPPY = "happy";
     const PLAY_GAME = "play_game";
     const END_CONVERSATION = "end_conversation";
@@ -790,6 +886,21 @@
         theme: "findgame",
       },
     ];
+
+    function applyGameIconsFromConfig(gameIcons) {
+      if (!gameIcons || typeof gameIcons !== "object") return;
+      for (const game of GAME_CATALOG) {
+        const custom = gameIcons[game.id];
+        if (custom?.url) game.icon = custom.url;
+      }
+      document.querySelectorAll("[data-game-icon]").forEach((img) => {
+        const game = GAME_CATALOG.find((g) => g.id === img.dataset.gameIcon);
+        if (game) {
+          img.src = game.icon;
+          img.alt = game.name;
+        }
+      });
+    }
 
     let idleVideoUrl = null;
     let transitionVideoUrl = null;
@@ -841,6 +952,7 @@
     let idleNudgeCount = 0;
     let idleEndTimer = null;
     let launchingGame = false;
+    let directSessionEntry = false;
     let lastChickenDanceAt = 0;
     const CHICKEN_DANCE_COOLDOWN_MS = 2500;
 
@@ -1079,6 +1191,38 @@
       statusIdleEl.textContent = msg;
     }
 
+    function setCaptionLine(el, textEl, text, { listening = false } = {}) {
+      if (!el || !textEl) return;
+      const trimmed = (text || "").trim();
+      if (!trimmed && !listening) {
+        el.hidden = true;
+        el.classList.remove("visible", "caption-line--listening");
+        textEl.textContent = "";
+        return;
+      }
+      el.hidden = false;
+      el.classList.add("visible");
+      el.classList.toggle("caption-line--listening", listening);
+      textEl.textContent = listening ? "Listening…" : trimmed;
+    }
+
+    function clearConversationCaptions() {
+      setCaptionLine(captionUserEl, captionUserTextEl, "");
+      setCaptionLine(captionAgentEl, captionAgentTextEl, "");
+    }
+
+    function showUserHeard(transcript) {
+      setCaptionLine(captionUserEl, captionUserTextEl, transcript);
+    }
+
+    function showUserListening() {
+      setCaptionLine(captionUserEl, captionUserTextEl, "", { listening: true });
+    }
+
+    function updateAgentCaption(text) {
+      setCaptionLine(captionAgentEl, captionAgentTextEl, text);
+    }
+
     function getAvatarBackgroundUrl(cfg) {
       return cfg?.avatarBackground?.url || DEFAULT_AVATAR_BG;
     }
@@ -1212,11 +1356,12 @@
 
     function abortPreparedConversationView() {
       exitSessionView();
-      if (idleVideoUrl && !active) {
-        restoreIdleVideoScreen();
-        resetIdleVideoElement();
-        idleVideoEl.play().catch(() => {});
-      }
+      const skipIdle = directSessionEntry;
+      directSessionEntry = false;
+      if (skipIdle || !idleVideoUrl || active) return;
+      restoreIdleVideoScreen();
+      resetIdleVideoElement();
+      idleVideoEl.play().catch(() => {});
     }
 
     async function playTransitionVideo() {
@@ -1285,7 +1430,15 @@
       if (!shouldAutoConnectFromGame() || active) return;
       uiLog("hello", "auto-connect from game return", "hello");
       clearAutoConnectParam();
-      await connectConversationAfterVideos();
+      wakeWordEnabled = false;
+      wakeWordRestartAttempts = 0;
+      stopWakeWordListening();
+      dismissIdleVideoScreen();
+      setIdleVideoMode(false);
+      setVideosLoading(false);
+      directSessionEntry = true;
+      await enterSessionView();
+      await connectConversation({ preparedView: true });
     }
 
     async function startConversationFromIdleTap() {
@@ -1498,6 +1651,8 @@
 
     function cleanupSession() {
       uiLog("cleanup", "begin", "hello");
+      clearConversationCaptions();
+      directSessionEntry = false;
       active = false;
       pendingEndConversation = false;
       pendingFunctionCalls.clear();
@@ -1642,6 +1797,7 @@
       speechStarted = false;
       audioDone = false;
       speechPlaybackStart = 0;
+      if (id) updateAgentCaption("");
     }
 
     function syncLipsyncTimeline() {
@@ -1699,6 +1855,7 @@
     function appendResponseText(delta) {
       if (!delta) return;
       responseText += delta;
+      updateAgentCaption(responseText);
       syncLipsyncTimeline();
     }
 
@@ -1796,6 +1953,7 @@
           if (cfg.lipsync) {
             localStorage.setItem(LIPSYNC_KEY, JSON.stringify(normalizeLipsync(cfg.lipsync)));
           }
+          applyGameIconsFromConfig(cfg.gameIcons);
           return cfg;
         }
       } catch {}
@@ -1995,6 +2153,7 @@
       }
 
       resetResponseState(null);
+      clearConversationCaptions();
 
       const wsProtocol = location.protocol === "https:" ? "wss:" : "ws:";
       ws = new WebSocket(`${wsProtocol}//${location.host}/ws`);
@@ -2054,6 +2213,7 @@
         if (e.type === "response.output_text.done" || e.type === "response.output_audio_transcript.done") {
           if (e.text) responseText = e.text;
           else if (e.transcript) responseText = e.transcript;
+          updateAgentCaption(responseText);
           syncLipsyncTimeline();
         }
 
@@ -2069,6 +2229,7 @@
         } else if (e.type === "response.output_item.done") {
           trackFunctionCallItem(e.item);
         } else if (e.type === "conversation.item.input_audio_transcription.completed") {
+          if (e.transcript?.trim()) showUserHeard(e.transcript);
           if (isGoodbye(e.transcript)) nudgeEndConversation();
           if (isDanceRequest(e.transcript)) triggerChickenDance(e.transcript);
         } else if (e.type === "session.created") {
@@ -2078,6 +2239,8 @@
           goodbyeNudged = false;
           idleNudgeCount = 0;
           cancelIdleNudge();
+          showUserListening();
+          updateAgentCaption("");
           stopAudio();
           stopAvatarSpeech();
           resetResponseState(null);
@@ -2209,8 +2372,18 @@
     }
 
     async function init() {
+      const fromGame = shouldAutoConnectFromGame();
       const cfg = await getConfig();
       applyAvatarStageBackground(getAvatarBackgroundUrl(cfg));
+
+      if (fromGame) {
+        dismissIdleVideoScreen();
+        setIdleVideoMode(false);
+        setVideosLoading(false);
+        await autoConnectFromGameReturn();
+        return;
+      }
+
       const hasIdleVideo = cfg.idleVideo?.url;
       if (hasIdleVideo) {
         setStatus("Loading videos…");
@@ -2226,10 +2399,6 @@
       } catch (e) {
         console.error(e);
         showErr(`Avatar failed to load: ${e.message}`);
-      }
-      if (shouldAutoConnectFromGame()) {
-        await autoConnectFromGameReturn();
-        return;
       }
       if (idleVideoReady) {
         setStatus('Tap the screen to begin a conversation');
