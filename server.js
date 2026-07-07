@@ -487,6 +487,9 @@ const HAPPY_TOOL_INSTRUCTION =
 const LEAVE_TOOL_INSTRUCTION =
   ' When the user says goodbye, bye, see you, see you later, I have to go, or otherwise indicates they want to end the conversation, respond with a brief farewell and immediately call the end_conversation tool in the same turn. Always call end_conversation when the user is done talking — do not keep chatting after a goodbye.';
 
+const PLAY_GAME_TOOL_INSTRUCTION =
+  ' When the user wants to play a game, asks to play something, says "let\'s play", "I want to play a game", or similar, respond with brief enthusiasm and call the play_game tool in the same turn. The app will randomly pick one of the available games.';
+
 const SHOW_FOOTBALL_ICON_TOOL = {
   type: 'function',
   name: 'show_football_icon',
@@ -535,13 +538,29 @@ const END_CONVERSATION_TOOL = {
   },
 };
 
+const PLAY_GAME_TOOL = {
+  type: 'function',
+  name: 'play_game',
+  description:
+    'Launches a random mini-game when the user wants to play. Call when they ask to play a game or want some game time.',
+  parameters: {
+    type: 'object',
+    properties: {
+      reason: {
+        type: 'string',
+        description: 'What the user asked for, e.g. "I want to play a game"',
+      },
+    },
+  },
+};
+
 function buildSessionCfg({ instructions, voice, model } = {}) {
   const session = {
     type: 'realtime',
     model: model || DEFAULT_MODEL,
-    instructions: (instructions || DEFAULT_INSTRUCTIONS) + FOOTBALL_TOOL_INSTRUCTION + HAPPY_TOOL_INSTRUCTION + LEAVE_TOOL_INSTRUCTION,
+    instructions: (instructions || DEFAULT_INSTRUCTIONS) + FOOTBALL_TOOL_INSTRUCTION + HAPPY_TOOL_INSTRUCTION + PLAY_GAME_TOOL_INSTRUCTION + LEAVE_TOOL_INSTRUCTION,
     output_modalities: ['audio', 'text'],
-    tools: [SHOW_FOOTBALL_ICON_TOOL, HAPPY_TOOL, END_CONVERSATION_TOOL],
+    tools: [SHOW_FOOTBALL_ICON_TOOL, HAPPY_TOOL, PLAY_GAME_TOOL, END_CONVERSATION_TOOL],
     tool_choice: 'auto',
     audio: {
       input: {

@@ -483,6 +483,186 @@
       0%, 100% { opacity: 0.85; }
       50% { opacity: 1; }
     }
+
+    /* ── Game launch transition ── */
+    #game-launch-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      background: radial-gradient(ellipse at 50% 30%, #2a1f6e 0%, #0f1117 55%, #05060a 100%);
+      overflow: hidden;
+    }
+
+    #game-launch-overlay.visible {
+      display: flex;
+    }
+
+    .game-launch-stars {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        radial-gradient(2px 2px at 12% 18%, rgba(255,255,255,0.7) 50%, transparent 51%),
+        radial-gradient(1.5px 1.5px at 78% 12%, rgba(255,255,255,0.55) 50%, transparent 51%),
+        radial-gradient(2px 2px at 34% 72%, rgba(255,255,255,0.45) 50%, transparent 51%),
+        radial-gradient(1.5px 1.5px at 88% 64%, rgba(255,255,255,0.6) 50%, transparent 51%),
+        radial-gradient(2px 2px at 56% 38%, rgba(255,255,255,0.35) 50%, transparent 51%),
+        radial-gradient(1.5px 1.5px at 22% 48%, rgba(255,255,255,0.5) 50%, transparent 51%);
+      animation: game-launch-twinkle 2.4s ease-in-out infinite alternate;
+    }
+
+    @keyframes game-launch-twinkle {
+      0% { opacity: 0.55; }
+      100% { opacity: 1; }
+    }
+
+    .game-launch-card {
+      position: relative;
+      z-index: 1;
+      width: min(92vw, 420px);
+      padding: 2rem 1.75rem 1.75rem;
+      border-radius: 28px;
+      text-align: center;
+      background: linear-gradient(165deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.05) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      backdrop-filter: blur(16px);
+      box-shadow:
+        0 24px 60px rgba(0, 0, 0, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.12);
+      animation: game-launch-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    @keyframes game-launch-pop {
+      0% { transform: scale(0.72) rotate(-4deg); opacity: 0; }
+      100% { transform: scale(1) rotate(0deg); opacity: 1; }
+    }
+
+    .game-launch-kicker {
+      margin: 0 0 0.5rem;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: #b8c5ff;
+    }
+
+    .game-launch-title {
+      margin: 0 0 1.25rem;
+      font-size: clamp(1.35rem, 4.5vw, 1.75rem);
+      font-weight: 700;
+      line-height: 1.2;
+      color: #fff;
+      text-shadow: 0 2px 12px rgba(108, 140, 255, 0.35);
+    }
+
+    .game-launch-reel {
+      position: relative;
+      width: clamp(7.5rem, 22vw, 9.5rem);
+      height: clamp(7.5rem, 22vw, 9.5rem);
+      margin: 0 auto 1.25rem;
+      border-radius: 24px;
+      background: rgba(15, 17, 23, 0.72);
+      border: 2px solid rgba(255, 255, 255, 0.14);
+      box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.35);
+      overflow: hidden;
+    }
+
+    .game-launch-reel.shuffling .game-launch-icon {
+      animation: game-launch-shuffle 0.12s ease-in-out infinite alternate;
+    }
+
+    .game-launch-reel.landed .game-launch-icon {
+      animation: game-launch-land 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    @keyframes game-launch-shuffle {
+      0% { transform: scale(0.88) rotate(-6deg); opacity: 0.65; }
+      100% { transform: scale(1.02) rotate(6deg); opacity: 1; }
+    }
+
+    @keyframes game-launch-land {
+      0% { transform: scale(0.5) rotate(-18deg); opacity: 0; }
+      70% { transform: scale(1.12) rotate(6deg); opacity: 1; }
+      100% { transform: scale(1) rotate(0deg); opacity: 1; }
+    }
+
+    .game-launch-icon {
+      position: absolute;
+      inset: 14%;
+      width: 72%;
+      height: 72%;
+      margin: auto;
+      object-fit: contain;
+      filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.35));
+    }
+
+    .game-launch-name {
+      margin: 0 0 0.35rem;
+      min-height: 1.5em;
+      font-size: clamp(1rem, 3.2vw, 1.2rem);
+      font-weight: 600;
+      color: #e8eaed;
+    }
+
+    .game-launch-sub {
+      margin: 0 0 1.25rem;
+      min-height: 1.25em;
+      font-size: 0.875rem;
+      color: #9aa0a6;
+    }
+
+    .game-launch-progress {
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.1);
+      overflow: hidden;
+    }
+
+    .game-launch-progress-fill {
+      width: 0%;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #6c8cff, #a78bfa, #f472b6);
+      background-size: 200% 100%;
+      animation: game-launch-bar-shine 1.2s linear infinite;
+      transition: width 0.35s ease;
+    }
+
+    @keyframes game-launch-bar-shine {
+      0% { background-position: 0% 50%; }
+      100% { background-position: 200% 50%; }
+    }
+
+    .game-launch-confetti {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .game-launch-confetti span {
+      position: absolute;
+      top: -12%;
+      width: 10px;
+      height: 14px;
+      border-radius: 2px;
+      opacity: 0;
+      animation: game-launch-confetti-fall 1.8s ease-in forwards;
+    }
+
+    @keyframes game-launch-confetti-fall {
+      0% { transform: translateY(0) rotate(0deg); opacity: 0; }
+      10% { opacity: 1; }
+      100% { transform: translateY(115vh) rotate(720deg); opacity: 0.85; }
+    }
+
+    .game-launch-card.theme-wordwhack { border-color: rgba(255, 214, 120, 0.35); }
+    .game-launch-card.theme-cardgame { border-color: rgba(120, 180, 255, 0.35); }
+    .game-launch-card.theme-findgame { border-color: rgba(120, 255, 180, 0.35); }
   </style>
 </head>
 <body>
@@ -548,6 +728,23 @@
     </div>
   </div>
 
+  <div id="game-launch-overlay" aria-live="polite" aria-hidden="true">
+    <div class="game-launch-stars" aria-hidden="true"></div>
+    <div class="game-launch-confetti" id="game-launch-confetti" aria-hidden="true"></div>
+    <div class="game-launch-card" id="game-launch-card">
+      <p class="game-launch-kicker">Game time!</p>
+      <h2 class="game-launch-title" id="game-launch-heading">Picking a surprise game…</h2>
+      <div class="game-launch-reel" id="game-launch-reel">
+        <img class="game-launch-icon" id="game-launch-icon" src="" alt="">
+      </div>
+      <p class="game-launch-name" id="game-launch-name"></p>
+      <p class="game-launch-sub" id="game-launch-sub">Uncle Tommy is spinning the wheel</p>
+      <div class="game-launch-progress" aria-hidden="true">
+        <div class="game-launch-progress-fill" id="game-launch-progress"></div>
+      </div>
+    </div>
+  </div>
+
   <script type="module">
     import { TommyAvatar, normalizeAvatar, normalizeLipsync, DEFAULT_AVATAR } from "/visme/avatar.js";
 
@@ -580,12 +777,49 @@
     const idleVideoLoadingEl = document.getElementById("idle-video-loading");
     const idleVideoHint = document.getElementById("idle-video-hint");
     const avatarStageEl = document.getElementById("avatar-stage");
+    const gameLaunchOverlay = document.getElementById("game-launch-overlay");
+    const gameLaunchCard = document.getElementById("game-launch-card");
+    const gameLaunchHeading = document.getElementById("game-launch-heading");
+    const gameLaunchReel = document.getElementById("game-launch-reel");
+    const gameLaunchIcon = document.getElementById("game-launch-icon");
+    const gameLaunchName = document.getElementById("game-launch-name");
+    const gameLaunchSub = document.getElementById("game-launch-sub");
+    const gameLaunchProgress = document.getElementById("game-launch-progress");
+    const gameLaunchConfetti = document.getElementById("game-launch-confetti");
     const SHOW_FOOTBALL_ICON = "show_football_icon";
     const HAPPY = "happy";
+    const PLAY_GAME = "play_game";
     const END_CONVERSATION = "end_conversation";
     const CHICKEN_DANCE_URL = "/ChickenDance.fbx";
     const DEBUG_LOG_MAX = 80;
     const debugLogLines = [];
+
+    const GAME_CATALOG = [
+      {
+        id: "wordwhack",
+        name: "Word-Whack Blitz",
+        sub: "Complete the sentence",
+        url: "/games/",
+        icon: "/games/assets/images/mole.svg",
+        theme: "wordwhack",
+      },
+      {
+        id: "cardgame",
+        name: "Picture-Word Memory Match",
+        sub: "Flip cards and match words",
+        url: "/games/CardGame/",
+        icon: "/games/CardGame/assets/images/card-back.svg",
+        theme: "cardgame",
+      },
+      {
+        id: "findgame",
+        name: "Find the Object",
+        sub: "Tap the right thing",
+        url: "/games/FindGame/",
+        icon: "/games/FindGame/assets/images/scene.svg",
+        theme: "findgame",
+      },
+    ];
 
     let idleVideoUrl = null;
     let transitionVideoUrl = null;
@@ -637,6 +871,105 @@
     let idleNudgeTimer = null;
     let idleNudgeCount = 0;
     let idleEndTimer = null;
+    let launchingGame = false;
+
+    function pickRandomGame() {
+      return GAME_CATALOG[Math.floor(Math.random() * GAME_CATALOG.length)];
+    }
+
+    function spawnGameLaunchConfetti() {
+      if (!gameLaunchConfetti) return;
+      gameLaunchConfetti.replaceChildren();
+      const colors = ["#6c8cff", "#a78bfa", "#f472b6", "#fbbf24", "#34d399", "#fb7185"];
+      for (let i = 0; i < 28; i++) {
+        const piece = document.createElement("span");
+        piece.style.left = `${Math.random() * 100}%`;
+        piece.style.background = colors[i % colors.length];
+        piece.style.animationDelay = `${Math.random() * 0.45}s`;
+        piece.style.animationDuration = `${1.2 + Math.random() * 0.9}s`;
+        gameLaunchConfetti.appendChild(piece);
+      }
+    }
+
+    function setGameLaunchProgress(percent) {
+      if (gameLaunchProgress) gameLaunchProgress.style.width = `${percent}%`;
+    }
+
+    function waitMs(ms) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    async function playGameLaunchTransition(game) {
+      if (!gameLaunchOverlay || !game) return;
+
+      launchingGame = true;
+      gameLaunchOverlay.classList.add("visible");
+      gameLaunchOverlay.setAttribute("aria-hidden", "false");
+      gameLaunchCard.className = `game-launch-card theme-${game.theme}`;
+      gameLaunchHeading.textContent = "Picking a surprise game…";
+      gameLaunchName.textContent = "";
+      gameLaunchSub.textContent = "Uncle Tommy is spinning the wheel";
+      gameLaunchReel.className = "game-launch-reel shuffling";
+      setGameLaunchProgress(8);
+      spawnGameLaunchConfetti();
+
+      const shuffleMs = 1800;
+      const shuffleStart = performance.now();
+      let shuffleIndex = 0;
+
+      await new Promise((resolve) => {
+        const tick = () => {
+          const elapsed = performance.now() - shuffleStart;
+          const candidate = GAME_CATALOG[shuffleIndex % GAME_CATALOG.length];
+          gameLaunchIcon.src = candidate.icon;
+          gameLaunchIcon.alt = candidate.name;
+          shuffleIndex += 1;
+          setGameLaunchProgress(8 + Math.min(52, (elapsed / shuffleMs) * 52));
+          if (elapsed >= shuffleMs) {
+            resolve();
+            return;
+          }
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      });
+
+      gameLaunchReel.className = "game-launch-reel landed";
+      gameLaunchIcon.src = game.icon;
+      gameLaunchIcon.alt = game.name;
+      gameLaunchHeading.textContent = "You got…";
+      gameLaunchName.textContent = game.name;
+      gameLaunchSub.textContent = game.sub;
+      setGameLaunchProgress(72);
+      spawnGameLaunchConfetti();
+      await waitMs(900);
+
+      gameLaunchHeading.textContent = "Loading game!";
+      gameLaunchSub.textContent = "Get ready to play";
+      setGameLaunchProgress(100);
+      await waitMs(650);
+    }
+
+    function navigateToGame(game) {
+      if (!game?.url) return;
+      uiLog("game", `navigate → ${game.url}`, "hello", { game: game.id });
+      window.location.assign(game.url);
+    }
+
+    async function launchRandomGame(reason = "user asked to play", chosenGame = null) {
+      if (launchingGame) return null;
+      const game = chosenGame || pickRandomGame();
+      uiLog("game", `play_game (${reason}) → ${game.id}`, "hello");
+      setStatus(`Launching ${game.name}…`, true);
+      try {
+        await playGameLaunchTransition(game);
+      } catch (e) {
+        uiLog("game", `transition error: ${e.message}`, "warn");
+      }
+      try { ws?.close(); } catch {}
+      navigateToGame(game);
+      return game;
+    }
 
     function cancelIdleNudge() {
       if (idleNudgeTimer) { clearTimeout(idleNudgeTimer); idleNudgeTimer = null; }
@@ -1414,6 +1747,24 @@
         avatar?.playMixamoAnimation(CHICKEN_DANCE_URL);
         sendFunctionOutput(callId, { success: true, reason, animation: "chicken_dance" });
         ws.send(JSON.stringify({ type: "response.create" }));
+        return;
+      }
+
+      if (name === PLAY_GAME) {
+        let reason = "user asked to play a game";
+        try {
+          const args = JSON.parse(argsJson || "{}");
+          if (args.reason) reason = args.reason;
+        } catch {}
+        const game = pickRandomGame();
+        sendFunctionOutput(callId, {
+          success: true,
+          reason,
+          game: game.id,
+          game_name: game.name,
+        });
+        ws.send(JSON.stringify({ type: "response.create" }));
+        launchRandomGame(reason, game);
         return;
       }
 
