@@ -127,7 +127,7 @@
       width: 100%;
       height: 100%;
       z-index: 1;
-      background: #0b1222 url("/bg.png") center / cover no-repeat;
+      background: #0b1222;
     }
 
     body.in-session #avatar-stage {
@@ -821,7 +821,6 @@
     const DEFAULT_PROMPT = "You are Uncle Tommy, a friendly voice assistant. Keep responses brief.";
     const DEFAULT_VOICE = "default-zylgts2tamenvybeti3z0w__uncle_tommy";
     const DEFAULT_MODEL = "openai/gpt-4o-mini";
-    const DEFAULT_AVATAR_BG = "/bg.png";
 
     const btnStart = document.getElementById("btn-start");
     const btnStop = document.getElementById("btn-stop");
@@ -1224,15 +1223,19 @@
     }
 
     function getAvatarBackgroundUrl(cfg) {
-      return cfg?.avatarBackground?.url || DEFAULT_AVATAR_BG;
+      return cfg?.avatarBackground?.url || null;
     }
 
     function applyAvatarStageBackground(url) {
       avatarStageEl.style.backgroundColor = "#0b1222";
-      avatarStageEl.style.backgroundImage = `url("${url}")`;
-      avatarStageEl.style.backgroundSize = "cover";
-      avatarStageEl.style.backgroundPosition = "center";
-      avatarStageEl.style.backgroundRepeat = "no-repeat";
+      if (url) {
+        avatarStageEl.style.backgroundImage = `url("${url}")`;
+        avatarStageEl.style.backgroundSize = "cover";
+        avatarStageEl.style.backgroundPosition = "center";
+        avatarStageEl.style.backgroundRepeat = "no-repeat";
+      } else {
+        avatarStageEl.style.backgroundImage = "none";
+      }
     }
 
     function setIdleVideoMode(enabled) {

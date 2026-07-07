@@ -88,7 +88,7 @@ export class TommyAvatar {
   constructor(canvas, {
     vrmUrl = "/visme/Tommyv4.vrm",
     idleAnimationUrl = "/visme/Idle.fbx",
-    backgroundUrl = "/bg.png",
+    backgroundUrl = null,
     interactiveCamera = true,
     lipsync: lipsyncRaw,
     ...settings

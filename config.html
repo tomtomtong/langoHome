@@ -410,7 +410,7 @@
       </div>
       <hr class="section-divider" style="margin: 1.5rem 0 1.25rem">
       <h2 style="margin: 0 0 0.375rem; font-size: 1rem">Avatar background</h2>
-      <p style="margin: 0 0 1rem">Background image behind Uncle Tommy during conversations. Leave empty to use the default <code>bg.png</code>.</p>
+      <p style="margin: 0 0 1rem">Optional background image behind Uncle Tommy during conversations. Leave empty for a plain dark background.</p>
       <div class="video-upload-wrap">
         <img id="avatar-bg-preview" class="video-preview" alt="Avatar background preview" hidden>
         <p id="avatar-bg-status" class="field-hint" style="margin:0">No custom background uploaded.</p>
@@ -727,7 +727,7 @@
         'No custom background uploaded.',
       );
       if (window.__previewAvatar) {
-        window.__previewAvatar.setBackgroundUrl(avatarBackground?.url || '/bg.png');
+        window.__previewAvatar.setBackgroundUrl(avatarBackground?.url || null);
       }
     }
 
@@ -1387,7 +1387,7 @@ ${linesText.replace(/</g, '&lt;')}</pre>
 
     async function initPreview() {
       let lipsync = DEFAULT_LIPSYNC;
-      let backgroundUrl = '/bg.png';
+      let backgroundUrl = null;
       try {
         const res = await fetch("/api/config");
         if (res.ok) {
