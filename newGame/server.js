@@ -20,8 +20,6 @@ const DB_PATH = path.join(DATA_DIR, "game.db");
 const WORDWHACK_SLOTS = new Set([
   "background",
   "cloud",
-  "hillBack",
-  "hillFront",
   "hole",
   "mole",
   "wordSign",

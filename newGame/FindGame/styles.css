@@ -14,6 +14,12 @@ body {
   font-family: "Fredoka", "Baloo 2", system-ui, sans-serif;
 }
 
+body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 #bga-custom-background {
   position: fixed;
   inset: 0;
@@ -24,12 +30,13 @@ body {
 .scene {
   position: relative;
   z-index: 1;
-  width: min(960px, 96vw);
-  height: min(720px, 94vh);
-  margin: 3vh auto;
+  width: 960px;
+  height: 720px;
+  flex-shrink: 0;
+  transform-origin: center center;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }
 
 .hud {
@@ -90,7 +97,7 @@ body {
 
 .return-icon {
   display: block;
-  width: 52px;
+  width: 72px;
   height: auto;
 }
 
@@ -277,27 +284,27 @@ body {
 .position-marker-glow {
   background: radial-gradient(
     circle,
-    rgba(255, 235, 59, 0.95) 0%,
-    rgba(255, 193, 7, 0.55) 42%,
-    rgba(255, 152, 0, 0.15) 68%,
+    rgba(255, 235, 59, 0.55) 0%,
+    rgba(255, 193, 7, 0.32) 42%,
+    rgba(255, 152, 0, 0.1) 68%,
     transparent 72%
   );
   box-shadow:
-    0 0 18px rgba(255, 235, 59, 0.85),
-    0 0 36px rgba(255, 193, 7, 0.45);
-  animation: marker-glow 1.4s ease-in-out infinite;
+    0 0 10px rgba(255, 235, 59, 0.35),
+    0 0 20px rgba(255, 193, 7, 0.2);
+  animation: marker-glow 2.8s ease-in-out infinite;
   animation-delay: var(--flash-delay, 0s);
 }
 
 .position-marker-ripple {
-  border: 3px solid rgba(255, 255, 255, 0.95);
-  animation: marker-ripple 1.8s ease-out infinite;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  animation: marker-ripple 2.8s ease-out infinite;
   animation-delay: var(--flash-delay, 0s);
 }
 
 .position-marker-ripple--late {
-  animation-delay: calc(var(--flash-delay, 0s) + 0.6s);
-  border-color: rgba(255, 235, 59, 0.9);
+  animation-delay: calc(var(--flash-delay, 0s) + 1s);
+  border-color: rgba(255, 235, 59, 0.4);
 }
 
 .position-marker--debug .position-marker-glow {
@@ -308,21 +315,21 @@ body {
 .position-marker--answer .position-marker-glow {
   background: radial-gradient(
     circle,
-    rgba(129, 199, 132, 0.95) 0%,
-    rgba(76, 175, 80, 0.65) 42%,
-    rgba(46, 125, 50, 0.2) 68%,
+    rgba(129, 199, 132, 0.65) 0%,
+    rgba(76, 175, 80, 0.4) 42%,
+    rgba(46, 125, 50, 0.12) 68%,
     transparent 72%
   );
   box-shadow:
-    0 0 22px rgba(76, 175, 80, 0.9),
-    0 0 44px rgba(129, 199, 132, 0.5);
-  animation: answer-glow 0.9s ease-in-out infinite;
+    0 0 12px rgba(76, 175, 80, 0.45),
+    0 0 24px rgba(129, 199, 132, 0.25);
+  animation: answer-glow 2.2s ease-in-out infinite;
 }
 
 .position-marker--answer .position-marker-ripple {
-  border-color: rgba(255, 255, 255, 0.95);
-  border-width: 4px;
-  animation: answer-ripple 1.2s ease-out infinite;
+  border-color: rgba(255, 255, 255, 0.55);
+  border-width: 2px;
+  animation: answer-ripple 2.2s ease-out infinite;
 }
 
 .position-marker-check {
@@ -339,34 +346,34 @@ body {
 }
 
 @keyframes answer-glow {
-  0%, 100% { opacity: 0.7; transform: scale(0.9); }
-  50% { opacity: 1; transform: scale(1.05); }
+  0%, 100% { opacity: 0.55; transform: scale(0.94); }
+  50% { opacity: 0.75; transform: scale(1.02); }
 }
 
 @keyframes answer-ripple {
-  0% { opacity: 1; transform: scale(0.6); }
-  100% { opacity: 0; transform: scale(1.6); }
+  0% { opacity: 0.45; transform: scale(0.7); }
+  100% { opacity: 0; transform: scale(1.35); }
 }
 
 @keyframes marker-glow {
   0%, 100% {
-    opacity: 0.35;
-    transform: scale(0.82);
+    opacity: 0.45;
+    transform: scale(0.92);
   }
   50% {
-    opacity: 1;
-    transform: scale(1.08);
+    opacity: 0.65;
+    transform: scale(1);
   }
 }
 
 @keyframes marker-ripple {
   0% {
-    opacity: 0.95;
-    transform: scale(0.55);
+    opacity: 0.4;
+    transform: scale(0.65);
   }
   70%, 100% {
     opacity: 0;
-    transform: scale(1.55);
+    transform: scale(1.35);
   }
 }
 

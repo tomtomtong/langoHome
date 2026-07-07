@@ -73,6 +73,29 @@
   const returnBtn = document.getElementById("returnBtn");
   const replayBtn = document.getElementById("replayBtn");
 
+  const DESIGN_W = 960;
+  const DESIGN_H = 720;
+
+  function fitGameToScreen() {
+    const gameEl = document.getElementById("game");
+    if (!gameEl) return;
+    const vv = window.visualViewport;
+    const pad = 8;
+    const winW = (vv ? vv.width : window.innerWidth) - pad;
+    const winH = (vv ? vv.height : window.innerHeight) - pad;
+    const scale = Math.min(winW / DESIGN_W, winH / DESIGN_H, 4);
+    gameEl.style.transform = `scale(${scale})`;
+    gameEl.style.transformOrigin = "center center";
+  }
+
+  fitGameToScreen();
+  window.addEventListener("resize", fitGameToScreen);
+  window.addEventListener("orientationchange", fitGameToScreen);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", fitGameToScreen);
+    window.visualViewport.addEventListener("scroll", fitGameToScreen);
+  }
+
   function levelHotspots(lv) {
     if (Array.isArray(lv?.hotspots) && lv.hotspots.length) return lv.hotspots;
     if (lv?.hotspot) return [lv.hotspot];
@@ -487,8 +510,11 @@
       startGame();
     });
 
+    fitGameToScreen();
     startGame();
   }
 
   document.addEventListener("DOMContentLoaded", init);
+  window.addEventListener("load", fitGameToScreen);
+  setTimeout(fitGameToScreen, 50);
 })();

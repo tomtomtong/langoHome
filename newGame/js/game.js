@@ -64,7 +64,7 @@
   const CORRECT_MOLES_MAX = 3;
   const NEXT_ROUND_DELAY = 700;
   const MISSES_BEFORE_REVEAL = 2;
-  const REVEAL_ROUND_DELAY = 2200;
+  const REVEAL_ROUND_DELAY = 7000;
 
   // ---------- State ----------
   const state = {
@@ -255,7 +255,7 @@
       : state.roundCorrectWords;
     const answerText = answers.join(" / ");
     renderSentence(state.puzzle.prompt, answers[0]);
-    flashMessage(`Correct answer: ${answerText}`);
+    flashMessage(`Correct answer: ${answerText}`, REVEAL_ROUND_DELAY);
 
     clearTimeout(state.nextRoundTimer);
     state.nextRoundTimer = setTimeout(() => {
@@ -396,16 +396,16 @@
     step();
   }
 
-  function flashMessage(text) {
+  function flashMessage(text, duration = 1200) {
     const el = document.createElement("div");
-    el.className = "float-text good";
+    el.className = "float-text good" + (duration > 1200 ? " persist" : "");
     el.textContent = text;
     el.style.fontSize = "1.4rem";
     el.style.left = "50%";
     el.style.top = "40%";
     el.style.transform = "translate(-50%, 0)";
     fxLayer.appendChild(el);
-    setTimeout(() => el.remove(), 1200);
+    setTimeout(() => el.remove(), duration);
   }
 
   // ---------- Timer ----------

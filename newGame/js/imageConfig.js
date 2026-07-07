@@ -61,30 +61,6 @@ const ImageConfig = (() => {
         });
       },
     },
-    hillBack: {
-      label: "Hill (back)",
-      description: "Rear rolling hill layer",
-      default: "assets/images/hill-back.svg",
-      sizeMode: "stretch",
-      apply: (url, scale = DEFAULT_SCALE) => {
-        const size = bgSize("stretch", scale);
-        document.querySelectorAll(".hill-back").forEach((el) => {
-          el.style.background = `url("${url}") center bottom / ${size} no-repeat`;
-        });
-      },
-    },
-    hillFront: {
-      label: "Hill (front)",
-      description: "Front rolling hill layer",
-      default: "assets/images/hill-front.svg",
-      sizeMode: "stretch",
-      apply: (url, scale = DEFAULT_SCALE) => {
-        const size = bgSize("stretch", scale);
-        document.querySelectorAll(".hill-front").forEach((el) => {
-          el.style.background = `url("${url}") center bottom / ${size} no-repeat`;
-        });
-      },
-    },
     hole: {
       label: "Mole hole",
       description: "Hole ellipse and front lip",

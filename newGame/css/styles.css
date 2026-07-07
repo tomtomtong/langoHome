@@ -91,27 +91,6 @@ html, body {
   100% { transform: translateX(0); }
 }
 
-/* ---------- Hills ---------- */
-.hills { position: absolute; bottom: 0; left: 0; width: 100%; height: 60%; pointer-events: none; }
-.hill {
-  position: absolute;
-  bottom: 0;
-  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
-}
-.hill-back {
-  width: 140%;
-  height: 70%;
-  left: -20%;
-  background: linear-gradient(180deg, #5fbb2a, #3c7d18);
-  opacity: 0.85;
-}
-.hill-front {
-  width: 120%;
-  height: 45%;
-  left: -10%;
-  background: linear-gradient(180deg, #76cf33, #4f9e22);
-}
-
 /* ---------- HUD ---------- */
 .hud {
   position: relative;
@@ -720,6 +699,10 @@ body.image-based-mole .mole-teeth {
   font-size: 1.6rem;
   text-shadow: 0 2px 0 rgba(0,0,0,0.25);
   animation: floatUp 0.9s ease-out forwards;
+}
+.float-text.persist {
+  animation: none;
+  opacity: 1;
 }
 .float-text.good { color: #4ad24a; }
 .float-text.bad  { color: var(--bad); }
