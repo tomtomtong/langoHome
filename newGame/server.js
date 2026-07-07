@@ -9,6 +9,8 @@ const Database = require("better-sqlite3");
 const multer = require("multer");
 
 const PORT = process.env.PORT || 3000;
+const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+const DB_MAX_BYTES = 200 * 1024 * 1024;
 const DATA_DIR =
   process.env.GAME_DATA_DIR ||
   (process.env.RAILWAY_VOLUME_MOUNT_PATH
@@ -417,7 +419,7 @@ function saveLevelHotspots(id, sentence, target, hotspots, sortOrder) {
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: IMAGE_MAX_BYTES },
   fileFilter: (_req, file, cb) => {
     if (file.mimetype.startsWith("image/")) cb(null, true);
     else cb(new Error("Only image files are allowed (PNG, JPG, SVG, WebP, GIF)."));
@@ -805,7 +807,7 @@ app.get("/api/game-data/export", (_req, res) => {
 
 const dbUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 },
+  limits: { fileSize: DB_MAX_BYTES },
   fileFilter: (_req, file, cb) => {
     if (file.originalname.endsWith(".db") || file.mimetype === "application/x-sqlite3") {
       cb(null, true);
@@ -835,10 +837,13 @@ app.post("/api/game-data/import", dbUpload.single("database"), (req, res) => {
   setTimeout(() => process.exit(0), 500);
 });
 
-app.use((err, _req, res, next) => {
+app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
     if (err.code === "LIMIT_FILE_SIZE") {
-      return res.status(400).json({ error: "Image too large (max 5 MB)." });
+      const isDbImport = req.path === "/api/game-data/import";
+      const maxMb = (isDbImport ? DB_MAX_BYTES : IMAGE_MAX_BYTES) / (1024 * 1024);
+      const label = isDbImport ? "Database file" : "Image";
+      return res.status(400).json({ error: `${label} too large (max ${maxMb} MB).` });
     }
     return res.status(400).json({ error: err.message });
   }
