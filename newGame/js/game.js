@@ -509,12 +509,13 @@
   // ---------- Init ----------
   async function init() {
     buildGrid();
-    if (typeof ImageConfig !== "undefined") await ImageConfig.applyAll();
-    document.getElementById("returnBtn").addEventListener("click", () => {
-      if (window.history.length > 1) window.history.back();
-    });
+    if (typeof ImageConfig !== "undefined") {
+      await ImageConfig.applyAll();
+      await GameLoadingScreen.preloadImageConfig(ImageConfig);
+    }
     document.addEventListener("keydown", onKeyDown);
     startGame();
+    await GameLoadingScreen.hide();
   }
 
   document.addEventListener("DOMContentLoaded", init);

@@ -181,31 +181,6 @@
       background: linear-gradient(to top, rgba(15, 17, 23, 0.85), transparent);
     }
 
-    #football-icon {
-      display: none;
-      font-size: clamp(2.5rem, 8vw, 4rem);
-      line-height: 1;
-      filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
-      animation: football-pop 0.45s ease-out;
-      pointer-events: none;
-    }
-
-    #football-icon.visible { display: block; }
-
-    @keyframes football-pop {
-      0% { transform: scale(0.4) rotate(-20deg); opacity: 0; }
-      70% { transform: scale(1.15) rotate(8deg); opacity: 1; }
-      100% { transform: scale(1) rotate(0deg); opacity: 1; }
-    }
-
-    .football-wrap {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      pointer-events: none;
-    }
-
     .overlay-games {
       position: absolute;
       right: max(0.75rem, env(safe-area-inset-right));
@@ -706,9 +681,6 @@
           <a href="/config">Settings</a>
         </div>
       </div>
-      <div class="football-wrap">
-        <div id="football-icon" aria-hidden="true" title="Football mentioned">⚽</div>
-      </div>
       <nav class="overlay-games" aria-label="Games">
         <a class="game-shortcut game-shortcut--wordwhack" href="/games/" title="Word-Whack Blitz">
           <img src="/games/assets/images/mole.svg" alt="Word-Whack Blitz">
@@ -765,7 +737,6 @@
     const statusIdleEl = document.getElementById("status-idle");
     const errEl = document.getElementById("err");
     const errIdleEl = document.getElementById("err-idle");
-    const footballEl = document.getElementById("football-icon");
     const avatarStatusEl = document.getElementById("avatar-status");
     const btnSaveCamera = document.getElementById("btn-save-camera");
     const cameraSaveStatusEl = document.getElementById("camera-save-status");
@@ -786,7 +757,6 @@
     const gameLaunchSub = document.getElementById("game-launch-sub");
     const gameLaunchProgress = document.getElementById("game-launch-progress");
     const gameLaunchConfetti = document.getElementById("game-launch-confetti");
-    const SHOW_FOOTBALL_ICON = "show_football_icon";
     const HAPPY = "happy";
     const PLAY_GAME = "play_game";
     const END_CONVERSATION = "end_conversation";
@@ -833,7 +803,6 @@
     let tripleClickCount = 0;
     let tripleClickTimer = null;
     const TRIPLE_CLICK_MS = 500;
-    let footballHideTimer = null;
     let ws, ctx, src, proc, source, stream;
     let active = false, inSession = false, playing = false, nextPlayTime = 0;
     const ENABLE_WAKE_WORD = false;
@@ -1484,7 +1453,6 @@
 
     function cleanupSession() {
       uiLog("cleanup", "begin", "hello");
-      hideFootballIcon();
       active = false;
       pendingEndConversation = false;
       pendingFunctionCalls.clear();
@@ -1600,19 +1568,6 @@
       ws.send(JSON.stringify({ type: "response.create" }));
     }
 
-    function hideFootballIcon() {
-      footballEl.classList.remove("visible");
-      if (footballHideTimer) { clearTimeout(footballHideTimer); footballHideTimer = null; }
-    }
-
-    function showFootballIcon() {
-      footballEl.classList.remove("visible");
-      void footballEl.offsetWidth;
-      footballEl.classList.add("visible");
-      if (footballHideTimer) clearTimeout(footballHideTimer);
-      footballHideTimer = setTimeout(hideFootballIcon, 4000);
-    }
-
     function resetResponseState(id) {
       responseId = id ?? null;
       responseText = "";
@@ -1723,18 +1678,6 @@
       const { name, call_id: callId, arguments: argsJson } = resolveFunctionCall(event);
       if (!name || !callId) {
         console.warn("Function call missing name or call_id", event);
-        return;
-      }
-
-      if (name === SHOW_FOOTBALL_ICON) {
-        showFootballIcon();
-        let topic = "football";
-        try {
-          const args = JSON.parse(argsJson || "{}");
-          if (args.topic) topic = args.topic;
-        } catch {}
-        sendFunctionOutput(callId, { success: true, topic });
-        ws.send(JSON.stringify({ type: "response.create" }));
         return;
       }
 

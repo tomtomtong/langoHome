@@ -28,7 +28,26 @@
     return roots[gameId] || "index.html";
   }
 
+  const CONVERSATION_URL = "/";
+
+  function returnToConversation() {
+    window.location.assign(CONVERSATION_URL);
+  }
+
+  function wireReturnButtons() {
+    document.querySelectorAll("#returnBtn, #return-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        returnToConversation();
+      });
+    });
+  }
+
+  window.returnToConversation = returnToConversation;
+
   function init() {
+    wireReturnButtons();
+
     const current = getCurrentGameId();
     const theme = current === "cardgame" ? "cardgame" : current === "findgame" ? "findgame" : "wordwhack";
 

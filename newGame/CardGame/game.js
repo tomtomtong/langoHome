@@ -337,9 +337,11 @@ function onKeyDown(e) {
 async function initGame() {
   if (typeof CardImageConfig !== 'undefined') {
     await CardImageConfig.applyAll();
+    await GameLoadingScreen.preloadImageConfig(CardImageConfig);
   }
   document.addEventListener('keydown', onKeyDown);
   startGame();
+  await GameLoadingScreen.hide();
 }
 
 initGame();

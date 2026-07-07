@@ -9,13 +9,23 @@
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="../css/gamePicker.css" />
+  <link rel="stylesheet" href="../css/loadingScreen.css" />
 </head>
 <body>
+  <div id="game-loading" class="game-loading--findgame" role="status" aria-live="polite" aria-busy="true">
+    <div class="game-loading-backdrop" aria-hidden="true"></div>
+    <div class="game-loading-card">
+      <div class="game-loading-spinner" aria-hidden="true"></div>
+      <p class="game-loading-title">Find the Object</p>
+      <p class="game-loading-sub">Preparing the scene…</p>
+      <div class="game-loading-bar" aria-hidden="true"><div class="game-loading-bar-fill"></div></div>
+    </div>
+  </div>
   <div id="bga-custom-background" aria-hidden="true"></div>
 
   <div id="game" class="scene">
     <header class="hud">
-      <button type="button" class="return-btn" id="returnBtn" title="Restart" aria-label="Restart">
+      <button type="button" class="return-btn" id="returnBtn" title="Return to conversation" aria-label="Return to conversation">
         <img src="assets/images/return-btn.svg" alt="" class="return-icon" />
       </button>
 
@@ -63,6 +73,7 @@
     </div>
   </div>
 
+  <script src="../js/loadingScreen.js"></script>
   <script src="js/imageConfig.js"></script>
   <script src="../js/gamePicker.js"></script>
   <script src="game.js"></script>

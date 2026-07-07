@@ -9,8 +9,18 @@
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/styles.css" />
   <link rel="stylesheet" href="css/gamePicker.css" />
+  <link rel="stylesheet" href="css/loadingScreen.css" />
 </head>
 <body>
+  <div id="game-loading" class="game-loading--wordwhack" role="status" aria-live="polite" aria-busy="true">
+    <div class="game-loading-backdrop" aria-hidden="true"></div>
+    <div class="game-loading-card">
+      <div class="game-loading-spinner" aria-hidden="true"></div>
+      <p class="game-loading-title">Word-Whack Blitz</p>
+      <p class="game-loading-sub">Setting up the field…</p>
+      <div class="game-loading-bar" aria-hidden="true"><div class="game-loading-bar-fill"></div></div>
+    </div>
+  </div>
   <div id="game" class="scene">
     <!-- Sky / clouds decor -->
     <div class="sky-decor">
@@ -21,7 +31,7 @@
 
     <!-- Header -->
     <header class="hud">
-      <button type="button" class="return-btn" id="returnBtn" title="Return" aria-label="Return"></button>
+      <button type="button" class="return-btn" id="returnBtn" title="Return to conversation" aria-label="Return to conversation"></button>
 
       <div class="sign-wrap">
         <div class="rope rope-left"></div>
@@ -72,6 +82,7 @@
     <div id="fx" class="fx-layer"></div>
   </div>
 
+  <script src="js/loadingScreen.js"></script>
   <script src="js/imageConfig.js"></script>
   <script src="js/gamePicker.js"></script>
   <script src="js/game.js"></script>

@@ -478,9 +478,6 @@ function normalizeLipsync(raw) {
   };
 }
 
-const FOOTBALL_TOOL_INSTRUCTION =
-  ' When the user mentions football, soccer, or related topics, call the show_football_icon tool.';
-
 const HAPPY_TOOL_INSTRUCTION =
   ' When the user explicitly asks you to dance or do the chicken dance, call the happy tool in the same turn so Uncle Tommy performs his chicken dance. Do not call it just because the user sounds happy, excited, or celebratory.';
 
@@ -489,21 +486,6 @@ const LEAVE_TOOL_INSTRUCTION =
 
 const PLAY_GAME_TOOL_INSTRUCTION =
   ' When the user wants to play a game, asks to play something, says "let\'s play", "I want to play a game", or similar, respond with brief enthusiasm and call the play_game tool in the same turn. The app will randomly pick one of the available games.';
-
-const SHOW_FOOTBALL_ICON_TOOL = {
-  type: 'function',
-  name: 'show_football_icon',
-  description: 'Shows a football emoji icon on the user\'s screen when they talk about football or soccer.',
-  parameters: {
-    type: 'object',
-    properties: {
-      topic: {
-        type: 'string',
-        description: 'Brief description of the football-related topic the user mentioned',
-      },
-    },
-  },
-};
 
 const HAPPY_TOOL = {
   type: 'function',
@@ -558,9 +540,9 @@ function buildSessionCfg({ instructions, voice, model } = {}) {
   const session = {
     type: 'realtime',
     model: model || DEFAULT_MODEL,
-    instructions: (instructions || DEFAULT_INSTRUCTIONS) + FOOTBALL_TOOL_INSTRUCTION + HAPPY_TOOL_INSTRUCTION + PLAY_GAME_TOOL_INSTRUCTION + LEAVE_TOOL_INSTRUCTION,
+    instructions: (instructions || DEFAULT_INSTRUCTIONS) + HAPPY_TOOL_INSTRUCTION + PLAY_GAME_TOOL_INSTRUCTION + LEAVE_TOOL_INSTRUCTION,
     output_modalities: ['audio', 'text'],
-    tools: [SHOW_FOOTBALL_ICON_TOOL, HAPPY_TOOL, PLAY_GAME_TOOL, END_CONVERSATION_TOOL],
+    tools: [HAPPY_TOOL, PLAY_GAME_TOOL, END_CONVERSATION_TOOL],
     tool_choice: 'auto',
     audio: {
       input: {

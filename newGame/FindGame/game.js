@@ -40,7 +40,6 @@
   const overlayTitle = document.getElementById("overlayTitle");
   const overlayMsg = document.getElementById("overlayMsg");
   const overlayBtn = document.getElementById("overlayBtn");
-  const returnBtn = document.getElementById("returnBtn");
   const replayBtn = document.getElementById("replayBtn");
 
   const DESIGN_W = 960;
@@ -462,27 +461,30 @@
   async function init() {
     if (typeof FindImageConfig !== "undefined") {
       await FindImageConfig.applyAll();
+      await GameLoadingScreen.preloadImageConfig(FindImageConfig);
     }
 
     await loadLevels();
     if (!levels.length) {
       voiceStatusEl.textContent = "No levels configured";
+      await GameLoadingScreen.hide();
       return;
     }
 
     sceneWrap.addEventListener("click", onSceneClick);
     replayBtn.addEventListener("click", replayQuestion);
-    returnBtn.addEventListener("click", () => {
-      audioUnlocked = true;
-      startGame();
-    });
     overlayBtn.addEventListener("click", () => {
       audioUnlocked = true;
       startGame();
     });
 
+    const firstLevel = levels[pickRandomLevelIndex()];
+    const firstSceneUrl = levelSceneUrl(firstLevel);
+    if (firstSceneUrl) await GameLoadingScreen.preloadImage(firstSceneUrl);
+
     fitGameToScreen();
     startGame();
+    await GameLoadingScreen.hide();
   }
 
   document.addEventListener("DOMContentLoaded", init);
