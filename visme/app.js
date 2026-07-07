@@ -4,12 +4,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
 import { textToPhonemeTimeline, timelineToIpaString } from "./phonetics.js";
 import { clearBlend, smoothMorphTowardTargets } from "./lipsync.js";
-import {
-  FACE_BLENDSHAPE_NAMES,
-  defaultBlendshapeWeights,
-  hasFaceMorphTargets,
-  morphNameToIndex,
-} from "./blendshapes.js";
+import { BLENDSHAPE_COUNT, hasFaceMorphTargets } from "./blendshapes.js";
 
 const canvas = document.getElementById("vrm-canvas");
 const form = document.getElementById("speak-form");
@@ -93,13 +88,13 @@ window.addEventListener("resize", () => {
 
 // ── Load VRM on page open ──
 async function loadVrm() {
-  statusEl.textContent = "Loading TommyOrignial.vrm…";
+  statusEl.textContent = "Loading Tommyv4.vrm…";
 
   const loader = new GLTFLoader();
   loader.register((parser) => new VRMLoaderPlugin(parser));
 
   try {
-    const gltf = await loader.loadAsync("/TommyOrignial.vrm");
+    const gltf = await loader.loadAsync("/visme/Tommyv4.vrm");
     const vrm = gltf.userData.vrm;
     if (!vrm) { statusEl.textContent = "No VRM data found in file."; return; }
 
@@ -114,7 +109,7 @@ async function loadVrm() {
     });
 
     if (morphMeshes.length === 0) {
-      statusEl.textContent = "VRM loaded but no face morph targets found.";
+      statusEl.textContent = "VRM loaded but no 0–21 morph targets found.";
     } else {
       statusEl.textContent = `Ready — ${morphMeshes.length} mesh(es). Type a word and hit Speak.`;
     }
@@ -167,7 +162,7 @@ form.addEventListener("submit", async (e) => {
   const t0 = performance.now();
   const totalDuration = timeline[timeline.length - 1].end;
   let lastStepT = performance.now();
-  const targetValues = defaultBlendshapeWeights().fill(0);
+  const target22 = new Array(BLENDSHAPE_COUNT).fill(0);
 
   await new Promise((resolve) => {
     function step() {
@@ -189,12 +184,11 @@ form.addEventListener("submit", async (e) => {
         if (elapsed >= entry.start && elapsed < entry.end) { activeEntry = entry; break; }
       }
 
-      targetValues.fill(0);
+      target22.fill(0);
       if (activeEntry) {
-        const index = morphNameToIndex(activeEntry.morphName ?? "mouthClose");
-        if (index >= 0) targetValues[index] = exaggerate;
+        target22[activeEntry.blendId ?? 0] = exaggerate;
       }
-      smoothMorphTowardTargets(morphMeshes, targetValues, FACE_BLENDSHAPE_NAMES, dtSec, crossfadeMs);
+      smoothMorphTowardTargets(morphMeshes, target22, dtSec, crossfadeMs);
 
       // highlight pill
       for (const p of pills) {

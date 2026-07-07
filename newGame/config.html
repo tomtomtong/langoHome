@@ -38,6 +38,23 @@
       Run <code>npm start</code> to start the server.
     </div>
 
+    <section class="db-admin-section" id="dbAdminSection">
+      <div class="db-admin-header">
+        <div>
+          <h2 class="db-admin-heading">Database backup</h2>
+          <p class="db-admin-desc">
+            Import or export the full <code>game.db</code> file (images, levels, and voice settings).
+            Import replaces everything currently on the server.
+          </p>
+        </div>
+      </div>
+      <div class="db-admin-actions">
+        <button type="button" class="btn-db-export" id="exportDbBtn">Export game.db</button>
+        <button type="button" class="btn-db-import" id="importDbBtn">Import game.db</button>
+        <input type="file" id="importDbInput" accept=".db,application/x-sqlite3" hidden />
+      </div>
+    </section>
+
     <section class="inworld-section hidden" id="inworldSection">
       <div class="inworld-header">
         <div>
@@ -906,6 +923,102 @@
           inworldKeyHint.textContent = err.message || "Could not load settings — is the server running?";
         }
       }
+
+      /* ---- Database import / export ---- */
+      const exportDbBtn = document.getElementById("exportDbBtn");
+      const importDbBtn = document.getElementById("importDbBtn");
+      const importDbInput = document.getElementById("importDbInput");
+
+      async function exportGameDatabase() {
+        exportDbBtn.disabled = true;
+        try {
+          const res = await fetch("/api/game-data/export");
+          if (!res.ok) {
+            const data = await parseJsonResponse(res);
+            throw new Error(data.error || "Export failed");
+          }
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = "game.db";
+          link.click();
+          URL.revokeObjectURL(url);
+          showToast("game.db downloaded");
+        } catch (err) {
+          showToast(err.message || "Export failed");
+        } finally {
+          exportDbBtn.disabled = false;
+        }
+      }
+
+      async function waitForServerReload(maxAttempts = 30, intervalMs = 1000) {
+        for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+          await new Promise((resolve) => setTimeout(resolve, intervalMs));
+          try {
+            const res = await fetch("/api/images");
+            if (res.ok) return true;
+          } catch {
+            /* server still restarting */
+          }
+        }
+        return false;
+      }
+
+      async function importGameDatabase(file) {
+        if (!file) return;
+        if (!file.name.toLowerCase().endsWith(".db")) {
+          showToast("Choose a .db SQLite file");
+          return;
+        }
+        if (
+          !confirm(
+            "Replace the entire server database with this file?\n\nAll current images, levels, and voice settings will be overwritten."
+          )
+        ) {
+          return;
+        }
+
+        importDbBtn.disabled = true;
+        exportDbBtn.disabled = true;
+        showToast("Importing database…");
+
+        const form = new FormData();
+        form.append("database", file);
+
+        try {
+          const res = await fetch("/api/game-data/import", {
+            method: "POST",
+            body: form,
+          });
+          const data = await parseJsonResponse(res);
+          if (!res.ok) throw new Error(data.error || "Import failed");
+          showToast("Database imported — waiting for server…");
+          const backOnline = await waitForServerReload();
+          if (backOnline) {
+            location.reload();
+            return;
+          }
+          showToast("Import complete — restart the server, then refresh this page");
+        } catch (err) {
+          if (err.message === "Failed to fetch") {
+            showToast("Server stopped — restart it, then refresh this page");
+          } else {
+            showToast(err.message || "Import failed");
+          }
+        } finally {
+          importDbBtn.disabled = false;
+          exportDbBtn.disabled = false;
+          importDbInput.value = "";
+        }
+      }
+
+      exportDbBtn.addEventListener("click", exportGameDatabase);
+      importDbBtn.addEventListener("click", () => importDbInput.click());
+      importDbInput.addEventListener("change", () => {
+        const file = importDbInput.files?.[0];
+        if (file) importGameDatabase(file);
+      });
 
       document.getElementById("saveInworldBtn").addEventListener("click", async () => {
         const payload = {};

@@ -7,7 +7,6 @@ import { loadMixamoIdleClip } from "./mixamo-idle.js";
 import {
   BLENDSHAPE_COUNT,
   BLENDSHAPE_LABELS,
-  FACE_BLENDSHAPE_NAMES,
   buildBlendshapeTestTimeline,
   defaultBlendshapeWeights,
   hasFaceMorphTargets,
@@ -17,7 +16,6 @@ import {
 export {
   BLENDSHAPE_COUNT,
   BLENDSHAPE_LABELS,
-  FACE_BLENDSHAPE_NAMES,
   normalizeBlendshapes,
 };
 
@@ -87,7 +85,7 @@ export function normalizeLipsync(raw) {
 
 export class TommyAvatar {
   constructor(canvas, {
-    vrmUrl = "/TommyOrignial.vrm",
+    vrmUrl = "/visme/Tommyv4.vrm",
     idleAnimationUrl = "/visme/Idle.fbx",
     backgroundUrl = "/bg.png",
     interactiveCamera = true,
@@ -365,7 +363,7 @@ export class TommyAvatar {
   }
 
   async load() {
-    this.setStatus("Loading TommyOrignial.vrm…");
+    this.setStatus("Loading Tommyv4.vrm…");
 
     const loader = new GLTFLoader();
     loader.register((parser) => new VRMLoaderPlugin(parser));
@@ -394,7 +392,7 @@ export class TommyAvatar {
       });
 
       if (this.morphMeshes.length === 0) {
-        this.setStatus("VRM loaded but no face morph targets found.");
+        this.setStatus("VRM loaded but no viseme morph targets found.");
         return false;
       }
 
@@ -428,8 +426,6 @@ export class TommyAvatar {
 
   previewBlendshape(index, value) {
     if (!this.morphMeshes.length) return;
-    const morphName = FACE_BLENDSHAPE_NAMES[index];
-    if (!morphName) return;
     this._manualBlendIndex = index;
     this._manualBlendValue = Math.min(2, Math.max(0, Number(value) || 0));
     this._applyManualBlendshape();
@@ -439,17 +435,17 @@ export class TommyAvatar {
     this._manualBlendIndex = null;
     this._manualBlendValue = 0;
     if (!this.speaking && !this._previewPlaying) {
-      clearBlend(this.morphMeshes, FACE_BLENDSHAPE_NAMES);
+      clearBlend(this.morphMeshes);
     }
   }
 
   _applyManualBlendshape() {
     if (this._manualBlendIndex == null || !this.morphMeshes.length) return;
-    clearBlend(this.morphMeshes, FACE_BLENDSHAPE_NAMES);
-    const morphName = FACE_BLENDSHAPE_NAMES[this._manualBlendIndex];
+    clearBlend(this.morphMeshes);
+    const idx = this._manualBlendIndex;
     const val = this._manualBlendValue;
     for (const mesh of this.morphMeshes) {
-      const mi = mesh.morphTargetDictionary[morphName];
+      const mi = mesh.morphTargetDictionary[String(idx)];
       if (mi !== undefined) mesh.morphTargetInfluences[mi] = val;
     }
   }

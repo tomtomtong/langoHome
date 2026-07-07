@@ -295,7 +295,7 @@ const DEFAULT_LIPSYNC = {
   exaggerate: 1,
   msPerPhone: 120,
   crossfadeMs: 50,
-  blendshapes: Array(50).fill(1),
+  blendshapes: Array(22).fill(1),
 };
 
 function parseLipsyncNumber(value, min, max, fallback) {
@@ -305,9 +305,9 @@ function parseLipsyncNumber(value, min, max, fallback) {
 }
 
 function normalizeBlendshapes(raw) {
-  const weights = Array(50).fill(1);
+  const weights = Array(22).fill(1);
   if (!Array.isArray(raw)) return weights;
-  for (let i = 0; i < 50; i++) {
+  for (let i = 0; i < 22; i++) {
     weights[i] = parseLipsyncNumber(raw[i], 0, 2, 1);
   }
   return weights;

@@ -15,8 +15,6 @@ const DATA_DIR =
     ? path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH, "game-data")
     : path.join(__dirname, "data"));
 const DB_PATH = path.join(DATA_DIR, "game.db");
-const GAME_ADMIN_KEY = process.env.GAME_ADMIN_KEY || "";
-
 const WORDWHACK_SLOTS = new Set([
   "background",
   "cloud",
@@ -796,23 +794,7 @@ app.delete("/api/images", (req, res) => {
   res.json({ ok: true, game: game || "all" });
 });
 
-function requireGameAdmin(req, res) {
-  if (!GAME_ADMIN_KEY) {
-    res.status(503).json({
-      error: "Database admin API disabled. Set GAME_ADMIN_KEY on the server.",
-    });
-    return false;
-  }
-  const key = req.headers["x-game-admin-key"];
-  if (key !== GAME_ADMIN_KEY) {
-    res.status(403).json({ error: "Invalid admin key." });
-    return false;
-  }
-  return true;
-}
-
-app.get("/api/game-data/export", (req, res) => {
-  if (!requireGameAdmin(req, res)) return;
+app.get("/api/game-data/export", (_req, res) => {
   if (!fs.existsSync(DB_PATH)) {
     return res.status(404).json({ error: "Database file not found." });
   }
@@ -834,7 +816,6 @@ const dbUpload = multer({
 });
 
 app.post("/api/game-data/import", dbUpload.single("database"), (req, res) => {
-  if (!requireGameAdmin(req, res)) return;
   if (!req.file?.buffer?.length) {
     return res.status(400).json({ error: "Missing database file." });
   }

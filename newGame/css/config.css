@@ -800,3 +800,79 @@ body.hotspot-dragging {
   cursor: pointer;
   box-shadow: 0 4px 0 #5e3a18;
 }
+
+.db-admin-section {
+  background: #fff6df;
+  border: 3px solid #5e3a18;
+  border-radius: 16px;
+  padding: 20px 24px;
+  margin-bottom: 20px;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.1);
+}
+
+.db-admin-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.db-admin-heading {
+  font-family: "Baloo 2", sans-serif;
+  font-size: 1.35rem;
+  color: #5a2da0;
+  margin-bottom: 4px;
+}
+
+.db-admin-desc {
+  font-size: 0.9rem;
+  color: #5e3a18;
+  max-width: 640px;
+  line-height: 1.45;
+}
+
+.db-admin-desc code {
+  background: rgba(255, 255, 255, 0.45);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+
+.db-admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.btn-db-export,
+.btn-db-import {
+  font-family: "Baloo 2", sans-serif;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 10px 22px;
+  cursor: pointer;
+  box-shadow: 0 4px 0 #5e3a18;
+}
+
+.btn-db-export {
+  background: linear-gradient(180deg, #8a4fd0, #5a2da0);
+}
+
+.btn-db-import {
+  background: linear-gradient(180deg, #ff8a3d, #ef5f23);
+}
+
+.btn-db-export:hover:not(:disabled),
+.btn-db-import:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.btn-db-export:disabled,
+.btn-db-import:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

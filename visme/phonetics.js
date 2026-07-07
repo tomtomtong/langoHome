@@ -1,3 +1,5 @@
+import { PHONE_TO_BLEND } from "./blendshapes.js";
+
 const DICT = {
   a: ["EY"],
   the: ["DH", "AH"],
@@ -181,22 +183,17 @@ export function textToPhonemeTimeline(text, msPerPhone = 120) {
   for (let wi = 0; wi < words.length; wi++) {
     const phones = wordToPhonemes(words[wi]);
     for (const p of phones) {
-      timeline.push({
-        phoneme: p,
-        start: t,
-        end: t + msPerPhone,
-        morphName: PHONE_TO_MORPH[p] ?? "mouthClose",
-      });
+      timeline.push({ phoneme: p, start: t, end: t + msPerPhone, blendId: PHONE_TO_BLEND[p] ?? 0 });
       t += msPerPhone;
     }
     // short silence between words
     if (wi < words.length - 1) {
-      timeline.push({ phoneme: "SIL", start: t, end: t + wordGap, morphName: "mouthClose" });
+      timeline.push({ phoneme: "SIL", start: t, end: t + wordGap, blendId: 0 });
       t += wordGap;
     }
   }
   // final silence
-  timeline.push({ phoneme: "SIL", start: t, end: t + finalSilence, morphName: "mouthClose" });
+  timeline.push({ phoneme: "SIL", start: t, end: t + finalSilence, blendId: 0 });
   return timeline;
 }
 
@@ -216,5 +213,3 @@ const IPA = {
   R: "ɹ", S: "s", SH: "ʃ", T: "t", TH: "θ", V: "v", W: "w",
   Y: "j", Z: "z", ZH: "ʒ",
 };
-
-import { PHONE_TO_MORPH } from "./blendshapes.js";
