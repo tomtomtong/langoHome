@@ -28,7 +28,7 @@
     return roots[gameId] || "index.html";
   }
 
-  const CONVERSATION_URL = "/";
+  const CONVERSATION_URL = "/?connect=1";
 
   function returnToConversation() {
     window.location.assign(CONVERSATION_URL);

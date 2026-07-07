@@ -479,7 +479,7 @@ function normalizeLipsync(raw) {
 }
 
 const HAPPY_TOOL_INSTRUCTION =
-  ' When the user explicitly asks you to dance or do the chicken dance, call the happy tool in the same turn so Uncle Tommy performs his chicken dance. Do not call it just because the user sounds happy, excited, or celebratory.';
+  ' Call the happy tool (chicken dance) whenever the user asks to dance, says "chicken dance", wants a funny move or celebration, or says anything that suggests they want Uncle Tommy to dance. Trigger on short phrases like "dance", "do a dance", "chicken dance", "dance for me", or "can you dance". Err on the side of calling it — kids love the chicken dance.';
 
 const LEAVE_TOOL_INSTRUCTION =
   ' When the user says goodbye, bye, see you, see you later, I have to go, or otherwise indicates they want to end the conversation, respond with a brief farewell and immediately call the end_conversation tool in the same turn. Always call end_conversation when the user is done talking — do not keep chatting after a goodbye.';
@@ -491,7 +491,7 @@ const HAPPY_TOOL = {
   type: 'function',
   name: 'happy',
   description:
-    'Makes Uncle Tommy perform his chicken dance animation when the user explicitly asks him to dance.',
+    'Makes Uncle Tommy perform his chicken dance animation. Call when the user wants a dance, says chicken dance, asks for something fun, or uses "dance" in a request.',
   parameters: {
     type: 'object',
     properties: {

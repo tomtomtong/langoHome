@@ -841,6 +841,8 @@
     let idleNudgeCount = 0;
     let idleEndTimer = null;
     let launchingGame = false;
+    let lastChickenDanceAt = 0;
+    const CHICKEN_DANCE_COOLDOWN_MS = 2500;
 
     function pickRandomGame() {
       return GAME_CATALOG[Math.floor(Math.random() * GAME_CATALOG.length)];
@@ -1208,7 +1210,17 @@
       document.body.classList.remove("idle-video-dismissed");
     }
 
+    function abortPreparedConversationView() {
+      exitSessionView();
+      if (idleVideoUrl && !active) {
+        restoreIdleVideoScreen();
+        resetIdleVideoElement();
+        idleVideoEl.play().catch(() => {});
+      }
+    }
+
     async function playTransitionVideo() {
+      const HANDOFF_BEFORE_END_SEC = 0.25;
       return new Promise((resolve, reject) => {
         playingTransitionVideo = true;
         setTransitionVideoMode(true);
@@ -1219,15 +1231,28 @@
         transitionVideoEl.currentTime = 0;
         transitionVideoEl.muted = false;
 
-        transitionVideoEl.onended = () => {
+        let settled = false;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
           transitionVideoEl.onended = null;
           transitionVideoEl.onerror = null;
+          transitionVideoEl.removeEventListener("timeupdate", onTimeUpdate);
           transitionVideoEl.pause();
           resolve();
         };
+
+        const onTimeUpdate = () => {
+          const remaining = transitionVideoEl.duration - transitionVideoEl.currentTime;
+          if (Number.isFinite(remaining) && remaining <= HANDOFF_BEFORE_END_SEC) finish();
+        };
+
+        transitionVideoEl.addEventListener("timeupdate", onTimeUpdate);
+        transitionVideoEl.onended = finish;
         transitionVideoEl.onerror = () => {
           transitionVideoEl.onended = null;
           transitionVideoEl.onerror = null;
+          transitionVideoEl.removeEventListener("timeupdate", onTimeUpdate);
           reject(new Error("Transition video failed to play."));
         };
 
@@ -1239,7 +1264,28 @@
       wakeWordEnabled = false;
       wakeWordRestartAttempts = 0;
       stopWakeWordListening();
-      await connectConversation();
+      dismissIdleVideoScreen();
+      await enterSessionView();
+      await connectConversation({ preparedView: true });
+    }
+
+    function shouldAutoConnectFromGame() {
+      return new URLSearchParams(location.search).has("connect");
+    }
+
+    function clearAutoConnectParam() {
+      if (!shouldAutoConnectFromGame()) return;
+      const url = new URL(location.href);
+      url.searchParams.delete("connect");
+      const next = url.pathname + url.search + url.hash;
+      history.replaceState(null, "", next || "/");
+    }
+
+    async function autoConnectFromGameReturn() {
+      if (!shouldAutoConnectFromGame() || active) return;
+      uiLog("hello", "auto-connect from game return", "hello");
+      clearAutoConnectParam();
+      await connectConversationAfterVideos();
     }
 
     async function startConversationFromIdleTap() {
@@ -1256,7 +1302,6 @@
             uiLog("hello", `transition video error: ${e.message}`, "warn");
           }
         }
-        dismissIdleVideoScreen();
         uiLog("hello", "transition complete → connectConversation", "hello");
         await connectConversationAfterVideos();
       } finally {
@@ -1418,7 +1463,7 @@
       document.body.classList.add("in-session");
       if (!avatar?.loaded) setStatus("Loading avatar…");
       // Let layout paint so the canvas has real dimensions before WebGL init.
-      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      await new Promise((r) => requestAnimationFrame(r));
       try {
         await ensureAvatar();
         avatar.refreshAfterVisible();
@@ -1548,6 +1593,28 @@
       const t = text.toLowerCase().trim();
       return /\b(goodbye|good bye|bye bye|see you|see ya|gotta go|got to go|i'?m leaving|im leaving|take care|farewell|talk later|catch you later)\b/.test(t)
         || /\bbye\b/.test(t);
+    }
+
+    function isDanceRequest(text) {
+      const t = text.toLowerCase().trim();
+      if (!t) return false;
+      if (/\b(no|don't|dont|not|never|stop)\b.*\bdance\b/.test(t) || /\bdance\b.*\b(no|don't|dont|not|never|stop)\b/.test(t)) {
+        return false;
+      }
+      if (/\bchicken dance\b/.test(t) || /\bdo the chicken\b/.test(t)) return true;
+      if (/^(dance|dance!?|dance please)\.?$/i.test(t)) return true;
+      if (/\bdance\b/.test(t)) {
+        return /\b(do|can you|please|let'?s|show|chicken|time to|want to|wanna|for me|uncle tommy|tommy)\b/.test(t);
+      }
+      return /\b(do a dance|funny dance|your dance|shake it|bust a move)\b/.test(t);
+    }
+
+    function triggerChickenDance(reason = "user asked to dance") {
+      const now = Date.now();
+      if (now - lastChickenDanceAt < CHICKEN_DANCE_COOLDOWN_MS) return;
+      lastChickenDanceAt = now;
+      uiLog("dance", `chicken dance (${reason})`, "hello");
+      avatar?.playMixamoAnimation(CHICKEN_DANCE_URL);
     }
 
     function nudgeEndConversation() {
@@ -1688,6 +1755,7 @@
           if (args.reason) reason = args.reason;
         } catch {}
         avatar?.playMixamoAnimation(CHICKEN_DANCE_URL);
+        lastChickenDanceAt = Date.now();
         sendFunctionOutput(callId, { success: true, reason, animation: "chicken_dance" });
         ws.send(JSON.stringify({ type: "response.create" }));
         return;
@@ -1889,7 +1957,7 @@
       }, delay);
     }
 
-    async function connectConversation() {
+    async function connectConversation({ preparedView = false } = {}) {
       if (active) {
         uiLog("session", "connectConversation skipped — already active", "warn");
         return;
@@ -1901,6 +1969,7 @@
       if (!apiKey) {
         uiLog("session", "no API key", "err");
         showErr("No API key set.");
+        if (preparedView) abortPreparedConversationView();
         resumeWakeWordListening();
         return;
       }
@@ -1920,6 +1989,7 @@
         showErr("Microphone access denied.");
         btnStart.textContent = "Start Conversation";
         btnStart.disabled = false;
+        if (preparedView) abortPreparedConversationView();
         resumeWakeWordListening();
         return;
       }
@@ -2000,6 +2070,7 @@
           trackFunctionCallItem(e.item);
         } else if (e.type === "conversation.item.input_audio_transcription.completed") {
           if (isGoodbye(e.transcript)) nudgeEndConversation();
+          if (isDanceRequest(e.transcript)) triggerChickenDance(e.transcript);
         } else if (e.type === "session.created") {
           setStatus("Conversation active — speak anytime", true);
           avatar?.refreshAfterVisible();
@@ -2155,6 +2226,10 @@
       } catch (e) {
         console.error(e);
         showErr(`Avatar failed to load: ${e.message}`);
+      }
+      if (shouldAutoConnectFromGame()) {
+        await autoConnectFromGameReturn();
+        return;
       }
       if (idleVideoReady) {
         setStatus('Tap the screen to begin a conversation');
