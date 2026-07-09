@@ -248,68 +248,7 @@
     .game-icon-card .video-upload-actions {
       margin-top: 0.25rem;
     }
-    .avatar-preview-wrap {
-      margin-bottom: 1rem;
-      border: 1px solid #2a2f3a;
-      border-radius: 10px;
-      overflow: hidden;
-      background: #0b1222;
-    }
-
-    .avatar-preview-wrap.has-bg-image {
-      background-repeat: no-repeat;
-      background-position: center center;
-      background-size: min(1920px, 100vw) auto;
-    }
-    #lighting-preview-canvas {
-      display: block;
-      width: 100%;
-      height: 220px;
-    }
-    .slider-field { margin-bottom: 1.25rem; }
-    .slider-label {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      margin-bottom: 0.5rem;
-      font-size: 0.8125rem;
-      font-weight: 500;
-      color: #c4c7c5;
-    }
-    .slider-label output {
-      font-size: 0.75rem;
-      font-weight: 400;
-      color: #9aa0a6;
-      font-variant-numeric: tabular-nums;
-    }
-    .slider-wrap {
-      display: grid;
-      grid-template-columns: auto 1fr auto;
-      gap: 0.5rem;
-      align-items: center;
-    }
-    .slider-end {
-      font-size: 0.6875rem;
-      color: #5f6368;
-      white-space: nowrap;
-    }
-    input[type="range"] {
-      width: 100%;
-      margin: 0;
-      accent-color: #6c8cff;
-    }
   </style>
-  <script type="importmap">
-    {
-      "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
-        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/",
-        "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.3.4/lib/three-vrm.module.js",
-        "@pixiv/three-vrm-animation": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm-animation@3.3.4/lib/three-vrm-animation.module.js",
-        "vrm-mixamo-retarget": "https://cdn.jsdelivr.net/npm/vrm-mixamo-retarget@1.0.3/dist/index.esm.js"
-      }
-    }
-  </script>
 </head>
 <body>
   <div class="card wide">
@@ -361,60 +300,6 @@
       <h2 style="margin: 0 0 0.375rem; font-size: 1rem">Conversation game icons</h2>
       <p style="margin: 0 0 1rem">Icons on the game shortcuts during a conversation. Upload a custom image per game, or leave empty to use the built-in default. Square PNG or WebP works best.</p>
       <div id="game-icons-grid" class="game-icons-grid"></div>
-      <hr class="section-divider" style="margin: 1.5rem 0 1.25rem">
-      <h2 style="margin: 0 0 0.375rem; font-size: 1rem">Avatar lighting</h2>
-      <p style="margin: 0 0 1rem">Adjust scene lights for Uncle Tommy. Changes preview live below — click <strong>Save</strong> to apply in the voice app.</p>
-      <div class="avatar-preview-wrap">
-        <canvas id="lighting-preview-canvas"></canvas>
-      </div>
-      <p id="lighting-preview-status" class="field-hint" style="margin-bottom: 1rem">Loading preview…</p>
-      <div class="slider-field">
-        <div class="slider-label">
-          <label for="light-hemisphere">Ambient (hemisphere)</label>
-          <output id="light-hemisphere-value" for="light-hemisphere">1.60</output>
-        </div>
-        <div class="slider-wrap">
-          <span class="slider-end">Dim</span>
-          <input id="light-hemisphere" type="range" min="0" max="4" value="1.6" step="0.05">
-          <span class="slider-end">Bright</span>
-        </div>
-      </div>
-      <div class="slider-field">
-        <div class="slider-label">
-          <label for="light-key">Key light</label>
-          <output id="light-key-value" for="light-key">1.25</output>
-        </div>
-        <div class="slider-wrap">
-          <span class="slider-end">Dim</span>
-          <input id="light-key" type="range" min="0" max="4" value="1.25" step="0.05">
-          <span class="slider-end">Bright</span>
-        </div>
-      </div>
-      <div class="slider-field">
-        <div class="slider-label">
-          <label for="light-fill">Fill light</label>
-          <output id="light-fill-value" for="light-fill">0.50</output>
-        </div>
-        <div class="slider-wrap">
-          <span class="slider-end">Dim</span>
-          <input id="light-fill" type="range" min="0" max="4" value="0.5" step="0.05">
-          <span class="slider-end">Bright</span>
-        </div>
-      </div>
-      <div class="slider-field">
-        <div class="slider-label">
-          <label for="light-exposure">Exposure</label>
-          <output id="light-exposure-value" for="light-exposure">1.35</output>
-        </div>
-        <div class="slider-wrap">
-          <span class="slider-end">Dark</span>
-          <input id="light-exposure" type="range" min="0.4" max="3" value="1.35" step="0.05">
-          <span class="slider-end">Bright</span>
-        </div>
-      </div>
-      <div class="actions" style="margin-bottom: 1rem">
-        <button type="button" id="btn-reset-lighting" class="secondary">Reset lighting defaults</button>
-      </div>
       <div class="actions">
         <button type="submit">Save</button>
         <a class="btn" href="/avatar-config">Avatar settings</a>
@@ -424,8 +309,7 @@
     <div id="status" class="status"></div>
     <p class="hint">
       Settings are saved on the server (<code>config.json</code>) and persist across restarts.
-      Avatar background, lipsync, and expressions are on <a href="/avatar-config">Avatar Settings</a>.
-      Lighting is saved here with your voice agent settings.
+      Avatar background, lighting, lipsync, and expressions are on <a href="/avatar-config">Avatar Settings</a>.
       On Railway, attach a volume mounted at <code>/app/data</code> so config survives redeploys.
       Get a key at <a href="https://platform.inworld.ai/" target="_blank" rel="noopener">platform.inworld.ai</a>.
       You can also set <code>INWORLD_API_KEY</code> as a server environment variable instead.
@@ -449,13 +333,6 @@
     const PROMPT_KEY = 'inworld_system_prompt';
     const VOICE_KEY = 'inworld_voice_id';
     const MODEL_KEY = 'inworld_model';
-    const LIGHTING_KEY = 'inworld_lighting';
-    const DEFAULT_LIGHTING = {
-      hemisphereIntensity: 1.6,
-      keyLightIntensity: 1.25,
-      fillLightIntensity: 0.5,
-      exposure: 1.35,
-    };
     const input = document.getElementById('key');
     const prompt = document.getElementById('prompt');
     const voice = document.getElementById('voice');
@@ -474,15 +351,6 @@
     const btnUploadTransitionVideo = document.getElementById('btn-upload-transition-video');
     const btnRemoveTransitionVideo = document.getElementById('btn-remove-transition-video');
     const gameIconsGrid = document.getElementById('game-icons-grid');
-    const lightHemisphere = document.getElementById('light-hemisphere');
-    const lightKey = document.getElementById('light-key');
-    const lightFill = document.getElementById('light-fill');
-    const lightExposure = document.getElementById('light-exposure');
-    const lightHemisphereValue = document.getElementById('light-hemisphere-value');
-    const lightKeyValue = document.getElementById('light-key-value');
-    const lightFillValue = document.getElementById('light-fill-value');
-    const lightExposureValue = document.getElementById('light-exposure-value');
-    const btnResetLighting = document.getElementById('btn-reset-lighting');
 
     let serverConfig = null;
 
@@ -794,59 +662,6 @@ ${linesText.replace(/</g, '&lt;')}</pre>
     btnRefreshLogs.addEventListener('click', loadDebugReports);
     loadDebugReports();
 
-    function normalizeLighting(raw) {
-      const l = raw && typeof raw === 'object' ? raw : {};
-      const num = (v, min, max, fallback) => {
-        const n = Number(v);
-        if (!Number.isFinite(n)) return fallback;
-        return Math.min(max, Math.max(min, n));
-      };
-      return {
-        hemisphereIntensity: num(l.hemisphereIntensity, 0, 4, DEFAULT_LIGHTING.hemisphereIntensity),
-        keyLightIntensity: num(l.keyLightIntensity, 0, 4, DEFAULT_LIGHTING.keyLightIntensity),
-        fillLightIntensity: num(l.fillLightIntensity, 0, 4, DEFAULT_LIGHTING.fillLightIntensity),
-        exposure: num(l.exposure, 0.4, 3, DEFAULT_LIGHTING.exposure),
-      };
-    }
-
-    function updateLightingLabels() {
-      lightHemisphereValue.textContent = Number(lightHemisphere.value).toFixed(2);
-      lightKeyValue.textContent = Number(lightKey.value).toFixed(2);
-      lightFillValue.textContent = Number(lightFill.value).toFixed(2);
-      lightExposureValue.textContent = Number(lightExposure.value).toFixed(2);
-    }
-
-    function readLightingFromForm() {
-      return normalizeLighting({
-        hemisphereIntensity: lightHemisphere.value,
-        keyLightIntensity: lightKey.value,
-        fillLightIntensity: lightFill.value,
-        exposure: lightExposure.value,
-      });
-    }
-
-    function applyLightingFields(lighting) {
-      const l = normalizeLighting(lighting);
-      lightHemisphere.value = l.hemisphereIntensity;
-      lightKey.value = l.keyLightIntensity;
-      lightFill.value = l.fillLightIntensity;
-      lightExposure.value = l.exposure;
-      updateLightingLabels();
-      window.dispatchEvent(new CustomEvent('lighting-fields-updated', { detail: l }));
-    }
-
-    [lightHemisphere, lightKey, lightFill, lightExposure].forEach((el) => {
-      el.addEventListener('input', () => {
-        updateLightingLabels();
-        window.dispatchEvent(new CustomEvent('lighting-fields-updated', { detail: readLightingFromForm() }));
-      });
-    });
-    updateLightingLabels();
-
-    btnResetLighting.addEventListener('click', () => {
-      applyLightingFields(DEFAULT_LIGHTING);
-    });
-
     function syncLocalStorage(cfg) {
       if (cfg.apiKey) localStorage.setItem(KEY, cfg.apiKey);
       else localStorage.removeItem(KEY);
@@ -859,9 +674,6 @@ ${linesText.replace(/</g, '&lt;')}</pre>
         if (v) localStorage.setItem(k, v);
         else localStorage.removeItem(k);
       }
-      if (cfg.lighting) {
-        localStorage.setItem(LIGHTING_KEY, JSON.stringify(normalizeLighting(cfg.lighting)));
-      }
     }
 
     function applyConfig(cfg) {
@@ -869,7 +681,6 @@ ${linesText.replace(/</g, '&lt;')}</pre>
       prompt.value = cfg.instructions ?? '';
       voice.value = cfg.voice ?? '';
       model.value = cfg.model ?? '';
-      applyLightingFields(cfg.lighting);
       applyIdleVideo(cfg.idleVideo);
       applyTransitionVideo(cfg.transitionVideo);
       applyGameIcons(cfg.gameIcons);
@@ -880,16 +691,11 @@ ${linesText.replace(/</g, '&lt;')}</pre>
     }
 
     function loadFromLocalStorage() {
-      let lighting = DEFAULT_LIGHTING;
-      try {
-        lighting = normalizeLighting(JSON.parse(localStorage.getItem(LIGHTING_KEY) || '{}'));
-      } catch {}
       applyConfig({
         apiKey: localStorage.getItem(KEY) ?? '',
         instructions: localStorage.getItem(PROMPT_KEY) ?? '',
         voice: localStorage.getItem(VOICE_KEY) ?? '',
         model: localStorage.getItem(MODEL_KEY) ?? '',
-        lighting,
       });
     }
 
@@ -926,7 +732,7 @@ ${linesText.replace(/</g, '&lt;')}</pre>
         model: modelVal,
         lipsync: serverConfig?.lipsync,
         avatar: serverConfig?.avatar,
-        lighting: readLightingFromForm(),
+        lighting: serverConfig?.lighting,
       };
 
       try {
@@ -949,59 +755,9 @@ ${linesText.replace(/</g, '&lt;')}</pre>
 
       syncLocalStorage(payload);
       serverConfig = { ...serverConfig, ...payload };
-      status.textContent = 'Saved! Reload the voice app to apply lighting changes.';
+      status.textContent = 'Saved!';
       status.className = 'status ok';
     };
-  </script>
-  <script type="module">
-    import {
-      TommyAvatar,
-      DEFAULT_AVATAR,
-      DEFAULT_LIGHTING,
-      normalizeLighting,
-    } from "/visme/avatar.js";
-
-    const canvas = document.getElementById("lighting-preview-canvas");
-    const statusEl = document.getElementById("lighting-preview-status");
-    let previewAvatar = null;
-
-    window.addEventListener("lighting-fields-updated", (e) => {
-      previewAvatar?.applyLightingSettings(e.detail);
-    });
-
-    async function initLightingPreview() {
-      let lighting = DEFAULT_LIGHTING;
-      let backgroundUrl = null;
-      try {
-        const res = await fetch("/api/config");
-        if (res.ok) {
-          const cfg = await res.json();
-          lighting = normalizeLighting(cfg.lighting);
-          if (cfg.avatarBackground?.url) backgroundUrl = cfg.avatarBackground.url;
-        }
-      } catch {}
-
-      previewAvatar = new TommyAvatar(canvas, {
-        ...DEFAULT_AVATAR,
-        lighting,
-        backgroundUrl,
-        interactiveCamera: false,
-      });
-      const previewWrap = canvas.closest(".avatar-preview-wrap");
-      if (previewWrap) {
-        previewWrap.classList.toggle("has-bg-image", Boolean(backgroundUrl));
-        previewWrap.style.backgroundColor = "#0b1222";
-        previewWrap.style.backgroundImage = backgroundUrl ? `url("${backgroundUrl}")` : "none";
-      }
-      previewAvatar.onStatus = (msg) => { statusEl.textContent = msg; };
-      await previewAvatar.load();
-      previewAvatar.refreshAfterVisible();
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => previewAvatar.frameForLipsyncPreview());
-      });
-    }
-
-    initLightingPreview();
   </script>
 </body>
 </html>
