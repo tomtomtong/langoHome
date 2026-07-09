@@ -10,6 +10,7 @@
       document.documentElement.classList.add("game-return-connect");
     }
   </script>
+  <link rel="preload" href="/langoLogo.jpeg" as="image">
   <link rel="preload" href="/visme/Tommyv4.vrm" as="fetch" crossorigin>
   <script type="importmap">
     {
@@ -70,6 +71,28 @@
     #app {
       width: 100%;
       height: 100%;
+    }
+
+    /* ── Splash screen (logo while assets preload) ── */
+    #splash-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #ffffff;
+    }
+
+    #splash-screen img {
+      width: min(70vw, 420px);
+      height: auto;
+      max-height: 60vh;
+      object-fit: contain;
+    }
+
+    body.splash-dismissed #splash-screen {
+      display: none;
     }
 
     /* ── Idle screen (before Inworld session) ── */
@@ -723,6 +746,10 @@
   </style>
 </head>
 <body>
+  <div id="splash-screen" aria-label="Loading">
+    <img src="/langoLogo.jpeg" alt="Lango" width="420" height="420" decoding="async">
+  </div>
+
   <div id="portrait-prompt">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
       <rect x="5" y="2" width="14" height="20" rx="2"/>
@@ -761,6 +788,7 @@
           <span id="camera-save-status" aria-live="polite"></span>
           <button id="btn-save-camera" type="button">Save camera</button>
           <a href="/config">Settings</a>
+          <a href="/avatar-config">Avatar</a>
         </div>
       </div>
       <nav class="overlay-games" aria-label="Games">
@@ -1250,6 +1278,63 @@
       document.body.classList.toggle("videos-loading", loading);
     }
 
+    function preloadImage(url) {
+      if (!url) return Promise.resolve();
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error(`Failed to preload image: ${url}`));
+        img.src = url;
+      });
+    }
+
+    function prefetchAsset(url) {
+      if (!url) return Promise.resolve();
+      return fetch(url).then(() => {}).catch((e) => {
+        console.warn("Prefetch failed:", url, e);
+      });
+    }
+
+    function dismissSplash() {
+      document.body.classList.add("splash-dismissed");
+    }
+
+    function startIdleVideoPlayback() {
+      if (!idleVideoUrl || inSession || active) return;
+      idleVideoEl.play().catch(() => {});
+    }
+
+    async function preloadMediaAssets(cfg) {
+      applyAvatarStageBackground(getAvatarBackgroundUrl(cfg));
+
+      const tasks = [
+        preloadImage("/langoLogo.jpeg").catch(() => {}),
+        prefetchAsset(CHICKEN_DANCE_URL),
+        prefetchAsset("/visme/Idle.fbx"),
+      ];
+
+      const bgUrl = getAvatarBackgroundUrl(cfg);
+      if (bgUrl) tasks.push(preloadImage(bgUrl).catch(() => {}));
+
+      applyGameIconsFromConfig(cfg.gameIcons);
+      for (const game of GAME_CATALOG) {
+        if (game.icon) tasks.push(preloadImage(game.icon).catch(() => {}));
+      }
+
+      tasks.push(setupIdleVideos(cfg.idleVideo, cfg.transitionVideo, { autoplay: false }));
+
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      tasks.push(
+        ensureAvatar().catch((e) => {
+          console.error(e);
+          showErr(`Avatar failed to load: ${e.message}`);
+        }),
+      );
+
+      await Promise.all(tasks);
+      return Boolean(idleVideoUrl);
+    }
+
     function preloadVideoElement(video, url) {
       if (!url) return Promise.resolve(false);
 
@@ -1286,7 +1371,7 @@
       });
     }
 
-    async function setupIdleVideos(idleVideo, transitionVideo) {
+    async function setupIdleVideos(idleVideo, transitionVideo, { autoplay = true } = {}) {
       transitionVideoUrl = transitionVideo?.url || null;
       idleVideosReady = false;
 
@@ -1327,9 +1412,11 @@
       transitionVideoEl.pause();
       transitionVideoEl.currentTime = 0;
 
-      try {
-        await idleVideoEl.play();
-      } catch {}
+      if (autoplay) {
+        try {
+          await idleVideoEl.play();
+        } catch {}
+      }
       return true;
     }
 
@@ -2377,37 +2464,31 @@
     async function init() {
       const fromGame = shouldAutoConnectFromGame();
       const cfg = await getConfig();
-      applyAvatarStageBackground(getAvatarBackgroundUrl(cfg));
 
-      if (fromGame) {
-        dismissIdleVideoScreen();
-        setIdleVideoMode(false);
-        setVideosLoading(false);
-        await autoConnectFromGameReturn();
-        return;
-      }
-
-      const hasIdleVideo = cfg.idleVideo?.url;
-      if (hasIdleVideo) {
-        setStatus("Loading videos…");
-      }
-      const idleVideoReady = await setupIdleVideos(cfg.idleVideo, cfg.transitionVideo);
-      if (!idleVideoReady) {
-        setStatus("Loading avatar…");
-      }
-      // Let the hidden avatar stage get layout dimensions before WebGL init.
-      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       try {
-        await ensureAvatar();
+        const idleVideoReady = await preloadMediaAssets(cfg);
+        dismissSplash();
+
+        if (fromGame) {
+          dismissIdleVideoScreen();
+          setIdleVideoMode(false);
+          setVideosLoading(false);
+          await autoConnectFromGameReturn();
+          return;
+        }
+
+        if (idleVideoReady) {
+          startIdleVideoPlayback();
+          setStatus("Tap the screen to begin a conversation");
+        } else if (ENABLE_WAKE_WORD) {
+          startWakeWordListening();
+        } else {
+          setStatus('Tap "Start" to begin a conversation');
+        }
       } catch (e) {
         console.error(e);
-        showErr(`Avatar failed to load: ${e.message}`);
-      }
-      if (idleVideoReady) {
-        setStatus('Tap the screen to begin a conversation');
-      } else if (ENABLE_WAKE_WORD) {
-        startWakeWordListening();
-      } else {
+        dismissSplash();
+        showErr(`Failed to load: ${e.message}`);
         setStatus('Tap "Start" to begin a conversation');
       }
     }

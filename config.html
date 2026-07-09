@@ -166,18 +166,6 @@
       font-size: 0.8125rem;
       text-align: center;
     }
-    .avatar-preview-wrap {
-      margin-bottom: 1rem;
-      border: 1px solid #2a2f3a;
-      border-radius: 10px;
-      overflow: hidden;
-      background: #0b1222;
-    }
-    #avatar-preview-canvas {
-      display: block;
-      width: 100%;
-      height: 340px;
-    }
     button.secondary {
       flex: 0 0 auto;
       background: transparent;
@@ -185,95 +173,6 @@
       color: #c4c7c5;
     }
     button.secondary:hover { border-color: #5f6368; color: #e8eaed; background: transparent; }
-    .slider-field { margin-bottom: 1.25rem; }
-    .slider-label {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      margin-bottom: 0.5rem;
-      font-size: 0.8125rem;
-      font-weight: 500;
-      color: #c4c7c5;
-    }
-    .slider-label output {
-      font-size: 0.75rem;
-      font-weight: 400;
-      color: #9aa0a6;
-      font-variant-numeric: tabular-nums;
-    }
-    .slider-wrap {
-      display: grid;
-      grid-template-columns: auto 1fr auto;
-      gap: 0.5rem;
-      align-items: center;
-    }
-    .slider-end {
-      font-size: 0.6875rem;
-      color: #5f6368;
-      white-space: nowrap;
-    }
-    input[type="range"] {
-      width: 100%;
-      margin: 0;
-      accent-color: #6c8cff;
-    }
-    .blendshape-section { margin-bottom: 1.25rem; }
-    .blendshape-section h3 {
-      margin: 0 0 0.375rem;
-      font-size: 0.9375rem;
-    }
-    .blendshape-section > p {
-      margin: 0 0 0.75rem;
-      font-size: 0.8125rem;
-      color: #9aa0a6;
-      line-height: 1.45;
-    }
-    .blendshape-toolbar {
-      display: flex;
-      gap: 0.75rem;
-      margin-bottom: 0.75rem;
-    }
-    .blendshape-toolbar button {
-      flex: 0 0 auto;
-      padding: 0.5rem 0.875rem;
-    }
-    .blendshape-export {
-      width: 100%;
-      min-height: 220px;
-      margin-bottom: 0.75rem;
-      padding: 0.625rem 0.75rem;
-      border: 1px solid #2a2f3a;
-      border-radius: 8px;
-      background: #0f1117;
-      color: #c4c7c5;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 0.75rem;
-      line-height: 1.45;
-      resize: vertical;
-    }
-    .blendshape-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.625rem 1rem;
-      max-height: 380px;
-      overflow-y: auto;
-      padding: 0.75rem;
-      border: 1px solid #2a2f3a;
-      border-radius: 8px;
-      background: #0f1117;
-    }
-    .blendshape-grid .slider-field { margin-bottom: 0; }
-    .blendshape-grid .slider-label {
-      font-size: 0.75rem;
-      margin-bottom: 0.375rem;
-    }
-    .blendshape-grid .slider-label label { font-weight: 400; }
-    .blendshape-grid .slider-wrap { gap: 0.375rem; }
-    .blendshape-grid .slider-end { display: none; }
-    @media (max-width: 640px) {
-      .blendshape-grid { grid-template-columns: 1fr; }
-    }
-    .expression-grid { max-height: 420px; }
     .video-upload-wrap {
       display: flex;
       flex-direction: column;
@@ -350,17 +249,6 @@
       margin-top: 0.25rem;
     }
   </style>
-  <script type="importmap">
-    {
-      "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
-        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/",
-        "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.3.4/lib/three-vrm.module.js",
-        "@pixiv/three-vrm-animation": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm-animation@3.3.4/lib/three-vrm-animation.module.js",
-        "vrm-mixamo-retarget": "https://cdn.jsdelivr.net/npm/vrm-mixamo-retarget@1.0.3/dist/index.esm.js"
-      }
-    }
-  </script>
 </head>
 <body>
   <div class="card wide">
@@ -409,95 +297,19 @@
         </div>
       </div>
       <hr class="section-divider" style="margin: 1.5rem 0 1.25rem">
-      <h2 style="margin: 0 0 0.375rem; font-size: 1rem">Avatar background</h2>
-      <p style="margin: 0 0 1rem">Optional background image behind Uncle Tommy during conversations. Leave empty for a plain dark background.</p>
-      <div class="video-upload-wrap">
-        <img id="avatar-bg-preview" class="video-preview" alt="Avatar background preview" hidden>
-        <p id="avatar-bg-status" class="field-hint" style="margin:0">No custom background uploaded.</p>
-        <input id="avatar-bg-file" type="file" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp">
-        <div class="video-upload-actions">
-          <button type="button" id="btn-upload-avatar-bg" class="secondary">Upload background</button>
-          <button type="button" id="btn-remove-avatar-bg" class="secondary" hidden>Remove background</button>
-        </div>
-      </div>
-      <hr class="section-divider" style="margin: 1.5rem 0 1.25rem">
       <h2 style="margin: 0 0 0.375rem; font-size: 1rem">Conversation game icons</h2>
       <p style="margin: 0 0 1rem">Icons on the game shortcuts during a conversation. Upload a custom image per game, or leave empty to use the built-in default. Square PNG or WebP works best.</p>
       <div id="game-icons-grid" class="game-icons-grid"></div>
-      <hr class="section-divider" style="margin: 1.5rem 0 1.25rem">
-      <h2 style="margin: 0 0 0.375rem; font-size: 1rem">Lipsync (Visme)</h2>
-      <p style="margin: 0 0 1rem">Tune mouth movement sensitivity. Drag each blendshape slider to preview it on the avatar, or use the test buttons below.</p>
-      <div class="avatar-preview-wrap">
-        <canvas id="avatar-preview-canvas"></canvas>
-      </div>
-      <p id="avatar-preview-status" class="field-hint" style="margin-bottom: 1rem">Loading preview…</p>
-      <div class="slider-field">
-        <div class="slider-label">
-          <label for="lipsync-exaggerate">Mouth strength</label>
-          <output id="lipsync-exaggerate-value" for="lipsync-exaggerate">1.00×</output>
-        </div>
-        <div class="slider-wrap">
-          <span class="slider-end">Subtle</span>
-          <input id="lipsync-exaggerate" type="range" min="0.2" max="1.8" value="1" step="0.05">
-          <span class="slider-end">Strong</span>
-        </div>
-      </div>
-      <div class="slider-field">
-        <div class="slider-label">
-          <label for="lipsync-speed">Speaking speed</label>
-          <output id="lipsync-speed-value" for="lipsync-speed">120 ms</output>
-        </div>
-        <div class="slider-wrap">
-          <span class="slider-end">Faster</span>
-          <input id="lipsync-speed" type="range" min="50" max="280" value="120" step="5">
-          <span class="slider-end">Slower</span>
-        </div>
-      </div>
-      <div class="slider-field">
-        <div class="slider-label">
-          <label for="lipsync-crossfade">Viseme crossfade</label>
-          <output id="lipsync-crossfade-value" for="lipsync-crossfade">50 ms</output>
-        </div>
-        <div class="slider-wrap">
-          <span class="slider-end">Snap</span>
-          <input id="lipsync-crossfade" type="range" min="0" max="120" value="50" step="5">
-          <span class="slider-end">Smooth</span>
-        </div>
-      </div>
-      <div class="blendshape-section">
-        <h3>Blendshape weights</h3>
-        <p>Per-viseme strength multipliers (0–2×) for morph targets 0–21 on Tommyv4.vrm. Default is 1.00. Drag a slider to preview that shape on the avatar.</p>
-        <div class="blendshape-toolbar">
-          <button type="button" id="btn-reset-blendshapes" class="secondary">Reset blendshapes</button>
-          <button type="button" id="btn-export-blendshapes" class="secondary">Export blendshapes</button>
-        </div>
-        <textarea id="blendshape-export" class="blendshape-export" readonly hidden placeholder="Exported blendshape list will appear here…"></textarea>
-        <div id="blendshape-sliders" class="blendshape-grid"></div>
-      </div>
-      <div class="blendshape-section">
-        <h3>VRM expressions</h3>
-        <p>Preview VRM blendShapeGroups (Joy, Blink, ARKit face shapes, etc.). Drag a slider to 0–1. These are separate from the lipsync visemes above.</p>
-        <div class="blendshape-toolbar">
-          <button type="button" id="btn-reset-expressions" class="secondary">Reset expressions</button>
-          <button type="button" id="btn-test-expressions" class="secondary">Test all expressions</button>
-        </div>
-        <div id="expression-sliders" class="blendshape-grid expression-grid">
-          <p class="field-hint" style="margin:0;grid-column:1/-1">Loading expression list from Tommyv4.vrm…</p>
-        </div>
-      </div>
-      <div class="actions" style="margin-bottom: 1rem">
-        <button type="button" id="btn-test-lipsync" class="secondary">Test lipsync</button>
-        <button type="button" id="btn-test-blendshapes" class="secondary">Test all blendshapes</button>
-        <button type="button" id="btn-reset-lipsync" class="secondary">Reset lipsync defaults</button>
-      </div>
       <div class="actions">
         <button type="submit">Save</button>
+        <a class="btn" href="/avatar-config">Avatar settings</a>
         <a class="btn" href="/">Back to Voice</a>
       </div>
     </form>
     <div id="status" class="status"></div>
     <p class="hint">
       Settings are saved on the server (<code>config.json</code>) and persist across restarts.
+      Avatar background, lipsync, and expressions are on <a href="/avatar-config">Avatar Settings</a>.
       On Railway, attach a volume mounted at <code>/app/data</code> so config survives redeploys.
       Get a key at <a href="https://platform.inworld.ai/" target="_blank" rel="noopener">platform.inworld.ai</a>.
       You can also set <code>INWORLD_API_KEY</code> as a server environment variable instead.
@@ -521,25 +333,10 @@
     const PROMPT_KEY = 'inworld_system_prompt';
     const VOICE_KEY = 'inworld_voice_id';
     const MODEL_KEY = 'inworld_model';
-    const LIPSYNC_KEY = 'inworld_lipsync';
-    const DEFAULT_LIPSYNC = {
-      exaggerate: 1,
-      msPerPhone: 120,
-      crossfadeMs: 50,
-      blendshapes: Array(22).fill(1),
-    };
     const input = document.getElementById('key');
     const prompt = document.getElementById('prompt');
     const voice = document.getElementById('voice');
     const model = document.getElementById('model');
-    const lipsyncExaggerate = document.getElementById('lipsync-exaggerate');
-    const lipsyncSpeed = document.getElementById('lipsync-speed');
-    const lipsyncCrossfade = document.getElementById('lipsync-crossfade');
-    const lipsyncExaggerateValue = document.getElementById('lipsync-exaggerate-value');
-    const lipsyncSpeedValue = document.getElementById('lipsync-speed-value');
-    const lipsyncCrossfadeValue = document.getElementById('lipsync-crossfade-value');
-    const btnTestLipsync = document.getElementById('btn-test-lipsync');
-    const btnResetLipsync = document.getElementById('btn-reset-lipsync');
     const status = document.getElementById('status');
     const debugReportsEl = document.getElementById('debug-reports');
     const btnRefreshLogs = document.getElementById('btn-refresh-logs');
@@ -553,12 +350,9 @@
     const transitionVideoFile = document.getElementById('transition-video-file');
     const btnUploadTransitionVideo = document.getElementById('btn-upload-transition-video');
     const btnRemoveTransitionVideo = document.getElementById('btn-remove-transition-video');
-    const avatarBgPreview = document.getElementById('avatar-bg-preview');
-    const avatarBgStatus = document.getElementById('avatar-bg-status');
-    const avatarBgFile = document.getElementById('avatar-bg-file');
-    const btnUploadAvatarBg = document.getElementById('btn-upload-avatar-bg');
-    const btnRemoveAvatarBg = document.getElementById('btn-remove-avatar-bg');
     const gameIconsGrid = document.getElementById('game-icons-grid');
+
+    let serverConfig = null;
 
     const GAME_ICON_DEFS = [
       {
@@ -718,19 +512,6 @@
       );
     }
 
-    function applyAvatarBackground(avatarBackground) {
-      applyImagePreview(
-        avatarBgPreview,
-        avatarBgStatus,
-        btnRemoveAvatarBg,
-        avatarBackground,
-        'No custom background uploaded.',
-      );
-      if (window.__previewAvatar) {
-        window.__previewAvatar.setBackgroundUrl(avatarBackground?.url || null);
-      }
-    }
-
     async function uploadAssetFile(apiPath, responseKey, file, fieldName) {
       const form = new FormData();
       form.append(fieldName, file);
@@ -738,20 +519,6 @@
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Upload failed.');
       return data[responseKey];
-    }
-
-    function applyImagePreview(previewEl, statusEl, removeBtn, image, emptyLabel) {
-      if (image?.url) {
-        previewEl.src = image.url;
-        previewEl.hidden = false;
-        statusEl.textContent = `Uploaded: ${image.filename || 'image'}`;
-        removeBtn.hidden = false;
-      } else {
-        previewEl.removeAttribute('src');
-        previewEl.hidden = true;
-        statusEl.textContent = emptyLabel;
-        removeBtn.hidden = true;
-      }
     }
 
     async function removeVideoFile(apiPath) {
@@ -842,46 +609,6 @@
       }
     });
 
-    btnUploadAvatarBg.addEventListener('click', async () => {
-      const file = avatarBgFile.files?.[0];
-      if (!file) {
-        status.textContent = 'Choose a background image first.';
-        status.className = 'status err';
-        return;
-      }
-      btnUploadAvatarBg.disabled = true;
-      status.textContent = 'Uploading background…';
-      status.className = 'status ok';
-      try {
-        applyAvatarBackground(await uploadAssetFile('/api/avatar-background', 'avatarBackground', file, 'image'));
-        avatarBgFile.value = '';
-        status.textContent = 'Avatar background uploaded.';
-        status.className = 'status ok';
-      } catch (e) {
-        status.textContent = e.message || 'Could not upload background.';
-        status.className = 'status err';
-      } finally {
-        btnUploadAvatarBg.disabled = false;
-      }
-    });
-
-    btnRemoveAvatarBg.addEventListener('click', async () => {
-      if (!confirm('Remove the custom avatar background?')) return;
-      btnRemoveAvatarBg.disabled = true;
-      try {
-        await removeVideoFile('/api/avatar-background');
-        applyAvatarBackground(null);
-        avatarBgFile.value = '';
-        status.textContent = 'Avatar background removed.';
-        status.className = 'status ok';
-      } catch (e) {
-        status.textContent = e.message || 'Could not remove background.';
-        status.className = 'status err';
-      } finally {
-        btnRemoveAvatarBg.disabled = false;
-      }
-    });
-
     function formatReportTime(iso) {
       try {
         return new Date(iso).toLocaleString();
@@ -935,73 +662,6 @@ ${linesText.replace(/</g, '&lt;')}</pre>
     btnRefreshLogs.addEventListener('click', loadDebugReports);
     loadDebugReports();
 
-    function normalizeBlendshapes(raw) {
-      const weights = Array(22).fill(1);
-      if (!Array.isArray(raw)) return weights;
-      for (let i = 0; i < 22; i++) {
-        const n = Number(raw[i]);
-        weights[i] = Number.isFinite(n) ? Math.min(2, Math.max(0, n)) : 1;
-      }
-      return weights;
-    }
-
-    function normalizeLipsync(raw) {
-      const l = raw && typeof raw === 'object' ? raw : {};
-      const num = (v, min, max, fallback) => {
-        const n = Number(v);
-        if (!Number.isFinite(n)) return fallback;
-        return Math.min(max, Math.max(min, n));
-      };
-      return {
-        exaggerate: num(l.exaggerate, 0.2, 1.8, DEFAULT_LIPSYNC.exaggerate),
-        msPerPhone: num(l.msPerPhone, 50, 280, DEFAULT_LIPSYNC.msPerPhone),
-        crossfadeMs: num(l.crossfadeMs, 0, 120, DEFAULT_LIPSYNC.crossfadeMs),
-        blendshapes: normalizeBlendshapes(l.blendshapes),
-      };
-    }
-
-    function updateLipsyncLabels() {
-      lipsyncExaggerateValue.textContent = `${Number(lipsyncExaggerate.value).toFixed(2)}×`;
-      lipsyncSpeedValue.textContent = `${lipsyncSpeed.value} ms`;
-      const crossfade = Number(lipsyncCrossfade.value);
-      lipsyncCrossfadeValue.textContent = crossfade === 0 ? 'Off (snap)' : `${crossfade} ms`;
-    }
-
-    function readLipsyncFromForm() {
-      return normalizeLipsync({
-        exaggerate: lipsyncExaggerate.value,
-        msPerPhone: lipsyncSpeed.value,
-        crossfadeMs: lipsyncCrossfade.value,
-        blendshapes: window.getBlendshapeWeights?.(),
-      });
-    }
-
-    function applyLipsyncFields(lipsync) {
-      const l = normalizeLipsync(lipsync);
-      lipsyncExaggerate.value = l.exaggerate;
-      lipsyncSpeed.value = l.msPerPhone;
-      lipsyncCrossfade.value = l.crossfadeMs;
-      if (window.setBlendshapeWeights) window.setBlendshapeWeights(l.blendshapes);
-      else window.__pendingBlendshapes = l.blendshapes;
-      updateLipsyncLabels();
-      window.dispatchEvent(new CustomEvent('lipsync-fields-updated', { detail: l }));
-    }
-
-    lipsyncExaggerate.addEventListener('input', updateLipsyncLabels);
-    lipsyncSpeed.addEventListener('input', updateLipsyncLabels);
-    lipsyncCrossfade.addEventListener('input', updateLipsyncLabels);
-    lipsyncExaggerate.addEventListener('input', () => {
-      window.dispatchEvent(new CustomEvent('lipsync-fields-updated', { detail: readLipsyncFromForm() }));
-    });
-    lipsyncSpeed.addEventListener('input', () => {
-      window.dispatchEvent(new CustomEvent('lipsync-fields-updated', { detail: readLipsyncFromForm() }));
-    });
-    lipsyncCrossfade.addEventListener('input', () => {
-      window.dispatchEvent(new CustomEvent('lipsync-fields-updated', { detail: readLipsyncFromForm() }));
-    });
-    window.addEventListener('lipsync-labels-sync', updateLipsyncLabels);
-    updateLipsyncLabels();
-
     function syncLocalStorage(cfg) {
       if (cfg.apiKey) localStorage.setItem(KEY, cfg.apiKey);
       else localStorage.removeItem(KEY);
@@ -1014,7 +674,6 @@ ${linesText.replace(/</g, '&lt;')}</pre>
         if (v) localStorage.setItem(k, v);
         else localStorage.removeItem(k);
       }
-      localStorage.setItem(LIPSYNC_KEY, JSON.stringify(normalizeLipsync(cfg.lipsync)));
     }
 
     function applyConfig(cfg) {
@@ -1022,10 +681,8 @@ ${linesText.replace(/</g, '&lt;')}</pre>
       prompt.value = cfg.instructions ?? '';
       voice.value = cfg.voice ?? '';
       model.value = cfg.model ?? '';
-      applyLipsyncFields(cfg.lipsync);
       applyIdleVideo(cfg.idleVideo);
       applyTransitionVideo(cfg.transitionVideo);
-      applyAvatarBackground(cfg.avatarBackground);
       applyGameIcons(cfg.gameIcons);
       if (cfg.apiKey) {
         status.textContent = 'Settings saved.';
@@ -1034,16 +691,11 @@ ${linesText.replace(/</g, '&lt;')}</pre>
     }
 
     function loadFromLocalStorage() {
-      let lipsync = DEFAULT_LIPSYNC;
-      try {
-        lipsync = normalizeLipsync(JSON.parse(localStorage.getItem(LIPSYNC_KEY) || '{}'));
-      } catch {}
       applyConfig({
         apiKey: localStorage.getItem(KEY) ?? '',
         instructions: localStorage.getItem(PROMPT_KEY) ?? '',
         voice: localStorage.getItem(VOICE_KEY) ?? '',
         model: localStorage.getItem(MODEL_KEY) ?? '',
-        lipsync,
       });
     }
 
@@ -1051,47 +703,15 @@ ${linesText.replace(/</g, '&lt;')}</pre>
       try {
         const res = await fetch('/api/config');
         if (!res.ok) throw new Error('load failed');
-        const cfg = await res.json();
-        applyConfig(cfg);
-        syncLocalStorage(cfg);
+        serverConfig = await res.json();
+        applyConfig(serverConfig);
+        syncLocalStorage(serverConfig);
         return;
       } catch {}
       loadFromLocalStorage();
     }
 
     loadConfig();
-
-    btnResetLipsync.addEventListener('click', () => {
-      const current = readLipsyncFromForm();
-      applyLipsyncFields({
-        ...current,
-        exaggerate: DEFAULT_LIPSYNC.exaggerate,
-        msPerPhone: DEFAULT_LIPSYNC.msPerPhone,
-        crossfadeMs: DEFAULT_LIPSYNC.crossfadeMs,
-      });
-    });
-
-    document.getElementById('btn-reset-blendshapes').addEventListener('click', () => {
-      window.setBlendshapeWeights?.(Array(22).fill(1));
-      window.dispatchEvent(new CustomEvent('blendshapes-preview-clear'));
-      window.dispatchEvent(new CustomEvent('lipsync-fields-updated', { detail: readLipsyncFromForm() }));
-    });
-
-    btnTestLipsync.addEventListener('click', () => {
-      window.dispatchEvent(new CustomEvent('lipsync-preview-requested'));
-    });
-
-    document.getElementById('btn-test-blendshapes').addEventListener('click', () => {
-      window.dispatchEvent(new CustomEvent('blendshape-test-requested'));
-    });
-
-    document.getElementById('btn-reset-expressions').addEventListener('click', () => {
-      window.dispatchEvent(new CustomEvent('expressions-preview-clear'));
-    });
-
-    document.getElementById('btn-test-expressions').addEventListener('click', () => {
-      window.dispatchEvent(new CustomEvent('expression-test-requested'));
-    });
 
     document.getElementById('form').onsubmit = async (e) => {
       e.preventDefault();
@@ -1110,7 +730,8 @@ ${linesText.replace(/</g, '&lt;')}</pre>
         instructions: promptVal,
         voice: voiceVal,
         model: modelVal,
-        lipsync: readLipsyncFromForm(),
+        lipsync: serverConfig?.lipsync,
+        avatar: serverConfig?.avatar,
       };
 
       try {
@@ -1132,289 +753,10 @@ ${linesText.replace(/</g, '&lt;')}</pre>
       }
 
       syncLocalStorage(payload);
-      status.textContent = 'Saved! Reload the voice app to apply lipsync changes.';
+      serverConfig = { ...serverConfig, ...payload };
+      status.textContent = 'Saved!';
       status.className = 'status ok';
     };
-  </script>
-  <script type="module">
-    import {
-      TommyAvatar,
-      DEFAULT_AVATAR,
-      DEFAULT_LIPSYNC,
-      BLENDSHAPE_COUNT,
-      BLENDSHAPE_LABELS,
-      normalizeLipsync,
-      normalizeBlendshapes,
-    } from "/visme/avatar.js";
-
-    const canvas = document.getElementById("avatar-preview-canvas");
-    const statusEl = document.getElementById("avatar-preview-status");
-    const blendshapeGrid = document.getElementById("blendshape-sliders");
-    const expressionGrid = document.getElementById("expression-sliders");
-
-    let previewAvatar = null;
-    let expressionNames = [];
-
-    function buildExpressionSliders(names) {
-      expressionNames = names.slice();
-      if (!names.length) {
-        expressionGrid.innerHTML = '<p class="field-hint" style="margin:0">No VRM expressions found on this model.</p>';
-        return;
-      }
-
-      expressionGrid.innerHTML = names.map((name, i) => `
-        <div class="slider-field">
-          <div class="slider-label">
-            <label for="expression-${i}">${name.replace(/</g, "&lt;")}</label>
-            <output id="expression-${i}-value" for="expression-${i}">0.00</output>
-          </div>
-          <div class="slider-wrap">
-            <span class="slider-end">0</span>
-            <input id="expression-${i}" type="range" min="0" max="1" value="0" step="0.05" data-index="${i}">
-            <span class="slider-end">1</span>
-          </div>
-        </div>
-      `).join("");
-
-      expressionGrid.addEventListener("input", (e) => {
-        const input = e.target;
-        if (!input.matches('input[type="range"][data-index]')) return;
-        const index = Number(input.dataset.index);
-        const name = expressionNames[index];
-        if (!name) return;
-        const value = Number(input.value);
-        const out = document.getElementById(`expression-${input.id.split("-")[1]}-value`);
-        if (out) out.textContent = value.toFixed(2);
-        previewAvatar?.previewExpression(name, value);
-        statusEl.textContent = `Previewing expression: ${name} (${value.toFixed(2)})`;
-      });
-    }
-
-    function resetExpressionSliders() {
-      for (let i = 0; i < expressionNames.length; i++) {
-        const el = document.getElementById(`expression-${i}`);
-        const out = document.getElementById(`expression-${i}-value`);
-        if (!el) continue;
-        el.value = 0;
-        if (out) out.textContent = "0.00";
-      }
-    }
-
-    function buildBlendshapeSliders() {
-      blendshapeGrid.innerHTML = BLENDSHAPE_LABELS.map((label, i) => `
-        <div class="slider-field">
-          <div class="slider-label">
-            <label for="blendshape-${i}">${i} · ${label}</label>
-            <output id="blendshape-${i}-value" for="blendshape-${i}">1.00×</output>
-          </div>
-          <div class="slider-wrap">
-            <span class="slider-end">0</span>
-            <input id="blendshape-${i}" type="range" min="0" max="2" value="1" step="0.05" data-index="${i}">
-            <span class="slider-end">2×</span>
-          </div>
-        </div>
-      `).join("");
-
-      blendshapeGrid.addEventListener("input", (e) => {
-        const input = e.target;
-        if (!input.matches('input[type="range"][data-index]')) return;
-        const index = Number(input.dataset.index);
-        const value = Number(input.value);
-        document.getElementById(`blendshape-${index}-value`).textContent = `${value.toFixed(2)}×`;
-        previewAvatar?.previewBlendshape(index, value);
-        const settings = readLipsyncFromDom();
-        previewAvatar?.applyLipsyncSettings(settings);
-        statusEl.textContent = `Previewing blendshape ${index}: ${BLENDSHAPE_LABELS[index]}`;
-      });
-    }
-
-    window.getBlendshapeWeights = () => {
-      const weights = [];
-      for (let i = 0; i < BLENDSHAPE_COUNT; i++) {
-        weights.push(Number(document.getElementById(`blendshape-${i}`)?.value ?? 1));
-      }
-      return normalizeBlendshapes(weights);
-    };
-
-    window.setBlendshapeWeights = (weights) => {
-      const w = normalizeBlendshapes(weights);
-      for (let i = 0; i < BLENDSHAPE_COUNT; i++) {
-        const el = document.getElementById(`blendshape-${i}`);
-        const out = document.getElementById(`blendshape-${i}-value`);
-        if (!el) continue;
-        el.value = w[i];
-        if (out) out.textContent = `${w[i].toFixed(2)}×`;
-      }
-    };
-
-    function buildBlendshapeExportText() {
-      const weights = window.getBlendshapeWeights();
-      const header = [
-        "Tommyv4.vrm viseme blendshapes (morph targets 0–21)",
-        `Exported: ${new Date().toISOString()}`,
-        "",
-        "ID\tLabel\tWeight",
-      ];
-      const rows = BLENDSHAPE_LABELS.map((label, i) =>
-        `${i}\t${label}\t${weights[i].toFixed(2)}`
-      );
-      return [...header, ...rows].join("\n");
-    }
-
-    window.buildBlendshapeExportText = buildBlendshapeExportText;
-
-    document.getElementById("btn-export-blendshapes").addEventListener("click", async () => {
-      const text = buildBlendshapeExportText();
-      const exportEl = document.getElementById("blendshape-export");
-      exportEl.hidden = false;
-      exportEl.value = text;
-
-      let copied = false;
-      try {
-        await navigator.clipboard.writeText(text);
-        copied = true;
-      } catch {}
-
-      const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "blendshapes.txt";
-      a.click();
-      URL.revokeObjectURL(url);
-
-      statusEl.textContent = copied
-        ? "Blendshape list exported, copied to clipboard, and saved as blendshapes.txt."
-        : "Blendshape list exported below and saved as blendshapes.txt.";
-      exportEl.focus();
-      exportEl.select();
-    });
-
-    buildBlendshapeSliders();
-    if (window.__pendingBlendshapes) {
-      window.setBlendshapeWeights(window.__pendingBlendshapes);
-      delete window.__pendingBlendshapes;
-    }
-
-    window.addEventListener("lipsync-fields-updated", (e) => {
-      if (!previewAvatar) return;
-      previewAvatar.applyLipsyncSettings(e.detail);
-    });
-
-    window.addEventListener("blendshapes-preview-clear", () => {
-      previewAvatar?.clearManualBlendshapePreview();
-      statusEl.textContent = previewAvatar?.loaded ? "Blendshapes reset to 1.00×" : statusEl.textContent;
-    });
-
-    window.addEventListener("lipsync-preview-requested", () => {
-      if (!previewAvatar?.loaded) {
-        statusEl.textContent = "Avatar not ready for lipsync preview.";
-        return;
-      }
-      previewAvatar.applyLipsyncSettings(readLipsyncFromDom());
-      previewAvatar.playLipsyncPreview("Hello from Visme");
-      statusEl.textContent = "Playing lipsync preview…";
-    });
-
-    window.addEventListener("blendshape-test-requested", () => {
-      if (!previewAvatar?.loaded) {
-        statusEl.textContent = "Avatar not ready for blendshape test.";
-        return;
-      }
-      previewAvatar.applyLipsyncSettings(readLipsyncFromDom());
-      const started = previewAvatar.playBlendshapeTest({
-        onStep: ({ index, total, label }) => {
-          statusEl.textContent = `Blendshape ${index + 1}/${total}: ${label}`;
-        },
-        onDone: () => {
-          statusEl.textContent = "Blendshape test complete.";
-        },
-      });
-      if (!started) statusEl.textContent = "Blendshape test already running.";
-    });
-
-    window.addEventListener("expressions-preview-clear", () => {
-      resetExpressionSliders();
-      previewAvatar?.clearExpressionPreview();
-      statusEl.textContent = previewAvatar?.loaded ? "Expressions reset." : statusEl.textContent;
-    });
-
-    window.addEventListener("expression-test-requested", () => {
-      if (!previewAvatar?.loaded) {
-        statusEl.textContent = "Avatar not ready for expression test.";
-        return;
-      }
-      resetExpressionSliders();
-      const started = previewAvatar.playExpressionTest({
-        onStep: ({ index, total, name }) => {
-          statusEl.textContent = `Expression ${index + 1}/${total}: ${name}`;
-          const el = document.getElementById(`expression-${index}`);
-          const out = document.getElementById(`expression-${index}-value`);
-          if (el) el.value = 1;
-          if (out) out.textContent = "1.00";
-          for (let i = 0; i < index; i++) {
-            const prev = document.getElementById(`expression-${i}`);
-            const prevOut = document.getElementById(`expression-${i}-value`);
-            if (prev) prev.value = 0;
-            if (prevOut) prevOut.textContent = "0.00";
-          }
-        },
-        onDone: () => {
-          resetExpressionSliders();
-          statusEl.textContent = "Expression test complete.";
-        },
-      });
-      if (!started) statusEl.textContent = "Expression test already running.";
-    });
-
-    function readLipsyncFromDom() {
-      return normalizeLipsync({
-        exaggerate: document.getElementById("lipsync-exaggerate").value,
-        msPerPhone: document.getElementById("lipsync-speed").value,
-        crossfadeMs: document.getElementById("lipsync-crossfade").value,
-        blendshapes: window.getBlendshapeWeights?.(),
-      });
-    }
-
-    function writeLipsyncToDom(lipsync) {
-      const l = normalizeLipsync(lipsync);
-      document.getElementById("lipsync-exaggerate").value = l.exaggerate;
-      document.getElementById("lipsync-speed").value = l.msPerPhone;
-      document.getElementById("lipsync-crossfade").value = l.crossfadeMs;
-      window.setBlendshapeWeights?.(l.blendshapes);
-      window.dispatchEvent(new CustomEvent("lipsync-labels-sync"));
-    }
-
-    async function initPreview() {
-      let lipsync = DEFAULT_LIPSYNC;
-      let backgroundUrl = null;
-      try {
-        const res = await fetch("/api/config");
-        if (res.ok) {
-          const cfg = await res.json();
-          lipsync = normalizeLipsync(cfg.lipsync);
-          writeLipsyncToDom(lipsync);
-          if (cfg.avatarBackground?.url) backgroundUrl = cfg.avatarBackground.url;
-        }
-      } catch {}
-
-      previewAvatar = new TommyAvatar(canvas, {
-        ...DEFAULT_AVATAR,
-        lipsync,
-        backgroundUrl,
-        interactiveCamera: false,
-      });
-      window.__previewAvatar = previewAvatar;
-      previewAvatar.onStatus = (msg) => { statusEl.textContent = msg; };
-      await previewAvatar.load();
-      buildExpressionSliders(previewAvatar.getExpressionNames());
-      previewAvatar.refreshAfterVisible();
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => previewAvatar.frameForLipsyncPreview());
-      });
-    }
-
-    initPreview();
   </script>
 </body>
 </html>

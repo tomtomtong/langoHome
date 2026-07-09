@@ -274,6 +274,7 @@ function serveFile(res, filePath) {
 const pages = {
   '/': 'index.html',
   '/config': 'config.html',
+  '/avatar-config': 'avatar-config.html',
   '/visme': 'visme/index.html',
 };
 
