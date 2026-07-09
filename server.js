@@ -278,6 +278,18 @@ const pages = {
   '/visme': 'visme/index.html',
 };
 
+function resolvePage(url) {
+  if (pages[url]) return pages[url];
+  // Allow /config.html as well as /config (unknown paths used to fall back to index.html).
+  if (url.endsWith('.html')) {
+    const withoutExt = url.slice(0, -5);
+    if (pages[withoutExt]) return pages[withoutExt];
+    const filename = url.slice(1);
+    if (existsSync(join(ROOT, filename))) return filename;
+  }
+  return pages['/'];
+}
+
 const GAME_API_PREFIXES = [
   '/api/images',
   '/api/findgame',
@@ -330,6 +342,7 @@ const server = createServer((req, res) => {
         model: cfg.model ?? '',
         avatar: normalizeAvatar(cfg.avatar),
         lipsync: normalizeLipsync(cfg.lipsync),
+        lighting: normalizeLighting(cfg.lighting),
         idleVideo: idleVideos.getInfo(),
         transitionVideo: transitionVideos.getInfo(),
         avatarBackground: avatarBackgrounds.getInfo(),
@@ -354,6 +367,9 @@ const server = createServer((req, res) => {
             ? normalizeAvatar(parsed.avatar)
             : normalizeAvatar(existing.avatar),
           lipsync: normalizeLipsync(parsed.lipsync),
+          lighting: parsed.lighting != null
+            ? normalizeLighting(parsed.lighting)
+            : normalizeLighting(existing.lighting),
         });
         sendJson(res, 200, { ok: true });
       });
@@ -432,7 +448,7 @@ const server = createServer((req, res) => {
     return;
   }
 
-  const file = pages[url] ?? pages['/'];
+  const file = resolvePage(url);
   serveFile(res, join(ROOT, file));
 });
 
@@ -444,10 +460,10 @@ const DEFAULT_MODEL = 'openai/gpt-4o-mini';
 
 const DEFAULT_AVATAR = {
   cameraX: 0,
-  cameraY: 1.3,
-  cameraZ: 1.6,
+  cameraY: 1.56,
+  cameraZ: 1.4,
   targetX: 0,
-  targetY: 1.42,
+  targetY: 1.54,
   targetZ: 0,
 };
 
@@ -497,6 +513,23 @@ function normalizeLipsync(raw) {
     msPerPhone: parseLipsyncNumber(l.msPerPhone, 50, 280, DEFAULT_LIPSYNC.msPerPhone),
     crossfadeMs: parseLipsyncNumber(l.crossfadeMs, 0, 120, DEFAULT_LIPSYNC.crossfadeMs),
     blendshapes: normalizeBlendshapes(l.blendshapes),
+  };
+}
+
+const DEFAULT_LIGHTING = {
+  hemisphereIntensity: 1.6,
+  keyLightIntensity: 1.25,
+  fillLightIntensity: 0.5,
+  exposure: 1.35,
+};
+
+function normalizeLighting(raw) {
+  const l = raw && typeof raw === 'object' ? raw : {};
+  return {
+    hemisphereIntensity: parseLipsyncNumber(l.hemisphereIntensity, 0, 4, DEFAULT_LIGHTING.hemisphereIntensity),
+    keyLightIntensity: parseLipsyncNumber(l.keyLightIntensity, 0, 4, DEFAULT_LIGHTING.keyLightIntensity),
+    fillLightIntensity: parseLipsyncNumber(l.fillLightIntensity, 0, 4, DEFAULT_LIGHTING.fillLightIntensity),
+    exposure: parseLipsyncNumber(l.exposure, 0.4, 3, DEFAULT_LIGHTING.exposure),
   };
 }
 

@@ -838,7 +838,7 @@
   </div>
 
   <script type="module">
-    import { TommyAvatar, normalizeAvatar, normalizeLipsync, DEFAULT_AVATAR } from "/visme/avatar.js";
+    import { TommyAvatar, normalizeAvatar, normalizeLipsync, normalizeLighting, DEFAULT_AVATAR } from "/visme/avatar.js";
 
     const KEY = "inworld_api_key";
     const PROMPT_KEY = "inworld_system_prompt";
@@ -1600,6 +1600,7 @@
         model: cfg.model ?? localStorage.getItem(MODEL_KEY) ?? "",
         avatar: cameraSettings,
         lipsync: loadLipsyncFromLocalStorage(),
+        lighting: cfg.lighting,
       };
 
       if (!payload.apiKey) {
@@ -1679,11 +1680,13 @@
         const cfg = await getConfig();
         const av = normalizeAvatar(cfg.avatar);
         const lipsync = normalizeLipsync(cfg.lipsync);
+        const lighting = normalizeLighting(cfg.lighting);
         const backgroundUrl = getAvatarBackgroundUrl(cfg);
         applyAvatarStageBackground(backgroundUrl);
         avatar = new TommyAvatar(document.getElementById("vrm-canvas"), {
           ...av,
           lipsync,
+          lighting,
           backgroundUrl,
           interactiveCamera: false,
         });

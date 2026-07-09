@@ -556,6 +556,7 @@
         model: serverConfig.model ?? '',
         avatar: serverConfig.avatar,
         lipsync: readLipsyncFromForm(),
+        lighting: serverConfig.lighting,
       };
 
       try {
@@ -590,6 +591,7 @@
       BLENDSHAPE_COUNT,
       BLENDSHAPE_LABELS,
       normalizeLipsync,
+      normalizeLighting,
       normalizeBlendshapes,
     } from "/visme/avatar.js";
 
@@ -831,12 +833,14 @@
 
     async function initPreview() {
       let lipsync = DEFAULT_LIPSYNC;
+      let lighting = null;
       let backgroundUrl = null;
       try {
         const res = await fetch("/api/config");
         if (res.ok) {
           const cfg = await res.json();
           lipsync = normalizeLipsync(cfg.lipsync);
+          lighting = normalizeLighting(cfg.lighting);
           writeLipsyncToDom(lipsync);
           if (cfg.avatarBackground?.url) backgroundUrl = cfg.avatarBackground.url;
         }
@@ -845,6 +849,7 @@
       previewAvatar = new TommyAvatar(canvas, {
         ...DEFAULT_AVATAR,
         lipsync,
+        lighting,
         backgroundUrl,
         interactiveCamera: false,
       });
