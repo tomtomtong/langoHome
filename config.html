@@ -255,6 +255,12 @@
       overflow: hidden;
       background: #0b1222;
     }
+
+    .avatar-preview-wrap.has-bg-image {
+      background-repeat: no-repeat;
+      background-position: center center;
+      background-size: min(1920px, 100vw) auto;
+    }
     #lighting-preview-canvas {
       display: block;
       width: 100%;
@@ -981,11 +987,17 @@ ${linesText.replace(/</g, '&lt;')}</pre>
         backgroundUrl,
         interactiveCamera: false,
       });
+      const previewWrap = canvas.closest(".avatar-preview-wrap");
+      if (previewWrap) {
+        previewWrap.classList.toggle("has-bg-image", Boolean(backgroundUrl));
+        previewWrap.style.backgroundColor = "#0b1222";
+        previewWrap.style.backgroundImage = backgroundUrl ? `url("${backgroundUrl}")` : "none";
+      }
       previewAvatar.onStatus = (msg) => { statusEl.textContent = msg; };
       await previewAvatar.load();
       previewAvatar.refreshAfterVisible();
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => previewAvatar.frameForFace());
+        requestAnimationFrame(() => previewAvatar.frameForLipsyncPreview());
       });
     }
 

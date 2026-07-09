@@ -460,10 +460,10 @@ const DEFAULT_MODEL = 'openai/gpt-4o-mini';
 
 const DEFAULT_AVATAR = {
   cameraX: 0,
-  cameraY: 1.56,
-  cameraZ: 1.4,
+  cameraY: 1.3,
+  cameraZ: 1.6,
   targetX: 0,
-  targetY: 1.54,
+  targetY: 1.42,
   targetZ: 0,
 };
 

@@ -153,6 +153,12 @@
       background: #0b1222;
     }
 
+    #avatar-stage.has-bg-image {
+      background-repeat: no-repeat;
+      background-position: center center;
+      background-size: min(1920px, 100vw) auto;
+    }
+
     body.in-session #avatar-stage {
       visibility: visible;
       pointer-events: auto;
@@ -349,6 +355,44 @@
 
     body.camera-edit-mode #camera-save-status {
       display: block;
+    }
+
+    #camera-height-controls {
+      display: none;
+      position: fixed;
+      right: max(1rem, env(safe-area-inset-right));
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 4;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    body.camera-edit-mode #camera-height-controls {
+      display: flex;
+    }
+
+    #camera-height-controls button {
+      width: 2.75rem;
+      height: 2.75rem;
+      padding: 0;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(15, 17, 23, 0.75);
+      color: #e8eaed;
+      font-size: 1rem;
+      line-height: 1;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+    }
+
+    #camera-height-controls button:hover {
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.35);
+    }
+
+    #camera-height-controls button:active {
+      background: rgba(108, 140, 255, 0.35);
     }
 
     #camera-save-status.err { color: #f28b82; }
@@ -782,6 +826,10 @@
     </div>
 
     <div id="session-overlay">
+      <div id="camera-height-controls" aria-label="Camera height">
+        <button type="button" id="btn-camera-up" aria-label="Raise camera">▲</button>
+        <button type="button" id="btn-camera-down" aria-label="Lower camera">▼</button>
+      </div>
       <div class="overlay-top">
         <span id="avatar-status"></span>
         <div class="overlay-top-actions">
@@ -858,6 +906,8 @@
     const errIdleEl = document.getElementById("err-idle");
     const avatarStatusEl = document.getElementById("avatar-status");
     const btnSaveCamera = document.getElementById("btn-save-camera");
+    const btnCameraUp = document.getElementById("btn-camera-up");
+    const btnCameraDown = document.getElementById("btn-camera-down");
     const cameraSaveStatusEl = document.getElementById("camera-save-status");
     const btnSendLog = document.getElementById("btn-send-log");
     const debugUploadStatusEl = document.getElementById("debug-upload-status");
@@ -982,6 +1032,7 @@
     let directSessionEntry = false;
     let lastChickenDanceAt = 0;
     const CHICKEN_DANCE_COOLDOWN_MS = 2500;
+    const CAMERA_HEIGHT_STEP = 0.05;
 
     function pickRandomGame() {
       return GAME_CATALOG[Math.floor(Math.random() * GAME_CATALOG.length)];
@@ -1256,11 +1307,9 @@
 
     function applyAvatarStageBackground(url) {
       avatarStageEl.style.backgroundColor = "#0b1222";
+      avatarStageEl.classList.toggle("has-bg-image", Boolean(url));
       if (url) {
         avatarStageEl.style.backgroundImage = `url("${url}")`;
-        avatarStageEl.style.backgroundSize = "cover";
-        avatarStageEl.style.backgroundPosition = "center";
-        avatarStageEl.style.backgroundRepeat = "no-repeat";
       } else {
         avatarStageEl.style.backgroundImage = "none";
       }
@@ -1634,9 +1683,24 @@
 
     btnSaveCamera.addEventListener("click", saveCameraSettings);
 
+    function nudgeCameraHeight(deltaY) {
+      if (!cameraEditMode || !avatar?.loaded) return;
+      avatar.nudgeCameraHeight(deltaY);
+    }
+
+    btnCameraUp.addEventListener("click", (e) => {
+      e.stopPropagation();
+      nudgeCameraHeight(CAMERA_HEIGHT_STEP);
+    });
+
+    btnCameraDown.addEventListener("click", (e) => {
+      e.stopPropagation();
+      nudgeCameraHeight(-CAMERA_HEIGHT_STEP);
+    });
+
     function updateAvatarStatusDisplay() {
       if (cameraEditMode) {
-        avatarStatusEl.textContent = "Camera edit · drag to position · pinch to scale";
+        avatarStatusEl.textContent = "Camera edit · drag to pan · pinch to zoom · ▲▼ height";
       } else if (avatarReadyMessage) {
         avatarStatusEl.textContent = avatarReadyMessage;
       } else {

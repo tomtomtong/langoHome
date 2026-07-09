@@ -79,6 +79,12 @@
       overflow: hidden;
       background: #0b1222;
     }
+
+    .avatar-preview-wrap.has-bg-image {
+      background-repeat: no-repeat;
+      background-position: center center;
+      background-size: min(1920px, 100vw) auto;
+    }
     #avatar-preview-canvas {
       display: block;
       width: 100%;
@@ -354,6 +360,7 @@
     }
 
     function applyAvatarBackground(avatarBackground) {
+      const wrap = document.querySelector(".avatar-preview-wrap");
       applyImagePreview(
         avatarBgPreview,
         avatarBgStatus,
@@ -361,9 +368,12 @@
         avatarBackground,
         'No custom background uploaded.',
       );
-      if (window.__previewAvatar) {
-        window.__previewAvatar.setBackgroundUrl(avatarBackground?.url || null);
+      if (wrap) {
+        wrap.classList.toggle("has-bg-image", Boolean(avatarBackground?.url));
+        wrap.style.backgroundColor = "#0b1222";
+        wrap.style.backgroundImage = avatarBackground?.url ? `url("${avatarBackground.url}")` : "none";
       }
+      window.__previewAvatar?.setBackgroundUrl(avatarBackground?.url || null);
     }
 
     async function uploadAssetFile(apiPath, responseKey, file, fieldName) {

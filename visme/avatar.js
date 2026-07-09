@@ -20,31 +20,15 @@ export {
   normalizeBlendshapes,
 };
 
-// Default framing — straight-on face view (eyes/nose centered).
+// Default framing — face/upper body centered higher in the viewport.
 export const DEFAULT_AVATAR = {
   cameraX: 0,
-  cameraY: 1.56,
-  cameraZ: 1.4,
+  cameraY: 1.3,
+  cameraZ: 1.6,
   targetX: 0,
-  targetY: 1.54,
+  targetY: 1.42,
   targetZ: 0,
 };
-
-const LEGACY_DEFAULT_AVATAR = {
-  cameraY: 1.3,
-  targetY: 1.42,
-  cameraZ: 1.6,
-};
-
-function shouldAutoFrameFace(settings) {
-  const av = normalizeAvatar(settings);
-  const matches = (ref) => Object.keys(ref).every((k) => Math.abs(av[k] - ref[k]) < 0.001);
-  if (matches(DEFAULT_AVATAR)) return true;
-  if (matches(LEGACY_DEFAULT_AVATAR)) return true;
-  // Camera below the look-at point tilts up and emphasizes the jaw.
-  if (av.cameraY < av.targetY - 0.04) return true;
-  return false;
-}
 
 const DISTANCE_MIN = 0.8;
 const DISTANCE_MAX = 3.5;
@@ -181,7 +165,7 @@ export class TommyAvatar {
     canvas.addEventListener("webglcontextrestored", () => this._syncGpuTextures(), false);
 
     this.scene = new THREE.Scene();
-    this.scene.background = this.defaultBackground;
+    this.scene.background = this.backgroundUrl ? null : this.defaultBackground;
 
     this.camera = new THREE.PerspectiveCamera(30, w / h, 0.1, 100);
     this.lookAtTarget = new THREE.Vector3(av.targetX, av.targetY, av.targetZ);
@@ -196,7 +180,6 @@ export class TommyAvatar {
       offset: new THREE.Vector3(),
     };
     this.applyCameraSettings(av);
-    this._initialCameraSettings = { ...av };
 
     this.hemiLight = new THREE.HemisphereLight(0xffffff, 0x666688, this.lightingSettings.hemisphereIntensity);
     this.scene.add(this.hemiLight);
@@ -262,6 +245,15 @@ export class TommyAvatar {
     this.camera.position.add(offset);
     this.lookAtTarget.add(offset);
     this._syncCameraLookAt();
+  }
+
+  /** Move camera and look-at target vertically (world Y). */
+  nudgeCameraHeight(deltaY) {
+    if (!Number.isFinite(deltaY) || deltaY === 0) return;
+    this.camera.position.y += deltaY;
+    this.lookAtTarget.y += deltaY;
+    this._syncCameraLookAt();
+    this._emitCameraChange();
   }
 
   _zoomByFactor(factor) {
@@ -372,24 +364,15 @@ export class TommyAvatar {
       this.backgroundTexture.dispose();
       this.backgroundTexture = null;
     }
-    if (this.backgroundUrl) {
-      await this._loadBackgroundTexture();
-      return;
-    }
-    this.scene.background = this.defaultBackground;
+    this.scene.background = this.backgroundUrl ? null : this.defaultBackground;
+  }
+
+  _syncSceneBackground() {
+    this.scene.background = this.backgroundUrl ? null : this.defaultBackground;
   }
 
   async _loadBackgroundTexture() {
-    if (!this.backgroundUrl) return;
-    try {
-      const loader = new THREE.TextureLoader();
-      const texture = await loader.loadAsync(this.backgroundUrl);
-      texture.colorSpace = THREE.SRGBColorSpace;
-      this.backgroundTexture = texture;
-      this.scene.background = texture;
-    } catch (e) {
-      console.warn("Failed to load background:", e);
-    }
+    this._syncSceneBackground();
   }
 
   async _loadIdleAnimation(vrm) {
@@ -466,9 +449,6 @@ export class TommyAvatar {
       this.facialIdle = new FacialIdleController(vrm);
       await this._loadIdleAnimation(vrm);
       this.loaded = true;
-      if (shouldAutoFrameFace(this._initialCameraSettings)) {
-        this.frameForFace();
-      }
       this.setStatus("Avatar ready");
       return true;
     } catch (e) {
@@ -814,8 +794,8 @@ export class TommyAvatar {
     return { ...this.lightingSettings };
   }
 
-  /** Frame the face straight-on — eyes/nose centered, not the jaw. */
-  frameForFace() {
+  /** Frame head and shoulders in view — for the settings-page lipsync preview. */
+  frameForLipsyncPreview() {
     if (!this.vrm) return;
     this._resize();
 
@@ -825,18 +805,18 @@ export class TommyAvatar {
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
 
-    let faceY = center.y + size.y * 0.12;
+    let faceY = box.max.y - size.y * 0.1;
     const head = this.vrm.humanoid?.getNormalizedBoneNode?.("head");
     if (head) {
       const headWorld = new THREE.Vector3();
       head.getWorldPosition(headWorld);
-      faceY = headWorld.y - size.y * 0.07;
+      faceY = headWorld.y - size.y * 0.05;
     }
 
     const target = new THREE.Vector3(center.x, faceY, center.z);
     this.lookAtTarget.copy(target);
 
-    const frameHeight = size.y * 0.38;
+    const frameHeight = size.y * 0.45;
     const fovRad = (this.camera.fov * Math.PI) / 180;
     const distance = THREE.MathUtils.clamp(
       (frameHeight * 0.52) / Math.tan(fovRad / 2),
@@ -844,14 +824,8 @@ export class TommyAvatar {
       DISTANCE_MAX,
     );
 
-    this.camera.position.set(target.x, target.y + size.y * 0.02, target.z + distance);
+    this.camera.position.set(target.x, target.y + size.y * 0.03, target.z + distance);
     this._syncCameraLookAt();
-    this._emitCameraChange();
-  }
-
-  /** @deprecated Use frameForFace */
-  frameForLipsyncPreview() {
-    this.frameForFace();
   }
 
   _syncGpuTextures() {
