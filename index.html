@@ -1031,6 +1031,8 @@
     let launchingGame = false;
     let directSessionEntry = false;
     let lastChickenDanceAt = 0;
+    let cachedConfig = null;
+    let connectPrep = null;
     const CHICKEN_DANCE_COOLDOWN_MS = 2500;
     const CAMERA_HEIGHT_STEP = 0.05;
 
@@ -1494,6 +1496,7 @@
     }
 
     function abortPreparedConversationView() {
+      abortConnectPrep();
       exitSessionView();
       const skipIdle = directSessionEntry;
       directSessionEntry = false;
@@ -1549,8 +1552,10 @@
       wakeWordRestartAttempts = 0;
       stopWakeWordListening();
       dismissIdleVideoScreen();
-      await enterSessionView();
-      await connectConversation({ preparedView: true });
+      await Promise.all([
+        enterSessionView(),
+        connectConversation({ preparedView: true }),
+      ]);
     }
 
     function shouldAutoConnectFromGame() {
@@ -1576,8 +1581,11 @@
       setIdleVideoMode(false);
       setVideosLoading(false);
       directSessionEntry = true;
-      await enterSessionView();
-      await connectConversation({ preparedView: true });
+      beginConnectPrep().catch(() => {});
+      await Promise.all([
+        enterSessionView(),
+        connectConversation({ preparedView: true }),
+      ]);
     }
 
     async function startConversationFromIdleTap() {
@@ -1585,9 +1593,13 @@
       idleVideoStarting = true;
       uiLog("hello", "idle video tapped", "hello");
 
+      beginConnectPrep().catch((e) => {
+        uiLog("hello", `connect prep: ${e?.message || e}`, "warn");
+      });
+
       try {
         if (transitionVideoUrl) {
-          uiLog("hello", "playing transition video", "hello");
+          uiLog("hello", "playing transition video (mic + ws warming in parallel)", "hello");
           try {
             await playTransitionVideo();
           } catch (e) {
@@ -1596,6 +1608,9 @@
         }
         uiLog("hello", "transition complete → connectConversation", "hello");
         await connectConversationAfterVideos();
+      } catch (e) {
+        abortConnectPrep();
+        throw e;
       } finally {
         idleVideoStarting = false;
       }
@@ -1741,7 +1756,7 @@
       if (avatar) return avatar;
       if (avatarLoading) return avatarLoading;
       avatarLoading = (async () => {
-        const cfg = await getConfig();
+        const cfg = cachedConfig || await getConfig();
         const av = normalizeAvatar(cfg.avatar);
         const lipsync = normalizeLipsync(cfg.lipsync);
         const lighting = normalizeLighting(cfg.lighting);
@@ -1808,6 +1823,7 @@
 
     function cleanupSession() {
       uiLog("cleanup", "begin", "hello");
+      abortConnectPrep();
       clearConversationCaptions();
       directSessionEntry = false;
       active = false;
@@ -2099,7 +2115,8 @@
       }
     }
 
-    async function getConfig() {
+    async function getConfig(forceRefresh = false) {
+      if (cachedConfig && !forceRefresh) return cachedConfig;
       try {
         const res = await fetch("/api/config");
         if (res.ok) {
@@ -2111,10 +2128,11 @@
             localStorage.setItem(LIPSYNC_KEY, JSON.stringify(normalizeLipsync(cfg.lipsync)));
           }
           applyGameIconsFromConfig(cfg.gameIcons);
+          cachedConfig = cfg;
           return cfg;
         }
       } catch {}
-      return {
+      cachedConfig = {
         apiKey: localStorage.getItem(KEY),
         instructions: localStorage.getItem(PROMPT_KEY),
         voice: localStorage.getItem(VOICE_KEY),
@@ -2122,6 +2140,214 @@
         avatar: loadAvatarFromLocalStorage(),
         lipsync: loadLipsyncFromLocalStorage(),
       };
+      return cachedConfig;
+    }
+
+    function releasePrepMic(prep) {
+      if (!prep) return;
+      try { prep.proc?.disconnect(); } catch {}
+      try { prep.source?.disconnect(); } catch {}
+      prep.proc = null;
+      prep.source = null;
+      try { prep.stream?.getTracks().forEach((t) => t.stop()); } catch {}
+      prep.stream = null;
+      try { if (prep.ctx?.state !== "closed") prep.ctx?.close(); } catch {}
+      prep.ctx = null;
+    }
+
+    function abortConnectPrep() {
+      if (!connectPrep) return;
+      const prep = connectPrep;
+      connectPrep = null;
+      prep.aborted = true;
+      prep.messageQueue = [];
+      try { prep.ws?.close(); } catch {}
+      releasePrepMic(prep);
+    }
+
+    function waitForWsOpen(socket, timeoutMs = 12000) {
+      if (socket.readyState === WebSocket.OPEN) return Promise.resolve();
+      if (socket.readyState === WebSocket.CLOSING || socket.readyState === WebSocket.CLOSED) {
+        return Promise.reject(new Error("WebSocket closed before open"));
+      }
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("WebSocket open timeout")), timeoutMs);
+        socket.addEventListener("open", () => {
+          clearTimeout(timer);
+          resolve();
+        }, { once: true });
+        socket.addEventListener("close", () => {
+          clearTimeout(timer);
+          reject(new Error("WebSocket closed before open"));
+        }, { once: true });
+      });
+    }
+
+    function setupMicPipeline() {
+      if (ctx?.state === "suspended") ctx.resume().catch(() => {});
+      source = ctx.createMediaStreamSource(stream);
+      proc = ctx.createScriptProcessor(2048, 1, 1);
+      proc.onaudioprocess = ({ inputBuffer }) => {
+        if (ws.readyState !== WebSocket.OPEN) return;
+        const f = inputBuffer.getChannelData(0);
+        const pcm = new Int16Array(f.length);
+        for (let i = 0; i < f.length; i++) pcm[i] = Math.max(-32768, Math.min(32767, f[i] * 32768));
+        ws.send(JSON.stringify({ type: "input_audio_buffer.append", audio: b64(pcm.buffer) }));
+      };
+      const silentGain = ctx.createGain();
+      silentGain.gain.value = 0;
+      source.connect(proc);
+      proc.connect(silentGain);
+      silentGain.connect(ctx.destination);
+    }
+
+    function handleWsMessage(data) {
+      const e = JSON.parse(data);
+
+      if (e.type === "client.error") {
+        uiLog("session", `client.error: ${e.message}`, "err");
+        showErr(e.message);
+        ws.close();
+        return;
+      }
+
+      if (e.response_id) handleNewResponse(e.response_id);
+
+      if (e.type === "response.created") {
+        cancelIdleNudge();
+        handleNewResponse(e.response?.id || e.response_id);
+      }
+
+      if (e.type === "response.output_text.delta" || e.type === "response.output_audio_transcript.delta") {
+        appendResponseText(e.delta);
+      }
+
+      if (e.type === "response.output_text.done" || e.type === "response.output_audio_transcript.done") {
+        if (e.text) responseText = e.text;
+        else if (e.transcript) responseText = e.transcript;
+        updateAgentCaption(responseText);
+        syncLipsyncTimeline();
+      }
+
+      if (e.type === "response.output_audio.delta") {
+        setStatus("Conversation active — speak anytime", true);
+
+        const pcm16 = Uint8Array.from(atob(e.delta), (c) => c.charCodeAt(0));
+        addAudioChunkMs(new Int16Array(pcm16.buffer));
+        queue.push(pcm16.buffer);
+        if (!playing) playNext();
+      } else if (e.type === "response.output_item.added") {
+        trackFunctionCallItem(e.item);
+      } else if (e.type === "response.output_item.done") {
+        trackFunctionCallItem(e.item);
+      } else if (e.type === "conversation.item.input_audio_transcription.completed") {
+        if (e.transcript?.trim()) showUserHeard(e.transcript);
+        if (isGoodbye(e.transcript)) nudgeEndConversation();
+        if (isDanceRequest(e.transcript)) triggerChickenDance(e.transcript);
+      } else if (e.type === "session.updated" || e.type === "session.created") {
+        setStatus("Conversation active — speak anytime", true);
+        avatar?.refreshAfterVisible();
+      } else if (e.type === "input_audio_buffer.speech_started") {
+        goodbyeNudged = false;
+        idleNudgeCount = 0;
+        cancelIdleNudge();
+        showUserListening();
+        updateAgentCaption("");
+        stopAudio();
+        stopAvatarSpeech();
+        resetResponseState(null);
+      } else if (e.type === "input_audio_buffer.timeout_triggered") {
+        setStatus("No speech detected — Uncle Tommy is checking in", true);
+      } else if (e.type === "response.output_audio.done") {
+        audioDone = true;
+        maybeEndAvatarSpeech();
+        closeAfterToolEnd();
+        if (!playing && queue.length === 0) scheduleIdleNudge();
+      } else if (e.type === "response.done") {
+        audioDone = true;
+        maybeEndAvatarSpeech();
+        closeAfterToolEnd();
+        if (!playing && queue.length === 0) scheduleIdleNudge();
+      } else if (e.type === "response.function_call_arguments.done") {
+        handleFunctionCall(e);
+      }
+    }
+
+    function attachWsHandlers(socket) {
+      socket.onmessage = ({ data }) => handleWsMessage(data);
+      socket.onclose = (event) => {
+        uiLog("session", "ws closed", "hello", {
+          code: event.code,
+          reason: event.reason || "(none)",
+          wasClean: event.wasClean,
+        });
+        try { cleanupSession(); }
+        catch (e) { console.error("cleanupSession threw", e); }
+        finally { returnToHelloCycle(); }
+      };
+    }
+
+    function beginConnectPrep() {
+      if (active) return Promise.resolve(null);
+      if (connectPrep?.readyPromise) return connectPrep.readyPromise;
+
+      const prep = {
+        aborted: false,
+        cfg: null,
+        ctx: null,
+        stream: null,
+        ws: null,
+        messageQueue: [],
+        readyPromise: null,
+      };
+      connectPrep = prep;
+
+      prep.readyPromise = (async () => {
+        const cfg = await getConfig();
+        prep.cfg = cfg;
+        const apiKey = cfg.apiKey?.trim();
+        if (!apiKey) throw new Error("NO_API_KEY");
+
+        const micWork = (async () => {
+          prep.ctx = new AudioContext({ sampleRate: 24000 });
+          prep.stream = await navigator.mediaDevices.getUserMedia({
+            audio: { sampleRate: 24000, channelCount: 1, echoCancellation: true, noiseSuppression: true },
+          });
+        })();
+
+        const wsProtocol = location.protocol === "https:" ? "wss:" : "ws:";
+        prep.ws = new WebSocket(`${wsProtocol}//${location.host}/ws`);
+
+        prep.ws.onopen = () => {
+          if (prep.aborted) return;
+          prep.ws.send(JSON.stringify({
+            type: "client.auth",
+            apiKey,
+            instructions: cfg.instructions?.trim() || DEFAULT_PROMPT,
+            voice: cfg.voice?.trim() || DEFAULT_VOICE,
+            model: cfg.model?.trim() || DEFAULT_MODEL,
+          }));
+        };
+
+        prep.ws.onmessage = ({ data }) => {
+          if (prep.aborted || active) return;
+          prep.messageQueue.push(data);
+        };
+
+        prep.ws.onclose = () => {
+          if (prep.aborted || active) return;
+          prep.aborted = true;
+        };
+
+        await Promise.all([micWork, waitForWsOpen(prep.ws)]);
+        if (prep.aborted) throw new Error("Connection prep aborted");
+        return prep;
+      })().catch((e) => {
+        if (!prep.aborted) abortConnectPrep();
+        throw e;
+      });
+
+      return prep.readyPromise;
     }
 
     function clearRecognitionWatchdog() {
@@ -2279,11 +2505,12 @@
       }
 
       uiLog("session", "connectConversation begin", "hello");
-      const cfg = await getConfig();
+      const cfg = cachedConfig || await getConfig();
       const apiKey = cfg.apiKey?.trim();
       if (!apiKey) {
         uiLog("session", "no API key", "err");
         showErr("No API key set.");
+        abortConnectPrep();
         if (preparedView) abortPreparedConversationView();
         resumeWakeWordListening();
         return;
@@ -2294,14 +2521,54 @@
       btnStart.textContent = "Connecting…";
       setStatus("Connecting to Uncle Tommy…");
 
+      let prep = connectPrep;
+      connectPrep = null;
+      const queuedMessages = [];
+
       try {
-        ctx = new AudioContext({ sampleRate: 24000 });
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: { sampleRate: 24000, channelCount: 1, echoCancellation: true, noiseSuppression: true },
-        });
-      } catch {
-        uiLog("session", "getUserMedia denied", "err");
-        showErr("Microphone access denied.");
+        if (prep && !prep.aborted) {
+          await prep.readyPromise;
+          if (prep.aborted || prep.ws?.readyState !== WebSocket.OPEN) {
+            throw new Error("Connection prep failed");
+          }
+          ctx = prep.ctx;
+          stream = prep.stream;
+          ws = prep.ws;
+          queuedMessages.push(...prep.messageQueue);
+          prep.ctx = null;
+          prep.stream = null;
+          prep.ws = null;
+        } else {
+          ctx = new AudioContext({ sampleRate: 24000 });
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: { sampleRate: 24000, channelCount: 1, echoCancellation: true, noiseSuppression: true },
+          });
+          const wsProtocol = location.protocol === "https:" ? "wss:" : "ws:";
+          ws = new WebSocket(`${wsProtocol}//${location.host}/ws`);
+          await new Promise((resolve, reject) => {
+            ws.onopen = () => {
+              uiLog("session", "ws open", "hello");
+              ws.send(JSON.stringify({
+                type: "client.auth",
+                apiKey,
+                instructions: cfg.instructions?.trim() || DEFAULT_PROMPT,
+                voice: cfg.voice?.trim() || DEFAULT_VOICE,
+                model: cfg.model?.trim() || DEFAULT_MODEL,
+              }));
+              resolve();
+            };
+            ws.onerror = () => reject(new Error("WebSocket failed"));
+            ws.onclose = () => reject(new Error("WebSocket closed"));
+          });
+        }
+      } catch (e) {
+        const denied = e?.name === "NotAllowedError" || e?.name === "NotFoundError";
+        uiLog("session", denied ? "getUserMedia denied" : `connect failed: ${e?.message}`, "err");
+        showErr(denied ? "Microphone access denied." : "Could not connect. Try again.");
+        try { ws?.close(); } catch {}
+        ws = null;
+        abortConnectPrep();
+        releaseMicSync();
         btnStart.textContent = "Start Conversation";
         btnStart.disabled = false;
         if (preparedView) abortPreparedConversationView();
@@ -2311,123 +2578,18 @@
 
       resetResponseState(null);
       clearConversationCaptions();
+      attachWsHandlers(ws);
+      active = true;
+      setupMicPipeline();
+      uiLog("session", "session live", "hello", { prep: Boolean(prep), queued: queuedMessages.length });
 
-      const wsProtocol = location.protocol === "https:" ? "wss:" : "ws:";
-      ws = new WebSocket(`${wsProtocol}//${location.host}/ws`);
+      for (const data of queuedMessages) {
+        handleWsMessage(data);
+      }
 
-      ws.onopen = () => {
-        uiLog("session", "ws open", "hello");
-        ws.send(JSON.stringify({
-          type: "client.auth",
-          apiKey,
-          instructions: cfg.instructions?.trim() || DEFAULT_PROMPT,
-          voice: cfg.voice?.trim() || DEFAULT_VOICE,
-          model: cfg.model?.trim() || DEFAULT_MODEL,
-        }));
-
-        active = true;
-        enterSessionView();
-        if (ctx?.state === "suspended") ctx.resume().catch(() => {});
-        source = ctx.createMediaStreamSource(stream);
-        proc = ctx.createScriptProcessor(2048, 1, 1);
-        proc.onaudioprocess = ({ inputBuffer }) => {
-          if (ws.readyState !== WebSocket.OPEN) return;
-          const f = inputBuffer.getChannelData(0);
-          const pcm = new Int16Array(f.length);
-          for (let i = 0; i < f.length; i++) pcm[i] = Math.max(-32768, Math.min(32767, f[i] * 32768));
-          ws.send(JSON.stringify({ type: "input_audio_buffer.append", audio: b64(pcm.buffer) }));
-        };
-        // Route mic through a zero-gain node so the ScriptProcessor fires
-        // (it must reach destination) but the user doesn't hear themselves.
-        const silentGain = ctx.createGain();
-        silentGain.gain.value = 0;
-        source.connect(proc);
-        proc.connect(silentGain);
-        silentGain.connect(ctx.destination);
-      };
-
-      ws.onmessage = ({ data }) => {
-        const e = JSON.parse(data);
-
-        if (e.type === "client.error") {
-          uiLog("session", `client.error: ${e.message}`, "err");
-          showErr(e.message);
-          ws.close();
-          return;
-        }
-
-        if (e.response_id) handleNewResponse(e.response_id);
-
-        if (e.type === "response.created") {
-          cancelIdleNudge();
-          handleNewResponse(e.response?.id || e.response_id);
-        }
-
-        if (e.type === "response.output_text.delta" || e.type === "response.output_audio_transcript.delta") {
-          appendResponseText(e.delta);
-        }
-
-        if (e.type === "response.output_text.done" || e.type === "response.output_audio_transcript.done") {
-          if (e.text) responseText = e.text;
-          else if (e.transcript) responseText = e.transcript;
-          updateAgentCaption(responseText);
-          syncLipsyncTimeline();
-        }
-
-        if (e.type === "response.output_audio.delta") {
-          setStatus("Conversation active — speak anytime", true);
-
-          const pcm16 = Uint8Array.from(atob(e.delta), (c) => c.charCodeAt(0));
-          addAudioChunkMs(new Int16Array(pcm16.buffer));
-          queue.push(pcm16.buffer);
-          if (!playing) playNext();
-        } else if (e.type === "response.output_item.added") {
-          trackFunctionCallItem(e.item);
-        } else if (e.type === "response.output_item.done") {
-          trackFunctionCallItem(e.item);
-        } else if (e.type === "conversation.item.input_audio_transcription.completed") {
-          if (e.transcript?.trim()) showUserHeard(e.transcript);
-          if (isGoodbye(e.transcript)) nudgeEndConversation();
-          if (isDanceRequest(e.transcript)) triggerChickenDance(e.transcript);
-        } else if (e.type === "session.created") {
-          setStatus("Conversation active — speak anytime", true);
-          avatar?.refreshAfterVisible();
-        } else if (e.type === "input_audio_buffer.speech_started") {
-          goodbyeNudged = false;
-          idleNudgeCount = 0;
-          cancelIdleNudge();
-          showUserListening();
-          updateAgentCaption("");
-          stopAudio();
-          stopAvatarSpeech();
-          resetResponseState(null);
-        } else if (e.type === "input_audio_buffer.timeout_triggered") {
-          setStatus("No speech detected — Uncle Tommy is checking in", true);
-        } else if (e.type === "response.output_audio.done") {
-          audioDone = true;
-          maybeEndAvatarSpeech();
-          closeAfterToolEnd();
-          if (!playing && queue.length === 0) scheduleIdleNudge();
-        } else if (e.type === "response.done") {
-          audioDone = true;
-          maybeEndAvatarSpeech();
-          closeAfterToolEnd();
-          if (!playing && queue.length === 0) scheduleIdleNudge();
-        } else if (e.type === "response.function_call_arguments.done") {
-          handleFunctionCall(e);
-        }
-      };
-
-      ws.onclose = (event) => {
-        uiLog("session", "ws closed", "hello", {
-          code: event.code,
-          reason: event.reason || "(none)",
-          wasClean: event.wasClean,
-        });
-        try { cleanupSession(); }
-        catch (e) { console.error("cleanupSession threw", e); }
-        finally { returnToHelloCycle(); }
-      };
+      if (!preparedView && !inSession) {
+        await enterSessionView();
+      }
     }
 
     function endConversation() {
@@ -2489,12 +2651,16 @@
       return btoa(s);
     }
 
-    btnStart.addEventListener("click", () => {
+    btnStart.addEventListener("click", async () => {
       uiLog("hello", "Start button clicked", "hello");
       wakeWordEnabled = false;
       wakeWordRestartAttempts = 0;
       stopWakeWordListening();
-      connectConversation();
+      beginConnectPrep().catch(() => {});
+      await Promise.all([
+        enterSessionView(),
+        connectConversation({ preparedView: true }),
+      ]);
     });
 
     btnStop.addEventListener("click", endConversation);
@@ -2532,17 +2698,25 @@
       const fromGame = shouldAutoConnectFromGame();
       const cfg = await getConfig();
 
+      if (fromGame) {
+        dismissSplash();
+        dismissIdleVideoScreen();
+        setIdleVideoMode(false);
+        setVideosLoading(false);
+        preloadMediaAssets(cfg).catch((e) => console.warn("background preload:", e));
+        try {
+          await autoConnectFromGameReturn();
+        } catch (e) {
+          console.error(e);
+          showErr(`Failed to connect: ${e.message}`);
+          setStatus('Tap "Start" to begin a conversation');
+        }
+        return;
+      }
+
       try {
         const idleVideoReady = await preloadMediaAssets(cfg);
         dismissSplash();
-
-        if (fromGame) {
-          dismissIdleVideoScreen();
-          setIdleVideoMode(false);
-          setVideosLoading(false);
-          await autoConnectFromGameReturn();
-          return;
-        }
 
         if (idleVideoReady) {
           startIdleVideoPlayback();
