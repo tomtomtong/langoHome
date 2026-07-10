@@ -33,6 +33,7 @@ export const DEFAULT_AVATAR = {
 const DISTANCE_MIN = 0.8;
 const DISTANCE_MAX = 3.5;
 const ZOOM_WHEEL_SENSITIVITY = 0.0012;
+const ANIMATION_LOOP_COUNT = 3;
 
 // Non-color data maps must stay in linear/no color space.
 const NON_COLOR_TEXTURE_KEYS = new Set([
@@ -109,7 +110,7 @@ export function normalizeLipsync(raw) {
 export class TommyAvatar {
   constructor(canvas, {
     vrmUrl = "/visme/Tommyv4.vrm",
-    idleAnimationUrl = "/Animation/Happy%20Idle.fbx",
+    idleAnimationUrl = "/Animation/Idle.fbx",
     backgroundUrl = null,
     interactiveCamera = true,
     lipsync: lipsyncRaw,
@@ -738,7 +739,7 @@ export class TommyAvatar {
       this._stopDanceAnimation();
 
       const action = this.mixer.clipAction(clip);
-      action.setLoop(THREE.LoopOnce);
+      action.setLoop(THREE.LoopRepeat, ANIMATION_LOOP_COUNT);
       action.clampWhenFinished = true;
 
       if (this.idleAction) this.idleAction.fadeOut(0.3);

@@ -75,7 +75,6 @@
     maxCombo: 0,
     questionsAnswered: 0,
     lastPuzzleIdx: -1,
-    lastTargetWord: "",
     puzzle: null,
     roundMisses: 0,
     roundCorrectWords: [],
@@ -143,10 +142,7 @@
   }
 
   // ---------- Puzzle setup ----------
-  function pickPuzzle() {
-    if (typeof VocaConfig !== "undefined" && VocaConfig.hasItems()) {
-      return pickVocaRound();
-    }
+  function pickBuiltinPuzzle() {
     let idx;
     do {
       idx = Math.floor(Math.random() * PUZZLES.length);
@@ -156,53 +152,57 @@
     return state.puzzle;
   }
 
+  function pickPuzzle() {
+    if (typeof VocaConfig !== "undefined" && VocaConfig.hasItems()) {
+      return pickVocaRound();
+    }
+    return pickBuiltinPuzzle();
+  }
+
   function pickVocaRound() {
-    const target = VocaConfig.pickRandomOne(state.lastTargetWord);
-    if (!target) return pickPuzzle();
+    const vocabWords = VocaConfig.getItems()
+      .map((item) => item.word.trim().toUpperCase())
+      .filter(Boolean);
+    if (vocabWords.length < HOLE_COUNT) {
+      return pickBuiltinPuzzle();
+    }
 
-    state.lastTargetWord = target.word;
-    const targetWord = target.word.toUpperCase();
-    const distractorItems = VocaConfig.pickRandom(HOLE_COUNT - 1, target.word);
-    const distractors = distractorItems.map((item) => item.word.toUpperCase());
+    let idx;
+    do {
+      idx = Math.floor(Math.random() * PUZZLES.length);
+    } while (PUZZLES.length > 1 && idx === state.lastPuzzleIdx);
+    state.lastPuzzleIdx = idx;
+    const template = PUZZLES[idx];
 
-    while (distractors.length < HOLE_COUNT - 1) {
-      const extra = VocaConfig.pickRandom(1, target.word)[0];
-      if (extra) distractors.push(extra.word.toUpperCase());
-      else break;
+    const shuffled = shuffle([...vocabWords]);
+    const correctCount = Math.min(
+      CORRECT_MOLES_MAX,
+      Math.max(CORRECT_MOLES_MIN, template.correct.length),
+      HOLE_COUNT - 1,
+      shuffled.length - 1
+    );
+    const distractorCount = HOLE_COUNT - correctCount;
+    const correct = shuffled.slice(0, correctCount);
+    let distractors = shuffled.slice(correctCount, correctCount + distractorCount);
+
+    while (distractors.length < distractorCount) {
+      distractors.push(shuffled[distractors.length % shuffled.length]);
     }
 
     state.puzzle = {
-      prompt: "Find this word!",
-      imageUrl: target.imageUrl,
-      targetWord,
-      correct: [targetWord],
+      prompt: template.prompt,
+      correct,
       distractors,
     };
     return state.puzzle;
   }
 
   function renderSentence(prompt, answer) {
-    const imageUrl = state.puzzle?.imageUrl;
-    if (imageUrl) {
-      const answerHtml = answer
-        ? `<span class="answer">${escapeHtml(answer)}</span>`
-        : `<span class="blank">&nbsp;</span>`;
-      sentenceEl.innerHTML = `
-        <div class="voca-prompt">
-          <img class="voca-prompt-img" src="${escapeAttr(imageUrl)}" alt="" />
-          <span class="voca-prompt-text">${escapeHtml(prompt)} ${answerHtml}</span>
-        </div>`;
-      return;
-    }
     if (answer) {
       sentenceEl.innerHTML = `${escapeHtml(prompt)} <span class="answer">${escapeHtml(answer)}</span>`;
       return;
     }
     sentenceEl.innerHTML = `${escapeHtml(prompt)} <span class="blank">&nbsp;</span>`;
-  }
-
-  function escapeAttr(s) {
-    return String(s).replace(/"/g, "&quot;");
   }
 
   function escapeHtml(s) {
@@ -556,17 +556,10 @@
     buildGrid();
     if (typeof VocaConfig !== "undefined") {
       await VocaConfig.loadFromServer();
-      const signLabel = document.querySelector(".sign-label");
-      if (signLabel && VocaConfig.hasItems()) {
-        signLabel.textContent = "Find the word";
-      }
     }
     if (typeof ImageConfig !== "undefined") {
       await ImageConfig.applyAll();
       await GameLoadingScreen.preloadImageConfig(ImageConfig);
-    }
-    if (typeof VocaConfig !== "undefined" && VocaConfig.hasItems()) {
-      await VocaConfig.preloadImages(VocaConfig.pickRoundPairs(12));
     }
     document.addEventListener("keydown", onKeyDown);
     startGame();

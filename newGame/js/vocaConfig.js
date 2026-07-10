@@ -20,7 +20,7 @@ const VocaConfig = (() => {
         if (!res.ok) throw new Error("fetch failed");
         const data = await res.json();
         items = Array.isArray(data.items)
-          ? data.items.filter((item) => item?.word && item?.imageUrl)
+          ? data.items.filter((item) => item?.word)
           : [];
         loaded = true;
       } catch {
@@ -60,8 +60,9 @@ const VocaConfig = (() => {
   }
 
   function pickRoundPairs(count = 6) {
-    if (!items.length) return [];
-    const shuffled = shuffle(items.slice());
+    const pool = items.filter((item) => item?.word && item?.imageUrl);
+    if (!pool.length) return [];
+    const shuffled = shuffle(pool.slice());
     return shuffled.slice(0, Math.min(count, shuffled.length)).map((item) => ({
       word: item.word,
       imageUrl: item.imageUrl,
