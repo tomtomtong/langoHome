@@ -1742,7 +1742,7 @@ const server = createServer((req, res) => {
   }
 
   if (url === '/ChickenDance.fbx') {
-    serveFile(res, join(ROOT, 'ChickenDance.fbx'));
+    serveFile(res, join(ROOT, 'Animation', 'Dance', 'ChickenDance.fbx'));
     return;
   }
 
@@ -1839,7 +1839,10 @@ function normalizeLighting(raw) {
 }
 
 const HAPPY_TOOL_INSTRUCTION =
-  ' Call the happy tool (chicken dance) whenever the user asks to dance, says "chicken dance", wants a funny move or celebration, or says anything that suggests they want Uncle Tommy to dance. Trigger on short phrases like "dance", "do a dance", "chicken dance", "dance for me", or "can you dance". Err on the side of calling it — kids love the chicken dance.';
+  ' Call the happy tool whenever the user asks to dance, says "chicken dance", wants a funny move or celebration, or says anything that suggests they want Uncle Tommy to dance. Trigger on short phrases like "dance", "do a dance", "chicken dance", "dance for me", or "can you dance". Uncle Tommy will do a random fun dance — err on the side of calling it.';
+
+const KUNGFU_TOOL_INSTRUCTION =
+  ' Call the kungfu tool whenever the user asks Uncle Tommy to fight, do kung fu, punch, karate, martial arts, or show fighting moves. Trigger on phrases like "kung fu", "do a punch", "fight", "fight me", "show me your moves", or "can you fight". Keep it playful and kid-friendly — Tommy is showing off moves, not real violence.';
 
 const LEAVE_TOOL_INSTRUCTION =
   ' Call end_conversation only when the user clearly wants to stop the session — e.g. says goodbye, bye bye, see you later, I have to go, or I\'m leaving. Do NOT call it for casual phrases like "nice to see you", "take care of", or "talk later about…". When they clearly want to leave, give a brief farewell and call end_conversation in the same turn.';
@@ -1851,13 +1854,29 @@ const HAPPY_TOOL = {
   type: 'function',
   name: 'happy',
   description:
-    'Makes Uncle Tommy perform his chicken dance animation. Call when the user wants a dance, says chicken dance, asks for something fun, or uses "dance" in a request.',
+    'Makes Uncle Tommy perform a random fun dance animation. Call when the user wants a dance, says chicken dance, asks for something fun, or uses "dance" in a request.',
   parameters: {
     type: 'object',
     properties: {
       reason: {
         type: 'string',
-        description: 'How the user asked to dance, e.g. "do the chicken dance"',
+        description: 'How the user asked to dance, e.g. "do a dance"',
+      },
+    },
+  },
+};
+
+const KUNGFU_TOOL = {
+  type: 'function',
+  name: 'kungfu',
+  description:
+    'Makes Uncle Tommy perform a random kung fu / fighting animation. Call when the user wants to fight, kung fu, punch, karate, martial arts, or fighting moves.',
+  parameters: {
+    type: 'object',
+    properties: {
+      reason: {
+        type: 'string',
+        description: 'How the user asked to fight, e.g. "do kung fu" or "punch"',
       },
     },
   },
@@ -1932,9 +1951,9 @@ function buildSessionCfg({ instructions, voice, model } = {}) {
   const session = {
     type: 'realtime',
     model: model || DEFAULT_MODEL,
-    instructions: (instructions || DEFAULT_INSTRUCTIONS) + HAPPY_TOOL_INSTRUCTION + GAME_TOOLS_INSTRUCTION + LEAVE_TOOL_INSTRUCTION,
+    instructions: (instructions || DEFAULT_INSTRUCTIONS) + HAPPY_TOOL_INSTRUCTION + KUNGFU_TOOL_INSTRUCTION + GAME_TOOLS_INSTRUCTION + LEAVE_TOOL_INSTRUCTION,
     output_modalities: ['audio', 'text'],
-    tools: [HAPPY_TOOL, PLAY_WORDWHACK_TOOL, PLAY_CARDGAME_TOOL, PLAY_FINDGAME_TOOL, END_CONVERSATION_TOOL],
+    tools: [HAPPY_TOOL, KUNGFU_TOOL, PLAY_WORDWHACK_TOOL, PLAY_CARDGAME_TOOL, PLAY_FINDGAME_TOOL, END_CONVERSATION_TOOL],
     tool_choice: 'auto',
     audio: {
       input: {

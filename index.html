@@ -1028,11 +1028,23 @@
     const captionAgentEl = document.getElementById("caption-agent");
     const captionAgentTextEl = document.getElementById("caption-agent-text");
     const HAPPY = "happy";
+    const KUNGFU = "kungfu";
     const PLAY_WORDWHACK = "play_wordwhack";
     const PLAY_CARDGAME = "play_cardgame";
     const PLAY_FINDGAME = "play_findgame";
     const END_CONVERSATION = "end_conversation";
-    const CHICKEN_DANCE_URL = "/ChickenDance.fbx";
+    const DANCE_ANIMATIONS = [
+      "/Animation/Dance/Booty%20Hip%20Hop%20Dance.fbx",
+      "/Animation/Dance/Locking%20Hip%20Hop%20Dance.fbx",
+      "/Animation/Dance/Snake%20Hip%20Hop%20Dance.fbx",
+      "/Animation/Dance/Wave%20Hip%20Hop%20Dance.fbx",
+      "/Animation/Dance/ChickenDance.fbx",
+      "/Animation/Dance/Ymca%20Dance.fbx",
+    ];
+    const KUNGFU_ANIMATIONS = [
+      "/Animation/KungFu/Standing%20Idle%20To%20Fight%20Idle.fbx",
+      "/Animation/KungFu/Punch%20Combo.fbx",
+    ];
     const BYEBYE_URL = "/Animation/byebye.fbx";
     const DEBUG_LOG_MAX = 80;
     const debugLogLines = [];
@@ -1136,13 +1148,28 @@
     let launchingGame = false;
     let directSessionEntry = false;
     let lastChickenDanceAt = 0;
+    let lastKungfuAt = 0;
     let cachedConfig = null;
     let connectPrep = null;
     const CHICKEN_DANCE_COOLDOWN_MS = 2500;
+    const KUNGFU_COOLDOWN_MS = 2500;
     const CAMERA_HEIGHT_STEP = 0.05;
 
     function pickRandomGame() {
       return GAME_CATALOG[Math.floor(Math.random() * GAME_CATALOG.length)];
+    }
+
+    function pickRandomDanceUrl() {
+      return DANCE_ANIMATIONS[Math.floor(Math.random() * DANCE_ANIMATIONS.length)];
+    }
+
+    function pickRandomKungfuUrl() {
+      return KUNGFU_ANIMATIONS[Math.floor(Math.random() * KUNGFU_ANIMATIONS.length)];
+    }
+
+    function animationNameFromUrl(url) {
+      const file = decodeURIComponent(url.split("/").pop() || "");
+      return file.replace(/\.fbx$/i, "");
     }
 
     function getGameById(id) {
@@ -1558,7 +1585,8 @@
     async function preloadMediaAssets(cfg) {
       const rawTasks = [
         preloadImage("/langoLogo.jpeg").catch(() => {}),
-        prefetchAsset(CHICKEN_DANCE_URL),
+        ...DANCE_ANIMATIONS.map(prefetchAsset),
+        ...KUNGFU_ANIMATIONS.map(prefetchAsset),
         prefetchAsset(BYEBYE_URL),
         prefetchAsset("/Animation/Happy%20Idle.fbx"),
       ];
@@ -2281,12 +2309,40 @@
       return /\b(do a dance|funny dance|your dance|shake it|bust a move)\b/.test(t);
     }
 
+    function isFightRequest(text) {
+      const t = text.toLowerCase().trim();
+      if (!t) return false;
+      if (
+        /\b(no|don't|dont|not|never|stop)\b.*\b(fight|kung\s*fu|punch|karate)\b/.test(t) ||
+        /\b(fight|kung\s*fu|punch|karate)\b.*\b(no|don't|dont|not|never|stop)\b/.test(t)
+      ) {
+        return false;
+      }
+      if (/\bkung\s*fu\b/.test(t) || /\bkarate\b/.test(t) || /\bmartial arts\b/.test(t)) return true;
+      if (/\bpunch\b/.test(t)) return true;
+      if (/^(fight|fight!?|fight please)\.?$/i.test(t)) return true;
+      if (/\bfight\b/.test(t)) {
+        return /\b(do|can you|please|let'?s|show|want to|wanna|for me|uncle tommy|tommy|with me)\b/.test(t);
+      }
+      return /\b(do a fight|fight move|fighting stance|show me your moves)\b/.test(t);
+    }
+
     function triggerChickenDance(reason = "user asked to dance") {
       const now = Date.now();
       if (now - lastChickenDanceAt < CHICKEN_DANCE_COOLDOWN_MS) return;
       lastChickenDanceAt = now;
-      uiLog("dance", `chicken dance (${reason})`, "hello");
-      avatar?.playMixamoAnimation(CHICKEN_DANCE_URL);
+      const danceUrl = pickRandomDanceUrl();
+      uiLog("dance", `${animationNameFromUrl(danceUrl)} (${reason})`, "hello");
+      avatar?.playMixamoAnimation(danceUrl);
+    }
+
+    function triggerKungfu(reason = "user asked to fight") {
+      const now = Date.now();
+      if (now - lastKungfuAt < KUNGFU_COOLDOWN_MS) return;
+      lastKungfuAt = now;
+      const kungfuUrl = pickRandomKungfuUrl();
+      uiLog("kungfu", `${animationNameFromUrl(kungfuUrl)} (${reason})`, "hello");
+      avatar?.playMixamoAnimation(kungfuUrl);
     }
 
     function resetResponseState(id) {
@@ -2411,9 +2467,24 @@
           const args = JSON.parse(argsJson || "{}");
           if (args.reason) reason = args.reason;
         } catch {}
-        avatar?.playMixamoAnimation(CHICKEN_DANCE_URL);
+        const danceUrl = pickRandomDanceUrl();
+        avatar?.playMixamoAnimation(danceUrl);
         lastChickenDanceAt = Date.now();
-        sendFunctionOutput(callId, { success: true, reason, animation: "chicken_dance" });
+        sendFunctionOutput(callId, { success: true, reason, animation: animationNameFromUrl(danceUrl) });
+        ws.send(JSON.stringify({ type: "response.create" }));
+        return;
+      }
+
+      if (name === KUNGFU) {
+        let reason = "user asked to fight";
+        try {
+          const args = JSON.parse(argsJson || "{}");
+          if (args.reason) reason = args.reason;
+        } catch {}
+        const kungfuUrl = pickRandomKungfuUrl();
+        avatar?.playMixamoAnimation(kungfuUrl);
+        lastKungfuAt = Date.now();
+        sendFunctionOutput(callId, { success: true, reason, animation: animationNameFromUrl(kungfuUrl) });
         ws.send(JSON.stringify({ type: "response.create" }));
         return;
       }
@@ -2581,6 +2652,7 @@
       } else if (e.type === "conversation.item.input_audio_transcription.completed") {
         if (e.transcript?.trim()) showUserHeard(e.transcript);
         if (isDanceRequest(e.transcript)) triggerChickenDance(e.transcript);
+        if (isFightRequest(e.transcript)) triggerKungfu(e.transcript);
       } else if (e.type === "session.updated" || e.type === "session.created") {
         setStatus("Conversation active — speak anytime", true);
         avatar?.refreshAfterVisible();
