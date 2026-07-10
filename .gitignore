@@ -3,6 +3,6 @@ node_modules/
 config.json
 hello-debug-log.json
 idle-video/
-transition-video/
+video-pairs/
 avatar-background/
 game-icons/

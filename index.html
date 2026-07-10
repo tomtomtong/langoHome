@@ -836,6 +836,7 @@
           <span id="camera-save-status" aria-live="polite"></span>
           <button id="btn-save-camera" type="button">Save camera</button>
           <a href="/config">Settings</a>
+          <a href="/video-pairs">Videos</a>
           <a href="/avatar-config">Avatar</a>
         </div>
       </div>
@@ -981,6 +982,8 @@
 
     let idleVideoUrl = null;
     let transitionVideoUrl = null;
+    let idleVideoHintText = "Tap to start conversation";
+    let activeVideoPair = null;
     let idleVideosReady = false;
     let idleVideoStarting = false;
     let playingTransitionVideo = false;
@@ -1304,7 +1307,17 @@
     }
 
     function getAvatarBackgroundUrl(cfg) {
+      if (activeVideoPair?.backgroundImage?.url) {
+        return activeVideoPair.backgroundImage.url;
+      }
       return cfg?.avatarBackground?.url || null;
+    }
+
+    function applyActivePairBackground(cfg) {
+      const bgUrl = getAvatarBackgroundUrl(cfg);
+      applyAvatarStageBackground(bgUrl);
+      avatar?.setBackgroundUrl(bgUrl).catch(() => {});
+      return bgUrl;
     }
 
     function applyAvatarStageBackground(url) {
@@ -1356,23 +1369,21 @@
     }
 
     async function preloadMediaAssets(cfg) {
-      applyAvatarStageBackground(getAvatarBackgroundUrl(cfg));
-
       const tasks = [
         preloadImage("/langoLogo.jpeg").catch(() => {}),
         prefetchAsset(CHICKEN_DANCE_URL),
         prefetchAsset("/visme/Idle.fbx"),
       ];
 
-      const bgUrl = getAvatarBackgroundUrl(cfg);
-      if (bgUrl) tasks.push(preloadImage(bgUrl).catch(() => {}));
-
       applyGameIconsFromConfig(cfg.gameIcons);
       for (const game of GAME_CATALOG) {
         if (game.icon) tasks.push(preloadImage(game.icon).catch(() => {}));
       }
 
-      tasks.push(setupIdleVideos(cfg.idleVideo, cfg.transitionVideo, { autoplay: false }));
+      tasks.push(setupIdleVideosFromConfig(cfg));
+
+      const bgUrl = applyActivePairBackground(cfg);
+      if (bgUrl) tasks.push(preloadImage(bgUrl).catch(() => {}));
 
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       tasks.push(
@@ -1422,9 +1433,68 @@
       });
     }
 
-    async function setupIdleVideos(idleVideo, transitionVideo, { autoplay = true } = {}) {
+    function parseTimeToMinutes(value) {
+      if (!value || typeof value !== "string") return null;
+      const match = value.trim().match(/^(\d{1,2}):(\d{2})$/);
+      if (!match) return null;
+      const h = Number(match[1]);
+      const m = Number(match[2]);
+      if (!Number.isFinite(h) || !Number.isFinite(m) || h < 0 || h > 23 || m < 0 || m > 59) return null;
+      return h * 60 + m;
+    }
+
+    function isPairActiveNow(pair, date = new Date()) {
+      const start = parseTimeToMinutes(pair.startTime ?? "00:00");
+      const end = parseTimeToMinutes(pair.endTime ?? "23:59");
+      if (start === null || end === null) return true;
+      const now = date.getHours() * 60 + date.getMinutes();
+      if (start === end) return true;
+      if (start < end) return now >= start && now <= end;
+      return now >= start || now <= end;
+    }
+
+    function pickVideoPair(videoPairs, date = new Date()) {
+      const eligible = (videoPairs || []).filter((p) => p.loopVideo?.url && isPairActiveNow(p, date));
+      if (!eligible.length) return null;
+      return eligible[Math.floor(Math.random() * eligible.length)];
+    }
+
+    function getSessionInstructions(cfg) {
+      const pairPrompt = activeVideoPair?.text?.trim();
+      if (pairPrompt) return pairPrompt;
+      return cfg.instructions?.trim() || DEFAULT_PROMPT;
+    }
+
+    function setupIdleVideosFromConfig(cfg, { autoplay = false } = {}) {
+      activeVideoPair = pickVideoPair(cfg.videoPairs);
+      let result;
+      if (activeVideoPair) {
+        idleVideoHintText = activeVideoPair.text?.trim() || "Tap to start conversation";
+        result = setupIdleVideos(activeVideoPair.loopVideo, activeVideoPair.transitionVideo, {
+          autoplay,
+          hintText: idleVideoHintText,
+        });
+      } else {
+        const hasConfiguredPairs = (cfg.videoPairs || []).some((p) => p.loopVideo?.url);
+        if (hasConfiguredPairs) {
+          activeVideoPair = null;
+          idleVideoHintText = "Tap to start conversation";
+          result = setupIdleVideos(null, null, { autoplay, hintText: idleVideoHintText });
+        } else {
+          activeVideoPair = null;
+          idleVideoHintText = "Tap to start conversation";
+          result = setupIdleVideos(cfg.idleVideo, cfg.transitionVideo, { autoplay, hintText: idleVideoHintText });
+        }
+      }
+      applyActivePairBackground(cfg);
+      return result;
+    }
+
+    async function setupIdleVideos(idleVideo, transitionVideo, { autoplay = true, hintText = "Tap to start conversation" } = {}) {
       transitionVideoUrl = transitionVideo?.url || null;
       idleVideosReady = false;
+      idleVideoHintText = hintText?.trim() || "Tap to start conversation";
+      if (idleVideoHint) idleVideoHint.textContent = idleVideoHintText;
 
       if (!idleVideo?.url) {
         idleVideoUrl = null;
@@ -1480,6 +1550,7 @@
       transitionVideoEl.pause();
       transitionVideoEl.currentTime = 0;
       idleVideoHint.hidden = false;
+      idleVideoHint.textContent = idleVideoHintText;
       idleVideoScreen.style.cursor = "pointer";
     }
 
@@ -1621,12 +1692,39 @@
       startConversationFromIdleTap();
     });
 
+    async function refreshIdleVideosForCurrentPeriod() {
+      if (inSession || active || playingTransitionVideo || idleVideoStarting) return;
+      const cfg = cachedConfig || await getConfig();
+      const nextPair = pickVideoPair(cfg.videoPairs);
+      const nextId = nextPair?.id ?? null;
+      const currentId = activeVideoPair?.id ?? null;
+      if (nextId === currentId) {
+        if (nextPair) {
+          activeVideoPair = nextPair;
+          idleVideoHintText = nextPair.text?.trim() || "Tap to start conversation";
+          if (idleVideoHint) idleVideoHint.textContent = idleVideoHintText;
+          applyActivePairBackground(cfg);
+        }
+        return;
+      }
+      const wasPlaying = Boolean(idleVideoUrl) && !document.body.classList.contains("idle-video-dismissed");
+      await setupIdleVideosFromConfig(cfg, { autoplay: wasPlaying });
+      if (wasPlaying && idleVideoUrl) {
+        restoreIdleVideoScreen();
+        resetIdleVideoElement();
+        idleVideoEl.play().catch(() => {});
+      }
+    }
+
     function resumeIdleVideo() {
-      if (!idleVideoUrl || inSession || active) return;
-      restoreIdleVideoScreen();
-      resetIdleVideoElement();
-      idleVideoEl.currentTime = 0;
-      idleVideoEl.play().catch(() => {});
+      if (inSession || active) return;
+      refreshIdleVideosForCurrentPeriod().then(() => {
+        if (!idleVideoUrl) return;
+        restoreIdleVideoScreen();
+        resetIdleVideoElement();
+        idleVideoEl.currentTime = 0;
+        idleVideoEl.play().catch(() => {});
+      });
     }
 
     function loadAvatarFromLocalStorage() {
@@ -2323,7 +2421,7 @@
           prep.ws.send(JSON.stringify({
             type: "client.auth",
             apiKey,
-            instructions: cfg.instructions?.trim() || DEFAULT_PROMPT,
+            instructions: getSessionInstructions(cfg),
             voice: cfg.voice?.trim() || DEFAULT_VOICE,
             model: cfg.model?.trim() || DEFAULT_MODEL,
           }));
@@ -2551,7 +2649,7 @@
               ws.send(JSON.stringify({
                 type: "client.auth",
                 apiKey,
-                instructions: cfg.instructions?.trim() || DEFAULT_PROMPT,
+                instructions: getSessionInstructions(cfg),
                 voice: cfg.voice?.trim() || DEFAULT_VOICE,
                 model: cfg.model?.trim() || DEFAULT_MODEL,
               }));
@@ -2747,6 +2845,10 @@
         }
       }, 4000);
     }
+
+    setInterval(() => {
+      refreshIdleVideosForCurrentPeriod().catch(() => {});
+    }, 60_000);
 
     uiLog("hello", "app init", "hello", { IS_IOS, WAKE_WORD_RESTART_DELAY, POST_SESSION_WAKE_DELAY });
     init();

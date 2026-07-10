@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync, readdirSync, statSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync, readdirSync, statSync, copyFileSync } from 'fs';
 import { createServer } from 'http';
 import { createRequire } from 'module';
 import { join, dirname, extname } from 'path';
@@ -17,6 +17,8 @@ const DEBUG_LOG_PATH = join(CONFIG_DIR, 'hello-debug-log.json');
 const DEBUG_LOG_MAX_REPORTS = 20;
 const IDLE_VIDEO_DIR = join(CONFIG_DIR, 'idle-video');
 const TRANSITION_VIDEO_DIR = join(CONFIG_DIR, 'transition-video');
+const VIDEO_PAIRS_DIR = join(CONFIG_DIR, 'video-pairs');
+const VIDEO_PAIRS_MANIFEST_PATH = join(VIDEO_PAIRS_DIR, 'manifest.json');
 const AVATAR_BG_DIR = join(CONFIG_DIR, 'avatar-background');
 const GAME_ICONS_DIR = join(CONFIG_DIR, 'game-icons');
 const GAME_ICON_IDS = ['wordwhack', 'cardgame', 'findgame'];
@@ -149,6 +151,385 @@ function createImageStore(dir, basename, apiPath) {
 
 const idleVideos = createVideoStore(IDLE_VIDEO_DIR, 'idle', '/api/idle-video');
 const transitionVideos = createVideoStore(TRANSITION_VIDEO_DIR, 'transition', '/api/transition-video');
+
+function ensureVideoPairsDir() {
+  if (!existsSync(VIDEO_PAIRS_DIR)) mkdirSync(VIDEO_PAIRS_DIR, { recursive: true });
+}
+
+function newPairId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function loadVideoPairsManifest() {
+  ensureVideoPairsDir();
+  try {
+    if (existsSync(VIDEO_PAIRS_MANIFEST_PATH)) {
+      const data = JSON.parse(readFileSync(VIDEO_PAIRS_MANIFEST_PATH, 'utf8'));
+      return Array.isArray(data.pairs) ? data : { pairs: [] };
+    }
+  } catch (e) {
+    console.warn('Could not load video-pairs manifest:', e.message);
+  }
+  return { pairs: [] };
+}
+
+function saveVideoPairsManifest(manifest) {
+  ensureVideoPairsDir();
+  writeFileSync(VIDEO_PAIRS_MANIFEST_PATH, JSON.stringify(manifest, null, 2) + '\n');
+}
+
+function getPairVideoFilename(pairDir, basename) {
+  if (!existsSync(pairDir)) return null;
+  const files = readdirSync(pairDir).filter((name) => name.startsWith(`${basename}.`));
+  return files.length ? files[0] : null;
+}
+
+function getPairAssetInfo(pairId, basename) {
+  const pairDir = join(VIDEO_PAIRS_DIR, pairId);
+  const filename = getPairVideoFilename(pairDir, basename);
+  if (!filename) return null;
+  const filePath = join(pairDir, filename);
+  const updatedAt = statSync(filePath).mtimeMs || Date.now();
+  const apiPath = `/api/video-pairs/${pairId}/${basename}`;
+  return {
+    filename,
+    url: `${apiPath}?v=${updatedAt}`,
+    updatedAt,
+  };
+}
+
+function getPairVideoInfo(pairId, basename) {
+  return getPairAssetInfo(pairId, basename);
+}
+
+function buildPairInfo(meta) {
+  return {
+    id: meta.id,
+    text: meta.text || '',
+    startTime: meta.startTime || '00:00',
+    endTime: meta.endTime || '23:59',
+    loopVideo: getPairVideoInfo(meta.id, 'loop'),
+    transitionVideo: getPairVideoInfo(meta.id, 'transition'),
+    backgroundImage: getPairAssetInfo(meta.id, 'background'),
+    order: meta.order ?? 0,
+  };
+}
+
+function normalizeTimeString(value) {
+  const s = String(value ?? '').trim();
+  if (!s) return null;
+  const match = s.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+  const h = Number(match[1]);
+  const m = Number(match[2]);
+  if (!Number.isFinite(h) || !Number.isFinite(m) || h < 0 || h > 23 || m < 0 || m > 59) return null;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+function parseTimeToMinutes(value) {
+  const normalized = normalizeTimeString(value);
+  if (!normalized) return null;
+  const [h, m] = normalized.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function isTimeInPeriod(startTime, endTime, date = new Date()) {
+  const start = parseTimeToMinutes(startTime);
+  const end = parseTimeToMinutes(endTime);
+  if (start === null || end === null) return true;
+  const now = date.getHours() * 60 + date.getMinutes();
+  if (start === end) return true;
+  if (start < end) return now >= start && now <= end;
+  return now >= start || now <= end;
+}
+
+function migrateLegacyVideosIfNeeded() {
+  const manifest = loadVideoPairsManifest();
+  if (manifest.pairs.length > 0 || manifest.legacyMigrated) return;
+
+  const idleInfo = idleVideos.getInfo();
+  if (!idleInfo) {
+    manifest.legacyMigrated = true;
+    saveVideoPairsManifest(manifest);
+    return;
+  }
+
+  const id = newPairId();
+  const pairDir = join(VIDEO_PAIRS_DIR, id);
+  mkdirSync(pairDir, { recursive: true });
+
+  copyFileSync(join(IDLE_VIDEO_DIR, idleInfo.filename), join(pairDir, `loop${extname(idleInfo.filename)}`));
+
+  const transitionInfo = transitionVideos.getInfo();
+  if (transitionInfo) {
+    copyFileSync(
+      join(TRANSITION_VIDEO_DIR, transitionInfo.filename),
+      join(pairDir, `transition${extname(transitionInfo.filename)}`),
+    );
+  }
+
+  manifest.pairs.push({
+    id,
+    text: 'Tap to start conversation',
+    startTime: '00:00',
+    endTime: '23:59',
+    order: 0,
+  });
+  manifest.legacyMigrated = true;
+  saveVideoPairsManifest(manifest);
+}
+
+function listVideoPairs() {
+  migrateLegacyVideosIfNeeded();
+  const manifest = loadVideoPairsManifest();
+  return manifest.pairs
+    .slice()
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    .map(buildPairInfo);
+}
+
+function findPairMeta(pairId) {
+  const manifest = loadVideoPairsManifest();
+  return manifest.pairs.find((p) => p.id === pairId) || null;
+}
+
+function clearPairVideo(pairId, basename) {
+  const pairDir = join(VIDEO_PAIRS_DIR, pairId);
+  if (!existsSync(pairDir)) return;
+  for (const name of readdirSync(pairDir)) {
+    if (name.startsWith(`${basename}.`)) {
+      try { unlinkSync(join(pairDir, name)); } catch {}
+    }
+  }
+}
+
+function createPairVideoUpload(pairId, basename) {
+  const pairDir = join(VIDEO_PAIRS_DIR, pairId);
+  return multer({
+    storage: multer.diskStorage({
+      destination: (_req, _file, cb) => {
+        if (!existsSync(pairDir)) mkdirSync(pairDir, { recursive: true });
+        cb(null, pairDir);
+      },
+      filename: (_req, file, cb) => {
+        const ext = extname(file.originalname || '').toLowerCase() || '.mp4';
+        cb(null, `${basename}${ext}`);
+      },
+    }),
+    limits: { fileSize: VIDEO_MAX_BYTES },
+    fileFilter: videoFileFilter,
+  }).single('video');
+}
+
+function createPairImageUpload(pairId, basename) {
+  const pairDir = join(VIDEO_PAIRS_DIR, pairId);
+  return multer({
+    storage: multer.diskStorage({
+      destination: (_req, _file, cb) => {
+        if (!existsSync(pairDir)) mkdirSync(pairDir, { recursive: true });
+        cb(null, pairDir);
+      },
+      filename: (_req, file, cb) => {
+        const ext = extname(file.originalname || '').toLowerCase() || '.png';
+        cb(null, `${basename}${ext}`);
+      },
+    }),
+    limits: { fileSize: IMAGE_MAX_BYTES },
+    fileFilter: imageFileFilter,
+  }).single('image');
+}
+
+function handlePairBackgroundUpload(pairId, req, res) {
+  const basename = 'background';
+  if (req.method === 'GET') {
+    const info = getPairAssetInfo(pairId, basename);
+    if (!info) {
+      sendJson(res, 404, { error: 'No background image uploaded for this pair.' });
+      return;
+    }
+    serveFile(res, join(VIDEO_PAIRS_DIR, pairId, info.filename));
+    return;
+  }
+  if (req.method === 'PUT' || req.method === 'POST') {
+    if (!findPairMeta(pairId)) {
+      sendJson(res, 404, { error: 'Video pair not found.' });
+      return;
+    }
+    clearPairVideo(pairId, basename);
+    const upload = createPairImageUpload(pairId, basename);
+    upload(req, res, (err) => {
+      if (err) {
+        const message = err.code === 'LIMIT_FILE_SIZE'
+          ? `File must be under ${Math.round(IMAGE_MAX_BYTES / (1024 * 1024))} MB.`
+          : (err.message || 'Upload failed.');
+        sendJson(res, 400, { error: message });
+        return;
+      }
+      if (!req.file) {
+        sendJson(res, 400, { error: 'No file provided.' });
+        return;
+      }
+      sendJson(res, 200, { ok: true, backgroundImage: getPairAssetInfo(pairId, basename) });
+    });
+    return;
+  }
+  if (req.method === 'DELETE') {
+    if (!findPairMeta(pairId)) {
+      sendJson(res, 404, { error: 'Video pair not found.' });
+      return;
+    }
+    clearPairVideo(pairId, basename);
+    sendJson(res, 200, { ok: true });
+    return;
+  }
+  sendJson(res, 405, { error: 'Method not allowed.' });
+}
+
+function handlePairVideoUpload(pairId, basename, resKey, req, res) {
+  if (req.method === 'GET') {
+    const info = getPairVideoInfo(pairId, basename);
+    if (!info) {
+      sendJson(res, 404, { error: `No ${basename} video uploaded for this pair.` });
+      return;
+    }
+    serveFile(res, join(VIDEO_PAIRS_DIR, pairId, info.filename));
+    return;
+  }
+  if (req.method === 'PUT' || req.method === 'POST') {
+    if (!findPairMeta(pairId)) {
+      sendJson(res, 404, { error: 'Video pair not found.' });
+      return;
+    }
+    clearPairVideo(pairId, basename);
+    const upload = createPairVideoUpload(pairId, basename);
+    upload(req, res, (err) => {
+      if (err) {
+        const message = err.code === 'LIMIT_FILE_SIZE'
+          ? `File must be under ${Math.round(VIDEO_MAX_BYTES / (1024 * 1024))} MB.`
+          : (err.message || 'Upload failed.');
+        sendJson(res, 400, { error: message });
+        return;
+      }
+      if (!req.file) {
+        sendJson(res, 400, { error: 'No file provided.' });
+        return;
+      }
+      sendJson(res, 200, { ok: true, [resKey]: getPairVideoInfo(pairId, basename) });
+    });
+    return;
+  }
+  if (req.method === 'DELETE') {
+    if (!findPairMeta(pairId)) {
+      sendJson(res, 404, { error: 'Video pair not found.' });
+      return;
+    }
+    clearPairVideo(pairId, basename);
+    sendJson(res, 200, { ok: true });
+    return;
+  }
+  sendJson(res, 405, { error: 'Method not allowed.' });
+}
+
+function handleVideoPairsApi(req, res, url) {
+  const pairBackgroundMatch = url.match(/^\/api\/video-pairs\/([^/]+)\/background$/);
+  if (pairBackgroundMatch) {
+    handlePairBackgroundUpload(pairBackgroundMatch[1], req, res);
+    return true;
+  }
+
+  const pairVideoMatch = url.match(/^\/api\/video-pairs\/([^/]+)\/(loop|transition)$/);
+  if (pairVideoMatch) {
+    const [, pairId, videoType] = pairVideoMatch;
+    const resKey = videoType === 'loop' ? 'loopVideo' : 'transitionVideo';
+    handlePairVideoUpload(pairId, videoType, resKey, req, res);
+    return true;
+  }
+
+  const pairMatch = url.match(/^\/api\/video-pairs\/([^/]+)$/);
+  if (pairMatch) {
+    const pairId = pairMatch[1];
+    if (req.method === 'PUT') {
+      readJsonBody(req, res, (parsed) => {
+        const manifest = loadVideoPairsManifest();
+        const meta = manifest.pairs.find((p) => p.id === pairId);
+        if (!meta) {
+          sendJson(res, 404, { error: 'Video pair not found.' });
+          return;
+        }
+        meta.text = String(parsed.text || '').slice(0, 500);
+        if (parsed.startTime != null) {
+          const startTime = normalizeTimeString(parsed.startTime);
+          if (!startTime) {
+            sendJson(res, 400, { error: 'Invalid start time. Use HH:MM (24-hour).' });
+            return;
+          }
+          meta.startTime = startTime;
+        }
+        if (parsed.endTime != null) {
+          const endTime = normalizeTimeString(parsed.endTime);
+          if (!endTime) {
+            sendJson(res, 400, { error: 'Invalid end time. Use HH:MM (24-hour).' });
+            return;
+          }
+          meta.endTime = endTime;
+        }
+        if (parsed.order != null) meta.order = Number(parsed.order) || 0;
+        saveVideoPairsManifest(manifest);
+        sendJson(res, 200, { ok: true, pair: buildPairInfo(meta) });
+      });
+      return true;
+    }
+    if (req.method === 'DELETE') {
+      const manifest = loadVideoPairsManifest();
+      const idx = manifest.pairs.findIndex((p) => p.id === pairId);
+      if (idx === -1) {
+        sendJson(res, 404, { error: 'Video pair not found.' });
+        return true;
+      }
+      manifest.pairs.splice(idx, 1);
+      saveVideoPairsManifest(manifest);
+      const pairDir = join(VIDEO_PAIRS_DIR, pairId);
+      if (existsSync(pairDir)) {
+        for (const name of readdirSync(pairDir)) {
+          try { unlinkSync(join(pairDir, name)); } catch {}
+        }
+        try { unlinkSync(pairDir); } catch {}
+      }
+      sendJson(res, 200, { ok: true });
+      return true;
+    }
+    sendJson(res, 405, { error: 'Method not allowed.' });
+    return true;
+  }
+
+  if (url === '/api/video-pairs') {
+    if (req.method === 'GET') {
+      sendJson(res, 200, { pairs: listVideoPairs() });
+      return true;
+    }
+    if (req.method === 'POST') {
+      readJsonBody(req, res, (parsed) => {
+        const manifest = loadVideoPairsManifest();
+        const maxOrder = manifest.pairs.reduce((m, p) => Math.max(m, p.order ?? 0), -1);
+        const meta = {
+          id: newPairId(),
+          text: String(parsed.text || 'Tap to start conversation').slice(0, 500),
+          startTime: normalizeTimeString(parsed.startTime) || '00:00',
+          endTime: normalizeTimeString(parsed.endTime) || '23:59',
+          order: maxOrder + 1,
+        };
+        manifest.pairs.push(meta);
+        saveVideoPairsManifest(manifest);
+        sendJson(res, 200, { ok: true, pair: buildPairInfo(meta) });
+      });
+      return true;
+    }
+    sendJson(res, 405, { error: 'Method not allowed.' });
+    return true;
+  }
+
+  return false;
+}
 const avatarBackgrounds = createImageStore(AVATAR_BG_DIR, 'background', '/api/avatar-background');
 const gameIconStores = Object.fromEntries(
   GAME_ICON_IDS.map((id) => [
@@ -275,6 +656,7 @@ const pages = {
   '/': 'index.html',
   '/config': 'config.html',
   '/avatar-config': 'avatar-config.html',
+  '/video-pairs': 'video-pairs.html',
   '/visme': 'visme/index.html',
 };
 
@@ -335,6 +717,8 @@ const server = createServer((req, res) => {
   if (url === '/api/config') {
     if (req.method === 'GET') {
       const cfg = loadConfig();
+      const videoPairs = listVideoPairs();
+      const firstPair = videoPairs.find((p) => p.loopVideo) || null;
       sendJson(res, 200, {
         apiKey: cfg.apiKey ?? '',
         instructions: cfg.instructions ?? '',
@@ -343,8 +727,9 @@ const server = createServer((req, res) => {
         avatar: normalizeAvatar(cfg.avatar),
         lipsync: normalizeLipsync(cfg.lipsync),
         lighting: normalizeLighting(cfg.lighting),
-        idleVideo: idleVideos.getInfo(),
-        transitionVideo: transitionVideos.getInfo(),
+        videoPairs,
+        idleVideo: firstPair?.loopVideo ?? idleVideos.getInfo(),
+        transitionVideo: firstPair?.transitionVideo ?? transitionVideos.getInfo(),
         avatarBackground: avatarBackgrounds.getInfo(),
         gameIcons: getGameIconsInfo(),
       });
@@ -418,6 +803,10 @@ const server = createServer((req, res) => {
 
   if (url === '/api/transition-video') {
     handleUploadApi(transitionVideos, 'transitionVideo', req, res, VIDEO_MAX_BYTES);
+    return;
+  }
+
+  if (handleVideoPairsApi(req, res, url)) {
     return;
   }
 

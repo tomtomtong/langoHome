@@ -274,34 +274,12 @@
         <p class="field-hint">Provider/model pair, e.g. <code>openai/gpt-4o-mini</code> or <code>openai/gpt-4.1-nano</code>.</p>
       </div>
       <hr class="section-divider" style="margin: 1.5rem 0 1.25rem">
-      <h2 style="margin: 0 0 0.375rem; font-size: 1rem">Idle screen video</h2>
-      <p style="margin: 0 0 1rem">Upload the video shown on the home screen before a conversation starts. Visitors tap anywhere on the video to continue.</p>
-      <div class="video-upload-wrap">
-        <video id="idle-video-preview" class="video-preview" controls loop muted playsinline hidden></video>
-        <p id="idle-video-status" class="field-hint" style="margin:0">No idle screen video uploaded.</p>
-        <input id="idle-video-file" type="file" accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov">
-        <div class="video-upload-actions">
-          <button type="button" id="btn-upload-idle-video" class="secondary">Upload idle screen video</button>
-          <button type="button" id="btn-remove-idle-video" class="secondary" hidden>Remove idle screen video</button>
-        </div>
-      </div>
-      <h2 style="margin: 1.5rem 0 0.375rem; font-size: 1rem">Transition video</h2>
-      <p style="margin: 0 0 1rem">Optional video that plays once after a tap, before the conversation starts. If omitted, tapping goes straight into the conversation.</p>
-      <div class="video-upload-wrap">
-        <video id="transition-video-preview" class="video-preview" controls muted playsinline hidden></video>
-        <p id="transition-video-status" class="field-hint" style="margin:0">No transition video uploaded.</p>
-        <input id="transition-video-file" type="file" accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov">
-        <div class="video-upload-actions">
-          <button type="button" id="btn-upload-transition-video" class="secondary">Upload transition video</button>
-          <button type="button" id="btn-remove-transition-video" class="secondary" hidden>Remove transition video</button>
-        </div>
-      </div>
-      <hr class="section-divider" style="margin: 1.5rem 0 1.25rem">
       <h2 style="margin: 0 0 0.375rem; font-size: 1rem">Conversation game icons</h2>
       <p style="margin: 0 0 1rem">Icons on the game shortcuts during a conversation. Upload a custom image per game, or leave empty to use the built-in default. Square PNG or WebP works best.</p>
       <div id="game-icons-grid" class="game-icons-grid"></div>
       <div class="actions">
         <button type="submit">Save</button>
+        <a class="btn" href="/video-pairs">Video pairs</a>
         <a class="btn" href="/avatar-config">Avatar settings</a>
         <a class="btn" href="/">Back to Voice</a>
       </div>
@@ -310,6 +288,7 @@
     <p class="hint">
       Settings are saved on the server (<code>config.json</code>) and persist across restarts.
       Avatar background, lighting, lipsync, and expressions are on <a href="/avatar-config">Avatar Settings</a>.
+      Loop and transition videos are on <a href="/video-pairs">Video Pairs</a>.
       On Railway, attach a volume mounted at <code>/app/data</code> so config survives redeploys.
       Get a key at <a href="https://platform.inworld.ai/" target="_blank" rel="noopener">platform.inworld.ai</a>.
       You can also set <code>INWORLD_API_KEY</code> as a server environment variable instead.
@@ -340,16 +319,6 @@
     const status = document.getElementById('status');
     const debugReportsEl = document.getElementById('debug-reports');
     const btnRefreshLogs = document.getElementById('btn-refresh-logs');
-    const idleVideoPreview = document.getElementById('idle-video-preview');
-    const idleVideoStatus = document.getElementById('idle-video-status');
-    const idleVideoFile = document.getElementById('idle-video-file');
-    const btnUploadIdleVideo = document.getElementById('btn-upload-idle-video');
-    const btnRemoveIdleVideo = document.getElementById('btn-remove-idle-video');
-    const transitionVideoPreview = document.getElementById('transition-video-preview');
-    const transitionVideoStatus = document.getElementById('transition-video-status');
-    const transitionVideoFile = document.getElementById('transition-video-file');
-    const btnUploadTransitionVideo = document.getElementById('btn-upload-transition-video');
-    const btnRemoveTransitionVideo = document.getElementById('btn-remove-transition-video');
     const gameIconsGrid = document.getElementById('game-icons-grid');
 
     let serverConfig = null;
@@ -477,41 +446,6 @@
     renderGameIconCards();
     wireGameIconUploads();
 
-    function applyVideoPreview(previewEl, statusEl, removeBtn, video, emptyLabel) {
-      if (video?.url) {
-        previewEl.src = video.url;
-        previewEl.hidden = false;
-        statusEl.textContent = `Uploaded: ${video.filename || 'video'}`;
-        removeBtn.hidden = false;
-        previewEl.load();
-      } else {
-        previewEl.removeAttribute('src');
-        previewEl.hidden = true;
-        statusEl.textContent = emptyLabel;
-        removeBtn.hidden = true;
-      }
-    }
-
-    function applyIdleVideo(idleVideo) {
-      applyVideoPreview(
-        idleVideoPreview,
-        idleVideoStatus,
-        btnRemoveIdleVideo,
-        idleVideo,
-        'No idle screen video uploaded.',
-      );
-    }
-
-    function applyTransitionVideo(transitionVideo) {
-      applyVideoPreview(
-        transitionVideoPreview,
-        transitionVideoStatus,
-        btnRemoveTransitionVideo,
-        transitionVideo,
-        'No transition video uploaded.',
-      );
-    }
-
     async function uploadAssetFile(apiPath, responseKey, file, fieldName) {
       const form = new FormData();
       form.append(fieldName, file);
@@ -528,86 +462,6 @@
         throw new Error(data.error || 'Remove failed.');
       }
     }
-
-    btnUploadIdleVideo.addEventListener('click', async () => {
-      const file = idleVideoFile.files?.[0];
-      if (!file) {
-        status.textContent = 'Choose a video file first.';
-        status.className = 'status err';
-        return;
-      }
-      btnUploadIdleVideo.disabled = true;
-      status.textContent = 'Uploading video…';
-      status.className = 'status ok';
-      try {
-        applyIdleVideo(await uploadAssetFile('/api/idle-video', 'idleVideo', file, 'video'));
-        idleVideoFile.value = '';
-        status.textContent = 'Idle screen video uploaded.';
-        status.className = 'status ok';
-      } catch (e) {
-        status.textContent = e.message || 'Could not upload video.';
-        status.className = 'status err';
-      } finally {
-        btnUploadIdleVideo.disabled = false;
-      }
-    });
-
-    btnRemoveIdleVideo.addEventListener('click', async () => {
-      if (!confirm('Remove the idle screen video?')) return;
-      btnRemoveIdleVideo.disabled = true;
-      try {
-        await removeVideoFile('/api/idle-video');
-        applyIdleVideo(null);
-        idleVideoFile.value = '';
-        status.textContent = 'Idle screen video removed.';
-        status.className = 'status ok';
-      } catch (e) {
-        status.textContent = e.message || 'Could not remove video.';
-        status.className = 'status err';
-      } finally {
-        btnRemoveIdleVideo.disabled = false;
-      }
-    });
-
-    btnUploadTransitionVideo.addEventListener('click', async () => {
-      const file = transitionVideoFile.files?.[0];
-      if (!file) {
-        status.textContent = 'Choose a transition video file first.';
-        status.className = 'status err';
-        return;
-      }
-      btnUploadTransitionVideo.disabled = true;
-      status.textContent = 'Uploading transition video…';
-      status.className = 'status ok';
-      try {
-        applyTransitionVideo(await uploadAssetFile('/api/transition-video', 'transitionVideo', file, 'video'));
-        transitionVideoFile.value = '';
-        status.textContent = 'Transition video uploaded.';
-        status.className = 'status ok';
-      } catch (e) {
-        status.textContent = e.message || 'Could not upload transition video.';
-        status.className = 'status err';
-      } finally {
-        btnUploadTransitionVideo.disabled = false;
-      }
-    });
-
-    btnRemoveTransitionVideo.addEventListener('click', async () => {
-      if (!confirm('Remove the transition video?')) return;
-      btnRemoveTransitionVideo.disabled = true;
-      try {
-        await removeVideoFile('/api/transition-video');
-        applyTransitionVideo(null);
-        transitionVideoFile.value = '';
-        status.textContent = 'Transition video removed.';
-        status.className = 'status ok';
-      } catch (e) {
-        status.textContent = e.message || 'Could not remove transition video.';
-        status.className = 'status err';
-      } finally {
-        btnRemoveTransitionVideo.disabled = false;
-      }
-    });
 
     function formatReportTime(iso) {
       try {
@@ -681,8 +535,6 @@ ${linesText.replace(/</g, '&lt;')}</pre>
       prompt.value = cfg.instructions ?? '';
       voice.value = cfg.voice ?? '';
       model.value = cfg.model ?? '';
-      applyIdleVideo(cfg.idleVideo);
-      applyTransitionVideo(cfg.transitionVideo);
       applyGameIcons(cfg.gameIcons);
       if (cfg.apiKey) {
         status.textContent = 'Settings saved.';

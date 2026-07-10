@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Video Pairs — Voice Agent</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      margin: 0;
+      min-height: 100vh;
+      background: #0f1117;
+      color: #e8eaed;
+      padding: 2rem 1rem;
+    }
+    .page {
+      width: 100%;
+      max-width: 760px;
+      margin: 0 auto;
+    }
+    .card {
+      padding: 2rem;
+      background: #1a1d27;
+      border-radius: 12px;
+      border: 1px solid #2a2f3a;
+    }
+    h1 { margin: 0 0 0.25rem; font-size: 1.25rem; }
+    .intro { margin: 0 0 1.5rem; color: #9aa0a6; font-size: 0.875rem; line-height: 1.5; }
+    label { display: block; margin-bottom: 0.5rem; font-size: 0.875rem; font-weight: 500; }
+    input[type="text"], textarea {
+      width: 100%;
+      padding: 0.625rem 0.75rem;
+      border: 1px solid #3c4043;
+      border-radius: 8px;
+      background: #0f1117;
+      color: #e8eaed;
+      font-size: 0.875rem;
+      font-family: inherit;
+    }
+    textarea {
+      min-height: 72px;
+      resize: vertical;
+      line-height: 1.5;
+    }
+    input:focus, textarea:focus { outline: none; border-color: #6c8cff; }
+    .field { margin-bottom: 1rem; }
+    .field-hint {
+      margin: 0.375rem 0 0;
+      font-size: 0.75rem;
+      color: #5f6368;
+      line-height: 1.4;
+    }
+    .actions { display: flex; gap: 0.75rem; margin-top: 1.5rem; flex-wrap: wrap; }
+    button, a.btn {
+      padding: 0.625rem 1rem;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: center;
+      text-decoration: none;
+    }
+    button {
+      border: none;
+      background: #6c8cff;
+      color: #fff;
+    }
+    button:hover { background: #5a7aef; }
+    button.secondary {
+      background: transparent;
+      border: 1px solid #3c4043;
+      color: #c4c7c5;
+    }
+    button.secondary:hover { border-color: #5f6368; color: #e8eaed; background: transparent; }
+    button.danger {
+      background: transparent;
+      border: 1px solid #8b3a3a;
+      color: #f28b82;
+    }
+    button.danger:hover { border-color: #c44; color: #ffb4ae; background: transparent; }
+    a.btn {
+      background: transparent;
+      border: 1px solid #3c4043;
+      color: #9aa0a6;
+    }
+    a.btn:hover { border-color: #5f6368; color: #e8eaed; }
+    .status {
+      margin-top: 1rem;
+      padding: 0.625rem 0.75rem;
+      border-radius: 8px;
+      font-size: 0.8125rem;
+      display: none;
+    }
+    .status.ok { display: block; background: #1e3a2f; color: #81c995; }
+    .status.err { display: block; background: #3a1e1e; color: #f28b82; }
+    .pair-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+    .pair-card {
+      border: 1px solid #2a2f3a;
+      border-radius: 10px;
+      background: #171a21;
+      padding: 1.25rem;
+    }
+    .pair-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .pair-card-header h2 {
+      margin: 0;
+      font-size: 0.9375rem;
+      font-weight: 600;
+    }
+    .video-section {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid #2a2f3a;
+    }
+    .video-section h3 {
+      margin: 0 0 0.5rem;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: #c4c7c5;
+    }
+    .video-upload-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 0.625rem;
+    }
+    .video-preview {
+      width: 100%;
+      max-height: 180px;
+      border-radius: 8px;
+      border: 1px solid #2a2f3a;
+      background: #0b1222;
+      object-fit: contain;
+    }
+    .image-preview {
+      width: 100%;
+      max-height: 160px;
+      border-radius: 8px;
+      border: 1px solid #2a2f3a;
+      background: #0b1222;
+      object-fit: contain;
+    }
+    .video-upload-actions {
+      display: flex;
+      gap: 0.625rem;
+      flex-wrap: wrap;
+    }
+    .video-upload-actions button {
+      flex: 0 0 auto;
+      padding: 0.5rem 0.875rem;
+    }
+    input[type="file"] {
+      width: 100%;
+      padding: 0.375rem 0;
+      color: #9aa0a6;
+      font-size: 0.8125rem;
+    }
+    .time-range {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+    @media (max-width: 520px) {
+      .time-range { grid-template-columns: 1fr; }
+    }
+    input[type="time"] {
+      width: 100%;
+      padding: 0.625rem 0.75rem;
+      border: 1px solid #3c4043;
+      border-radius: 8px;
+      background: #0f1117;
+      color: #e8eaed;
+      font-size: 0.875rem;
+      font-family: inherit;
+    }
+    input[type="time"]:focus { outline: none; border-color: #6c8cff; }
+    .empty-state {
+      padding: 1.25rem;
+      border: 1px dashed #3c4043;
+      border-radius: 8px;
+      color: #5f6368;
+      font-size: 0.875rem;
+      text-align: center;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="card">
+      <h1>Video Pairs</h1>
+      <p class="intro">
+        Upload loop and transition videos in pairs, each with a time window, prompt, and optional avatar background.
+        The voice app picks one pair at random within the current time window.
+        That pair's text is shown on screen and sent to Inworld as the session prompt.
+        Its background image is used behind Uncle Tommy during the conversation.
+      </p>
+
+      <div id="pair-list" class="pair-list">
+        <div class="empty-state">Loading…</div>
+      </div>
+
+      <div class="actions">
+        <button type="button" id="btn-add-pair">Add another pair</button>
+        <a class="btn" href="/config">Voice settings</a>
+        <a class="btn" href="/">Back to Voice</a>
+      </div>
+
+      <div id="status" class="status"></div>
+    </div>
+  </div>
+
+  <script>
+    const pairListEl = document.getElementById('pair-list');
+    const statusEl = document.getElementById('status');
+    const btnAddPair = document.getElementById('btn-add-pair');
+
+    let pairs = [];
+
+    function setStatus(message, type = 'ok') {
+      statusEl.textContent = message;
+      statusEl.className = `status ${type}`;
+    }
+
+    function applyVideoPreview(previewEl, statusEl, removeBtn, video, emptyLabel) {
+      if (video?.url) {
+        previewEl.src = video.url;
+        previewEl.hidden = false;
+        statusEl.textContent = `Uploaded: ${video.filename || 'video'}`;
+        removeBtn.hidden = false;
+        previewEl.load?.();
+      } else {
+        previewEl.removeAttribute('src');
+        previewEl.hidden = true;
+        statusEl.textContent = emptyLabel;
+        removeBtn.hidden = true;
+      }
+    }
+
+    function applyImagePreview(previewEl, statusEl, removeBtn, image, emptyLabel) {
+      if (image?.url) {
+        previewEl.src = image.url;
+        previewEl.hidden = false;
+        statusEl.textContent = `Uploaded: ${image.filename || 'image'}`;
+        removeBtn.hidden = false;
+      } else {
+        previewEl.removeAttribute('src');
+        previewEl.hidden = true;
+        statusEl.textContent = emptyLabel;
+        removeBtn.hidden = true;
+      }
+    }
+
+    async function uploadPairImage(pairId, file) {
+      const form = new FormData();
+      form.append('image', file);
+      const res = await fetch(`/api/video-pairs/${pairId}/background`, { method: 'PUT', body: form });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Upload failed.');
+      return data.backgroundImage;
+    }
+
+    async function removePairImage(pairId) {
+      const res = await fetch(`/api/video-pairs/${pairId}/background`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Remove failed.');
+      }
+    }
+
+    async function uploadPairVideo(pairId, videoType, file) {
+      const form = new FormData();
+      form.append('video', file);
+      const res = await fetch(`/api/video-pairs/${pairId}/${videoType}`, { method: 'PUT', body: form });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Upload failed.');
+      return data[videoType === 'loop' ? 'loopVideo' : 'transitionVideo'];
+    }
+
+    async function removePairVideo(pairId, videoType) {
+      const res = await fetch(`/api/video-pairs/${pairId}/${videoType}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Remove failed.');
+      }
+    }
+
+    async function savePairSettings(pairId, settings) {
+      const res = await fetch(`/api/video-pairs/${pairId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not save pair settings.');
+      return data.pair;
+    }
+
+    async function deletePair(pairId) {
+      const res = await fetch(`/api/video-pairs/${pairId}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Could not delete pair.');
+      }
+    }
+
+    async function createPair(text = 'Tap to start conversation') {
+      const res = await fetch('/api/video-pairs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not create pair.');
+      return data.pair;
+    }
+
+    function updatePairInState(pair) {
+      const idx = pairs.findIndex((p) => p.id === pair.id);
+      if (idx === -1) pairs.push(pair);
+      else pairs[idx] = pair;
+    }
+
+    function renderPairCard(pair, index) {
+      const card = document.createElement('div');
+      card.className = 'pair-card';
+      card.dataset.pairId = pair.id;
+
+      card.innerHTML = `
+        <div class="pair-card-header">
+          <h2>Pair ${index + 1}</h2>
+          <button type="button" class="danger btn-remove-pair">Remove pair</button>
+        </div>
+        <div class="field">
+          <label for="pair-text-${pair.id}">Prompt &amp; on-screen text</label>
+          <textarea id="pair-text-${pair.id}" placeholder="Used as the Inworld session prompt and shown over the loop video">${pair.text || ''}</textarea>
+          <p class="field-hint">Sent to Inworld when a conversation starts from this pair, and shown on the home screen.</p>
+        </div>
+        <div class="field">
+          <label>Active time period <span style="color:#5f6368;font-weight:400">(local time)</span></label>
+          <div class="time-range">
+            <div>
+              <label for="pair-start-${pair.id}" style="font-size:0.75rem;color:#9aa0a6">Start</label>
+              <input id="pair-start-${pair.id}" type="time" value="${pair.startTime || '00:00'}">
+            </div>
+            <div>
+              <label for="pair-end-${pair.id}" style="font-size:0.75rem;color:#9aa0a6">End</label>
+              <input id="pair-end-${pair.id}" type="time" value="${pair.endTime || '23:59'}">
+            </div>
+          </div>
+          <p class="field-hint">This pair is eligible only during this window. Overnight ranges work too (e.g. 22:00–06:00). Multiple pairs in the same window are chosen at random.</p>
+        </div>
+        <div class="video-section">
+          <h3>Avatar background image</h3>
+          <p class="field-hint" style="margin:0 0 0.625rem">Shown behind Uncle Tommy during conversations when this pair is active.</p>
+          <div class="video-upload-wrap">
+            <img class="image-preview bg-preview" alt="Background preview" hidden>
+            <p class="field-hint bg-status" style="margin:0">No background image uploaded.</p>
+            <input class="bg-file" type="file" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp">
+            <div class="video-upload-actions">
+              <button type="button" class="secondary btn-upload-bg">Upload background</button>
+              <button type="button" class="secondary btn-remove-bg" hidden>Remove background</button>
+            </div>
+          </div>
+        </div>
+        <div class="video-section">
+          <h3>Loop video</h3>
+          <p class="field-hint" style="margin:0 0 0.625rem">Plays on repeat before a conversation starts.</p>
+          <div class="video-upload-wrap">
+            <video class="video-preview loop-preview" controls loop muted playsinline hidden></video>
+            <p class="field-hint loop-status" style="margin:0">No loop video uploaded.</p>
+            <input class="loop-file" type="file" accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov">
+            <div class="video-upload-actions">
+              <button type="button" class="secondary btn-upload-loop">Upload loop video</button>
+              <button type="button" class="secondary btn-remove-loop" hidden>Remove loop video</button>
+            </div>
+          </div>
+        </div>
+        <div class="video-section">
+          <h3>Transition video</h3>
+          <p class="field-hint" style="margin:0 0 0.625rem">Optional. Plays once after a tap, before the conversation.</p>
+          <div class="video-upload-wrap">
+            <video class="video-preview transition-preview" controls muted playsinline hidden></video>
+            <p class="field-hint transition-status" style="margin:0">No transition video uploaded.</p>
+            <input class="transition-file" type="file" accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov">
+            <div class="video-upload-actions">
+              <button type="button" class="secondary btn-upload-transition">Upload transition video</button>
+              <button type="button" class="secondary btn-remove-transition" hidden>Remove transition video</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const textEl = card.querySelector(`#pair-text-${pair.id}`);
+      const startTimeEl = card.querySelector(`#pair-start-${pair.id}`);
+      const endTimeEl = card.querySelector(`#pair-end-${pair.id}`);
+      const loopPreview = card.querySelector('.loop-preview');
+      const loopStatus = card.querySelector('.loop-status');
+      const loopFile = card.querySelector('.loop-file');
+      const btnUploadLoop = card.querySelector('.btn-upload-loop');
+      const btnRemoveLoop = card.querySelector('.btn-remove-loop');
+      const transitionPreview = card.querySelector('.transition-preview');
+      const transitionStatus = card.querySelector('.transition-status');
+      const transitionFile = card.querySelector('.transition-file');
+      const btnUploadTransition = card.querySelector('.btn-upload-transition');
+      const btnRemoveTransition = card.querySelector('.btn-remove-transition');
+      const bgPreview = card.querySelector('.bg-preview');
+      const bgStatus = card.querySelector('.bg-status');
+      const bgFile = card.querySelector('.bg-file');
+      const btnUploadBg = card.querySelector('.btn-upload-bg');
+      const btnRemoveBg = card.querySelector('.btn-remove-bg');
+      const btnRemovePair = card.querySelector('.btn-remove-pair');
+
+      applyImagePreview(bgPreview, bgStatus, btnRemoveBg, pair.backgroundImage, 'No background image uploaded.');
+      applyVideoPreview(loopPreview, loopStatus, btnRemoveLoop, pair.loopVideo, 'No loop video uploaded.');
+      applyVideoPreview(
+        transitionPreview,
+        transitionStatus,
+        btnRemoveTransition,
+        pair.transitionVideo,
+        'No transition video uploaded.',
+      );
+
+      let settingsSaveTimer = null;
+      const scheduleSaveSettings = () => {
+        clearTimeout(settingsSaveTimer);
+        settingsSaveTimer = setTimeout(async () => {
+          try {
+            const updated = await savePairSettings(pair.id, {
+              text: textEl.value.trim(),
+              startTime: startTimeEl.value,
+              endTime: endTimeEl.value,
+            });
+            updatePairInState(updated);
+          } catch (e) {
+            setStatus(e.message || 'Could not save pair settings.', 'err');
+          }
+        }, 500);
+      };
+
+      textEl.addEventListener('input', scheduleSaveSettings);
+      startTimeEl.addEventListener('change', scheduleSaveSettings);
+      endTimeEl.addEventListener('change', scheduleSaveSettings);
+
+      btnUploadBg.addEventListener('click', async () => {
+        const file = bgFile.files?.[0];
+        if (!file) {
+          setStatus('Choose a background image first.', 'err');
+          return;
+        }
+        btnUploadBg.disabled = true;
+        setStatus('Uploading background image…', 'ok');
+        try {
+          const backgroundImage = await uploadPairImage(pair.id, file);
+          pair.backgroundImage = backgroundImage;
+          updatePairInState(pair);
+          applyImagePreview(bgPreview, bgStatus, btnRemoveBg, backgroundImage, 'No background image uploaded.');
+          bgFile.value = '';
+          setStatus('Background image uploaded.', 'ok');
+        } catch (e) {
+          setStatus(e.message || 'Could not upload background image.', 'err');
+        } finally {
+          btnUploadBg.disabled = false;
+        }
+      });
+
+      btnRemoveBg.addEventListener('click', async () => {
+        if (!confirm('Remove the background image for this pair?')) return;
+        btnRemoveBg.disabled = true;
+        try {
+          await removePairImage(pair.id);
+          pair.backgroundImage = null;
+          updatePairInState(pair);
+          applyImagePreview(bgPreview, bgStatus, btnRemoveBg, null, 'No background image uploaded.');
+          bgFile.value = '';
+          setStatus('Background image removed.', 'ok');
+        } catch (e) {
+          setStatus(e.message || 'Could not remove background image.', 'err');
+        } finally {
+          btnRemoveBg.disabled = false;
+        }
+      });
+
+      btnUploadLoop.addEventListener('click', async () => {
+        const file = loopFile.files?.[0];
+        if (!file) {
+          setStatus('Choose a loop video file first.', 'err');
+          return;
+        }
+        btnUploadLoop.disabled = true;
+        setStatus('Uploading loop video…', 'ok');
+        try {
+          const loopVideo = await uploadPairVideo(pair.id, 'loop', file);
+          pair.loopVideo = loopVideo;
+          updatePairInState(pair);
+          applyVideoPreview(loopPreview, loopStatus, btnRemoveLoop, loopVideo, 'No loop video uploaded.');
+          loopFile.value = '';
+          setStatus('Loop video uploaded.', 'ok');
+        } catch (e) {
+          setStatus(e.message || 'Could not upload loop video.', 'err');
+        } finally {
+          btnUploadLoop.disabled = false;
+        }
+      });
+
+      btnRemoveLoop.addEventListener('click', async () => {
+        if (!confirm('Remove the loop video for this pair?')) return;
+        btnRemoveLoop.disabled = true;
+        try {
+          await removePairVideo(pair.id, 'loop');
+          pair.loopVideo = null;
+          updatePairInState(pair);
+          applyVideoPreview(loopPreview, loopStatus, btnRemoveLoop, null, 'No loop video uploaded.');
+          loopFile.value = '';
+          setStatus('Loop video removed.', 'ok');
+        } catch (e) {
+          setStatus(e.message || 'Could not remove loop video.', 'err');
+        } finally {
+          btnRemoveLoop.disabled = false;
+        }
+      });
+
+      btnUploadTransition.addEventListener('click', async () => {
+        const file = transitionFile.files?.[0];
+        if (!file) {
+          setStatus('Choose a transition video file first.', 'err');
+          return;
+        }
+        btnUploadTransition.disabled = true;
+        setStatus('Uploading transition video…', 'ok');
+        try {
+          const transitionVideo = await uploadPairVideo(pair.id, 'transition', file);
+          pair.transitionVideo = transitionVideo;
+          updatePairInState(pair);
+          applyVideoPreview(
+            transitionPreview,
+            transitionStatus,
+            btnRemoveTransition,
+            transitionVideo,
+            'No transition video uploaded.',
+          );
+          transitionFile.value = '';
+          setStatus('Transition video uploaded.', 'ok');
+        } catch (e) {
+          setStatus(e.message || 'Could not upload transition video.', 'err');
+        } finally {
+          btnUploadTransition.disabled = false;
+        }
+      });
+
+      btnRemoveTransition.addEventListener('click', async () => {
+        if (!confirm('Remove the transition video for this pair?')) return;
+        btnRemoveTransition.disabled = true;
+        try {
+          await removePairVideo(pair.id, 'transition');
+          pair.transitionVideo = null;
+          updatePairInState(pair);
+          applyVideoPreview(
+            transitionPreview,
+            transitionStatus,
+            btnRemoveTransition,
+            null,
+            'No transition video uploaded.',
+          );
+          transitionFile.value = '';
+          setStatus('Transition video removed.', 'ok');
+        } catch (e) {
+          setStatus(e.message || 'Could not remove transition video.', 'err');
+        } finally {
+          btnRemoveTransition.disabled = false;
+        }
+      });
+
+      btnRemovePair.addEventListener('click', async () => {
+        if (!confirm('Remove this entire video pair?')) return;
+        btnRemovePair.disabled = true;
+        try {
+          await deletePair(pair.id);
+          pairs = pairs.filter((p) => p.id !== pair.id);
+          renderPairs();
+          setStatus('Pair removed.', 'ok');
+        } catch (e) {
+          setStatus(e.message || 'Could not remove pair.', 'err');
+          btnRemovePair.disabled = false;
+        }
+      });
+
+      return card;
+    }
+
+    function renderPairs() {
+      pairListEl.innerHTML = '';
+      if (!pairs.length) {
+        pairListEl.innerHTML = '<div class="empty-state">No video pairs yet. Click <strong>Add another pair</strong> to create one.</div>';
+        return;
+      }
+      pairs.forEach((pair, index) => {
+        pairListEl.appendChild(renderPairCard(pair, index));
+      });
+    }
+
+    async function loadPairs() {
+      try {
+        const res = await fetch('/api/video-pairs');
+        if (!res.ok) throw new Error('load failed');
+        const data = await res.json();
+        pairs = Array.isArray(data.pairs) ? data.pairs : [];
+        renderPairs();
+      } catch {
+        pairListEl.innerHTML = '<div class="empty-state">Could not load video pairs from server.</div>';
+      }
+    }
+
+    btnAddPair.addEventListener('click', async () => {
+      btnAddPair.disabled = true;
+      setStatus('Creating pair…', 'ok');
+      try {
+        const pair = await createPair();
+        pairs.push(pair);
+        renderPairs();
+        setStatus('New pair added.', 'ok');
+      } catch (e) {
+        setStatus(e.message || 'Could not create pair.', 'err');
+      } finally {
+        btnAddPair.disabled = false;
+      }
+    });
+
+    loadPairs();
+  </script>
+</body>
+</html>
