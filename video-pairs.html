@@ -199,9 +199,9 @@
     <div class="card">
       <h1>Video Pairs</h1>
       <p class="intro">
-        Upload loop and transition videos in pairs, each with a time window, prompt, and optional avatar background.
+        Upload loop and transition videos in pairs, each with a time window, session prompt, and optional avatar background.
         The voice app picks one pair at random within the current time window.
-        That pair's prompt is sent to Inworld when a conversation starts.
+        At conversation start, the <strong>system prompt</strong> (Voice Settings) and this pair&rsquo;s <strong>session prompt</strong> are combined and sent to Inworld.
         Its background image is used behind Uncle Tommy during the conversation.
       </p>
 
@@ -341,8 +341,8 @@
         </div>
         <div class="field">
           <label for="pair-text-${pair.id}">Session prompt</label>
-          <textarea id="pair-text-${pair.id}" placeholder="Sent to Inworld when a conversation starts from this pair">${pair.text || ''}</textarea>
-          <p class="field-hint">Used as the Inworld session prompt. The loop video screen always shows "Tap to start conversation".</p>
+          <textarea id="pair-text-${pair.id}" placeholder="Scene or activity for this time window, e.g. playing piano in the dining room">${pair.text || ''}</textarea>
+          <p class="field-hint">Added after the system prompt (Voice Settings) when this pair is active. Leave blank to use only the system prompt. The loop video screen always shows &ldquo;Tap to start conversation&rdquo;.</p>
         </div>
         <div class="field">
           <label>Active time period <span style="color:#5f6368;font-weight:400">(local time)</span></label>

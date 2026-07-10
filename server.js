@@ -83,6 +83,38 @@ const DEFAULT_USER_PROFILE = {
   favoriteMusic: '',
   favoritePlace: '',
   favoriteGameType: '',
+  learningLevelSource: '',
+  vocabularyLevel: '',
+  grammarFocus: '',
+  spellingLevel: '',
+  readingSpeed: '',
+  commonMistakes: '',
+  strongAreas: '',
+  weakAreas: '',
+  preferredDifficulty: '',
+  reviewFrequency: '',
+  motivationTriggers: '',
+  favoriteReward: '',
+  frustrationSignal: '',
+  encouragement: '',
+  competitionPreference: '',
+  correctionStyle: '',
+  preferredRoleplay: '',
+  fearDislike: '',
+  schoolGrade: '',
+  currentUnit: '',
+  weeklyVocabulary: '',
+  currentGrammar: '',
+  homeworkType: '',
+  dictationWords: '',
+  upcomingTest: '',
+  parentPriority: '',
+  recentlyMentioned: '',
+  recentAchievement: '',
+  recentMistake: '',
+  recentEmotion: '',
+  recentPromise: '',
+  nextFollowUp: '',
 };
 
 function normalizeUserProfile(raw) {
@@ -153,7 +185,52 @@ function buildProfileContext(profile) {
     ['Favorite Game Type', p.favoriteGameType],
   ].filter(([, value]) => value);
 
-  if (!basic.length && !favorites.length) return '';
+  const learningLevel = [
+    ['Source', p.learningLevelSource],
+    ['Vocabulary Level', p.vocabularyLevel],
+    ['Grammar Focus', p.grammarFocus],
+    ['Spelling Level', p.spellingLevel],
+    ['Reading Speed', p.readingSpeed],
+    ['Common Mistakes', p.commonMistakes],
+    ['Strong Areas', p.strongAreas],
+    ['Weak Areas', p.weakAreas],
+    ['Preferred Difficulty', p.preferredDifficulty],
+    ['Review Frequency', p.reviewFrequency],
+  ].filter(([, value]) => value);
+
+  const emotional = [
+    ['Motivation Triggers', p.motivationTriggers],
+    ['Favorite Reward', p.favoriteReward],
+    ['Frustration Signal', p.frustrationSignal],
+    ['Encouragement', p.encouragement],
+    ['Competition Preference', p.competitionPreference],
+    ['Correction Style', p.correctionStyle],
+    ['Preferred Roleplay', p.preferredRoleplay],
+    ['Fear / Dislike', p.fearDislike],
+  ].filter(([, value]) => value);
+
+  const schoolCurriculum = [
+    ['School Grade', p.schoolGrade],
+    ['Current Unit', p.currentUnit],
+    ['Weekly Vocabulary', p.weeklyVocabulary],
+    ['Current Grammar', p.currentGrammar],
+    ['Homework Type', p.homeworkType],
+    ['Dictation Words', p.dictationWords],
+    ['Upcoming Test', p.upcomingTest],
+    ['Parent Priority', p.parentPriority],
+  ].filter(([, value]) => value);
+
+  const conversationMemory = [
+    ['Recently Mentioned', p.recentlyMentioned],
+    ['Recent Achievement', p.recentAchievement],
+    ['Recent Mistake', p.recentMistake],
+    ['Recent Emotion', p.recentEmotion],
+    ['Recent Promise', p.recentPromise],
+    ['Next Follow-up', p.nextFollowUp],
+  ].filter(([, value]) => value);
+
+  if (!basic.length && !favorites.length && !learningLevel.length && !emotional.length
+    && !schoolCurriculum.length && !conversationMemory.length) return '';
 
   const lines = [
     'You are speaking with a child learner. Personalize the conversation using this profile.',
@@ -169,8 +246,28 @@ function buildProfileContext(profile) {
     for (const [label, value] of favorites) lines.push(`- ${label}: ${value}`);
     lines.push('');
   }
+  if (learningLevel.length) {
+    lines.push('Learning Level Profile:');
+    for (const [label, value] of learningLevel) lines.push(`- ${label}: ${value}`);
+    lines.push('');
+  }
+  if (emotional.length) {
+    lines.push('Emotional & Motivation Profile:');
+    for (const [label, value] of emotional) lines.push(`- ${label}: ${value}`);
+    lines.push('');
+  }
+  if (schoolCurriculum.length) {
+    lines.push('School & Curriculum Profile:');
+    for (const [label, value] of schoolCurriculum) lines.push(`- ${label}: ${value}`);
+    lines.push('');
+  }
+  if (conversationMemory.length) {
+    lines.push('Conversation Memory Profile:');
+    for (const [label, value] of conversationMemory) lines.push(`- ${label}: ${value}`);
+    lines.push('');
+  }
   lines.push(
-    'Use their name and interests naturally. Match their confidence level and attention span. Use their preferred praise style when encouraging them.',
+    'Use their name and interests naturally. Match their confidence level and attention span. Use their preferred praise style when encouraging them. Adapt difficulty, correction style, and rewards to their learning level and motivation profile. Watch for frustration signals and avoid things they dislike. Tie activities to their current school unit and weekly vocabulary when relevant. Reference conversation memory naturally — follow up on promises, achievements, and things they recently mentioned.',
   );
   return lines.join('\n');
 }
@@ -1400,8 +1497,8 @@ const HAPPY_TOOL_INSTRUCTION =
 const LEAVE_TOOL_INSTRUCTION =
   ' When the user says goodbye, bye, see you, see you later, I have to go, or otherwise indicates they want to end the conversation, respond with a brief farewell and immediately call the end_conversation tool in the same turn. Always call end_conversation when the user is done talking — do not keep chatting after a goodbye.';
 
-const PLAY_GAME_TOOL_INSTRUCTION =
-  ' When the user wants to play a game, asks to play something, says "let\'s play", "I want to play a game", or similar, respond with brief enthusiasm and call the play_game tool in the same turn. The app will randomly pick one of the available games.';
+const GAME_TOOLS_INSTRUCTION =
+  ' Three games are available: (1) Word-Whack Blitz — call play_wordwhack when they want whack-a-word, sentence completion, or "word whack". (2) Picture-Word Memory Match — call play_cardgame when they want the card game, memory match, flip cards, or picture-word match. (3) Find the Object — call play_findgame when they want find-the-object, tap to find, or spotting game. If they only say "let\'s play" or "play a game" without naming one, ask which of the three they want; call the matching tool once they choose or name a game clearly.';
 
 const HAPPY_TOOL = {
   type: 'function',
@@ -1436,17 +1533,49 @@ const END_CONVERSATION_TOOL = {
   },
 };
 
-const PLAY_GAME_TOOL = {
+const PLAY_WORDWHACK_TOOL = {
   type: 'function',
-  name: 'play_game',
+  name: 'play_wordwhack',
   description:
-    'Launches a random mini-game when the user wants to play. Call when they ask to play a game or want some game time.',
+    'Launches Word-Whack Blitz (complete the sentence / whack-a-word). Call when the user asks for this game by name or describes whacking words or finishing sentences.',
   parameters: {
     type: 'object',
     properties: {
       reason: {
         type: 'string',
-        description: 'What the user asked for, e.g. "I want to play a game"',
+        description: 'What the user asked for, e.g. "play word whack"',
+      },
+    },
+  },
+};
+
+const PLAY_CARDGAME_TOOL = {
+  type: 'function',
+  name: 'play_cardgame',
+  description:
+    'Launches Picture-Word Memory Match (flip cards and match words). Call when the user wants the card game, memory match, or picture-word game.',
+  parameters: {
+    type: 'object',
+    properties: {
+      reason: {
+        type: 'string',
+        description: 'What the user asked for, e.g. "play the card game"',
+      },
+    },
+  },
+};
+
+const PLAY_FINDGAME_TOOL = {
+  type: 'function',
+  name: 'play_findgame',
+  description:
+    'Launches Find the Object (tap the right thing in the scene). Call when the user wants find-the-object, spotting, or tap-to-find game.',
+  parameters: {
+    type: 'object',
+    properties: {
+      reason: {
+        type: 'string',
+        description: 'What the user asked for, e.g. "play find the object"',
       },
     },
   },
@@ -1456,9 +1585,9 @@ function buildSessionCfg({ instructions, voice, model } = {}) {
   const session = {
     type: 'realtime',
     model: model || DEFAULT_MODEL,
-    instructions: (instructions || DEFAULT_INSTRUCTIONS) + HAPPY_TOOL_INSTRUCTION + PLAY_GAME_TOOL_INSTRUCTION + LEAVE_TOOL_INSTRUCTION,
+    instructions: (instructions || DEFAULT_INSTRUCTIONS) + HAPPY_TOOL_INSTRUCTION + GAME_TOOLS_INSTRUCTION + LEAVE_TOOL_INSTRUCTION,
     output_modalities: ['audio', 'text'],
-    tools: [HAPPY_TOOL, PLAY_GAME_TOOL, END_CONVERSATION_TOOL],
+    tools: [HAPPY_TOOL, PLAY_WORDWHACK_TOOL, PLAY_CARDGAME_TOOL, PLAY_FINDGAME_TOOL, END_CONVERSATION_TOOL],
     tool_choice: 'auto',
     audio: {
       input: {

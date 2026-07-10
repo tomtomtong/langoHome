@@ -326,7 +326,8 @@
       gap: 0.75rem;
     }
 
-    #btn-save-camera {
+    #btn-save-camera,
+    #btn-cancel-camera {
       display: none;
       padding: 0.35rem 0.65rem;
       font-size: 0.75rem;
@@ -335,15 +336,21 @@
       backdrop-filter: blur(8px);
     }
 
-    body.camera-edit-mode #btn-save-camera {
+    body.camera-edit-mode #btn-save-camera,
+    body.camera-edit-mode #btn-cancel-camera {
       display: inline-block;
+    }
+
+    #btn-cancel-camera {
+      color: #e8eaed;
     }
 
     body.camera-edit-mode #avatar-status {
       color: #c4c7c5;
     }
 
-    #btn-save-camera:hover:not(:disabled) { background: rgba(255, 255, 255, 0.18); }
+    #btn-save-camera:hover:not(:disabled),
+    #btn-cancel-camera:hover:not(:disabled) { background: rgba(255, 255, 255, 0.18); }
 
     #camera-save-status {
       display: none;
@@ -834,6 +841,7 @@
         <span id="avatar-status"></span>
         <div class="overlay-top-actions">
           <span id="camera-save-status" aria-live="polite"></span>
+          <button id="btn-cancel-camera" type="button">Cancel</button>
           <button id="btn-save-camera" type="button">Save camera</button>
           <a href="/admin" id="admin-link" hidden>Admin</a>
         </div>
@@ -905,6 +913,7 @@
     const errIdleEl = document.getElementById("err-idle");
     const avatarStatusEl = document.getElementById("avatar-status");
     const btnSaveCamera = document.getElementById("btn-save-camera");
+    const btnCancelCamera = document.getElementById("btn-cancel-camera");
     const btnCameraUp = document.getElementById("btn-camera-up");
     const btnCameraDown = document.getElementById("btn-camera-down");
     const cameraSaveStatusEl = document.getElementById("camera-save-status");
@@ -930,7 +939,9 @@
     const captionAgentEl = document.getElementById("caption-agent");
     const captionAgentTextEl = document.getElementById("caption-agent-text");
     const HAPPY = "happy";
-    const PLAY_GAME = "play_game";
+    const PLAY_WORDWHACK = "play_wordwhack";
+    const PLAY_CARDGAME = "play_cardgame";
+    const PLAY_FINDGAME = "play_findgame";
     const END_CONVERSATION = "end_conversation";
     const CHICKEN_DANCE_URL = "/ChickenDance.fbx";
     const DEBUG_LOG_MAX = 80;
@@ -990,6 +1001,7 @@
     let avatar = null;
     let avatarLoading = null;
     let cameraEditMode = false;
+    let cameraEditBaseline = null;
     let avatarReadyMessage = "";
     let tripleClickCount = 0;
     let tripleClickTimer = null;
@@ -1043,6 +1055,10 @@
       return GAME_CATALOG[Math.floor(Math.random() * GAME_CATALOG.length)];
     }
 
+    function getGameById(id) {
+      return GAME_CATALOG.find((g) => g.id === id) || null;
+    }
+
     function spawnGameLaunchConfetti() {
       if (!gameLaunchConfetti) return;
       gameLaunchConfetti.replaceChildren();
@@ -1065,50 +1081,62 @@
       return new Promise((resolve) => setTimeout(resolve, ms));
     }
 
-    async function playGameLaunchTransition(game) {
+    async function playGameLaunchTransition(game, { surprise = false } = {}) {
       if (!gameLaunchOverlay || !game) return;
 
       launchingGame = true;
       gameLaunchOverlay.classList.add("visible");
       gameLaunchOverlay.setAttribute("aria-hidden", "false");
       gameLaunchCard.className = `game-launch-card theme-${game.theme}`;
-      gameLaunchHeading.textContent = "Picking a surprise game…";
-      gameLaunchName.textContent = "";
-      gameLaunchSub.textContent = "Uncle Tommy is spinning the wheel";
-      gameLaunchReel.className = "game-launch-reel shuffling";
       setGameLaunchProgress(8);
       spawnGameLaunchConfetti();
 
-      const shuffleMs = 1800;
-      const shuffleStart = performance.now();
-      let shuffleIndex = 0;
+      if (surprise) {
+        gameLaunchHeading.textContent = "Picking a surprise game…";
+        gameLaunchName.textContent = "";
+        gameLaunchSub.textContent = "Uncle Tommy is spinning the wheel";
+        gameLaunchReel.className = "game-launch-reel shuffling";
 
-      await new Promise((resolve) => {
-        const tick = () => {
-          const elapsed = performance.now() - shuffleStart;
-          const candidate = GAME_CATALOG[shuffleIndex % GAME_CATALOG.length];
-          gameLaunchIcon.src = candidate.icon;
-          gameLaunchIcon.alt = candidate.name;
-          shuffleIndex += 1;
-          setGameLaunchProgress(8 + Math.min(52, (elapsed / shuffleMs) * 52));
-          if (elapsed >= shuffleMs) {
-            resolve();
-            return;
-          }
+        const shuffleMs = 1800;
+        const shuffleStart = performance.now();
+        let shuffleIndex = 0;
+
+        await new Promise((resolve) => {
+          const tick = () => {
+            const elapsed = performance.now() - shuffleStart;
+            const candidate = GAME_CATALOG[shuffleIndex % GAME_CATALOG.length];
+            gameLaunchIcon.src = candidate.icon;
+            gameLaunchIcon.alt = candidate.name;
+            shuffleIndex += 1;
+            setGameLaunchProgress(8 + Math.min(52, (elapsed / shuffleMs) * 52));
+            if (elapsed >= shuffleMs) {
+              resolve();
+              return;
+            }
+            requestAnimationFrame(tick);
+          };
           requestAnimationFrame(tick);
-        };
-        requestAnimationFrame(tick);
-      });
+        });
 
-      gameLaunchReel.className = "game-launch-reel landed";
-      gameLaunchIcon.src = game.icon;
-      gameLaunchIcon.alt = game.name;
-      gameLaunchHeading.textContent = "You got…";
-      gameLaunchName.textContent = game.name;
-      gameLaunchSub.textContent = game.sub;
-      setGameLaunchProgress(72);
-      spawnGameLaunchConfetti();
-      await waitMs(900);
+        gameLaunchReel.className = "game-launch-reel landed";
+        gameLaunchIcon.src = game.icon;
+        gameLaunchIcon.alt = game.name;
+        gameLaunchHeading.textContent = "You got…";
+        gameLaunchName.textContent = game.name;
+        gameLaunchSub.textContent = game.sub;
+        setGameLaunchProgress(72);
+        spawnGameLaunchConfetti();
+        await waitMs(900);
+      } else {
+        gameLaunchReel.className = "game-launch-reel landed";
+        gameLaunchIcon.src = game.icon;
+        gameLaunchIcon.alt = game.name;
+        gameLaunchHeading.textContent = "Great choice!";
+        gameLaunchName.textContent = game.name;
+        gameLaunchSub.textContent = game.sub;
+        setGameLaunchProgress(72);
+        await waitMs(700);
+      }
 
       gameLaunchHeading.textContent = "Loading game!";
       gameLaunchSub.textContent = "Get ready to play";
@@ -1122,13 +1150,14 @@
       window.location.assign(game.url);
     }
 
-    async function launchRandomGame(reason = "user asked to play", chosenGame = null) {
+    async function launchGame(reason = "user asked to play", chosenGame = null) {
       if (launchingGame) return null;
+      const surprise = !chosenGame;
       const game = chosenGame || pickRandomGame();
-      uiLog("game", `play_game (${reason}) → ${game.id}`, "hello");
+      uiLog("game", `launch ${game.id} (${reason})`, "hello", { surprise });
       setStatus(`Launching ${game.name}…`, true);
       try {
-        await playGameLaunchTransition(game);
+        await playGameLaunchTransition(game, { surprise });
       } catch (e) {
         uiLog("game", `transition error: ${e.message}`, "warn");
       }
@@ -1504,9 +1533,10 @@
     }
 
     function getSessionInstructions(cfg) {
-      const pairPrompt = activeVideoPair?.text?.trim();
-      if (pairPrompt) return pairPrompt;
-      return cfg.instructions?.trim() || DEFAULT_PROMPT;
+      const systemPrompt = cfg.instructions?.trim() || DEFAULT_PROMPT;
+      const sessionPrompt = activeVideoPair?.text?.trim();
+      if (!sessionPrompt) return systemPrompt;
+      return `${systemPrompt}\n\nSession context:\n${sessionPrompt}`;
     }
 
     function setupIdleVideosFromConfig(cfg, { autoplay = false } = {}) {
@@ -1838,6 +1868,19 @@
 
     btnSaveCamera.addEventListener("click", saveCameraSettings);
 
+    function cancelCameraEdit() {
+      if (!cameraEditMode) return;
+      if (avatar?.loaded && cameraEditBaseline) {
+        avatar.applyCameraSettings(cameraEditBaseline);
+      }
+      setCameraEditMode(false);
+    }
+
+    btnCancelCamera.addEventListener("click", (e) => {
+      e.stopPropagation();
+      cancelCameraEdit();
+    });
+
     function nudgeCameraHeight(deltaY) {
       if (!cameraEditMode || !avatar?.loaded) return;
       avatar.nudgeCameraHeight(deltaY);
@@ -1855,7 +1898,7 @@
 
     function updateAvatarStatusDisplay() {
       if (cameraEditMode) {
-        avatarStatusEl.textContent = "Camera edit · drag to pan · pinch to zoom · ▲▼ height";
+        avatarStatusEl.textContent = "Camera edit · drag to pan · pinch to zoom · ▲▼ height · Cancel to discard";
       } else if (avatarReadyMessage) {
         avatarStatusEl.textContent = avatarReadyMessage;
       } else {
@@ -1864,10 +1907,16 @@
     }
 
     function setCameraEditMode(enabled) {
+      if (enabled && avatar?.loaded) {
+        cameraEditBaseline = normalizeAvatar(avatar.getCameraSettings());
+      }
       cameraEditMode = enabled;
       document.body.classList.toggle("camera-edit-mode", enabled);
       avatar?.setInteractiveCamera(enabled);
-      if (!enabled) cameraSaveStatusEl.textContent = "";
+      if (!enabled) {
+        cameraEditBaseline = null;
+        cameraSaveStatusEl.textContent = "";
+      }
       updateAvatarStatusDisplay();
     }
 
@@ -1891,6 +1940,12 @@
 
     document.getElementById("session-overlay").addEventListener("click", onAvatarStageClick);
     document.getElementById("vrm-canvas").addEventListener("click", onAvatarStageClick);
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape" || !cameraEditMode) return;
+      e.preventDefault();
+      cancelCameraEdit();
+    });
 
     async function ensureAvatar() {
       if (avatar) return avatar;
@@ -2231,13 +2286,24 @@
         return;
       }
 
-      if (name === PLAY_GAME) {
+      const gameToolMatch = {
+        [PLAY_WORDWHACK]: "wordwhack",
+        [PLAY_CARDGAME]: "cardgame",
+        [PLAY_FINDGAME]: "findgame",
+      }[name];
+
+      if (gameToolMatch) {
         let reason = "user asked to play a game";
         try {
           const args = JSON.parse(argsJson || "{}");
           if (args.reason) reason = args.reason;
         } catch {}
-        const game = pickRandomGame();
+        const game = getGameById(gameToolMatch);
+        if (!game) {
+          sendFunctionOutput(callId, { success: false, error: `Unknown game: ${gameToolMatch}` });
+          ws.send(JSON.stringify({ type: "response.create" }));
+          return;
+        }
         sendFunctionOutput(callId, {
           success: true,
           reason,
@@ -2245,7 +2311,7 @@
           game_name: game.name,
         });
         ws.send(JSON.stringify({ type: "response.create" }));
-        launchRandomGame(reason, game);
+        launchGame(reason, game);
         return;
       }
 
