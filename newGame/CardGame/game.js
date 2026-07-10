@@ -39,7 +39,23 @@ const levelCompleteEl = document.getElementById('level-complete');
 const completeStarsEl = document.getElementById('complete-stars');
 const completeScoreEl = document.getElementById('complete-score');
 
-/* --- Full-viewport layout (no transform scaling) --- */
+/* --- Responsive scaling to fit screen (max scale 4.0 for bigger display) --- */
+function fitGameToScreen() {
+  const gameEl = document.getElementById('game');
+  if (!gameEl) return;
+  const baseW = 800;
+  const baseH = 600;
+  const winW = window.innerWidth;
+  const winH = window.innerHeight;
+  const scaleX = winW / baseW;
+  const scaleY = winH / baseH;
+  const scale = Math.min(scaleX, scaleY, 4.0);
+  gameEl.style.transform = 'scale(' + scale + ')';
+  gameEl.style.transformOrigin = 'center center';
+}
+window.addEventListener('resize', fitGameToScreen);
+window.addEventListener('load', fitGameToScreen);
+setTimeout(fitGameToScreen, 50);
 
 function shuffle(arr) {
   for (let i = arr.length - 1; i > 0; i--) {
@@ -267,6 +283,7 @@ function startGame() {
   beginPreview(() => {
     timerId = setInterval(tick, 1000);
   });
+  fitGameToScreen();
   if (typeof window.__bgaMarkDirty === 'function') window.__bgaMarkDirty();
 }
 
@@ -295,6 +312,7 @@ window.setGameState = function(state) {
   gameOver = !!state.gameOver;
   lockBoard = false;
   render();
+  fitGameToScreen();
   if (!gameOver) timerId = setInterval(tick, 1000);
 };
 

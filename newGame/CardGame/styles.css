@@ -15,15 +15,17 @@ html, body {
   height: 100vh;
   overflow: hidden;
   font-family: 'Segoe UI', sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   color: #fff;
 }
 body {
   background: linear-gradient(135deg,#2b5876,#4e4376);
 }
 #game {
-  width: 100vw;
-  height: 100vh;
-  max-width: 100vw;
+  width: 800px;
+  height: 600px;
   padding: 10px 20px;
   text-align: center;
   position: relative;
@@ -31,7 +33,7 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  box-sizing: border-box;
+  transform-origin: center center;
 }
 h1 { margin: 6px; font-size: 18px; }
 .title-text {
@@ -46,10 +48,12 @@ h1 { margin: 6px; font-size: 18px; }
 #status-row {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   gap: 24px;
-  margin: 4px auto;
+  width: 100%;
+  margin: 4px 0;
   flex-wrap: wrap;
+  box-sizing: border-box;
 }
 #timer-display {
   display: flex;
@@ -122,7 +126,7 @@ h1 { margin: 6px; font-size: 18px; }
   grid-gap: 10px;
   justify-content: center;
   width: 100%;
-  max-width: calc(100vw - 40px);
+  max-width: 100%;
   flex: 1;
   align-content: center;
   margin: 0 auto;
@@ -174,12 +178,13 @@ h1 { margin: 6px; font-size: 18px; }
   padding: 10px 28px 8px;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   gap: 8px;
+  box-sizing: border-box;
 }
 .progress-frame {
   position: relative;
-  width: min(620px, calc(100vw - 56px));
+  width: 100%;
   height: 26px;
   background: linear-gradient(180deg, var(--wood-1), var(--wood-2));
   border: 4px solid var(--wood-3);
