@@ -270,7 +270,7 @@ function migrateLegacyVideosIfNeeded() {
 
   manifest.pairs.push({
     id,
-    text: 'Tap to start conversation',
+    text: '',
     startTime: '00:00',
     endTime: '23:59',
     order: 0,
@@ -513,7 +513,7 @@ function handleVideoPairsApi(req, res, url) {
         const maxOrder = manifest.pairs.reduce((m, p) => Math.max(m, p.order ?? 0), -1);
         const meta = {
           id: newPairId(),
-          text: String(parsed.text || 'Tap to start conversation').slice(0, 500),
+          text: String(parsed.text || '').slice(0, 500),
           startTime: normalizeTimeString(parsed.startTime) || '00:00',
           endTime: normalizeTimeString(parsed.endTime) || '23:59',
           order: maxOrder + 1,

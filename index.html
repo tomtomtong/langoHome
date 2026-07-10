@@ -1515,10 +1515,8 @@
       activeVideoPair = pickVideoPair(cfg.videoPairs);
       let result;
       if (activeVideoPair) {
-        idleVideoHintText = activeVideoPair.text?.trim() || "Tap to start conversation";
         result = setupIdleVideos(activeVideoPair.loopVideo, activeVideoPair.transitionVideo, {
           autoplay,
-          hintText: idleVideoHintText,
         });
       } else {
         const hasConfiguredPairs = (cfg.videoPairs || []).some((p) => p.loopVideo?.url);
@@ -1749,8 +1747,6 @@
       if (nextId === currentId) {
         if (nextPair) {
           activeVideoPair = nextPair;
-          idleVideoHintText = nextPair.text?.trim() || "Tap to start conversation";
-          if (idleVideoHint) idleVideoHint.textContent = idleVideoHintText;
           applyActivePairBackground(cfg);
         }
         return;

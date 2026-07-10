@@ -200,7 +200,7 @@
       <p class="intro">
         Upload loop and transition videos in pairs, each with a time window, prompt, and optional avatar background.
         The voice app picks one pair at random within the current time window.
-        That pair's text is shown on screen and sent to Inworld as the session prompt.
+        That pair's prompt is sent to Inworld when a conversation starts.
         Its background image is used behind Uncle Tommy during the conversation.
       </p>
 
@@ -312,7 +312,7 @@
       }
     }
 
-    async function createPair(text = 'Tap to start conversation') {
+    async function createPair(text = '') {
       const res = await fetch('/api/video-pairs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -340,9 +340,9 @@
           <button type="button" class="danger btn-remove-pair">Remove pair</button>
         </div>
         <div class="field">
-          <label for="pair-text-${pair.id}">Prompt &amp; on-screen text</label>
-          <textarea id="pair-text-${pair.id}" placeholder="Used as the Inworld session prompt and shown over the loop video">${pair.text || ''}</textarea>
-          <p class="field-hint">Sent to Inworld when a conversation starts from this pair, and shown on the home screen.</p>
+          <label for="pair-text-${pair.id}">Session prompt</label>
+          <textarea id="pair-text-${pair.id}" placeholder="Sent to Inworld when a conversation starts from this pair">${pair.text || ''}</textarea>
+          <p class="field-hint">Used as the Inworld session prompt. The loop video screen always shows "Tap to start conversation".</p>
         </div>
         <div class="field">
           <label>Active time period <span style="color:#5f6368;font-weight:400">(local time)</span></label>
