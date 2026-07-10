@@ -1064,13 +1064,12 @@
     let pendingEndConversation = false;
     let byebyeAnimationPromise = null;
     let endConversationCloseTimer = null;
-    let goodbyeNudged = false;
     const pendingFunctionCalls = new Map();
 
     // Client-side fallback: Inworld's idle_timeout_ms is not firing, so we
     // nudge the AI ourselves after the user stays silent post-response.
-    const IDLE_NUDGE_MS = 10000;
-    const MAX_IDLE_NUDGES = 2;
+    const IDLE_NUDGE_MS = 15000;
+    const MAX_IDLE_NUDGES = 4;
     let idleNudgeTimer = null;
     let idleNudgeCount = 0;
     let idleEndTimer = null;
@@ -1211,14 +1210,13 @@
           idleEndTimer = null;
           if (!active || pendingEndConversation || ws?.readyState !== WebSocket.OPEN) return;
           if (playing || queue.length > 0) { scheduleIdleNudge(); return; }
-          uiLog("idle", `user silent after ${MAX_IDLE_NUDGES} nudges → ending conversation`, "warn");
-          pendingEndConversation = true;
+          uiLog("idle", `user silent after ${MAX_IDLE_NUDGES} nudges → suggesting farewell`, "warn");
           ws.send(JSON.stringify({
             type: "conversation.item.create",
             item: {
               type: "message",
               role: "user",
-              content: [{ type: "input_text", text: "[The user has not responded after repeated check-ins. Give a brief, warm farewell and call end_conversation now.]" }],
+              content: [{ type: "input_text", text: "[The user has been silent for a while after several check-ins. If they seem done, give a brief warm farewell and call end_conversation. Otherwise encourage them one more time.]" }],
             },
           }));
           ws.send(JSON.stringify({ type: "response.create" }));
@@ -1238,7 +1236,7 @@
           item: {
             type: "message",
             role: "user",
-            content: [{ type: "input_text", text: "[The user has been silent for 10 seconds. Briefly and warmly check in and encourage them to keep talking.]" }],
+            content: [{ type: "input_text", text: `[The user has been silent for ${IDLE_NUDGE_MS / 1000} seconds. Briefly and warmly check in and encourage them to keep talking.]` }],
           },
         }));
         ws.send(JSON.stringify({ type: "response.create" }));
@@ -1259,7 +1257,6 @@
         wakeWordRestartAttempts,
         wakeWordRestartTimer: !!wakeWordRestartTimer,
         pendingEndConversation,
-        goodbyeNudged,
         playing,
         queueLen: queue.length,
         ws: wsStateLabel(),
@@ -2077,7 +2074,6 @@
       active = false;
       pendingEndConversation = false;
       pendingFunctionCalls.clear();
-      goodbyeNudged = false;
       cancelIdleNudge();
       idleNudgeCount = 0;
       if (endConversationCloseTimer) {
@@ -2195,12 +2191,6 @@
       };
     }
 
-    function isGoodbye(text) {
-      const t = text.toLowerCase().trim();
-      return /\b(goodbye|good bye|bye bye|see you|see ya|gotta go|got to go|i'?m leaving|im leaving|take care|farewell|talk later|catch you later)\b/.test(t)
-        || /\bbye\b/.test(t);
-    }
-
     function isDanceRequest(text) {
       const t = text.toLowerCase().trim();
       if (!t) return false;
@@ -2221,24 +2211,6 @@
       lastChickenDanceAt = now;
       uiLog("dance", `chicken dance (${reason})`, "hello");
       avatar?.playMixamoAnimation(CHICKEN_DANCE_URL);
-    }
-
-    function nudgeEndConversation() {
-      if (pendingEndConversation || goodbyeNudged || ws?.readyState !== WebSocket.OPEN) {
-        uiLog("end", "nudgeEndConversation skipped", "warn", snapshotHelloCycleState());
-        return;
-      }
-      uiLog("end", "goodbye detected → nudge agent to call end_conversation", "hello");
-      goodbyeNudged = true;
-      ws.send(JSON.stringify({
-        type: "conversation.item.create",
-        item: {
-          type: "message",
-          role: "user",
-          content: [{ type: "input_text", text: "[The user said goodbye. Give a brief farewell and call end_conversation now.]" }],
-        },
-      }));
-      ws.send(JSON.stringify({ type: "response.create" }));
     }
 
     function resetResponseState(id) {
@@ -2532,13 +2504,11 @@
         trackFunctionCallItem(e.item);
       } else if (e.type === "conversation.item.input_audio_transcription.completed") {
         if (e.transcript?.trim()) showUserHeard(e.transcript);
-        if (isGoodbye(e.transcript)) nudgeEndConversation();
         if (isDanceRequest(e.transcript)) triggerChickenDance(e.transcript);
       } else if (e.type === "session.updated" || e.type === "session.created") {
         setStatus("Conversation active — speak anytime", true);
         avatar?.refreshAfterVisible();
       } else if (e.type === "input_audio_buffer.speech_started") {
-        goodbyeNudged = false;
         idleNudgeCount = 0;
         cancelIdleNudge();
         showUserListening();

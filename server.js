@@ -1500,7 +1500,7 @@ const HAPPY_TOOL_INSTRUCTION =
   ' Call the happy tool (chicken dance) whenever the user asks to dance, says "chicken dance", wants a funny move or celebration, or says anything that suggests they want Uncle Tommy to dance. Trigger on short phrases like "dance", "do a dance", "chicken dance", "dance for me", or "can you dance". Err on the side of calling it — kids love the chicken dance.';
 
 const LEAVE_TOOL_INSTRUCTION =
-  ' When the user says goodbye, bye, see you, see you later, I have to go, or otherwise indicates they want to end the conversation, respond with a brief farewell and immediately call the end_conversation tool in the same turn. Always call end_conversation when the user is done talking — do not keep chatting after a goodbye.';
+  ' Call end_conversation only when the user clearly wants to stop the session — e.g. says goodbye, bye bye, see you later, I have to go, or I\'m leaving. Do NOT call it for casual phrases like "nice to see you", "take care of", or "talk later about…". When they clearly want to leave, give a brief farewell and call end_conversation in the same turn.';
 
 const GAME_TOOLS_INSTRUCTION =
   ' Three games are available: (1) Word-Whack Blitz — call play_wordwhack when they want whack-a-word, sentence completion, or "word whack". (2) Picture-Word Memory Match — call play_cardgame when they want the card game, memory match, flip cards, or picture-word match. (3) Find the Object — call play_findgame when they want find-the-object, tap to find, or spotting game. If they only say "let\'s play" or "play a game" without naming one, ask which of the three they want; call the matching tool once they choose or name a game clearly.';
@@ -1525,7 +1525,7 @@ const END_CONVERSATION_TOOL = {
   type: 'function',
   name: 'end_conversation',
   description:
-    'Ends the session. Call this whenever the user says goodbye, bye, see you later, or wants to stop talking.',
+    'Ends the voice session. Call only when the user clearly wants to leave — explicit goodbyes or saying they have to go. Do not call for ambiguous or partial phrases.',
   parameters: {
     type: 'object',
     properties: {
