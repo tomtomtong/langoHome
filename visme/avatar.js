@@ -728,7 +728,7 @@ export class TommyAvatar {
     }
   }
 
-  async playMixamoAnimation(url) {
+  async playMixamoAnimation(url, { resumeIdle = true } = {}) {
     if (!this.vrm || !this.mixer) return false;
 
     try {
@@ -743,15 +743,28 @@ export class TommyAvatar {
 
       if (this.idleAction) this.idleAction.fadeOut(0.3);
 
-      action.reset().fadeIn(0.3).play();
-      this.danceAction = action;
+      return await new Promise((resolve) => {
+        let settled = false;
+        const finish = (ok) => {
+          if (settled) return;
+          settled = true;
+          resolve(ok);
+        };
 
-      this._danceFinishedHandler = (e) => {
-        if (e.action !== action) return;
-        this._resumeIdleAfterDance();
-      };
-      this.mixer.addEventListener("finished", this._danceFinishedHandler);
-      return true;
+        action.reset().fadeIn(0.3).play();
+        this.danceAction = action;
+
+        this._danceFinishedHandler = (e) => {
+          if (e.action !== action) return;
+          if (resumeIdle) {
+            this._resumeIdleAfterDance();
+          } else {
+            this._stopDanceAnimation();
+          }
+          finish(true);
+        };
+        this.mixer.addEventListener("finished", this._danceFinishedHandler);
+      });
     } catch (e) {
       console.warn("Failed to play animation:", e);
       return false;

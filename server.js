@@ -1395,6 +1395,11 @@ const server = createServer((req, res) => {
     return;
   }
 
+  if (url.startsWith('/Animation/')) {
+    serveFile(res, join(ROOT, url.slice(1)));
+    return;
+  }
+
   if (url === '/ChickenDance.fbx') {
     serveFile(res, join(ROOT, 'ChickenDance.fbx'));
     return;

@@ -84,11 +84,35 @@
       background: #ffffff;
     }
 
-    #splash-screen img {
+    .splash-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.5rem;
       width: min(70vw, 420px);
+    }
+
+    #splash-screen img {
+      width: 100%;
       height: auto;
       max-height: 60vh;
       object-fit: contain;
+    }
+
+    .splash-loading-bar {
+      width: 100%;
+      height: 5px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(0, 0, 0, 0.08);
+    }
+
+    .splash-loading-bar-fill {
+      width: 0%;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #6c8cff, #5a7aef);
+      transition: width 0.3s ease-out;
     }
 
     body.splash-dismissed #splash-screen {
@@ -797,8 +821,13 @@
   </style>
 </head>
 <body>
-  <div id="splash-screen" aria-label="Loading">
-    <img src="/langoLogo.jpeg" alt="Lango" width="420" height="420" decoding="async">
+  <div id="splash-screen" role="status" aria-live="polite" aria-busy="true" aria-label="Loading">
+    <div class="splash-content">
+      <img src="/langoLogo.jpeg" alt="Lango" width="420" height="420" decoding="async">
+      <div class="splash-loading-bar" aria-hidden="true">
+        <div class="splash-loading-bar-fill" id="splash-progress-fill"></div>
+      </div>
+    </div>
   </div>
 
   <div id="portrait-prompt">
@@ -944,6 +973,7 @@
     const PLAY_FINDGAME = "play_findgame";
     const END_CONVERSATION = "end_conversation";
     const CHICKEN_DANCE_URL = "/ChickenDance.fbx";
+    const BYEBYE_URL = "/Animation/byebye.fbx";
     const DEBUG_LOG_MAX = 80;
     const debugLogLines = [];
 
@@ -1032,6 +1062,7 @@
     let audioDone = false;
     let lipsyncRaf = null;
     let pendingEndConversation = false;
+    let byebyeAnimationPromise = null;
     let endConversationCloseTimer = null;
     let goodbyeNudged = false;
     const pendingFunctionCalls = new Map();
@@ -1388,7 +1419,18 @@
       });
     }
 
+    const splashProgressFill = document.getElementById("splash-progress-fill");
+    const splashScreenEl = document.getElementById("splash-screen");
+
+    function setSplashProgress(pct) {
+      if (!splashProgressFill) return;
+      const clamped = Math.max(0, Math.min(100, pct));
+      splashProgressFill.style.width = `${clamped}%`;
+    }
+
     function dismissSplash() {
+      setSplashProgress(100);
+      if (splashScreenEl) splashScreenEl.setAttribute("aria-busy", "false");
       document.body.classList.add("splash-dismissed");
     }
 
@@ -1442,31 +1484,42 @@
     }
 
     async function preloadMediaAssets(cfg) {
-      const tasks = [
+      const rawTasks = [
         preloadImage("/langoLogo.jpeg").catch(() => {}),
         prefetchAsset(CHICKEN_DANCE_URL),
+        prefetchAsset(BYEBYE_URL),
         prefetchAsset("/visme/Idle.fbx"),
       ];
 
       applyGameIconsFromConfig(cfg.gameIcons);
       for (const game of GAME_CATALOG) {
-        if (game.icon) tasks.push(preloadImage(game.icon).catch(() => {}));
+        if (game.icon) rawTasks.push(preloadImage(game.icon).catch(() => {}));
       }
 
-      tasks.push(setupIdleVideosFromConfig(cfg));
+      rawTasks.push(setupIdleVideosFromConfig(cfg));
 
       const bgUrl = applyActivePairBackground(cfg);
-      if (bgUrl) tasks.push(preloadImage(bgUrl).catch(() => {}));
+      if (bgUrl) rawTasks.push(preloadImage(bgUrl).catch(() => {}));
 
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-      tasks.push(
+      rawTasks.push(
         ensureAvatar().catch((e) => {
           console.error(e);
           showErr(`Avatar failed to load: ${e.message}`);
         }),
       );
 
+      let done = 0;
+      const total = rawTasks.length;
+      const tasks = rawTasks.map((task) =>
+        Promise.resolve(task).finally(() => {
+          done += 1;
+          setSplashProgress(10 + Math.round((done / total) * 90));
+        }),
+      );
+
       await Promise.all(tasks);
+      setSplashProgress(100);
       return Boolean(idleVideoUrl);
     }
 
@@ -2016,8 +2069,8 @@
       ctx = null;
     }
 
-    function cleanupSession() {
-      uiLog("cleanup", "begin", "hello");
+    function cleanupSession({ keepSessionView = false } = {}) {
+      uiLog("cleanup", "begin", "hello", { keepSessionView });
       abortConnectPrep();
       clearConversationCaptions();
       directSessionEntry = false;
@@ -2031,15 +2084,45 @@
         clearTimeout(endConversationCloseTimer);
         endConversationCloseTimer = null;
       }
+      byebyeAnimationPromise = null;
       try { stopAudio(); } catch (e) { console.warn("stopAudio failed", e); }
       try { stopAvatarSpeech(); } catch (e) { console.warn("stopAvatarSpeech failed", e); }
       resetResponseState(null);
-      exitSessionView();
+      if (!keepSessionView) exitSessionView();
       releaseMicSync();
       ws = null;
       btnStart.textContent = "Start Conversation";
       btnStart.disabled = false;
       uiLog("cleanup", "done — ready for hello cycle", "hello");
+    }
+
+    function startByebyeAnimation() {
+      if (byebyeAnimationPromise) return byebyeAnimationPromise;
+      uiLog("end", "starting byebye animation alongside farewell", "hello");
+      byebyeAnimationPromise = (async () => {
+        const played = await avatar?.playMixamoAnimation(BYEBYE_URL, { resumeIdle: false });
+        if (!played) uiLog("end", "byebye animation failed to play", "warn");
+        return played;
+      })();
+      return byebyeAnimationPromise;
+    }
+
+    async function finishByebyeAndReturnToHelloCycle() {
+      uiLog("end", "farewell done — waiting for byebye then loop video", "hello");
+      try {
+        await ensureAvatar();
+        inSession = true;
+        document.body.classList.add("in-session");
+        avatar?.refreshAfterVisible();
+        if (!byebyeAnimationPromise) startByebyeAnimation();
+        await byebyeAnimationPromise;
+      } catch (e) {
+        uiLog("end", `byebye animation error: ${e?.message || e}`, "warn");
+      } finally {
+        byebyeAnimationPromise = null;
+        exitSessionView();
+        returnToHelloCycle();
+      }
     }
 
     function returnToHelloCycle() {
@@ -2258,7 +2341,8 @@
       uiLog("end", `end_conversation tool (${reason})`, "hello");
       sendFunctionOutput(callId, { success: true, reason });
       pendingEndConversation = true;
-      setStatus("Conversation ended");
+      setStatus("Goodbye!");
+      startByebyeAnimation();
       closeAfterToolEnd();
       setTimeout(closeAfterToolEnd, 1500);
       scheduleForceCloseAfterTool();
@@ -2487,9 +2571,13 @@
           reason: event.reason || "(none)",
           wasClean: event.wasClean,
         });
-        try { cleanupSession(); }
+        const shouldPlayByebye = pendingEndConversation;
+        try { cleanupSession({ keepSessionView: shouldPlayByebye }); }
         catch (e) { console.error("cleanupSession threw", e); }
-        finally { returnToHelloCycle(); }
+        finally {
+          if (shouldPlayByebye) finishByebyeAndReturnToHelloCycle();
+          else returnToHelloCycle();
+        }
       };
     }
 
@@ -2912,7 +3000,9 @@
       } catch (_) { /* ignore */ }
 
       const fromGame = shouldAutoConnectFromGame();
+      setSplashProgress(5);
       const cfg = await getConfig();
+      setSplashProgress(10);
 
       if (fromGame) {
         dismissSplash();

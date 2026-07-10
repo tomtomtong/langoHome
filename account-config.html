@@ -413,7 +413,6 @@
         </section>
 
         <div class="actions">
-          <button type="submit" id="save-btn">Save profile</button>
           <a class="btn" href="/">Back to Voice</a>
         </div>
       </form>
@@ -421,7 +420,7 @@
       <div id="status" class="status" role="status"></div>
 
       <p class="hint">
-        Profiles are stored per account and applied automatically when that user logs in.
+        Changes save automatically. Profiles are stored per account and applied when that user logs in.
         Use the sidebar to switch between CMS sections.
       </p>
     </div>
@@ -447,12 +446,13 @@
     const accountSelect = document.getElementById("account-select");
     const profileForm = document.getElementById("profile-form");
     const statusEl = document.getElementById("status");
-    const saveBtn = document.getElementById("save-btn");
     const loadBtn = document.getElementById("load-btn");
 
     let cachedProfiles = {};
     let dirty = false;
     let lastAccount = "";
+    let saveTimer = null;
+    let profileReady = false;
 
     function showStatus(message, ok) {
       statusEl.textContent = message;
@@ -486,6 +486,7 @@
     }
 
     async function loadProfiles() {
+      profileReady = false;
       clearStatus();
       const res = await fetch("/api/user-profiles");
       if (!res.ok) throw new Error("Could not load profiles.");
@@ -506,13 +507,12 @@
         lastAccount = accountSelect.value;
       }
       fillForm(cachedProfiles[selectedAccount()] || {});
+      profileReady = true;
     }
 
     async function saveProfile() {
       const username = selectedAccount();
       const profile = readFormProfile();
-      saveBtn.disabled = true;
-      clearStatus();
       try {
         const res = await fetch(`/api/user-profiles/${username}`, {
           method: "PUT",
@@ -529,13 +529,36 @@
         showStatus(`Saved profile for ${username}.`, true);
       } catch (e) {
         showStatus(e.message || "Could not save profile.", false);
-      } finally {
-        saveBtn.disabled = false;
+        throw e;
       }
     }
 
-    accountSelect.addEventListener("change", () => {
-      if (dirty && !confirm("You have unsaved changes. Switch account anyway?")) {
+    function scheduleSave() {
+      if (!profileReady) return;
+      dirty = true;
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(async () => {
+        clearStatus();
+        try {
+          await saveProfile();
+        } catch {
+          /* status shown in saveProfile */
+        }
+      }, 500);
+    }
+
+    async function flushSave() {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+      if (!dirty) return;
+      clearStatus();
+      await saveProfile();
+    }
+
+    accountSelect.addEventListener("change", async () => {
+      try {
+        await flushSave();
+      } catch {
         accountSelect.value = lastAccount;
         return;
       }
@@ -544,14 +567,8 @@
       clearStatus();
     });
 
-    profileForm.addEventListener("input", () => {
-      dirty = true;
-    });
-
-    profileForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      await saveProfile();
-    });
+    profileForm.addEventListener("input", scheduleSave);
+    profileForm.addEventListener("submit", (e) => e.preventDefault());
 
     loadBtn.addEventListener("click", async () => {
       try {

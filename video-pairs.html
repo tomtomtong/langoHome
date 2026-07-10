@@ -200,6 +200,7 @@
       <h1>Video Pairs</h1>
       <p class="intro">
         Upload loop and transition videos in pairs, each with a time window, session prompt, and optional avatar background.
+        Text and time changes save automatically; media uploads save when you upload.
         The voice app picks one pair at random within the current time window.
         At conversation start, the <strong>system prompt</strong> (Voice Settings) and this pair&rsquo;s <strong>session prompt</strong> are combined and sent to Inworld.
         Its background image is used behind Uncle Tommy during the conversation.
@@ -440,6 +441,7 @@
               endTime: endTimeEl.value,
             });
             updatePairInState(updated);
+            setStatus('Saved', 'ok');
           } catch (e) {
             setStatus(e.message || 'Could not save pair settings.', 'err');
           }

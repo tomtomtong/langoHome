@@ -75,7 +75,7 @@
           <span>Voice ID</span>
           <input type="text" id="inworldVoiceId" placeholder="default-zylgts2tamenvybeti3z0w__uncle_tommy" />
         </label>
-        <button type="button" class="btn-inworld-save" id="saveInworldBtn">Save voice settings</button>
+        <p class="inworld-hint">Changes save automatically.</p>
       </div>
     </section>
 
@@ -904,6 +904,8 @@
       const inworldVoiceIdInput = document.getElementById("inworldVoiceId");
       const inworldStatusBadge = document.getElementById("inworldStatusBadge");
       const inworldKeyHint = document.getElementById("inworldKeyHint");
+      let inworldSaveReady = false;
+      let inworldSaveTimer = null;
 
       async function parseJsonResponse(res) {
         const contentType = res.headers.get("content-type") || "";
@@ -916,6 +918,7 @@
       }
 
       async function loadInworldSettings() {
+        inworldSaveReady = false;
         try {
           const res = await fetch("/api/settings/inworld");
           const data = await parseJsonResponse(res);
@@ -928,8 +931,48 @@
           inworldStatusBadge.classList.toggle("configured", data.configured);
         } catch (err) {
           inworldKeyHint.textContent = err.message || "Could not load settings — is the server running?";
+        } finally {
+          inworldSaveReady = true;
         }
       }
+
+      async function saveInworldSettings() {
+        const payload = {};
+        const apiKey = inworldApiKeyInput.value.trim();
+        const voiceId = inworldVoiceIdInput.value.trim();
+        if (apiKey) payload.apiKey = apiKey;
+        if (voiceId) payload.voiceId = voiceId;
+        if (!apiKey && !voiceId) return;
+
+        try {
+          const res = await fetch("/api/settings/inworld", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const data = await parseJsonResponse(res);
+          if (!res.ok) throw new Error(data.error || "Save failed");
+          inworldApiKeyInput.value = "";
+          inworldVoiceIdInput.value = data.voiceId || "";
+          inworldKeyHint.textContent = data.configured
+            ? `Saved key ending in ${data.apiKeyPreview.slice(-4)} — leave blank to keep it`
+            : "No API key saved yet";
+          inworldStatusBadge.textContent = data.configured ? "Configured" : "Not configured";
+          inworldStatusBadge.classList.toggle("configured", data.configured);
+          showToast("Inworld voice settings saved");
+        } catch (err) {
+          showToast(err.message || "Save failed");
+        }
+      }
+
+      function scheduleInworldSave() {
+        if (!inworldSaveReady) return;
+        clearTimeout(inworldSaveTimer);
+        inworldSaveTimer = setTimeout(saveInworldSettings, 500);
+      }
+
+      inworldApiKeyInput.addEventListener("input", scheduleInworldSave);
+      inworldVoiceIdInput.addEventListener("input", scheduleInworldSave);
 
       /* ---- Database import / export ---- */
       const exportDbBtn = document.getElementById("exportDbBtn");
@@ -1025,37 +1068,6 @@
       importDbInput.addEventListener("change", () => {
         const file = importDbInput.files?.[0];
         if (file) importGameDatabase(file);
-      });
-
-      document.getElementById("saveInworldBtn").addEventListener("click", async () => {
-        const payload = {};
-        const apiKey = inworldApiKeyInput.value.trim();
-        const voiceId = inworldVoiceIdInput.value.trim();
-        if (apiKey) payload.apiKey = apiKey;
-        if (voiceId) payload.voiceId = voiceId;
-        if (!apiKey && !voiceId) {
-          showToast("Enter an API key or voice ID to save");
-          return;
-        }
-        try {
-          const res = await fetch("/api/settings/inworld", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-          const data = await parseJsonResponse(res);
-          if (!res.ok) throw new Error(data.error || "Save failed");
-          inworldApiKeyInput.value = "";
-          inworldVoiceIdInput.value = data.voiceId || "";
-          inworldKeyHint.textContent = data.configured
-            ? `Saved key ending in ${data.apiKeyPreview.slice(-4)} — leave blank to keep it`
-            : "No API key saved yet";
-          inworldStatusBadge.textContent = data.configured ? "Configured" : "Not configured";
-          inworldStatusBadge.classList.toggle("configured", data.configured);
-          showToast("Inworld voice settings saved");
-        } catch (err) {
-          showToast(err.message || "Save failed");
-        }
       });
 
       async function init() {

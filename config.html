@@ -258,7 +258,7 @@
     <form id="form">
       <div class="field">
         <label for="key">Inworld API Key</label>
-        <input id="key" type="password" placeholder="your-base64-api-key" autocomplete="off" required>
+        <input id="key" type="password" placeholder="your-base64-api-key" autocomplete="off">
       </div>
       <div class="field">
         <label for="prompt">System Prompt <span style="color:#5f6368;font-weight:400">(optional)</span></label>
@@ -280,13 +280,12 @@
       <p style="margin: 0 0 1rem">Icons on the game shortcuts during a conversation. Upload a custom image per game, or leave empty to use the built-in default. Square PNG or WebP works best.</p>
       <div id="game-icons-grid" class="game-icons-grid"></div>
       <div class="actions">
-        <button type="submit">Save</button>
         <a class="btn" href="/">Back to Voice</a>
       </div>
     </form>
     <div id="status" class="status"></div>
     <p class="hint">
-      Settings are saved on the server (<code>config.json</code>) and persist across restarts.
+      Changes save automatically. Settings are stored on the server (<code>config.json</code>) and persist across restarts.
       Use the sidebar to switch between CMS sections.
       On Railway, attach a volume mounted at <code>/app/data</code> so config survives redeploys.
       Get a key at <a href="https://platform.inworld.ai/" target="_blank" rel="noopener">platform.inworld.ai</a>.
@@ -321,6 +320,8 @@
     const gameIconsGrid = document.getElementById('game-icons-grid');
 
     let serverConfig = null;
+    let configReady = false;
+    let saveTimer = null;
 
     const GAME_ICON_DEFS = [
       {
@@ -535,10 +536,6 @@ ${linesText.replace(/</g, '&lt;')}</pre>
       voice.value = cfg.voice ?? '';
       model.value = cfg.model ?? '';
       applyGameIcons(cfg.gameIcons);
-      if (cfg.apiKey) {
-        status.textContent = 'Settings saved.';
-        status.className = 'status ok';
-      }
     }
 
     function loadFromLocalStorage() {
@@ -550,41 +547,32 @@ ${linesText.replace(/</g, '&lt;')}</pre>
       });
     }
 
-    async function loadConfig() {
-      try {
-        const res = await fetch('/api/config');
-        if (!res.ok) throw new Error('load failed');
-        serverConfig = await res.json();
-        applyConfig(serverConfig);
-        syncLocalStorage(serverConfig);
-        return;
-      } catch {}
-      loadFromLocalStorage();
+    function resolveApiKey() {
+      const typed = input.value.trim();
+      if (typed) return typed;
+      return serverConfig?.apiKey?.trim() || '';
     }
 
-    loadConfig();
-
-    document.getElementById('form').onsubmit = async (e) => {
-      e.preventDefault();
-      const val = input.value.trim();
-      const promptVal = prompt.value.trim();
-      const voiceVal = voice.value.trim();
-      const modelVal = model.value.trim();
-      if (!val) {
-        status.textContent = 'Please enter an API key.';
+    async function saveSettings() {
+      const apiKey = resolveApiKey();
+      if (!apiKey) {
+        status.textContent = 'Enter an API key to save settings.';
         status.className = 'status err';
         return;
       }
 
       const payload = {
-        apiKey: val,
-        instructions: promptVal,
-        voice: voiceVal,
-        model: modelVal,
+        apiKey,
+        instructions: prompt.value.trim(),
+        voice: voice.value.trim(),
+        model: model.value.trim(),
         lipsync: serverConfig?.lipsync,
         avatar: serverConfig?.avatar,
         lighting: serverConfig?.lighting,
       };
+
+      status.textContent = 'Saving…';
+      status.className = 'status ok';
 
       try {
         const res = await fetch('/api/config', {
@@ -606,9 +594,37 @@ ${linesText.replace(/</g, '&lt;')}</pre>
 
       syncLocalStorage(payload);
       serverConfig = { ...serverConfig, ...payload };
-      status.textContent = 'Saved!';
+      status.textContent = 'Saved';
       status.className = 'status ok';
-    };
+    }
+
+    function scheduleSave() {
+      if (!configReady) return;
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(saveSettings, 500);
+    }
+
+    async function loadConfig() {
+      configReady = false;
+      try {
+        const res = await fetch('/api/config');
+        if (!res.ok) throw new Error('load failed');
+        serverConfig = await res.json();
+        applyConfig(serverConfig);
+        syncLocalStorage(serverConfig);
+      } catch {
+        loadFromLocalStorage();
+      } finally {
+        configReady = true;
+      }
+    }
+
+    loadConfig();
+
+    document.getElementById('form').addEventListener('submit', (e) => e.preventDefault());
+    [input, prompt, voice, model].forEach((el) => {
+      el.addEventListener('input', scheduleSave);
+    });
   </script>
   <script src="/admin-nav.js"></script>
 </body>

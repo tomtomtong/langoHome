@@ -363,13 +363,12 @@
         <button type="button" id="btn-reset-lipsync" class="secondary">Reset lipsync defaults</button>
       </div>
       <div class="actions">
-        <button type="submit">Save avatar settings</button>
         <a class="btn" href="/">Back to Voice</a>
       </div>
     </form>
     <div id="status" class="status"></div>
     <p class="hint">
-      Avatar settings are saved on the server (<code>config.json</code>). Background images upload immediately.
+      Changes save automatically. Avatar settings are stored on the server (<code>config.json</code>). Background images upload immediately.
       Use the sidebar to switch between CMS sections.
     </p>
   </div>
@@ -413,6 +412,62 @@
     const btnResetLighting = document.getElementById('btn-reset-lighting');
 
     let serverConfig = null;
+    let avatarSaveReady = false;
+    let avatarSaveTimer = null;
+
+    async function saveAvatarSettings() {
+      if (!serverConfig?.apiKey?.trim()) {
+        status.textContent = 'Set an API key on Voice Agent Settings before saving.';
+        status.className = 'status err';
+        return;
+      }
+
+      const payload = {
+        apiKey: serverConfig.apiKey.trim(),
+        instructions: serverConfig.instructions ?? '',
+        voice: serverConfig.voice ?? '',
+        model: serverConfig.model ?? '',
+        avatar: serverConfig.avatar,
+        lipsync: readLipsyncFromForm(),
+        lighting: readLightingFromForm(),
+      };
+
+      status.textContent = 'Saving…';
+      status.className = 'status ok';
+
+      try {
+        const res = await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          status.textContent = data.error || 'Could not save settings.';
+          status.className = 'status err';
+          return;
+        }
+      } catch {
+        status.textContent = 'Could not reach server. Settings not saved.';
+        status.className = 'status err';
+        return;
+      }
+
+      serverConfig.lipsync = payload.lipsync;
+      serverConfig.lighting = payload.lighting;
+      localStorage.setItem(LIPSYNC_KEY, JSON.stringify(payload.lipsync));
+      localStorage.setItem(LIGHTING_KEY, JSON.stringify(payload.lighting));
+      status.textContent = 'Saved';
+      status.className = 'status ok';
+    }
+
+    function scheduleAvatarSave() {
+      if (!avatarSaveReady) return;
+      clearTimeout(avatarSaveTimer);
+      avatarSaveTimer = setTimeout(saveAvatarSettings, 500);
+    }
+
+    window.addEventListener('avatar-settings-changed', scheduleAvatarSave);
 
     function applyImagePreview(previewEl, statusEl, removeBtn, image, emptyLabel) {
       if (image?.url) {
@@ -559,12 +614,15 @@
     lipsyncCrossfade.addEventListener('input', updateLipsyncLabels);
     lipsyncExaggerate.addEventListener('input', () => {
       window.dispatchEvent(new CustomEvent('lipsync-fields-updated', { detail: readLipsyncFromForm() }));
+      scheduleAvatarSave();
     });
     lipsyncSpeed.addEventListener('input', () => {
       window.dispatchEvent(new CustomEvent('lipsync-fields-updated', { detail: readLipsyncFromForm() }));
+      scheduleAvatarSave();
     });
     lipsyncCrossfade.addEventListener('input', () => {
       window.dispatchEvent(new CustomEvent('lipsync-fields-updated', { detail: readLipsyncFromForm() }));
+      scheduleAvatarSave();
     });
     window.addEventListener('lipsync-labels-sync', updateLipsyncLabels);
     updateLipsyncLabels();
@@ -614,15 +672,18 @@
       el.addEventListener('input', () => {
         updateLightingLabels();
         window.dispatchEvent(new CustomEvent('lighting-fields-updated', { detail: readLightingFromForm() }));
+        scheduleAvatarSave();
       });
     });
     updateLightingLabels();
 
     btnResetLighting.addEventListener('click', () => {
       applyLightingFields(DEFAULT_LIGHTING);
+      scheduleAvatarSave();
     });
 
     async function loadConfig() {
+      avatarSaveReady = false;
       try {
         const res = await fetch('/api/config');
         if (!res.ok) throw new Error('load failed');
@@ -632,6 +693,7 @@
         applyAvatarBackground(serverConfig.avatarBackground);
         localStorage.setItem(LIPSYNC_KEY, JSON.stringify(normalizeLipsync(serverConfig.lipsync)));
         localStorage.setItem(LIGHTING_KEY, JSON.stringify(normalizeLighting(serverConfig.lighting)));
+        avatarSaveReady = true;
         return;
       } catch {}
       let lipsync = DEFAULT_LIPSYNC;
@@ -644,6 +706,7 @@
       } catch {}
       applyLipsyncFields(lipsync);
       applyLightingFields(lighting);
+      avatarSaveReady = true;
     }
 
     loadConfig();
@@ -656,12 +719,14 @@
         msPerPhone: DEFAULT_LIPSYNC.msPerPhone,
         crossfadeMs: DEFAULT_LIPSYNC.crossfadeMs,
       });
+      scheduleAvatarSave();
     });
 
     document.getElementById('btn-reset-blendshapes').addEventListener('click', () => {
       window.setBlendshapeWeights?.(Array(22).fill(1));
       window.dispatchEvent(new CustomEvent('blendshapes-preview-clear'));
       window.dispatchEvent(new CustomEvent('lipsync-fields-updated', { detail: readLipsyncFromForm() }));
+      scheduleAvatarSave();
     });
 
     btnTestLipsync.addEventListener('click', () => {
@@ -680,49 +745,7 @@
       window.dispatchEvent(new CustomEvent('expression-test-requested'));
     });
 
-    document.getElementById('form').onsubmit = async (e) => {
-      e.preventDefault();
-      if (!serverConfig?.apiKey?.trim()) {
-        status.textContent = 'Set an API key on Voice Agent Settings before saving.';
-        status.className = 'status err';
-        return;
-      }
-
-      const payload = {
-        apiKey: serverConfig.apiKey.trim(),
-        instructions: serverConfig.instructions ?? '',
-        voice: serverConfig.voice ?? '',
-        model: serverConfig.model ?? '',
-        avatar: serverConfig.avatar,
-        lipsync: readLipsyncFromForm(),
-        lighting: readLightingFromForm(),
-      };
-
-      try {
-        const res = await fetch('/api/config', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          status.textContent = data.error || 'Could not save settings.';
-          status.className = 'status err';
-          return;
-        }
-      } catch {
-        status.textContent = 'Could not reach server. Settings not saved.';
-        status.className = 'status err';
-        return;
-      }
-
-      serverConfig.lipsync = payload.lipsync;
-      serverConfig.lighting = payload.lighting;
-      localStorage.setItem(LIPSYNC_KEY, JSON.stringify(payload.lipsync));
-      localStorage.setItem(LIGHTING_KEY, JSON.stringify(payload.lighting));
-      status.textContent = 'Saved! Reload the voice app to apply changes.';
-      status.className = 'status ok';
-    };
+    document.getElementById('form').addEventListener('submit', (e) => e.preventDefault());
   </script>
   <script type="module">
     import {
@@ -819,6 +842,7 @@
         const settings = readLipsyncFromDom();
         previewAvatar?.applyLipsyncSettings(settings);
         statusEl.textContent = `Previewing blendshape ${index}: ${BLENDSHAPE_LABELS[index]}`;
+        window.dispatchEvent(new Event('avatar-settings-changed'));
       });
     }
 
