@@ -166,6 +166,9 @@ export class TommyAvatar {
 
     this.scene = new THREE.Scene();
     this.scene.background = this.backgroundUrl ? null : this.defaultBackground;
+    if (this.backgroundUrl) {
+      this.renderer.setClearColor(0x000000, 0);
+    }
 
     this.camera = new THREE.PerspectiveCamera(30, w / h, 0.1, 100);
     this.lookAtTarget = new THREE.Vector3(av.targetX, av.targetY, av.targetZ);
@@ -365,10 +368,16 @@ export class TommyAvatar {
       this.backgroundTexture = null;
     }
     this.scene.background = this.backgroundUrl ? null : this.defaultBackground;
+    if (this.renderer) {
+      this.renderer.setClearColor(0x000000, this.backgroundUrl ? 0 : 1);
+    }
   }
 
   _syncSceneBackground() {
     this.scene.background = this.backgroundUrl ? null : this.defaultBackground;
+    if (this.renderer) {
+      this.renderer.setClearColor(0x000000, this.backgroundUrl ? 0 : 1);
+    }
   }
 
   async _loadBackgroundTexture() {

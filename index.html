@@ -156,7 +156,7 @@
     #avatar-stage.has-bg-image {
       background-repeat: no-repeat;
       background-position: center center;
-      background-size: min(1920px, 100vw) auto;
+      background-size: 100% auto;
     }
 
     body.in-session #avatar-stage {
@@ -804,7 +804,7 @@
 
   <div id="app">
     <div id="idle-video-screen" aria-label="Tap to start conversation">
-      <video id="idle-video" class="screen-video" loop muted playsinline preload="auto"></video>
+      <video id="idle-video" class="screen-video" loop playsinline preload="auto"></video>
       <video id="transition-video" class="screen-video" playsinline preload="auto"></video>
       <div id="idle-video-loading">Loading videos…</div>
       <div id="idle-video-hint">Tap to start conversation</div>
@@ -984,6 +984,8 @@
     let transitionVideoUrl = null;
     let idleVideoHintText = "Tap to start conversation";
     let activeVideoPair = null;
+    let videoSoundUnlocked = false;
+    let videoSoundUnlockListenerAdded = false;
     let idleVideosReady = false;
     let idleVideoStarting = false;
     let playingTransitionVideo = false;
@@ -1363,9 +1365,53 @@
       document.body.classList.add("splash-dismissed");
     }
 
+    function applyVideoAudioSettings(videoEl) {
+      videoEl.volume = 1;
+      videoEl.muted = !videoSoundUnlocked;
+    }
+
+    function unlockVideoSound() {
+      if (videoSoundUnlocked) return;
+      videoSoundUnlocked = true;
+      applyVideoAudioSettings(idleVideoEl);
+      applyVideoAudioSettings(transitionVideoEl);
+    }
+
+    async function playVideoWithSound(videoEl) {
+      videoEl.volume = 1;
+      videoEl.muted = false;
+      try {
+        await videoEl.play();
+        videoSoundUnlocked = true;
+        return;
+      } catch {}
+      videoEl.muted = true;
+      await videoEl.play().catch(() => {});
+    }
+
+    function initVideoSoundUnlock() {
+      if (videoSoundUnlockListenerAdded) return;
+      videoSoundUnlockListenerAdded = true;
+      const unlock = () => {
+        unlockVideoSound();
+        if (
+          idleVideoUrl &&
+          !inSession &&
+          !active &&
+          !playingTransitionVideo &&
+          !idleVideoEl.paused
+        ) {
+          idleVideoEl.muted = false;
+          idleVideoEl.volume = 1;
+        }
+      };
+      window.addEventListener("pointerdown", unlock, { passive: true });
+      window.addEventListener("keydown", unlock, { passive: true });
+    }
+
     function startIdleVideoPlayback() {
       if (!idleVideoUrl || inSession || active) return;
-      idleVideoEl.play().catch(() => {});
+      playVideoWithSound(idleVideoEl);
     }
 
     async function preloadMediaAssets(cfg) {
@@ -1511,9 +1557,9 @@
       if (idleVideoLoadingEl) idleVideoLoadingEl.textContent = "Loading videos…";
 
       idleVideoEl.loop = true;
-      idleVideoEl.muted = true;
       transitionVideoEl.loop = false;
-      transitionVideoEl.muted = true;
+      applyVideoAudioSettings(idleVideoEl);
+      applyVideoAudioSettings(transitionVideoEl);
       transitionVideoEl.pause();
 
       const preloadTasks = [preloadVideoElement(idleVideoEl, idleVideo.url)];
@@ -1535,7 +1581,7 @@
 
       if (autoplay) {
         try {
-          await idleVideoEl.play();
+          await playVideoWithSound(idleVideoEl);
         } catch {}
       }
       return true;
@@ -1574,7 +1620,7 @@
       if (skipIdle || !idleVideoUrl || active) return;
       restoreIdleVideoScreen();
       resetIdleVideoElement();
-      idleVideoEl.play().catch(() => {});
+      playVideoWithSound(idleVideoEl);
     }
 
     async function playTransitionVideo() {
@@ -1587,7 +1633,9 @@
 
         idleVideoEl.pause();
         transitionVideoEl.currentTime = 0;
+        unlockVideoSound();
         transitionVideoEl.muted = false;
+        transitionVideoEl.volume = 1;
 
         let settled = false;
         const finish = () => {
@@ -1712,7 +1760,7 @@
       if (wasPlaying && idleVideoUrl) {
         restoreIdleVideoScreen();
         resetIdleVideoElement();
-        idleVideoEl.play().catch(() => {});
+        playVideoWithSound(idleVideoEl);
       }
     }
 
@@ -1723,7 +1771,7 @@
         restoreIdleVideoScreen();
         resetIdleVideoElement();
         idleVideoEl.currentTime = 0;
-        idleVideoEl.play().catch(() => {});
+        playVideoWithSound(idleVideoEl);
       });
     }
 
@@ -2851,6 +2899,7 @@
     }, 60_000);
 
     uiLog("hello", "app init", "hello", { IS_IOS, WAKE_WORD_RESTART_DELAY, POST_SESSION_WAKE_DELAY });
+    initVideoSoundUnlock();
     init();
   </script>
 </body>
