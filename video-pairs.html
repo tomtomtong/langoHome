@@ -172,17 +172,62 @@
     @media (max-width: 520px) {
       .time-range { grid-template-columns: 1fr; }
     }
-    input[type="time"] {
-      width: 100%;
+    .time-input-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .time-input-24 {
+      flex: 1;
+      min-width: 0;
       padding: 0.625rem 0.75rem;
       border: 1px solid #3c4043;
       border-radius: 8px;
       background: #0f1117;
       color: #e8eaed;
       font-size: 0.875rem;
-      font-family: inherit;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      letter-spacing: 0.04em;
     }
-    input[type="time"]:focus { outline: none; border-color: #6c8cff; }
+    .time-input-24:focus { outline: none; border-color: #6c8cff; }
+    .time-input-24.invalid { border-color: #c44; }
+    .time-format-tag {
+      flex: 0 0 auto;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #5f6368;
+    }
+    .timezone-panel {
+      margin-bottom: 1.25rem;
+      padding: 1rem 1.125rem;
+      border: 1px solid #2a2f3a;
+      border-radius: 10px;
+      background: #171a21;
+    }
+    .timezone-panel h2 {
+      margin: 0 0 0.375rem;
+      font-size: 0.9375rem;
+      font-weight: 600;
+    }
+    .timezone-row {
+      display: flex;
+      gap: 0.75rem;
+      align-items: flex-end;
+      flex-wrap: wrap;
+    }
+    .timezone-row .field {
+      flex: 1 1 220px;
+      margin-bottom: 0;
+    }
+    .timezone-now {
+      flex: 0 0 auto;
+      font-size: 0.8125rem;
+      color: #9aa0a6;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      padding-bottom: 0.625rem;
+    }
     .empty-state {
       padding: 1.25rem;
       border: 1px dashed #3c4043;
@@ -227,17 +272,34 @@
       <p class="intro">
         Upload loop and transition videos in pairs, each with a time window, session prompt, and optional avatar background.
         Text and time changes save automatically; media uploads save when you upload.
-        The voice app picks one pair at random within the current time window.
+        The voice app picks one pair at random within the current time window (using the schedule timezone below).
         At conversation start, the <strong>system prompt</strong> (Voice Settings) and this pair&rsquo;s <strong>session prompt</strong> are combined and sent to Inworld.
         Its background image is used behind Uncle Tommy during the conversation.
       </p>
+
+      <div class="timezone-panel">
+        <h2>Schedule timezone</h2>
+        <p class="field-hint" style="margin:0 0 0.75rem">
+          Start and end times below use <strong>24-hour</strong> format (<code>HH:MM</code>, e.g. 08:00, 20:30).
+          Pair windows are evaluated in this timezone, not each visitor&rsquo;s local clock.
+        </p>
+        <div class="timezone-row">
+          <div class="field">
+            <label for="pairs-timezone">Timezone</label>
+            <select id="pairs-timezone"></select>
+          </div>
+          <div class="timezone-now" id="timezone-now" aria-live="polite"></div>
+        </div>
+      </div>
 
       <div class="import-panel">
         <h2>Import from CSV</h2>
         <p class="field-hint" style="margin:0">
           Bulk-create pairs from a spreadsheet. Columns:
           <strong>session_prompt</strong>, <strong>theme</strong> (default, warm, cool, nature, night),
-          <strong>start_time</strong>, <strong>end_time</strong> (HH:MM, 24-hour),
+          <strong>timezone</strong> (optional IANA name, e.g. Asia/Hong_Kong),
+          <strong>start_time</strong>, <strong>end_time</strong> (24-hour:
+          <code>08:00</code>, <code>20:30</code>, <code>0800</code>, or <code>20:30:00</code>),
           <strong>loop_video_link</strong>, <strong>transit_video_link</strong>, <strong>bg_image_link</strong>
           (public http/https URLs; downloaded on import).
         </p>
@@ -268,13 +330,132 @@
     const btnImportCsv = document.getElementById('btn-import-csv');
     const btnDownloadCsvTemplate = document.getElementById('btn-download-csv-template');
     const csvFileInput = document.getElementById('csv-file-input');
+    const pairsTimezoneEl = document.getElementById('pairs-timezone');
+    const timezoneNowEl = document.getElementById('timezone-now');
 
-    const CSV_TEMPLATE = `session_prompt,theme,start_time,end_time,loop_video_link,transit_video_link,bg_image_link
-"Uncle Tommy is playing piano in the dining room",warm,08:00,11:59,https://example.com/loop.mp4,https://example.com/transit.mp4,https://example.com/bg.png
-"Reading stories in the garden",nature,14:00,16:59,,,
-"Getting ready for bedtime",night,20:00,22:00,https://example.com/night-loop.mp4,,https://example.com/night-bg.jpg`;
+    const TIMEZONE_OPTIONS = [
+      { id: 'UTC', label: 'UTC' },
+      { id: 'America/Los_Angeles', label: 'Pacific Time (Los Angeles)' },
+      { id: 'America/Denver', label: 'Mountain Time (Denver)' },
+      { id: 'America/Chicago', label: 'Central Time (Chicago)' },
+      { id: 'America/New_York', label: 'Eastern Time (New York)' },
+      { id: 'Europe/London', label: 'London' },
+      { id: 'Europe/Paris', label: 'Paris' },
+      { id: 'Asia/Dubai', label: 'Dubai' },
+      { id: 'Asia/Hong_Kong', label: 'Hong Kong' },
+      { id: 'Asia/Shanghai', label: 'Shanghai' },
+      { id: 'Asia/Tokyo', label: 'Tokyo' },
+      { id: 'Asia/Singapore', label: 'Singapore' },
+      { id: 'Australia/Sydney', label: 'Sydney' },
+    ];
+
+    let pairsTimezone = 'UTC';
+    let timezoneClockTimer = null;
+
+    const CSV_TEMPLATE = `session_prompt,theme,timezone,start_time,end_time,loop_video_link,transit_video_link,bg_image_link
+"Uncle Tommy is playing piano in the dining room",warm,Asia/Hong_Kong,08:00,11:59,https://example.com/loop.mp4,https://example.com/transit.mp4,https://example.com/bg.png
+"Reading stories in the garden",nature,Asia/Hong_Kong,1400,1659,,,
+"Getting ready for bedtime",night,Asia/Hong_Kong,20:00,22:00,https://example.com/night-loop.mp4,,https://example.com/night-bg.jpg`;
 
     let pairs = [];
+
+    function normalizeTime24(value) {
+      let s = String(value ?? '').trim();
+      if (!s) return null;
+
+      if (/^\d{3,4}$/.test(s)) {
+        const padded = s.padStart(4, '0');
+        s = `${padded.slice(0, 2)}:${padded.slice(2)}`;
+      }
+
+      const match = s.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+      if (!match) return null;
+      const h = Number(match[1]);
+      const m = Number(match[2]);
+      if (!Number.isFinite(h) || !Number.isFinite(m) || h < 0 || h > 23 || m < 0 || m > 59) return null;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+
+    function formatTimeInput(el) {
+      const normalized = normalizeTime24(el.value);
+      if (normalized) {
+        el.value = normalized;
+        el.classList.remove('invalid');
+        return normalized;
+      }
+      el.classList.add('invalid');
+      return null;
+    }
+
+    function getBrowserTimezone() {
+      try {
+        return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+      } catch {
+        return 'UTC';
+      }
+    }
+
+    function ensureTimezoneOption(timezone) {
+      if (!timezone || pairsTimezoneEl.querySelector(`option[value="${timezone}"]`)) return;
+      const opt = document.createElement('option');
+      opt.value = timezone;
+      opt.textContent = timezone;
+      pairsTimezoneEl.appendChild(opt);
+    }
+
+    function populateTimezoneSelect(selected) {
+      const browserTz = getBrowserTimezone();
+      pairsTimezoneEl.innerHTML = '';
+      const groups = [
+        { label: 'Common', items: TIMEZONE_OPTIONS },
+      ];
+      if (!TIMEZONE_OPTIONS.some((tz) => tz.id === browserTz)) {
+        groups.unshift({ label: 'Your browser', items: [{ id: browserTz, label: `${browserTz} (this device)` }] });
+      }
+      for (const group of groups) {
+        const og = document.createElement('optgroup');
+        og.label = group.label;
+        for (const tz of group.items) {
+          const opt = document.createElement('option');
+          opt.value = tz.id;
+          opt.textContent = tz.label;
+          og.appendChild(opt);
+        }
+        pairsTimezoneEl.appendChild(og);
+      }
+      ensureTimezoneOption(selected);
+      pairsTimezoneEl.value = selected;
+    }
+
+    function formatNowInTimezone(timezone) {
+      try {
+        return new Intl.DateTimeFormat('en-GB', {
+          timeZone: timezone,
+          weekday: 'short',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
+        }).format(new Date());
+      } catch {
+        return '';
+      }
+    }
+
+    function updateTimezoneClock() {
+      if (!timezoneNowEl) return;
+      timezoneNowEl.textContent = `Now: ${formatNowInTimezone(pairsTimezone)}`;
+    }
+
+    async function savePairsTimezone(timezone) {
+      const res = await fetch('/api/video-pairs/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ timezone }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not save timezone.');
+      return data.timezone;
+    }
 
     const PAIR_THEMES = [
       { id: 'default', label: 'Default' },
@@ -412,6 +593,7 @@
         const csvText = await file.text();
         const result = await importPairsFromCsv(csvText);
         await loadPairs();
+        if (result.timezone) pairsTimezone = result.timezone;
         const skipped = Array.isArray(result.errors) ? result.errors.length : 0;
         const warnings = Array.isArray(result.warnings) ? result.warnings : [];
         const parts = [`Imported ${result.imported} pair(s).`];
@@ -466,18 +648,24 @@
           <p class="field-hint">Added after the system prompt (Voice Settings) when this pair is active. Leave blank to use only the system prompt. The loop video screen always shows &ldquo;Tap to start conversation&rdquo;.</p>
         </div>
         <div class="field">
-          <label>Active time period <span style="color:#5f6368;font-weight:400">(local time)</span></label>
+          <label>Active time period</label>
           <div class="time-range">
             <div>
-              <label for="pair-start-${pair.id}" style="font-size:0.75rem;color:#9aa0a6">Start</label>
-              <input id="pair-start-${pair.id}" type="time" value="${pair.startTime || '00:00'}">
+              <label for="pair-start-${pair.id}" style="font-size:0.75rem;color:#9aa0a6">Start (24h)</label>
+              <div class="time-input-wrap">
+                <input id="pair-start-${pair.id}" class="time-input-24" type="text" inputmode="numeric" placeholder="08:00" maxlength="5" value="${pair.startTime || '00:00'}" aria-label="Start time, 24-hour HH:MM">
+                <span class="time-format-tag">HH:MM</span>
+              </div>
             </div>
             <div>
-              <label for="pair-end-${pair.id}" style="font-size:0.75rem;color:#9aa0a6">End</label>
-              <input id="pair-end-${pair.id}" type="time" value="${pair.endTime || '23:59'}">
+              <label for="pair-end-${pair.id}" style="font-size:0.75rem;color:#9aa0a6">End (24h)</label>
+              <div class="time-input-wrap">
+                <input id="pair-end-${pair.id}" class="time-input-24" type="text" inputmode="numeric" placeholder="23:59" maxlength="5" value="${pair.endTime || '23:59'}" aria-label="End time, 24-hour HH:MM">
+                <span class="time-format-tag">HH:MM</span>
+              </div>
             </div>
           </div>
-          <p class="field-hint">This pair is eligible only during this window. Overnight ranges work too (e.g. 22:00–06:00). Multiple pairs in the same window are chosen at random.</p>
+          <p class="field-hint">Use 24-hour clock (00:00–23:59) in <strong>${pairsTimezone}</strong>. Overnight ranges work too (e.g. 22:00–06:00). Multiple pairs in the same window are chosen at random.</p>
         </div>
         <div class="video-section">
           <h3>Avatar background image</h3>
@@ -555,12 +743,18 @@
       const scheduleSaveSettings = () => {
         clearTimeout(settingsSaveTimer);
         settingsSaveTimer = setTimeout(async () => {
+          const startTime = formatTimeInput(startTimeEl);
+          const endTime = formatTimeInput(endTimeEl);
+          if (!startTime || !endTime) {
+            setStatus('Use 24-hour times like 08:00 or 20:30.', 'err');
+            return;
+          }
           try {
             const updated = await savePairSettings(pair.id, {
               text: textEl.value.trim(),
               theme: themeEl.value,
-              startTime: startTimeEl.value,
-              endTime: endTimeEl.value,
+              startTime,
+              endTime,
             });
             updatePairInState(updated);
             setStatus('Saved', 'ok');
@@ -573,7 +767,9 @@
       textEl.addEventListener('input', scheduleSaveSettings);
       themeEl.addEventListener('change', scheduleSaveSettings);
       startTimeEl.addEventListener('change', scheduleSaveSettings);
+      endTimeEl.addEventListener('blur', scheduleSaveSettings);
       endTimeEl.addEventListener('change', scheduleSaveSettings);
+      startTimeEl.addEventListener('blur', scheduleSaveSettings);
 
       btnUploadBg.addEventListener('click', async () => {
         const file = bgFile.files?.[0];
@@ -738,11 +934,34 @@
         if (!res.ok) throw new Error('load failed');
         const data = await res.json();
         pairs = Array.isArray(data.pairs) ? data.pairs : [];
+        pairsTimezone = data.timezone || getBrowserTimezone() || 'UTC';
+        populateTimezoneSelect(pairsTimezone);
+        updateTimezoneClock();
         renderPairs();
       } catch {
         pairListEl.innerHTML = '<div class="empty-state">Could not load video pairs from server.</div>';
       }
     }
+
+    pairsTimezoneEl.addEventListener('change', async () => {
+      const nextTz = pairsTimezoneEl.value;
+      pairsTimezoneEl.disabled = true;
+      setStatus('Saving timezone…', 'ok');
+      try {
+        pairsTimezone = await savePairsTimezone(nextTz);
+        populateTimezoneSelect(pairsTimezone);
+        renderPairs();
+        updateTimezoneClock();
+        setStatus('Timezone saved.', 'ok');
+      } catch (e) {
+        pairsTimezoneEl.value = pairsTimezone;
+        setStatus(e.message || 'Could not save timezone.', 'err');
+      } finally {
+        pairsTimezoneEl.disabled = false;
+      }
+    });
+
+    timezoneClockTimer = setInterval(updateTimezoneClock, 30_000);
 
     btnAddPair.addEventListener('click', async () => {
       btnAddPair.disabled = true;

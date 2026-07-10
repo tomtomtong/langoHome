@@ -27,6 +27,7 @@ const GAME_ICONS_DIR = join(CONFIG_DIR, 'game-icons');
 const GAME_ICON_IDS = ['wordwhack', 'cardgame', 'findgame'];
 const PAIR_THEME_IDS = ['default', 'warm', 'cool', 'nature', 'night'];
 const DEFAULT_PAIR_THEME = 'default';
+const DEFAULT_VIDEO_PAIRS_TIMEZONE = 'UTC';
 const VIDEO_MAX_BYTES = 100 * 1024 * 1024;
 const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 
@@ -443,6 +444,7 @@ function requiresAdmin(url, method) {
 
   if (url.startsWith('/api/video-pairs') && m !== 'GET') return true;
   if (url === '/api/video-pairs' && m === 'POST') return true;
+  if (url === '/api/video-pairs/settings' && m === 'PUT') return true;
 
   if (isGameApiRoute(url)) {
     if (m === 'POST' && (url === '/api/inworld/tts' || url === '/api/inworld/llm/wordwhack-round')) return false;
@@ -587,17 +589,40 @@ function newPairId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function normalizeTimezone(value) {
+  const tz = String(value ?? '').trim();
+  if (!tz) return null;
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: tz });
+    return tz;
+  } catch {
+    return null;
+  }
+}
+
+function getVideoPairsTimezone() {
+  const manifest = loadVideoPairsManifest();
+  return manifest.timezone || DEFAULT_VIDEO_PAIRS_TIMEZONE;
+}
+
 function loadVideoPairsManifest() {
   ensureVideoPairsDir();
   try {
     if (existsSync(VIDEO_PAIRS_MANIFEST_PATH)) {
       const data = JSON.parse(readFileSync(VIDEO_PAIRS_MANIFEST_PATH, 'utf8'));
-      return Array.isArray(data.pairs) ? data : { pairs: [] };
+      if (!Array.isArray(data.pairs)) {
+        return { pairs: [], timezone: DEFAULT_VIDEO_PAIRS_TIMEZONE };
+      }
+      return {
+        pairs: data.pairs,
+        legacyMigrated: data.legacyMigrated,
+        timezone: normalizeTimezone(data.timezone) || DEFAULT_VIDEO_PAIRS_TIMEZONE,
+      };
     }
   } catch (e) {
     console.warn('Could not load video-pairs manifest:', e.message);
   }
-  return { pairs: [] };
+  return { pairs: [], timezone: DEFAULT_VIDEO_PAIRS_TIMEZONE };
 }
 
 function saveVideoPairsManifest(manifest) {
@@ -866,7 +891,9 @@ async function importVideoPairsFromCsv(csvText) {
   const hasKnownHeader = headers.some((h) => (
     [
       'session_prompt', 'text', 'prompt', 'theme',
-      'start_time', 'starttime', 'end_time', 'endtime',
+      'timezone', 'time_zone', 'tz',
+      'start_time', 'starttime', 'start',
+      'end_time', 'endtime', 'end',
       'loop_video_link', 'loop_video', 'loop_video_url',
       'transit_video_link', 'transition_video_link', 'transition_video', 'transit_video',
       'bg_image_link', 'background_image_link', 'background_image', 'bg_image',
@@ -880,6 +907,7 @@ async function importVideoPairsFromCsv(csvText) {
   const created = [];
   const errors = [];
   const warnings = [];
+  let importedTimezone = null;
 
   for (let i = 0; i < dataRows.length; i++) {
     const row = dataRows[i];
@@ -887,6 +915,7 @@ async function importVideoPairsFromCsv(csvText) {
     const fields = {
       text: getCsvField(headers, row, 'session_prompt', 'text', 'prompt', 'sessionprompt'),
       theme: getCsvField(headers, row, 'theme'),
+      timezone: getCsvField(headers, row, 'timezone', 'time_zone', 'tz'),
       startTime: getCsvField(headers, row, 'start_time', 'starttime', 'start'),
       endTime: getCsvField(headers, row, 'end_time', 'endtime', 'end'),
       loopVideoUrl: getCsvField(headers, row, 'loop_video_link', 'loop_video', 'loop_video_url'),
@@ -923,13 +952,38 @@ async function importVideoPairsFromCsv(csvText) {
       continue;
     }
 
-    if (fields.startTime && !normalizeTimeString(fields.startTime)) {
-      errors.push({ row: rowNum, error: `Invalid start time "${fields.startTime}". Use HH:MM (24-hour).` });
-      continue;
+    if (fields.startTime) {
+      const startTime = normalizeTimeString(fields.startTime);
+      if (!startTime) {
+        errors.push({
+          row: rowNum,
+          error: `Invalid start time "${fields.startTime}". Use 24-hour HH:MM (e.g. 08:00, 20:30), HHMM (0800), or HH:MM:SS.`,
+        });
+        continue;
+      }
+      fields.startTime = startTime;
     }
-    if (fields.endTime && !normalizeTimeString(fields.endTime)) {
-      errors.push({ row: rowNum, error: `Invalid end time "${fields.endTime}". Use HH:MM (24-hour).` });
-      continue;
+    if (fields.endTime) {
+      const endTime = normalizeTimeString(fields.endTime);
+      if (!endTime) {
+        errors.push({
+          row: rowNum,
+          error: `Invalid end time "${fields.endTime}". Use 24-hour HH:MM (e.g. 08:00, 20:30), HHMM (0800), or HH:MM:SS.`,
+        });
+        continue;
+      }
+      fields.endTime = endTime;
+    }
+    if (fields.timezone) {
+      const timezone = normalizeTimezone(fields.timezone);
+      if (!timezone) {
+        errors.push({
+          row: rowNum,
+          error: `Invalid timezone "${fields.timezone}". Use an IANA name such as Asia/Hong_Kong or UTC.`,
+        });
+        continue;
+      }
+      importedTimezone = timezone;
     }
     if (orderRaw !== '' && !Number.isFinite(order)) {
       errors.push({ row: rowNum, error: `Invalid order "${orderRaw}".` });
@@ -954,19 +1008,60 @@ async function importVideoPairsFromCsv(csvText) {
     };
   }
 
+  if (importedTimezone) manifest.timezone = importedTimezone;
   saveVideoPairsManifest(manifest);
-  return { imported: created.length, pairs: created, errors, warnings };
+  return {
+    imported: created.length,
+    pairs: created,
+    errors,
+    warnings,
+    timezone: importedTimezone || manifest.timezone || DEFAULT_VIDEO_PAIRS_TIMEZONE,
+  };
 }
 
 function normalizeTimeString(value) {
-  const s = String(value ?? '').trim();
+  let s = String(value ?? '').trim();
   if (!s) return null;
-  const match = s.match(/^(\d{1,2}):(\d{2})$/);
-  if (!match) return null;
-  const h = Number(match[1]);
-  const m = Number(match[2]);
-  if (!Number.isFinite(h) || !Number.isFinite(m) || h < 0 || h > 23 || m < 0 || m > 59) return null;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+
+  // Excel fraction-of-day serial (e.g. 0.333333 ≈ 08:00)
+  if (/^\d*\.?\d+$/.test(s) && s.includes('.') && !s.includes(':')) {
+    const frac = Number(s);
+    if (Number.isFinite(frac) && frac >= 0 && frac < 1) {
+      const totalMins = Math.round(frac * 24 * 60);
+      const h = Math.floor(totalMins / 60) % 24;
+      const m = totalMins % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+  }
+
+  // HHMM without colon (e.g. 0800, 2030)
+  if (/^\d{3,4}$/.test(s)) {
+    const padded = s.padStart(4, '0');
+    s = `${padded.slice(0, 2)}:${padded.slice(2)}`;
+  }
+
+  // HH:MM or HH:MM:SS (24-hour)
+  let match = s.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (match) {
+    const h = Number(match[1]);
+    const m = Number(match[2]);
+    if (!Number.isFinite(h) || !Number.isFinite(m) || h < 0 || h > 23 || m < 0 || m > 59) return null;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  }
+
+  // 12-hour with AM/PM (converted to stored 24-hour HH:MM)
+  match = s.match(/^(\d{1,2})(?::(\d{2}))?(?::\d{2})?\s*([AaPp])\.?\s*[Mm]\.?$/);
+  if (match) {
+    let h = Number(match[1]);
+    const m = Number(match[2] ?? '0');
+    const meridiem = match[3].toUpperCase();
+    if (!Number.isFinite(h) || !Number.isFinite(m) || h < 1 || h > 12 || m < 0 || m > 59) return null;
+    if (meridiem === 'A' && h === 12) h = 0;
+    if (meridiem === 'P' && h !== 12) h += 12;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  }
+
+  return null;
 }
 
 function parseTimeToMinutes(value) {
@@ -976,11 +1071,23 @@ function parseTimeToMinutes(value) {
   return h * 60 + m;
 }
 
-function isTimeInPeriod(startTime, endTime, date = new Date()) {
+function getLocalMinutesInTimezone(date, timeZone) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+  const hour = Number(parts.find((p) => p.type === 'hour')?.value ?? 0);
+  const minute = Number(parts.find((p) => p.type === 'minute')?.value ?? 0);
+  return hour * 60 + minute;
+}
+
+function isTimeInPeriod(startTime, endTime, date = new Date(), timeZone = getVideoPairsTimezone()) {
   const start = parseTimeToMinutes(startTime);
   const end = parseTimeToMinutes(endTime);
   if (start === null || end === null) return true;
-  const now = date.getHours() * 60 + date.getMinutes();
+  const now = getLocalMinutesInTimezone(date, timeZone);
   if (start === end) return true;
   if (start < end) return now >= start && now <= end;
   return now >= start || now <= end;
@@ -1247,9 +1354,24 @@ function handleVideoPairsApi(req, res, url) {
     return true;
   }
 
+  if (url === '/api/video-pairs/settings' && req.method === 'PUT') {
+    readJsonBody(req, res, (parsed) => {
+      const timezone = normalizeTimezone(parsed.timezone);
+      if (!timezone) {
+        sendJson(res, 400, { error: 'Invalid timezone. Use an IANA name such as Asia/Hong_Kong or UTC.' });
+        return;
+      }
+      const manifest = loadVideoPairsManifest();
+      manifest.timezone = timezone;
+      saveVideoPairsManifest(manifest);
+      sendJson(res, 200, { ok: true, timezone });
+    });
+    return true;
+  }
+
   if (url === '/api/video-pairs') {
     if (req.method === 'GET') {
-      sendJson(res, 200, { pairs: listVideoPairs() });
+      sendJson(res, 200, { pairs: listVideoPairs(), timezone: getVideoPairsTimezone() });
       return true;
     }
     if (req.method === 'POST') {
@@ -1639,6 +1761,7 @@ const server = createServer((req, res) => {
         lipsync: normalizeLipsync(cfg.lipsync),
         lighting: normalizeLighting(cfg.lighting),
         videoPairs,
+        videoPairsTimezone: getVideoPairsTimezone(),
         idleVideo: firstPair?.loopVideo ?? idleVideos.getInfo(),
         transitionVideo: firstPair?.transitionVideo ?? transitionVideos.getInfo(),
         avatarBackground: avatarBackgrounds.getInfo(),

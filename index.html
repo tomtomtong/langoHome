@@ -1095,6 +1095,7 @@
     let transitionVideoUrl = null;
     let idleVideoHintText = "Tap to start conversation";
     let activeVideoPair = null;
+    let videoPairsTimezone = "UTC";
     let videoSoundUnlocked = false;
     let videoSoundUnlockListenerAdded = false;
     let idleVideosReady = false;
@@ -1669,11 +1670,23 @@
       return h * 60 + m;
     }
 
-    function isPairActiveNow(pair, date = new Date()) {
+    function getLocalMinutesInTimezone(date, timeZone) {
+      const parts = new Intl.DateTimeFormat("en-GB", {
+        timeZone,
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      }).formatToParts(date);
+      const hour = Number(parts.find((p) => p.type === "hour")?.value ?? 0);
+      const minute = Number(parts.find((p) => p.type === "minute")?.value ?? 0);
+      return hour * 60 + minute;
+    }
+
+    function isPairActiveNow(pair, date = new Date(), timeZone = videoPairsTimezone) {
       const start = parseTimeToMinutes(pair.startTime ?? "00:00");
       const end = parseTimeToMinutes(pair.endTime ?? "23:59");
       if (start === null || end === null) return true;
-      const now = date.getHours() * 60 + date.getMinutes();
+      const now = getLocalMinutesInTimezone(date, timeZone);
       if (start === end) return true;
       if (start < end) return now >= start && now <= end;
       return now >= start || now <= end;
@@ -2537,6 +2550,7 @@
             localStorage.setItem(LIPSYNC_KEY, JSON.stringify(normalizeLipsync(cfg.lipsync)));
           }
           applyGameIconsFromConfig(cfg.gameIcons);
+          videoPairsTimezone = cfg.videoPairsTimezone || "UTC";
           cachedConfig = cfg;
           return cfg;
         }
