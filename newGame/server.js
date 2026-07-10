@@ -139,6 +139,15 @@ db.exec(`
     updated_at    INTEGER NOT NULL
   )
 `);
+db.exec(`
+  CREATE TABLE IF NOT EXISTS voca_items (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    word        TEXT NOT NULL,
+    image_url   TEXT NOT NULL,
+    sort_order  INTEGER NOT NULL DEFAULT 0,
+    updated_at  INTEGER NOT NULL
+  )
+`);
 
 const DEFAULT_INWORLD_VOICE_ID = "default-zylgts2tamenvybeti3z0w__uncle_tommy";
 const INWORLD_TTS_URL = "https://api.inworld.ai/tts/v1/voice";
@@ -162,6 +171,74 @@ function getSetting(key) {
 function setSetting(key, value) {
   upsertSettingStmt.run(key, value, Date.now());
 }
+
+const listVocaStmt = db.prepare(
+  "SELECT id, word, image_url, sort_order, updated_at FROM voca_items ORDER BY sort_order, id"
+);
+const getVocaStmt = db.prepare(
+  "SELECT id, word, image_url, sort_order, updated_at FROM voca_items WHERE id = ?"
+);
+const insertVocaStmt = db.prepare(`
+  INSERT INTO voca_items (word, image_url, sort_order, updated_at)
+  VALUES (?, ?, ?, ?)
+`);
+const updateVocaStmt = db.prepare(`
+  UPDATE voca_items SET word = ?, image_url = ?, sort_order = ?, updated_at = ?
+  WHERE id = ?
+`);
+const deleteVocaStmt = db.prepare("DELETE FROM voca_items WHERE id = ?");
+const deleteAllVocaStmt = db.prepare("DELETE FROM voca_items");
+const maxVocaSortStmt = db.prepare(
+  "SELECT COALESCE(MAX(sort_order), -1) AS max_order FROM voca_items"
+);
+
+function rowToVocaItem(row) {
+  return {
+    id: row.id,
+    word: row.word,
+    imageUrl: row.image_url,
+    sortOrder: row.sort_order,
+    updatedAt: row.updated_at,
+  };
+}
+
+function normalizeVocaInput(item) {
+  const word = String(item?.word ?? "").trim();
+  const imageUrl = String(item?.imageUrl ?? item?.image_url ?? item?.url ?? "").trim();
+  if (!word) throw new Error("word is required.");
+  if (!imageUrl) throw new Error("imageUrl is required.");
+  if (!/^https?:\/\//i.test(imageUrl)) {
+    throw new Error("imageUrl must be an http(s) URL.");
+  }
+  return { word, imageUrl };
+}
+
+function seedVocaItemsIfEmpty() {
+  const count = db.prepare("SELECT COUNT(*) AS n FROM voca_items").get().n;
+  if (count > 0) return;
+
+  const seedPath = path.join(__dirname, "data", "default-voca.json");
+  if (!fs.existsSync(seedPath)) return;
+
+  let items;
+  try {
+    items = JSON.parse(fs.readFileSync(seedPath, "utf8"));
+  } catch {
+    return;
+  }
+  if (!Array.isArray(items) || !items.length) return;
+
+  const now = Date.now();
+  const insertMany = db.transaction((rows) => {
+    rows.forEach((item, index) => {
+      const { word, imageUrl } = normalizeVocaInput(item);
+      insertVocaStmt.run(word, imageUrl, index, now);
+    });
+  });
+  insertMany(items);
+}
+
+seedVocaItemsIfEmpty();
 
 function maskApiKey(key) {
   if (!key || key.length < 8) return key ? "••••" : "";
@@ -675,6 +752,81 @@ app.post("/api/findgame/levels/reset", (_req, res) => {
   seedFindGameLevelsIfEmpty();
   const rows = listLevelsStmt.all();
   res.json({ levels: rows.map(rowToLevel) });
+});
+
+app.get("/api/voca", (_req, res) => {
+  const rows = listVocaStmt.all();
+  res.json({ items: rows.map(rowToVocaItem) });
+});
+
+app.post("/api/voca", express.json(), (req, res) => {
+  try {
+    const { word, imageUrl } = normalizeVocaInput(req.body || {});
+    const sortOrder =
+      req.body?.sortOrder != null
+        ? Number(req.body.sortOrder)
+        : maxVocaSortStmt.get().max_order + 1;
+    const now = Date.now();
+    const result = insertVocaStmt.run(word, imageUrl, sortOrder, now);
+    const row = getVocaStmt.get(result.lastInsertRowid);
+    res.status(201).json({ item: rowToVocaItem(row) });
+  } catch (err) {
+    res.status(400).json({ error: err.message || "Invalid vocabulary item." });
+  }
+});
+
+app.put("/api/voca/:id", express.json(), (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const existing = getVocaStmt.get(id);
+    if (!existing) {
+      return res.status(404).json({ error: "Vocabulary item not found." });
+    }
+    const { word, imageUrl } = normalizeVocaInput({
+      word: req.body?.word ?? existing.word,
+      imageUrl: req.body?.imageUrl ?? existing.image_url,
+    });
+    const sortOrder =
+      req.body?.sortOrder != null ? Number(req.body.sortOrder) : existing.sort_order;
+    const now = Date.now();
+    updateVocaStmt.run(word, imageUrl, sortOrder, now, id);
+    res.json({ item: rowToVocaItem(getVocaStmt.get(id)) });
+  } catch (err) {
+    res.status(400).json({ error: err.message || "Invalid vocabulary item." });
+  }
+});
+
+app.delete("/api/voca/:id", (req, res) => {
+  const id = Number(req.params.id);
+  if (!getVocaStmt.get(id)) {
+    return res.status(404).json({ error: "Vocabulary item not found." });
+  }
+  deleteVocaStmt.run(id);
+  res.json({ ok: true, id });
+});
+
+app.post("/api/voca/import", express.json(), (req, res) => {
+  try {
+    const items = req.body?.items;
+    const replace = req.body?.replace !== false;
+    if (!Array.isArray(items) || !items.length) {
+      return res.status(400).json({ error: "items array is required." });
+    }
+
+    const normalized = items.map((item) => normalizeVocaInput(item));
+    const now = Date.now();
+    const importMany = db.transaction((rows) => {
+      if (replace) deleteAllVocaStmt.run();
+      rows.forEach((item, index) => {
+        insertVocaStmt.run(item.word, item.imageUrl, index, now);
+      });
+    });
+    importMany(normalized);
+    const rows = listVocaStmt.all();
+    res.json({ ok: true, count: rows.length, items: rows.map(rowToVocaItem) });
+  } catch (err) {
+    res.status(400).json({ error: err.message || "Import failed." });
+  }
 });
 
 app.get("/api/settings/inworld", (_req, res) => {

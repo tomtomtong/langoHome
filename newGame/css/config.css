@@ -876,3 +876,144 @@ body.hotspot-dragging {
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+.voca-section {
+  background: #fff6df;
+  border: 4px solid #5e3a18;
+  border-radius: 18px;
+  padding: 20px;
+  margin-bottom: 22px;
+}
+
+.voca-section.hidden {
+  display: none;
+}
+
+.voca-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.voca-heading {
+  font-family: "Baloo 2", sans-serif;
+  font-size: 1.35rem;
+  color: #5a2da0;
+}
+
+.voca-desc {
+  margin-top: 4px;
+  font-size: 0.9rem;
+  color: #5e3a18;
+  max-width: 640px;
+  line-height: 1.45;
+}
+
+.voca-desc code {
+  background: rgba(255, 255, 255, 0.45);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+
+.voca-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.btn-voca-add,
+.btn-voca-import,
+.btn-voca-save,
+.btn-voca-delete {
+  font-family: "Baloo 2", sans-serif;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 8px 18px;
+  cursor: pointer;
+  box-shadow: 0 4px 0 #5e3a18;
+}
+
+.btn-voca-add,
+.btn-voca-save {
+  background: linear-gradient(180deg, #8a4fd0, #5a2da0);
+}
+
+.btn-voca-import,
+.btn-voca-delete {
+  background: linear-gradient(180deg, #ff8a3d, #ef5f23);
+}
+
+.btn-voca-add:hover,
+.btn-voca-import:hover,
+.btn-voca-save:hover,
+.btn-voca-delete:hover {
+  transform: translateY(-1px);
+}
+
+.voca-count {
+  margin-bottom: 14px;
+  font-size: 0.9rem;
+  color: #5e3a18;
+}
+
+.voca-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.voca-card {
+  background: #fff;
+  border: 3px solid #c9a06a;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.08);
+}
+
+.voca-preview {
+  height: 120px;
+  background: #e8f4ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.voca-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.voca-body {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.voca-word,
+.voca-url {
+  width: 100%;
+  font-family: inherit;
+  font-size: 0.9rem;
+  border: 2px solid #c9a06a;
+  border-radius: 8px;
+  padding: 6px 8px;
+  color: #3a2410;
+}
+
+.voca-card-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.slot-grid.hidden {
+  display: none;
+}

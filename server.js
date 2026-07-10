@@ -1444,6 +1444,7 @@ function resolvePage(url) {
 const GAME_API_PREFIXES = [
   '/api/images',
   '/api/findgame',
+  '/api/voca',
   '/api/settings/inworld',
   '/api/inworld/tts',
   '/api/game-data',
