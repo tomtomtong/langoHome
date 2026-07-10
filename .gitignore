@@ -1,6 +1,7 @@
 node_modules/
 .env
 config.json
+sessions.json
 hello-debug-log.json
 idle-video/
 video-pairs/

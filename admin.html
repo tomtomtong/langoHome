@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin CMS — Uncle Tommy</title>
+  <link rel="stylesheet" href="/admin-nav.css">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f1117;
+      color: #e8eaed;
+      padding: 1.5rem;
+    }
+    .page {
+      width: min(100%, 960px);
+      margin: 0 auto;
+    }
+    h1 {
+      margin: 0 0 0.35rem;
+      font-size: 1.5rem;
+    }
+    .lead {
+      margin: 0 0 1.75rem;
+      color: #9aa0a6;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 1rem;
+    }
+    .card {
+      display: block;
+      padding: 1.25rem;
+      border-radius: 12px;
+      background: #1a1d27;
+      border: 1px solid #2a2f3a;
+      color: inherit;
+      text-decoration: none;
+      transition: border-color 0.15s, transform 0.15s;
+    }
+    .card:hover {
+      border-color: #6c8cff;
+      transform: translateY(-1px);
+    }
+    .card h2 {
+      margin: 0 0 0.35rem;
+      font-size: 1rem;
+      color: #e8eaed;
+    }
+    .card p {
+      margin: 0;
+      font-size: 0.8125rem;
+      color: #9aa0a6;
+      line-height: 1.45;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1>Admin CMS</h1>
+    <p class="lead">Manage voice agent settings, avatar, videos, learner profiles, and game assets from one place. Sign in with <strong>admin</strong> / <strong>admin</strong>.</p>
+
+    <div class="grid">
+      <a class="card" href="/config">
+        <h2>Voice Settings</h2>
+        <p>Inworld API key, system prompt, voice, model, and conversation game icons.</p>
+      </a>
+      <a class="card" href="/avatar-config">
+        <h2>Avatar</h2>
+        <p>Camera, lighting, lipsync, expressions, and avatar background image.</p>
+      </a>
+      <a class="card" href="/video-pairs">
+        <h2>Video Pairs</h2>
+        <p>Loop and transition videos with time windows, prompts, and backgrounds.</p>
+      </a>
+      <a class="card" href="/account-config">
+        <h2>Account Profiles</h2>
+        <p>Child profiles and preferences for learner accounts user01–user20.</p>
+      </a>
+      <a class="card" href="/games/config.html">
+        <h2>Game Assets</h2>
+        <p>Game artwork, Find Game levels, Inworld TTS for Find Game, and database backup.</p>
+      </a>
+      <a class="card" href="/">
+        <h2>Voice App</h2>
+        <p>Return to the main Uncle Tommy conversation experience.</p>
+      </a>
+    </div>
+  </div>
+  <script src="/admin-nav.js"></script>
+</body>
+</html>

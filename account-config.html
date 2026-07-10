@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Account Profiles — Uncle Tommy</title>
+  <link rel="stylesheet" href="/admin-nav.css">
   <style>
     * { box-sizing: border-box; }
     body {
@@ -255,7 +256,6 @@
 
         <div class="actions">
           <button type="submit" id="save-btn">Save profile</button>
-          <a class="btn" href="/config">Voice settings</a>
           <a class="btn" href="/">Back to Voice</a>
         </div>
       </form>
@@ -264,8 +264,7 @@
 
       <p class="hint">
         Profiles are stored per account and applied automatically when that user logs in.
-        Voice and avatar settings are on <a href="/config">Voice Settings</a> and
-        <a href="/avatar-config">Avatar Settings</a>.
+        Use the sidebar to switch between CMS sections.
       </p>
     </div>
   </div>
@@ -401,5 +400,6 @@
       showStatus(e.message || "Could not load profiles.", false);
     });
   </script>
+  <script src="/admin-nav.js"></script>
 </body>
 </html>

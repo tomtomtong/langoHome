@@ -835,9 +835,7 @@
         <div class="overlay-top-actions">
           <span id="camera-save-status" aria-live="polite"></span>
           <button id="btn-save-camera" type="button">Save camera</button>
-          <a href="/config">Settings</a>
-          <a href="/video-pairs">Videos</a>
-          <a href="/avatar-config">Avatar</a>
+          <a href="/admin" id="admin-link" hidden>Admin</a>
         </div>
       </div>
       <nav class="overlay-games" aria-label="Games">
@@ -2837,6 +2835,16 @@
     }
 
     async function init() {
+      try {
+        const meRes = await fetch('/api/me');
+        if (meRes.ok) {
+          const me = await meRes.json();
+          if (me.role === 'admin') {
+            document.getElementById('admin-link').hidden = false;
+          }
+        }
+      } catch (_) { /* ignore */ }
+
       const fromGame = shouldAutoConnectFromGame();
       const cfg = await getConfig();
 

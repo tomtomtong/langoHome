@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <title>Config — Voice Agent</title>
+  <link rel="stylesheet" href="/admin-nav.css">
   <style>
     * { box-sizing: border-box; }
     body {
@@ -279,19 +280,13 @@
       <div id="game-icons-grid" class="game-icons-grid"></div>
       <div class="actions">
         <button type="submit">Save</button>
-        <a class="btn" href="/video-pairs">Video pairs</a>
-        <a class="btn" href="/account-config">Account profiles</a>
-        <a class="btn" href="/avatar-config">Avatar settings</a>
         <a class="btn" href="/">Back to Voice</a>
       </div>
     </form>
     <div id="status" class="status"></div>
     <p class="hint">
       Settings are saved on the server (<code>config.json</code>) and persist across restarts.
-      This page requires <a href="/admin/login">admin sign-in</a>.
-      Avatar background, lighting, lipsync, and expressions are on <a href="/avatar-config">Avatar Settings</a>.
-      Child profiles per login account are on <a href="/account-config">Account Profiles</a>.
-      Loop and transition videos are on <a href="/video-pairs">Video Pairs</a>.
+      Use the sidebar to switch between CMS sections.
       On Railway, attach a volume mounted at <code>/app/data</code> so config survives redeploys.
       Get a key at <a href="https://platform.inworld.ai/" target="_blank" rel="noopener">platform.inworld.ai</a>.
       You can also set <code>INWORLD_API_KEY</code> as a server environment variable instead.
@@ -614,5 +609,6 @@ ${linesText.replace(/</g, '&lt;')}</pre>
       status.className = 'status ok';
     };
   </script>
+  <script src="/admin-nav.js"></script>
 </body>
 </html>

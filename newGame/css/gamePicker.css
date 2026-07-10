@@ -2,12 +2,19 @@
    Game picker — shared overlay for all games
    =========================================================== */
 
-/* Return buttons — consistent top-left alignment in HUD grids */
-.hud .return-btn,
-.game-top-hud .return-btn,
-.game-top-hud #return-btn {
-  justify-self: start;
-  align-self: center;
+/* Return buttons — viewport top-left (outside scaled game canvases) */
+.return-btn,
+#return-btn {
+  position: fixed;
+  top: max(18px, env(safe-area-inset-top));
+  left: max(28px, env(safe-area-inset-left));
+  z-index: 110;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  line-height: 0;
+  transition: transform 0.2s ease;
 }
 
 .game-picker {

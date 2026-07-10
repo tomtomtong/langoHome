@@ -15,6 +15,7 @@ const ROOT = dirname(fileURLToPath(import.meta.url));
 const CONFIG_DIR = process.env.CONFIG_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH || ROOT;
 const CONFIG_PATH = join(CONFIG_DIR, 'config.json');
 const USER_PROFILES_PATH = join(CONFIG_DIR, 'user-profiles.json');
+const SESSIONS_PATH = join(CONFIG_DIR, 'sessions.json');
 const DEBUG_LOG_PATH = join(CONFIG_DIR, 'hello-debug-log.json');
 const DEBUG_LOG_MAX_REPORTS = 20;
 const IDLE_VIDEO_DIR = join(CONFIG_DIR, 'idle-video');
@@ -54,6 +55,9 @@ const STUDENT_USERS = Object.fromEntries(
 
 const ADMIN_USERNAME = 'admin';
 const ADMIN_PASSWORD = 'admin';
+
+const SESSION_MAX_AGE_MS = 365 * 24 * 60 * 60 * 1000;
+const SESSION_MAX_AGE_SEC = Math.floor(SESSION_MAX_AGE_MS / 1000);
 
 const USER_LIST = Object.keys(STUDENT_USERS);
 
@@ -184,6 +188,39 @@ function isValidUsername(username) {
 
 const sessions = new Map();
 
+function loadSessions() {
+  try {
+    if (!existsSync(SESSIONS_PATH)) return;
+    const data = JSON.parse(readFileSync(SESSIONS_PATH, 'utf8'));
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return;
+    const now = Date.now();
+    for (const [token, session] of Object.entries(data)) {
+      if (!session || typeof session !== 'object') continue;
+      if (typeof session.expiresAt === 'number' && session.expiresAt <= now) continue;
+      sessions.set(token, session);
+    }
+  } catch (e) {
+    console.warn('Could not load sessions.json:', e.message);
+  }
+}
+
+function saveSessions() {
+  try {
+    ensureConfigDir();
+    writeFileSync(SESSIONS_PATH, JSON.stringify(Object.fromEntries(sessions), null, 2) + '\n');
+  } catch (e) {
+    console.warn('Could not save sessions.json:', e.message);
+  }
+}
+
+function deleteSession(token) {
+  if (!token) return;
+  sessions.delete(token);
+  saveSessions();
+}
+
+loadSessions();
+
 function parseCookies(req) {
   const cookies = {};
   for (const part of (req.headers.cookie || '').split(';')) {
@@ -201,7 +238,12 @@ function parseCookies(req) {
 function getSession(req) {
   const token = parseCookies(req).session;
   if (!token || !sessions.has(token)) return null;
-  return sessions.get(token);
+  const session = sessions.get(token);
+  if (typeof session.expiresAt === 'number' && session.expiresAt <= Date.now()) {
+    deleteSession(token);
+    return null;
+  }
+  return session;
 }
 
 function isAuthenticated(req) {
@@ -231,12 +273,19 @@ function verifyAdminCredentials(username, password) {
 
 function createSession(username, role) {
   const token = randomBytes(32).toString('hex');
-  sessions.set(token, { username, role, createdAt: Date.now() });
+  const now = Date.now();
+  sessions.set(token, {
+    username,
+    role,
+    createdAt: now,
+    expiresAt: now + SESSION_MAX_AGE_MS,
+  });
+  saveSessions();
   return token;
 }
 
 function sessionCookie(token) {
-  return `session=${token}; Path=/; HttpOnly; SameSite=Lax`;
+  return `session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_MAX_AGE_SEC}`;
 }
 
 function clearSessionCookie() {
@@ -268,6 +317,7 @@ function isPublicPath(url) {
 }
 
 const ADMIN_PAGE_PATHS = new Set([
+  '/admin',
   '/config',
   '/account-config',
   '/avatar-config',
@@ -934,6 +984,7 @@ const pages = {
   '/': 'index.html',
   '/login': 'login.html',
   '/admin/login': 'admin-login.html',
+  '/admin': 'admin.html',
   '/config': 'config.html',
   '/account-config': 'account-config.html',
   '/avatar-config': 'avatar-config.html',
@@ -1027,8 +1078,7 @@ const server = createServer((req, res) => {
   }
 
   if (url === '/api/logout' && req.method === 'POST') {
-    const token = parseCookies(req).session;
-    if (token) sessions.delete(token);
+    deleteSession(parseCookies(req).session);
     res.writeHead(200, {
       'Content-Type': 'application/json',
       'Set-Cookie': clearSessionCookie(),
@@ -1056,7 +1106,7 @@ const server = createServer((req, res) => {
 
   if (url === '/admin/login' && isAdmin(req)) {
     const next = new URL(rawUrl, 'http://local').searchParams.get('next');
-    const dest = next && next.startsWith('/') ? next : '/config';
+    const dest = next && next.startsWith('/') ? next : '/admin';
     res.writeHead(302, { Location: dest, ...SECURITY_HEADERS });
     res.end();
     return;
@@ -1253,7 +1303,7 @@ const server = createServer((req, res) => {
     return;
   }
 
-  const rootAsset = url.match(/^\/[^/]+\.(png|jpe?g|webp|fbx|vrm|mp4|webm|mov)$/i);
+  const rootAsset = url.match(/^\/[^/]+\.(png|jpe?g|webp|fbx|vrm|mp4|webm|mov|css|js)$/i);
   if (rootAsset) {
     serveFile(res, join(ROOT, url.slice(1)));
     return;
@@ -1533,7 +1583,7 @@ wss.on('connection', (browser, req) => {
 const port = Number(process.env.PORT) || 4000;
 server.listen(port, '0.0.0.0', () => {
   console.log(`Listening on http://0.0.0.0:${port}  (config: /config)`);
-  console.log(`Admin CMS login: http://0.0.0.0:${port}/admin/login`);
+  console.log(`Admin CMS: http://0.0.0.0:${port}/admin  (login: /admin/login)`);
   console.log(`Account profiles: http://0.0.0.0:${port}/account-config`);
   console.log(`Games hub:  http://0.0.0.0:${port}/games/`);
   console.log(`Game database: ${GAME_DB_PATH}`);

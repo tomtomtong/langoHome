@@ -167,7 +167,7 @@
     const form = document.getElementById("login-form");
     const errorEl = document.getElementById("error");
     const submitBtn = document.getElementById("submit-btn");
-    const nextUrl = new URLSearchParams(location.search).get("next") || "/config";
+    const nextUrl = new URLSearchParams(location.search).get("next") || "/admin";
 
     function showError(message) {
       errorEl.textContent = message;
@@ -201,7 +201,7 @@
           return;
         }
 
-        location.href = nextUrl.startsWith("/") ? nextUrl : "/config";
+        location.href = nextUrl.startsWith("/") ? nextUrl : "/admin";
       } catch {
         showError("Could not reach the server. Please try again.");
       } finally {

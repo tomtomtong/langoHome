@@ -1,0 +1,159 @@
+/* Shared admin CMS sidebar — included on all config pages */
+body.admin-page {
+  padding-left: 240px !important;
+}
+
+body.admin-page.admin-page--centered {
+  display: block !important;
+  min-height: 100vh;
+  padding-top: 1.5rem;
+  padding-right: 1.5rem;
+  padding-bottom: 1.5rem;
+}
+
+.admin-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 240px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  background: #12151c;
+  border-right: 1px solid #2a2f3d;
+  color: #e8eaed;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.admin-sidebar-brand {
+  padding: 1.25rem 1rem 1rem;
+  border-bottom: 1px solid #2a2f3d;
+}
+
+.admin-sidebar-brand strong {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.admin-sidebar-brand span {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: #9aa0a6;
+}
+
+.admin-sidebar-nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.75rem 0.5rem;
+}
+
+.admin-sidebar-nav a {
+  display: block;
+  padding: 0.55rem 0.75rem;
+  margin-bottom: 0.15rem;
+  border-radius: 8px;
+  color: #bdc1c6;
+  text-decoration: none;
+  font-size: 0.875rem;
+  transition: background 0.12s, color 0.12s;
+}
+
+.admin-sidebar-nav a:hover {
+  background: #1e2430;
+  color: #e8eaed;
+}
+
+.admin-sidebar-nav a.active {
+  background: #2a3348;
+  color: #fff;
+  font-weight: 500;
+}
+
+.admin-sidebar-footer {
+  padding: 0.75rem 0.5rem 1rem;
+  border-top: 1px solid #2a2f3d;
+}
+
+.admin-sidebar-footer a,
+.admin-sidebar-footer button {
+  display: block;
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  margin-bottom: 0.15rem;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #9aa0a6;
+  font-size: 0.875rem;
+  font-family: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.admin-sidebar-footer a:hover,
+.admin-sidebar-footer button:hover {
+  background: #1e2430;
+  color: #e8eaed;
+}
+
+.admin-sidebar-footer button.logout-btn {
+  color: #f28b82;
+}
+
+.admin-sidebar-footer button.logout-btn:hover {
+  background: rgba(234, 67, 53, 0.12);
+  color: #ffb4ae;
+}
+
+@media (max-width: 768px) {
+  body.admin-page {
+    padding-left: 0 !important;
+    padding-top: 3.25rem !important;
+  }
+
+  .admin-sidebar {
+    width: 100%;
+    height: auto;
+    bottom: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .admin-sidebar-brand {
+    display: none;
+  }
+
+  .admin-sidebar-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    padding: 0.5rem;
+    overflow-x: auto;
+  }
+
+  .admin-sidebar-nav a {
+    white-space: nowrap;
+    margin-bottom: 0;
+  }
+
+  .admin-sidebar-footer {
+    display: flex;
+    gap: 0.25rem;
+    padding: 0.5rem;
+    border-top: none;
+    border-left: 1px solid #2a2f3d;
+  }
+
+  .admin-sidebar-footer a,
+  .admin-sidebar-footer button {
+    width: auto;
+    margin-bottom: 0;
+    white-space: nowrap;
+  }
+}

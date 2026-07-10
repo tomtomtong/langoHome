@@ -131,7 +131,6 @@ html, body {
   background: var(--cream) url("../assets/images/return-btn.svg") center / contain no-repeat;
   box-shadow: var(--shadow);
   cursor: pointer;
-  justify-self: start;
   transition: transform 0.1s ease;
 }
 .return-btn:hover { transform: translateY(-1px); }
@@ -145,6 +144,7 @@ html, body {
 /* ---------- Sign ---------- */
 .sign-wrap {
   position: relative;
+  grid-column: 2;
   justify-self: center;
   padding-top: 26px;
 }
@@ -220,7 +220,10 @@ html, body {
 }
 
 /* ---------- Stopwatch ---------- */
-.timer-wrap { justify-self: end; }
+.timer-wrap {
+  grid-column: 3;
+  justify-self: end;
+}
 .stopwatch {
   position: relative;
   width: 96px;
