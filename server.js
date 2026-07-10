@@ -1,4 +1,5 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync, readdirSync, statSync, copyFileSync } from 'fs';
+import { randomBytes, timingSafeEqual } from 'crypto';
 import { createServer } from 'http';
 import { createRequire } from 'module';
 import { join, dirname, extname } from 'path';
@@ -13,6 +14,7 @@ const ROOT = dirname(fileURLToPath(import.meta.url));
 // Local: ./config.json  |  Railway: mount a volume (e.g. /app/data) — uses RAILWAY_VOLUME_MOUNT_PATH
 const CONFIG_DIR = process.env.CONFIG_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH || ROOT;
 const CONFIG_PATH = join(CONFIG_DIR, 'config.json');
+const USER_PROFILES_PATH = join(CONFIG_DIR, 'user-profiles.json');
 const DEBUG_LOG_PATH = join(CONFIG_DIR, 'hello-debug-log.json');
 const DEBUG_LOG_MAX_REPORTS = 20;
 const IDLE_VIDEO_DIR = join(CONFIG_DIR, 'idle-video');
@@ -42,6 +44,206 @@ const SECURITY_HEADERS = {
   'Cross-Origin-Opener-Policy': 'same-origin',
   'Cross-Origin-Embedder-Policy': 'require-corp',
 };
+
+const USERS = Object.fromEntries(
+  Array.from({ length: 20 }, (_, i) => {
+    const username = `user${String(i + 1).padStart(2, '0')}`;
+    return [username, 'password123'];
+  }),
+);
+
+const USER_LIST = Object.keys(USERS);
+
+const DEFAULT_USER_PROFILE = {
+  childName: '',
+  nickname: '',
+  age: '',
+  grade: '',
+  mainLearningLanguage: '',
+  homeLanguage: '',
+  personalityType: '',
+  confidenceLevel: '',
+  attentionSpan: '',
+  preferredPraise: '',
+  favoriteToy: '',
+  favoriteCharacter: '',
+  favoriteFood: '',
+  favoriteDrink: '',
+  favoriteColor: '',
+  favoriteAnimal: '',
+  favoriteHobby: '',
+  favoriteSport: '',
+  favoriteMusic: '',
+  favoritePlace: '',
+  favoriteGameType: '',
+};
+
+function normalizeUserProfile(raw) {
+  const src = raw && typeof raw === 'object' ? raw : {};
+  const profile = {};
+  for (const key of Object.keys(DEFAULT_USER_PROFILE)) {
+    profile[key] = String(src[key] ?? '').trim();
+  }
+  return profile;
+}
+
+function loadUserProfiles() {
+  try {
+    if (existsSync(USER_PROFILES_PATH)) {
+      const data = JSON.parse(readFileSync(USER_PROFILES_PATH, 'utf8'));
+      if (data && typeof data === 'object' && !Array.isArray(data)) return data;
+    }
+  } catch (e) {
+    console.warn('Could not load user-profiles.json:', e.message);
+  }
+  return {};
+}
+
+function saveUserProfiles(profiles) {
+  ensureConfigDir();
+  writeFileSync(USER_PROFILES_PATH, JSON.stringify(profiles, null, 2) + '\n');
+}
+
+function getUserProfile(username) {
+  const profiles = loadUserProfiles();
+  return normalizeUserProfile(profiles[username]);
+}
+
+function saveUserProfile(username, profile) {
+  if (!USERS[username]) return false;
+  const profiles = loadUserProfiles();
+  profiles[username] = normalizeUserProfile(profile);
+  saveUserProfiles(profiles);
+  return true;
+}
+
+function buildProfileContext(profile) {
+  const p = normalizeUserProfile(profile);
+  const basic = [
+    ['Child Name', p.childName],
+    ['Nickname', p.nickname],
+    ['Age', p.age],
+    ['Grade', p.grade],
+    ['Main Learning Language', p.mainLearningLanguage],
+    ['Home Language', p.homeLanguage],
+    ['Personality Type', p.personalityType],
+    ['Confidence Level', p.confidenceLevel],
+    ['Attention Span', p.attentionSpan],
+    ['Preferred Praise', p.preferredPraise],
+  ].filter(([, value]) => value);
+
+  const favorites = [
+    ['Favorite Toy', p.favoriteToy],
+    ['Favorite Character', p.favoriteCharacter],
+    ['Favorite Food', p.favoriteFood],
+    ['Favorite Drink', p.favoriteDrink],
+    ['Favorite Color', p.favoriteColor],
+    ['Favorite Animal', p.favoriteAnimal],
+    ['Favorite Hobby', p.favoriteHobby],
+    ['Favorite Sport', p.favoriteSport],
+    ['Favorite Song / Music Type', p.favoriteMusic],
+    ['Favorite Place', p.favoritePlace],
+    ['Favorite Game Type', p.favoriteGameType],
+  ].filter(([, value]) => value);
+
+  if (!basic.length && !favorites.length) return '';
+
+  const lines = [
+    'You are speaking with a child learner. Personalize the conversation using this profile.',
+    '',
+  ];
+  if (basic.length) {
+    lines.push('Basic Profile:');
+    for (const [label, value] of basic) lines.push(`- ${label}: ${value}`);
+    lines.push('');
+  }
+  if (favorites.length) {
+    lines.push('Favorite Items:');
+    for (const [label, value] of favorites) lines.push(`- ${label}: ${value}`);
+    lines.push('');
+  }
+  lines.push(
+    'Use their name and interests naturally. Match their confidence level and attention span. Use their preferred praise style when encouraging them.',
+  );
+  return lines.join('\n');
+}
+
+function mergeInstructionsWithProfile(baseInstructions, profile) {
+  const base = (baseInstructions || DEFAULT_INSTRUCTIONS).trim();
+  const profileBlock = buildProfileContext(profile);
+  if (!profileBlock) return base;
+  return `${base}\n\n${profileBlock}`;
+}
+
+function isValidUsername(username) {
+  return Object.prototype.hasOwnProperty.call(USERS, username);
+}
+
+const sessions = new Map();
+
+function parseCookies(req) {
+  const cookies = {};
+  for (const part of (req.headers.cookie || '').split(';')) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq === -1) continue;
+    const key = trimmed.slice(0, eq);
+    const value = trimmed.slice(eq + 1);
+    cookies[key] = decodeURIComponent(value);
+  }
+  return cookies;
+}
+
+function getSession(req) {
+  const token = parseCookies(req).session;
+  if (!token || !sessions.has(token)) return null;
+  return sessions.get(token);
+}
+
+function isAuthenticated(req) {
+  return getSession(req) !== null;
+}
+
+function verifyCredentials(username, password) {
+  const expected = USERS[username];
+  if (!expected) return false;
+  const a = Buffer.from(password);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+
+function createSession(username) {
+  const token = randomBytes(32).toString('hex');
+  sessions.set(token, { username, createdAt: Date.now() });
+  return token;
+}
+
+function sessionCookie(token) {
+  return `session=${token}; Path=/; HttpOnly; SameSite=Lax`;
+}
+
+function clearSessionCookie() {
+  return 'session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0';
+}
+
+function redirectToLogin(res, nextUrl) {
+  const loc = nextUrl && nextUrl !== '/login'
+    ? `/login?next=${encodeURIComponent(nextUrl)}`
+    : '/login';
+  res.writeHead(302, { Location: loc, ...SECURITY_HEADERS });
+  res.end();
+}
+
+function isPublicPath(url) {
+  return url === '/login' || url === '/api/login' || url === '/langoLogo.jpeg';
+}
+
+function wantsHtml(req) {
+  const accept = req.headers.accept || '';
+  return accept.includes('text/html') || accept === '*/*' || !accept.includes('application/json');
+}
 
 const MIME = {
   '.js': 'application/javascript; charset=utf-8',
@@ -654,7 +856,9 @@ function serveFile(res, filePath) {
 
 const pages = {
   '/': 'index.html',
+  '/login': 'login.html',
   '/config': 'config.html',
+  '/account-config': 'account-config.html',
   '/avatar-config': 'avatar-config.html',
   '/video-pairs': 'video-pairs.html',
   '/visme': 'visme/index.html',
@@ -702,6 +906,107 @@ const server = createServer((req, res) => {
   const qIndex = rawUrl.indexOf('?');
   const url = qIndex === -1 ? rawUrl : rawUrl.slice(0, qIndex);
   const query = qIndex === -1 ? '' : rawUrl.slice(qIndex);
+
+  if (url === '/api/login' && req.method === 'POST') {
+    readJsonBody(req, res, (parsed) => {
+      const username = String(parsed.username || '').trim();
+      const password = String(parsed.password || '');
+      if (!verifyCredentials(username, password)) {
+        sendJson(res, 401, { error: 'Invalid username or password.' });
+        return;
+      }
+      const token = createSession(username);
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Set-Cookie': sessionCookie(token),
+        ...SECURITY_HEADERS,
+      });
+      res.end(JSON.stringify({ ok: true, username }));
+    });
+    return;
+  }
+
+  if (url === '/api/logout' && req.method === 'POST') {
+    const token = parseCookies(req).session;
+    if (token) sessions.delete(token);
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Set-Cookie': clearSessionCookie(),
+      ...SECURITY_HEADERS,
+    });
+    res.end(JSON.stringify({ ok: true }));
+    return;
+  }
+
+  if (url === '/api/me' && req.method === 'GET') {
+    const session = getSession(req);
+    if (!session) {
+      sendJson(res, 401, { error: 'Not authenticated.' });
+      return;
+    }
+    sendJson(res, 200, { username: session.username });
+    return;
+  }
+
+  if (url === '/login' && isAuthenticated(req)) {
+    res.writeHead(302, { Location: '/', ...SECURITY_HEADERS });
+    res.end();
+    return;
+  }
+
+  if (!isPublicPath(url) && !isAuthenticated(req)) {
+    if (wantsHtml(req)) {
+      redirectToLogin(res, url);
+      return;
+    }
+    sendJson(res, 401, { error: 'Login required.' });
+    return;
+  }
+
+  if (url === '/api/me/profile' && req.method === 'GET') {
+    const session = getSession(req);
+    sendJson(res, 200, {
+      username: session.username,
+      profile: getUserProfile(session.username),
+    });
+    return;
+  }
+
+  if (url === '/api/user-profiles' && req.method === 'GET') {
+    const profiles = loadUserProfiles();
+    const normalized = {};
+    for (const username of USER_LIST) {
+      normalized[username] = normalizeUserProfile(profiles[username]);
+    }
+    sendJson(res, 200, { users: USER_LIST, profiles: normalized });
+    return;
+  }
+
+  const profileMatch = url.match(/^\/api\/user-profiles\/(user\d{2})$/);
+  if (profileMatch) {
+    const username = profileMatch[1];
+    if (!isValidUsername(username)) {
+      sendJson(res, 404, { error: 'Unknown account.' });
+      return;
+    }
+    if (req.method === 'GET') {
+      sendJson(res, 200, { username, profile: getUserProfile(username) });
+      return;
+    }
+    if (req.method === 'PUT' || req.method === 'POST') {
+      readJsonBody(req, res, (parsed) => {
+        const profile = parsed.profile != null ? parsed.profile : parsed;
+        if (!saveUserProfile(username, profile)) {
+          sendJson(res, 400, { error: 'Could not save profile.' });
+          return;
+        }
+        sendJson(res, 200, { ok: true, username, profile: getUserProfile(username) });
+      });
+      return;
+    }
+    sendJson(res, 405, { error: 'Method not allowed.' });
+    return;
+  }
 
   if (isGameApiRoute(url)) {
     delegateToGameApp(req, res, url, query);
@@ -1061,7 +1366,12 @@ function connectToInworld(apiKey, browser, session) {
   });
 }
 
-wss.on('connection', (browser) => {
+wss.on('connection', (browser, req) => {
+  if (!isAuthenticated(req)) {
+    browser.close(4001, 'Login required');
+    return;
+  }
+
   let connected = false;
 
   const fail = (message) => {
@@ -1090,8 +1400,11 @@ wss.on('connection', (browser) => {
     clearTimeout(authTimeout);
     connected = true;
     browser.removeAllListeners('message');
+    const sessionUser = getSession(req);
+    const profile = sessionUser ? getUserProfile(sessionUser.username) : {};
+    const baseInstructions = parsed.instructions?.trim() || saved.instructions?.trim();
     connectToInworld(apiKey, browser, {
-      instructions: parsed.instructions?.trim() || saved.instructions?.trim(),
+      instructions: mergeInstructionsWithProfile(baseInstructions, profile),
       voice: parsed.voice?.trim() || saved.voice?.trim(),
       model: parsed.model?.trim() || saved.model?.trim(),
     });
@@ -1101,6 +1414,7 @@ wss.on('connection', (browser) => {
 const port = Number(process.env.PORT) || 4000;
 server.listen(port, '0.0.0.0', () => {
   console.log(`Listening on http://0.0.0.0:${port}  (config: /config)`);
+  console.log(`Account profiles: http://0.0.0.0:${port}/account-config`);
   console.log(`Games hub:  http://0.0.0.0:${port}/games/`);
   console.log(`Game database: ${GAME_DB_PATH}`);
   if (CONFIG_DIR !== ROOT) console.log(`Config stored at ${CONFIG_PATH}`);

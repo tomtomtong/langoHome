@@ -15,17 +15,15 @@ html, body {
   height: 100vh;
   overflow: hidden;
   font-family: 'Segoe UI', sans-serif;
-  display: flex;
-  justify-content: center;
-  align-items: center;
   color: #fff;
 }
 body {
   background: linear-gradient(135deg,#2b5876,#4e4376);
 }
 #game {
-  width: 800px;
-  height: 600px;
+  width: 100vw;
+  height: 100vh;
+  max-width: 100vw;
   padding: 10px 20px;
   text-align: center;
   position: relative;
@@ -33,7 +31,7 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  transform-origin: center center;
+  box-sizing: border-box;
 }
 h1 { margin: 6px; font-size: 18px; }
 .title-text {
@@ -124,7 +122,7 @@ h1 { margin: 6px; font-size: 18px; }
   grid-gap: 10px;
   justify-content: center;
   width: 100%;
-  max-width: 544px;
+  max-width: calc(100vw - 40px);
   flex: 1;
   align-content: center;
   margin: 0 auto;
@@ -181,7 +179,7 @@ h1 { margin: 6px; font-size: 18px; }
 }
 .progress-frame {
   position: relative;
-  width: min(620px, 80vw);
+  width: min(620px, calc(100vw - 56px));
   height: 26px;
   background: linear-gradient(180deg, var(--wood-1), var(--wood-2));
   border: 4px solid var(--wood-3);

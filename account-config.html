@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Account Profiles — Uncle Tommy</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      margin: 0;
+      min-height: 100vh;
+      background: #0f1117;
+      color: #e8eaed;
+      padding: 1.5rem;
+    }
+    .page {
+      width: min(100%, 960px);
+      margin: 0 auto;
+    }
+    .card {
+      padding: 2rem;
+      background: #1a1d27;
+      border-radius: 12px;
+      border: 1px solid #2a2f3a;
+    }
+    h1 { margin: 0 0 0.25rem; font-size: 1.35rem; }
+    .lead {
+      margin: 0 0 1.5rem;
+      color: #9aa0a6;
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+    h2 {
+      margin: 0 0 1rem;
+      font-size: 1rem;
+      color: #c4c7c5;
+    }
+    label {
+      display: block;
+      margin-bottom: 0.4rem;
+      font-size: 0.8125rem;
+      font-weight: 500;
+    }
+    input, textarea, select {
+      width: 100%;
+      padding: 0.625rem 0.75rem;
+      border: 1px solid #3c4043;
+      border-radius: 8px;
+      background: #0f1117;
+      color: #e8eaed;
+      font-size: 0.875rem;
+      font-family: inherit;
+    }
+    textarea {
+      min-height: 72px;
+      resize: vertical;
+      line-height: 1.45;
+    }
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: #6c8cff;
+    }
+    .field { margin-bottom: 1rem; }
+    .field-hint {
+      margin: 0.35rem 0 0;
+      font-size: 0.75rem;
+      color: #5f6368;
+      line-height: 1.4;
+    }
+    .account-picker {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 0.75rem;
+      align-items: end;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid #2a2f3a;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0 1rem;
+    }
+    .section {
+      margin-bottom: 2rem;
+    }
+    .section:last-of-type { margin-bottom: 0; }
+    .actions {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-top: 1.5rem;
+    }
+    button, a.btn {
+      padding: 0.625rem 1rem;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: center;
+      text-decoration: none;
+    }
+    button {
+      border: none;
+      background: #6c8cff;
+      color: #fff;
+    }
+    button:hover:not(:disabled) { background: #5a7aef; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    a.btn, button.secondary {
+      background: transparent;
+      border: 1px solid #3c4043;
+      color: #9aa0a6;
+    }
+    a.btn:hover, button.secondary:hover {
+      border-color: #5f6368;
+      color: #e8eaed;
+    }
+    .status {
+      margin-top: 1rem;
+      padding: 0.625rem 0.75rem;
+      border-radius: 8px;
+      font-size: 0.8125rem;
+      display: none;
+    }
+    .status.ok { display: block; background: #1e3a2f; color: #81c995; }
+    .status.err { display: block; background: #3a1e1e; color: #f28b82; }
+    .hint {
+      margin-top: 1.25rem;
+      font-size: 0.75rem;
+      color: #5f6368;
+      line-height: 1.5;
+    }
+    .hint a { color: #6c8cff; }
+    @media (max-width: 720px) {
+      .grid-2 { grid-template-columns: 1fr; }
+      .account-picker { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="card">
+      <h1>Account Profiles</h1>
+      <p class="lead">
+        Set a child profile for each login account (user01–user20). Uncle Tommy uses this
+        information to personalize conversations when that account signs in.
+      </p>
+
+      <div class="account-picker">
+        <div class="field" style="margin-bottom:0">
+          <label for="account-select">Account</label>
+          <select id="account-select"></select>
+        </div>
+        <button type="button" class="secondary" id="load-btn">Reload</button>
+      </div>
+
+      <form id="profile-form">
+        <section class="section">
+          <h2>Basic Profile</h2>
+          <div class="grid-2">
+            <div class="field">
+              <label for="childName">Child Name</label>
+              <input id="childName" name="childName" type="text" placeholder="Ethan" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="nickname">Nickname</label>
+              <input id="nickname" name="nickname" type="text" placeholder="E仔 / Little Tiger" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="age">Age</label>
+              <input id="age" name="age" type="text" placeholder="7" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="grade">Grade</label>
+              <input id="grade" name="grade" type="text" placeholder="P2" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="mainLearningLanguage">Main Learning Language</label>
+              <input id="mainLearningLanguage" name="mainLearningLanguage" type="text" placeholder="English" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="homeLanguage">Home Language</label>
+              <input id="homeLanguage" name="homeLanguage" type="text" placeholder="Cantonese / Mandarin" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="confidenceLevel">Confidence Level</label>
+              <input id="confidenceLevel" name="confidenceLevel" type="text" placeholder="Medium" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="attentionSpan">Attention Span</label>
+              <input id="attentionSpan" name="attentionSpan" type="text" placeholder="8–12 minutes" autocomplete="off">
+            </div>
+          </div>
+          <div class="field">
+            <label for="personalityType">Personality Type</label>
+            <textarea id="personalityType" name="personalityType" placeholder="Shy at first, playful after warming up"></textarea>
+          </div>
+          <div class="field">
+            <label for="preferredPraise">Preferred Praise</label>
+            <textarea id="preferredPraise" name="preferredPraise" placeholder="Funny praise, superhero-style encouragement"></textarea>
+          </div>
+        </section>
+
+        <section class="section">
+          <h2>Favorite Items</h2>
+          <div class="grid-2">
+            <div class="field">
+              <label for="favoriteToy">Favorite Toy</label>
+              <input id="favoriteToy" name="favoriteToy" type="text" placeholder="LEGO dragon" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="favoriteCharacter">Favorite Character</label>
+              <input id="favoriteCharacter" name="favoriteCharacter" type="text" placeholder="Pokémon Pikachu" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="favoriteFood">Favorite Food</label>
+              <input id="favoriteFood" name="favoriteFood" type="text" placeholder="Pizza" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="favoriteDrink">Favorite Drink</label>
+              <input id="favoriteDrink" name="favoriteDrink" type="text" placeholder="Chocolate milk" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="favoriteColor">Favorite Color</label>
+              <input id="favoriteColor" name="favoriteColor" type="text" placeholder="Blue" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="favoriteAnimal">Favorite Animal</label>
+              <input id="favoriteAnimal" name="favoriteAnimal" type="text" placeholder="Dolphin" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="favoriteHobby">Favorite Hobby</label>
+              <input id="favoriteHobby" name="favoriteHobby" type="text" placeholder="Drawing" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="favoriteSport">Favorite Sport</label>
+              <input id="favoriteSport" name="favoriteSport" type="text" placeholder="Football" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="favoriteMusic">Favorite Song / Music Type</label>
+              <input id="favoriteMusic" name="favoriteMusic" type="text" placeholder="Baby Shark / funny songs" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="favoritePlace">Favorite Place</label>
+              <input id="favoritePlace" name="favoritePlace" type="text" placeholder="Beach" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="favoriteGameType">Favorite Game Type</label>
+              <input id="favoriteGameType" name="favoriteGameType" type="text" placeholder="Racing games" autocomplete="off">
+            </div>
+          </div>
+        </section>
+
+        <div class="actions">
+          <button type="submit" id="save-btn">Save profile</button>
+          <a class="btn" href="/config">Voice settings</a>
+          <a class="btn" href="/">Back to Voice</a>
+        </div>
+      </form>
+
+      <div id="status" class="status" role="status"></div>
+
+      <p class="hint">
+        Profiles are stored per account and applied automatically when that user logs in.
+        Voice and avatar settings are on <a href="/config">Voice Settings</a> and
+        <a href="/avatar-config">Avatar Settings</a>.
+      </p>
+    </div>
+  </div>
+
+  <script>
+    const PROFILE_FIELDS = [
+      "childName", "nickname", "age", "grade", "mainLearningLanguage", "homeLanguage",
+      "personalityType", "confidenceLevel", "attentionSpan", "preferredPraise",
+      "favoriteToy", "favoriteCharacter", "favoriteFood", "favoriteDrink", "favoriteColor",
+      "favoriteAnimal", "favoriteHobby", "favoriteSport", "favoriteMusic", "favoritePlace",
+      "favoriteGameType",
+    ];
+
+    const accountSelect = document.getElementById("account-select");
+    const profileForm = document.getElementById("profile-form");
+    const statusEl = document.getElementById("status");
+    const saveBtn = document.getElementById("save-btn");
+    const loadBtn = document.getElementById("load-btn");
+
+    let cachedProfiles = {};
+    let dirty = false;
+    let lastAccount = "";
+
+    function showStatus(message, ok) {
+      statusEl.textContent = message;
+      statusEl.className = `status ${ok ? "ok" : "err"}`;
+    }
+
+    function clearStatus() {
+      statusEl.textContent = "";
+      statusEl.className = "status";
+    }
+
+    function readFormProfile() {
+      const profile = {};
+      for (const key of PROFILE_FIELDS) {
+        const el = document.getElementById(key);
+        profile[key] = el ? el.value.trim() : "";
+      }
+      return profile;
+    }
+
+    function fillForm(profile) {
+      for (const key of PROFILE_FIELDS) {
+        const el = document.getElementById(key);
+        if (el) el.value = profile?.[key] ?? "";
+      }
+      dirty = false;
+    }
+
+    function selectedAccount() {
+      return accountSelect.value;
+    }
+
+    async function loadProfiles() {
+      clearStatus();
+      const res = await fetch("/api/user-profiles");
+      if (!res.ok) throw new Error("Could not load profiles.");
+      const data = await res.json();
+      cachedProfiles = data.profiles || {};
+      if (!accountSelect.options.length) {
+        for (const username of data.users || []) {
+          const opt = document.createElement("option");
+          opt.value = username;
+          opt.textContent = username;
+          accountSelect.appendChild(opt);
+        }
+        const params = new URLSearchParams(location.search);
+        const requested = params.get("user");
+        if (requested && data.users?.includes(requested)) {
+          accountSelect.value = requested;
+        }
+        lastAccount = accountSelect.value;
+      }
+      fillForm(cachedProfiles[selectedAccount()] || {});
+    }
+
+    async function saveProfile() {
+      const username = selectedAccount();
+      const profile = readFormProfile();
+      saveBtn.disabled = true;
+      clearStatus();
+      try {
+        const res = await fetch(`/api/user-profiles/${username}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ profile }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Save failed.");
+        }
+        const data = await res.json();
+        cachedProfiles[username] = data.profile;
+        dirty = false;
+        showStatus(`Saved profile for ${username}.`, true);
+      } catch (e) {
+        showStatus(e.message || "Could not save profile.", false);
+      } finally {
+        saveBtn.disabled = false;
+      }
+    }
+
+    accountSelect.addEventListener("change", () => {
+      if (dirty && !confirm("You have unsaved changes. Switch account anyway?")) {
+        accountSelect.value = lastAccount;
+        return;
+      }
+      lastAccount = accountSelect.value;
+      fillForm(cachedProfiles[selectedAccount()] || {});
+      clearStatus();
+    });
+
+    profileForm.addEventListener("input", () => {
+      dirty = true;
+    });
+
+    profileForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      await saveProfile();
+    });
+
+    loadBtn.addEventListener("click", async () => {
+      try {
+        await loadProfiles();
+        showStatus("Profiles reloaded.", true);
+      } catch (e) {
+        showStatus(e.message || "Reload failed.", false);
+      }
+    });
+
+    loadProfiles().catch((e) => {
+      showStatus(e.message || "Could not load profiles.", false);
+    });
+  </script>
+</body>
+</html>
