@@ -445,7 +445,7 @@ function requiresAdmin(url, method) {
   if (url === '/api/video-pairs' && m === 'POST') return true;
 
   if (isGameApiRoute(url)) {
-    if (m === 'POST' && url === '/api/inworld/tts') return false;
+    if (m === 'POST' && (url === '/api/inworld/tts' || url === '/api/inworld/llm/wordwhack-round')) return false;
     if (m === 'GET') {
       if (url === '/api/game-data/export') return true;
       if (url === '/api/settings/inworld') return true;
@@ -1447,6 +1447,7 @@ const GAME_API_PREFIXES = [
   '/api/voca',
   '/api/settings/inworld',
   '/api/inworld/tts',
+  '/api/inworld/llm',
   '/api/game-data',
 ];
 

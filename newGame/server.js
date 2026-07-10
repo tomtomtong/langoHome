@@ -151,6 +151,7 @@ db.exec(`
 
 const DEFAULT_INWORLD_VOICE_ID = "default-zylgts2tamenvybeti3z0w__uncle_tommy";
 const INWORLD_TTS_URL = "https://api.inworld.ai/tts/v1/voice";
+const INWORLD_LLM_URL = "https://api.inworld.ai/v1/chat/completions";
 
 const getSettingStmt = db.prepare(
   "SELECT setting_value FROM game_settings WHERE setting_key = ?"
@@ -866,6 +867,119 @@ app.put("/api/settings/inworld", express.json(), (req, res) => {
     voiceId: savedVoice,
     apiKeyPreview: maskApiKey(savedKey),
   });
+});
+
+function normalizeRoundWords(words, requiredWord) {
+  const seen = new Set();
+  const out = [];
+  const add = (value) => {
+    const word = String(value || "")
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z]/g, "");
+    if (!word || seen.has(word)) return;
+    seen.add(word);
+    out.push(word);
+  };
+  if (requiredWord) add(requiredWord);
+  (words || []).forEach(add);
+  return out;
+}
+
+app.post("/api/inworld/llm/wordwhack-round", express.json(), async (req, res) => {
+  const apiKey = getSetting("inworld_api_key");
+  if (!apiKey) {
+    return res.status(503).json({ error: "Inworld API key not configured." });
+  }
+
+  const targetWord = String(req.body?.targetWord || "").trim();
+  if (!targetWord) {
+    return res.status(400).json({ error: "targetWord is required." });
+  }
+
+  const otherWords = Array.isArray(req.body?.otherWords)
+    ? req.body.otherWords.map((word) => String(word).trim()).filter(Boolean)
+    : [];
+
+  const systemPrompt = `You generate content for a children's English vocabulary game (ages 6-10).
+Return ONLY valid JSON with keys: "prompt", "correct", "distractors".
+- prompt: short sentence stem BEFORE the blank, with no trailing blank, underscore, or period (example: "Honey is")
+- correct: 3-5 single English words in UPPERCASE that correctly complete the sentence; MUST include the target word
+- distractors: 5-8 single UPPERCASE words that are plausible but WRONG answers for this sentence
+Use simple kid-friendly language. One word per array entry. No punctuation in array values.`;
+
+  const userPrompt = `Target vocabulary word: "${targetWord}"
+Other lesson words (use as distractors when they do not fit the sentence): ${otherWords.slice(0, 30).join(", ") || "(none)"}
+Create a fill-in-the-blank sentence where "${targetWord}" is one of the correct answers.`;
+
+  try {
+    const upstream = await fetch(INWORLD_LLM_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "openai/gpt-4o-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.8,
+      }),
+    });
+
+    const payload = await upstream.json();
+    if (!upstream.ok) {
+      const message =
+        payload?.error?.message ||
+        payload?.error ||
+        "Inworld LLM request failed.";
+      return res.status(upstream.status).json({ error: message });
+    }
+
+    const content = payload?.choices?.[0]?.message?.content;
+    if (!content) {
+      return res.status(502).json({ error: "Inworld returned empty content." });
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      return res.status(502).json({ error: "Inworld returned invalid JSON." });
+    }
+
+    const prompt = String(parsed.prompt || "")
+      .trim()
+      .replace(/\s*[_….]+\s*$/, "");
+    if (!prompt) {
+      return res.status(502).json({ error: "Inworld returned an invalid prompt." });
+    }
+
+    const targetUpper = targetWord.toUpperCase();
+    const correct = normalizeRoundWords(parsed.correct, targetUpper);
+    const distractors = normalizeRoundWords(parsed.distractors).filter(
+      (word) => !correct.includes(word)
+    );
+
+    if (correct.length < 2) {
+      return res.status(502).json({ error: "Inworld returned too few correct answers." });
+    }
+    if (distractors.length < 3) {
+      return res.status(502).json({ error: "Inworld returned too few distractors." });
+    }
+
+    res.json({
+      prompt,
+      correct,
+      distractors,
+      targetWord: targetUpper,
+    });
+  } catch (err) {
+    res.status(502).json({ error: err.message || "Failed to reach Inworld LLM." });
+  }
 });
 
 app.post("/api/inworld/tts", express.json(), async (req, res) => {

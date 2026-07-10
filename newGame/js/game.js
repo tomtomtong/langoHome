@@ -66,6 +66,8 @@
   const MISSES_BEFORE_REVEAL = 2;
   const REVEAL_ROUND_DELAY = 7000;
 
+  const GENERIC_DISTRACTORS = ["LOUD", "COLD", "FAST", "BLUE", "METAL", "SILENT", "SQUARE", "HOT"];
+
   // ---------- State ----------
   const state = {
     running: false,
@@ -75,6 +77,7 @@
     maxCombo: 0,
     questionsAnswered: 0,
     lastPuzzleIdx: -1,
+    lastTargetWord: null,
     puzzle: null,
     roundMisses: 0,
     roundCorrectWords: [],
@@ -152,49 +155,92 @@
     return state.puzzle;
   }
 
-  function pickPuzzle() {
+  function titleCase(word) {
+    const trimmed = String(word || "").trim();
+    if (!trimmed) return "";
+    return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
+  }
+
+  async function fetchLlmRound(targetWord, otherWords) {
+    const res = await fetch("/api/inworld/llm/wordwhack-round", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ targetWord, otherWords }),
+    });
+    if (!res.ok) throw new Error("LLM round failed");
+    const data = await res.json();
+    if (!data?.prompt || !Array.isArray(data.correct) || !Array.isArray(data.distractors)) {
+      throw new Error("Invalid LLM round payload");
+    }
+    return data;
+  }
+
+  function buildFallbackVocaRound(targetWord, otherWords) {
+    const target = targetWord.trim().toUpperCase();
+    const pool = otherWords
+      .map((word) => word.trim().toUpperCase())
+      .filter((word) => word && word !== target);
+    const correct = [target, ...shuffle(pool).slice(0, 2)];
+    let distractors = shuffle(pool).filter((word) => !correct.includes(word));
+    for (const word of GENERIC_DISTRACTORS) {
+      if (distractors.length >= HOLE_COUNT) break;
+      if (!correct.includes(word) && !distractors.includes(word)) distractors.push(word);
+    }
+    return {
+      prompt: `The word is ${titleCase(targetWord)} — it is`,
+      correct,
+      distractors,
+    };
+  }
+
+  async function pickVocaRound() {
+    const vocabItems = VocaConfig.getItems()
+      .map((item) => item.word.trim())
+      .filter(Boolean);
+    if (vocabItems.length < 3) {
+      return pickBuiltinPuzzle();
+    }
+
+    const targetItem = VocaConfig.pickRandomOne(state.lastTargetWord);
+    if (!targetItem?.word) {
+      return pickBuiltinPuzzle();
+    }
+
+    const targetWord = targetItem.word.trim();
+    state.lastTargetWord = targetWord;
+    const otherWords = vocabItems.filter(
+      (word) => word.toLowerCase() !== targetWord.toLowerCase()
+    );
+
+    try {
+      const round = await fetchLlmRound(targetWord, otherWords);
+      const targetUpper = targetWord.toUpperCase();
+      const correct = round.correct
+        .map((word) => String(word).trim().toUpperCase())
+        .filter(Boolean);
+      if (!correct.includes(targetUpper)) correct.unshift(targetUpper);
+
+      const distractors = round.distractors
+        .map((word) => String(word).trim().toUpperCase())
+        .filter((word) => word && !correct.includes(word));
+
+      state.puzzle = {
+        prompt: round.prompt.trim(),
+        correct: [...new Set(correct)],
+        distractors: [...new Set(distractors)],
+      };
+    } catch {
+      state.puzzle = buildFallbackVocaRound(targetWord, otherWords);
+    }
+
+    return state.puzzle;
+  }
+
+  async function pickPuzzle() {
     if (typeof VocaConfig !== "undefined" && VocaConfig.hasItems()) {
       return pickVocaRound();
     }
     return pickBuiltinPuzzle();
-  }
-
-  function pickVocaRound() {
-    const vocabWords = VocaConfig.getItems()
-      .map((item) => item.word.trim().toUpperCase())
-      .filter(Boolean);
-    if (vocabWords.length < HOLE_COUNT) {
-      return pickBuiltinPuzzle();
-    }
-
-    let idx;
-    do {
-      idx = Math.floor(Math.random() * PUZZLES.length);
-    } while (PUZZLES.length > 1 && idx === state.lastPuzzleIdx);
-    state.lastPuzzleIdx = idx;
-    const template = PUZZLES[idx];
-
-    const shuffled = shuffle([...vocabWords]);
-    const correctCount = Math.min(
-      CORRECT_MOLES_MAX,
-      Math.max(CORRECT_MOLES_MIN, template.correct.length),
-      HOLE_COUNT - 1,
-      shuffled.length - 1
-    );
-    const distractorCount = HOLE_COUNT - correctCount;
-    const correct = shuffled.slice(0, correctCount);
-    let distractors = shuffled.slice(correctCount, correctCount + distractorCount);
-
-    while (distractors.length < distractorCount) {
-      distractors.push(shuffled[distractors.length % shuffled.length]);
-    }
-
-    state.puzzle = {
-      prompt: template.prompt,
-      correct,
-      distractors,
-    };
-    return state.puzzle;
   }
 
   function renderSentence(prompt, answer) {
@@ -266,10 +312,13 @@
     });
   }
 
-  function loadRound() {
+  async function loadRound() {
     if (!state.running) return;
+    state.roundBusy = true;
+    renderSentence("Thinking…");
+    resetHoles();
+    await pickPuzzle();
     state.roundBusy = false;
-    pickPuzzle();
     renderSentence(state.puzzle.prompt);
     spawnRoundMoles();
   }
@@ -488,6 +537,7 @@
     state.time = ROUND_TIME;
     state.questionsAnswered = 0;
     state.lastPuzzleIdx = -1;
+    state.lastTargetWord = null;
     state.roundBusy = false;
 
     questionVal.textContent = 0;
