@@ -835,12 +835,12 @@
       </div>
       <div class="overlay-top">
         <span id="avatar-status"></span>
-        <div class="overlay-top-actions">
+        <div class="overlay-top-actions" id="overlay-top-actions">
           <span id="camera-save-status" aria-live="polite"></span>
-          <button id="btn-save-camera" type="button">Save camera</button>
-          <a href="/config">Settings</a>
-          <a href="/video-pairs">Videos</a>
-          <a href="/avatar-config">Avatar</a>
+          <button id="btn-save-camera" type="button" class="admin-only" hidden>Save camera</button>
+          <a href="/config" class="admin-only" hidden>Settings</a>
+          <a href="/video-pairs" class="admin-only" hidden>Videos</a>
+          <a href="/avatar-config" class="admin-only" hidden>Avatar</a>
         </div>
       </div>
       <nav class="overlay-games" aria-label="Games">
@@ -2839,7 +2839,20 @@
       window.addEventListener('keydown', unlock, { once: false });
     }
 
+    async function setupAdminUi() {
+      try {
+        const res = await fetch("/api/me");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.role !== "admin") return;
+        document.querySelectorAll(".admin-only").forEach((el) => {
+          el.hidden = false;
+        });
+      } catch {}
+    }
+
     async function init() {
+      setupAdminUi();
       const fromGame = shouldAutoConnectFromGame();
       const cfg = await getConfig();
 

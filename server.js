@@ -45,14 +45,17 @@ const SECURITY_HEADERS = {
   'Cross-Origin-Embedder-Policy': 'require-corp',
 };
 
-const USERS = Object.fromEntries(
+const STUDENT_USERS = Object.fromEntries(
   Array.from({ length: 20 }, (_, i) => {
     const username = `user${String(i + 1).padStart(2, '0')}`;
     return [username, 'password123'];
   }),
 );
 
-const USER_LIST = Object.keys(USERS);
+const ADMIN_USERNAME = 'admin';
+const ADMIN_PASSWORD = '654321';
+
+const USER_LIST = Object.keys(STUDENT_USERS);
 
 const DEFAULT_USER_PROFILE = {
   childName: '',
@@ -110,7 +113,7 @@ function getUserProfile(username) {
 }
 
 function saveUserProfile(username, profile) {
-  if (!USERS[username]) return false;
+  if (!STUDENT_USERS[username]) return false;
   const profiles = loadUserProfiles();
   profiles[username] = normalizeUserProfile(profile);
   saveUserProfiles(profiles);
@@ -176,7 +179,7 @@ function mergeInstructionsWithProfile(baseInstructions, profile) {
 }
 
 function isValidUsername(username) {
-  return Object.prototype.hasOwnProperty.call(USERS, username);
+  return Object.prototype.hasOwnProperty.call(STUDENT_USERS, username);
 }
 
 const sessions = new Map();
@@ -205,8 +208,12 @@ function isAuthenticated(req) {
   return getSession(req) !== null;
 }
 
-function verifyCredentials(username, password) {
-  const expected = USERS[username];
+function isAdmin(req) {
+  return getSession(req)?.role === 'admin';
+}
+
+function verifyStudentCredentials(username, password) {
+  const expected = STUDENT_USERS[username];
   if (!expected) return false;
   const a = Buffer.from(password);
   const b = Buffer.from(expected);
@@ -214,9 +221,17 @@ function verifyCredentials(username, password) {
   return timingSafeEqual(a, b);
 }
 
-function createSession(username) {
+function verifyAdminCredentials(username, password) {
+  if (username !== ADMIN_USERNAME) return false;
+  const a = Buffer.from(password);
+  const b = Buffer.from(ADMIN_PASSWORD);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+
+function createSession(username, role) {
   const token = randomBytes(32).toString('hex');
-  sessions.set(token, { username, createdAt: Date.now() });
+  sessions.set(token, { username, role, createdAt: Date.now() });
   return token;
 }
 
@@ -236,8 +251,69 @@ function redirectToLogin(res, nextUrl) {
   res.end();
 }
 
+function redirectToAdminLogin(res, nextUrl) {
+  const loc = nextUrl && nextUrl !== '/admin/login'
+    ? `/admin/login?next=${encodeURIComponent(nextUrl)}`
+    : '/admin/login';
+  res.writeHead(302, { Location: loc, ...SECURITY_HEADERS });
+  res.end();
+}
+
 function isPublicPath(url) {
-  return url === '/login' || url === '/api/login' || url === '/langoLogo.jpeg';
+  return url === '/login'
+    || url === '/admin/login'
+    || url === '/api/login'
+    || url === '/api/admin/login'
+    || url === '/langoLogo.jpeg';
+}
+
+const ADMIN_PAGE_PATHS = new Set([
+  '/config',
+  '/account-config',
+  '/avatar-config',
+  '/video-pairs',
+]);
+
+function isGameConfigPage(gamePath) {
+  return gamePath === '/config.html' || gamePath.endsWith('/config.html');
+}
+
+function requiresAdmin(url, method) {
+  const m = (method || 'GET').toUpperCase();
+
+  if (ADMIN_PAGE_PATHS.has(url)) return true;
+
+  if (url === '/api/config' && m === 'POST') return true;
+  if (url.startsWith('/api/user-profiles')) return true;
+  if (url === '/api/debug-log' && m === 'GET') return true;
+
+  const uploadPaths = ['/api/idle-video', '/api/transition-video', '/api/avatar-background'];
+  if (uploadPaths.includes(url) && m !== 'GET') return true;
+
+  if (url.match(/^\/api\/game-icons\/(wordwhack|cardgame|findgame)$/) && m !== 'GET') return true;
+
+  if (url.startsWith('/api/video-pairs') && m !== 'GET') return true;
+  if (url === '/api/video-pairs' && m === 'POST') return true;
+
+  if (isGameApiRoute(url)) {
+    if (m === 'POST' && url === '/api/inworld/tts') return false;
+    if (m === 'GET') {
+      if (url === '/api/game-data/export') return true;
+      if (url === '/api/settings/inworld') return true;
+      return false;
+    }
+    return true;
+  }
+
+  return false;
+}
+
+function denyAdminAccess(req, res, nextUrl) {
+  if (wantsHtml(req)) {
+    redirectToAdminLogin(res, nextUrl);
+    return;
+  }
+  sendJson(res, 403, { error: 'Admin login required.' });
 }
 
 function wantsHtml(req) {
@@ -857,6 +933,7 @@ function serveFile(res, filePath) {
 const pages = {
   '/': 'index.html',
   '/login': 'login.html',
+  '/admin/login': 'admin-login.html',
   '/config': 'config.html',
   '/account-config': 'account-config.html',
   '/avatar-config': 'avatar-config.html',
@@ -911,17 +988,40 @@ const server = createServer((req, res) => {
     readJsonBody(req, res, (parsed) => {
       const username = String(parsed.username || '').trim();
       const password = String(parsed.password || '');
-      if (!verifyCredentials(username, password)) {
+      if (verifyAdminCredentials(username, password)) {
+        sendJson(res, 403, { error: 'Use admin sign-in at /admin/login for CMS access.' });
+        return;
+      }
+      if (!verifyStudentCredentials(username, password)) {
         sendJson(res, 401, { error: 'Invalid username or password.' });
         return;
       }
-      const token = createSession(username);
+      const token = createSession(username, 'student');
       res.writeHead(200, {
         'Content-Type': 'application/json',
         'Set-Cookie': sessionCookie(token),
         ...SECURITY_HEADERS,
       });
-      res.end(JSON.stringify({ ok: true, username }));
+      res.end(JSON.stringify({ ok: true, username, role: 'student' }));
+    });
+    return;
+  }
+
+  if (url === '/api/admin/login' && req.method === 'POST') {
+    readJsonBody(req, res, (parsed) => {
+      const username = String(parsed.username || '').trim();
+      const password = String(parsed.password || '');
+      if (!verifyAdminCredentials(username, password)) {
+        sendJson(res, 401, { error: 'Invalid admin username or password.' });
+        return;
+      }
+      const token = createSession(username, 'admin');
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Set-Cookie': sessionCookie(token),
+        ...SECURITY_HEADERS,
+      });
+      res.end(JSON.stringify({ ok: true, username, role: 'admin' }));
     });
     return;
   }
@@ -944,12 +1044,20 @@ const server = createServer((req, res) => {
       sendJson(res, 401, { error: 'Not authenticated.' });
       return;
     }
-    sendJson(res, 200, { username: session.username });
+    sendJson(res, 200, { username: session.username, role: session.role });
     return;
   }
 
   if (url === '/login' && isAuthenticated(req)) {
     res.writeHead(302, { Location: '/', ...SECURITY_HEADERS });
+    res.end();
+    return;
+  }
+
+  if (url === '/admin/login' && isAdmin(req)) {
+    const next = new URL(rawUrl, 'http://local').searchParams.get('next');
+    const dest = next && next.startsWith('/') ? next : '/config';
+    res.writeHead(302, { Location: dest, ...SECURITY_HEADERS });
     res.end();
     return;
   }
@@ -960,6 +1068,11 @@ const server = createServer((req, res) => {
       return;
     }
     sendJson(res, 401, { error: 'Login required.' });
+    return;
+  }
+
+  if (requiresAdmin(url, req.method) && !isAdmin(req)) {
+    denyAdminAccess(req, res, url);
     return;
   }
 
@@ -1015,6 +1128,10 @@ const server = createServer((req, res) => {
 
   if (isGameStaticRoute(url)) {
     const gamePath = url === '/games' ? '/index.html' : url.slice('/games'.length) || '/index.html';
+    if (isGameConfigPage(gamePath) && !isAdmin(req)) {
+      denyAdminAccess(req, res, url);
+      return;
+    }
     delegateToGameApp(req, res, gamePath, query);
     return;
   }
@@ -1401,7 +1518,9 @@ wss.on('connection', (browser, req) => {
     connected = true;
     browser.removeAllListeners('message');
     const sessionUser = getSession(req);
-    const profile = sessionUser ? getUserProfile(sessionUser.username) : {};
+    const profile = sessionUser?.role === 'student'
+      ? getUserProfile(sessionUser.username)
+      : {};
     const baseInstructions = parsed.instructions?.trim() || saved.instructions?.trim();
     connectToInworld(apiKey, browser, {
       instructions: mergeInstructionsWithProfile(baseInstructions, profile),
@@ -1414,6 +1533,7 @@ wss.on('connection', (browser, req) => {
 const port = Number(process.env.PORT) || 4000;
 server.listen(port, '0.0.0.0', () => {
   console.log(`Listening on http://0.0.0.0:${port}  (config: /config)`);
+  console.log(`Admin CMS login: http://0.0.0.0:${port}/admin/login`);
   console.log(`Account profiles: http://0.0.0.0:${port}/account-config`);
   console.log(`Games hub:  http://0.0.0.0:${port}/games/`);
   console.log(`Game database: ${GAME_DB_PATH}`);
