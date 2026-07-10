@@ -1418,6 +1418,7 @@ const server = createServer((req, res) => {
 const wss = new WebSocketServer({ server, path: '/ws' });
 
 const DEFAULT_VOICE_ID = 'default-zylgts2tamenvybeti3z0w__uncle_tommy';
+const DEFAULT_TTS_MODEL = 'inworld-tts-2';
 const DEFAULT_INSTRUCTIONS = 'You are Uncle Tommy, a friendly voice assistant. Keep responses brief.';
 const DEFAULT_MODEL = 'openai/gpt-4o-mini';
 
@@ -1607,6 +1608,7 @@ function buildSessionCfg({ instructions, voice, model } = {}) {
       },
       output: {
         voice: voice || DEFAULT_VOICE_ID,
+        model: DEFAULT_TTS_MODEL,
       },
     },
   };
