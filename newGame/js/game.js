@@ -75,6 +75,7 @@
     maxCombo: 0,
     questionsAnswered: 0,
     lastPuzzleIdx: -1,
+    lastTargetWord: "",
     puzzle: null,
     roundMisses: 0,
     roundCorrectWords: [],
@@ -143,6 +144,9 @@
 
   // ---------- Puzzle setup ----------
   function pickPuzzle() {
+    if (typeof VocaConfig !== "undefined" && VocaConfig.hasItems()) {
+      return pickVocaRound();
+    }
     let idx;
     do {
       idx = Math.floor(Math.random() * PUZZLES.length);
@@ -152,12 +156,53 @@
     return state.puzzle;
   }
 
+  function pickVocaRound() {
+    const target = VocaConfig.pickRandomOne(state.lastTargetWord);
+    if (!target) return pickPuzzle();
+
+    state.lastTargetWord = target.word;
+    const targetWord = target.word.toUpperCase();
+    const distractorItems = VocaConfig.pickRandom(HOLE_COUNT - 1, target.word);
+    const distractors = distractorItems.map((item) => item.word.toUpperCase());
+
+    while (distractors.length < HOLE_COUNT - 1) {
+      const extra = VocaConfig.pickRandom(1, target.word)[0];
+      if (extra) distractors.push(extra.word.toUpperCase());
+      else break;
+    }
+
+    state.puzzle = {
+      prompt: "Find this word!",
+      imageUrl: target.imageUrl,
+      targetWord,
+      correct: [targetWord],
+      distractors,
+    };
+    return state.puzzle;
+  }
+
   function renderSentence(prompt, answer) {
+    const imageUrl = state.puzzle?.imageUrl;
+    if (imageUrl) {
+      const answerHtml = answer
+        ? `<span class="answer">${escapeHtml(answer)}</span>`
+        : `<span class="blank">&nbsp;</span>`;
+      sentenceEl.innerHTML = `
+        <div class="voca-prompt">
+          <img class="voca-prompt-img" src="${escapeAttr(imageUrl)}" alt="" />
+          <span class="voca-prompt-text">${escapeHtml(prompt)} ${answerHtml}</span>
+        </div>`;
+      return;
+    }
     if (answer) {
       sentenceEl.innerHTML = `${escapeHtml(prompt)} <span class="answer">${escapeHtml(answer)}</span>`;
       return;
     }
     sentenceEl.innerHTML = `${escapeHtml(prompt)} <span class="blank">&nbsp;</span>`;
+  }
+
+  function escapeAttr(s) {
+    return String(s).replace(/"/g, "&quot;");
   }
 
   function escapeHtml(s) {
@@ -509,9 +554,19 @@
   // ---------- Init ----------
   async function init() {
     buildGrid();
+    if (typeof VocaConfig !== "undefined") {
+      await VocaConfig.loadFromServer();
+      const signLabel = document.querySelector(".sign-label");
+      if (signLabel && VocaConfig.hasItems()) {
+        signLabel.textContent = "Find the word";
+      }
+    }
     if (typeof ImageConfig !== "undefined") {
       await ImageConfig.applyAll();
       await GameLoadingScreen.preloadImageConfig(ImageConfig);
+    }
+    if (typeof VocaConfig !== "undefined" && VocaConfig.hasItems()) {
+      await VocaConfig.preloadImages(VocaConfig.pickRoundPairs(12));
     }
     document.addEventListener("keydown", onKeyDown);
     startGame();

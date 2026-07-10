@@ -109,7 +109,7 @@
       <div class="voca-header">
         <div>
           <h2 class="voca-heading">Vocabulary list</h2>
-          <p class="voca-desc">Word + image pairs for games and learning content. Import a CSV with <code>content,url</code> columns or add items manually.</p>
+          <p class="voca-desc">Word + image pairs used by Word-Whack Blitz and Picture-Word Memory Match. Import a CSV with <code>content,url</code> columns — it saves automatically.</p>
         </div>
         <div class="voca-actions">
           <button type="button" class="btn-voca-add" id="addVocaBtn">+ Add word</button>
@@ -1112,10 +1112,7 @@
           showToast("No valid rows found in CSV");
           return;
         }
-        const replace = confirm(
-          `Import ${items.length} words from CSV?\n\nOK = replace the current list\nCancel = keep current list`
-        );
-        if (!replace) return;
+        showToast(`Importing ${items.length} words…`);
         const res = await fetch("/api/voca/import", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1125,7 +1122,7 @@
         if (!res.ok) throw new Error(data.error || "Import failed");
         vocaItems = data.items || [];
         renderVocaList();
-        showToast(`Imported ${data.count} words`);
+        showToast(`Saved ${data.count} words — games will use the updated list`);
       }
 
       document.getElementById("addVocaBtn").addEventListener("click", () => {

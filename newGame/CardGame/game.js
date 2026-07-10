@@ -1,7 +1,7 @@
 const CARD_BACK_IMAGES = [];
 const CARD_BACK_IMAGES_UPDATED = [];
 
-const PAIRS = [
+const DEFAULT_PAIRS = [
   { img: '🐱', word: 'Cat' },
   { img: '🐶', word: 'Dog' },
   { img: '🍎', word: 'Apple' },
@@ -9,7 +9,10 @@ const PAIRS = [
   { img: '🌸', word: 'Flower' },
   { img: '🏠', word: 'House' }
 ];
-const TOTAL_PAIRS = PAIRS.length;
+
+const ROUND_PAIR_COUNT = 6;
+let roundPairs = DEFAULT_PAIRS.slice();
+let totalPairs = roundPairs.length;
 const ROUND_TIME = 90;
 const PREVIEW_TIME = 4;
 const BASE_SCORE = 10;
@@ -57,6 +60,52 @@ window.addEventListener('resize', fitGameToScreen);
 window.addEventListener('load', fitGameToScreen);
 setTimeout(fitGameToScreen, 50);
 
+function pickRoundPairs() {
+  if (typeof VocaConfig !== 'undefined' && VocaConfig.hasItems()) {
+    const picked = VocaConfig.pickRoundPairs(ROUND_PAIR_COUNT);
+    if (picked.length) {
+      roundPairs = picked.map((item) => ({
+        img: item.imageUrl,
+        word: item.word,
+      }));
+      totalPairs = roundPairs.length;
+      return;
+    }
+  }
+  roundPairs = DEFAULT_PAIRS.slice();
+  totalPairs = roundPairs.length;
+}
+
+function isImageContent(content) {
+  return typeof content === 'string' && /^https?:\/\//i.test(content);
+}
+
+function setCardFace(el, card) {
+  el.classList.remove('word');
+  el.textContent = '';
+  el.style.backgroundImage = '';
+  el.style.backgroundSize = '';
+  el.style.backgroundPosition = '';
+
+  if (card.type === 'word') {
+    el.classList.add('word');
+    el.textContent = card.content;
+    return;
+  }
+
+  if (isImageContent(card.content)) {
+    el.classList.add('img-card');
+    const img = document.createElement('img');
+    img.className = 'card-voca-img';
+    img.src = card.content;
+    img.alt = '';
+    el.appendChild(img);
+    return;
+  }
+
+  el.textContent = card.content;
+}
+
 function shuffle(arr) {
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -91,7 +140,7 @@ function applyCardBackStyle(el) {
 
 function buildDeck() {
   deck = [];
-  PAIRS.forEach((p, idx) => {
+  roundPairs.forEach((p, idx) => {
     deck.push({ pairId: idx, type: 'img', content: p.img, matched: false });
     deck.push({ pairId: idx, type: 'word', content: p.word, matched: false });
   });
@@ -134,8 +183,7 @@ function render() {
     if (c.matched) el.classList.add('matched');
     if (isFlipped) {
       el.classList.add('flipped');
-      if (c.type === 'word') el.classList.add('word');
-      el.textContent = c.content;
+      setCardFace(el, c);
     } else {
       el.classList.add('card-back');
       applyCardBackStyle(el);
@@ -153,7 +201,7 @@ function updateHUD() {
   if (timerTextEl) {
     timerTextEl.textContent = previewMode ? 'Remember!' : timeLeft;
   }
-  if (pairsFoundEl) pairsFoundEl.textContent = matchedCount + '/' + TOTAL_PAIRS;
+  if (pairsFoundEl) pairsFoundEl.textContent = matchedCount + '/' + totalPairs;
   if (scoreEl) scoreEl.textContent = score;
 }
 
@@ -192,7 +240,7 @@ function onCardClick(i) {
       flippedCards = [];
       render();
       if (typeof window.__bgaMarkDirty === 'function') window.__bgaMarkDirty();
-      if (matchedCount === TOTAL_PAIRS) onFullClear();
+      if (matchedCount === totalPairs) onFullClear();
     } else {
       lockBoard = true;
       combo = 0;
@@ -231,6 +279,7 @@ function refreshBoard() {
   combo = 0;
   const resumeTimer = !gameOver;
   if (resumeTimer) clearInterval(timerId);
+  pickRoundPairs();
   buildDeck();
   beginPreview(() => {
     if (resumeTimer) timerId = setInterval(tick, 1000);
@@ -279,6 +328,7 @@ function startGame() {
   gameOver = false;
   previewMode = false;
   hideLevelComplete();
+  pickRoundPairs();
   buildDeck();
   beginPreview(() => {
     timerId = setInterval(tick, 1000);
@@ -335,6 +385,16 @@ function onKeyDown(e) {
 }
 
 async function initGame() {
+  if (typeof VocaConfig !== 'undefined') {
+    await VocaConfig.loadFromServer();
+    pickRoundPairs();
+    if (VocaConfig.hasItems()) {
+      await VocaConfig.preloadImages(roundPairs.map((pair) => ({
+        imageUrl: pair.img,
+        word: pair.word,
+      })));
+    }
+  }
   if (typeof CardImageConfig !== 'undefined') {
     await CardImageConfig.applyAll();
     await GameLoadingScreen.preloadImageConfig(CardImageConfig);

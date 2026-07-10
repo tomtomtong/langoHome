@@ -213,6 +213,31 @@ html, body {
   text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
   animation: answerPop 0.35s ease;
 }
+
+.voca-prompt {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.voca-prompt-img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 3px solid #5e3a18;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.15);
+}
+
+.voca-prompt-text {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
 @keyframes answerPop {
   0%   { transform: scale(0.6); opacity: 0; }
   70%  { transform: scale(1.12); }

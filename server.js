@@ -1737,7 +1737,7 @@ const server = createServer((req, res) => {
   }
 
   if (url.startsWith('/Animation/')) {
-    serveFile(res, join(ROOT, url.slice(1)));
+    serveFile(res, join(ROOT, decodeURIComponent(url.slice(1))));
     return;
   }
 
