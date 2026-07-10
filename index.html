@@ -639,6 +639,66 @@
       50% { opacity: 1; }
     }
 
+    body.pair-theme-warm #idle-video-hint {
+      background: rgba(92, 56, 20, 0.78);
+      color: #ffe8c8;
+    }
+
+    body.pair-theme-cool #idle-video-hint {
+      background: rgba(18, 58, 92, 0.78);
+      color: #d8f1ff;
+    }
+
+    body.pair-theme-nature #idle-video-hint {
+      background: rgba(24, 72, 38, 0.78);
+      color: #dff9e5;
+    }
+
+    body.pair-theme-night #idle-video-hint {
+      background: rgba(42, 28, 82, 0.78);
+      color: #e8ddff;
+    }
+
+    body.pair-theme-warm .caption-line--user {
+      background: rgba(255, 180, 96, 0.22);
+      border-color: rgba(255, 180, 96, 0.38);
+    }
+
+    body.pair-theme-warm .caption-line--agent {
+      background: rgba(255, 214, 160, 0.14);
+      border-color: rgba(255, 214, 160, 0.24);
+    }
+
+    body.pair-theme-cool .caption-line--user {
+      background: rgba(96, 180, 255, 0.22);
+      border-color: rgba(96, 180, 255, 0.38);
+    }
+
+    body.pair-theme-cool .caption-line--agent {
+      background: rgba(160, 220, 255, 0.14);
+      border-color: rgba(160, 220, 255, 0.24);
+    }
+
+    body.pair-theme-nature .caption-line--user {
+      background: rgba(96, 210, 128, 0.22);
+      border-color: rgba(96, 210, 128, 0.38);
+    }
+
+    body.pair-theme-nature .caption-line--agent {
+      background: rgba(170, 240, 188, 0.14);
+      border-color: rgba(170, 240, 188, 0.24);
+    }
+
+    body.pair-theme-night .caption-line--user {
+      background: rgba(167, 139, 250, 0.22);
+      border-color: rgba(167, 139, 250, 0.38);
+    }
+
+    body.pair-theme-night .caption-line--agent {
+      background: rgba(196, 181, 253, 0.14);
+      border-color: rgba(196, 181, 253, 0.24);
+    }
+
     /* ── Game launch transition ── */
     #game-launch-overlay {
       display: none;
@@ -1363,6 +1423,20 @@
       setCaptionLine(captionAgentEl, captionAgentTextEl, text);
     }
 
+    const PAIR_THEME_IDS = ["default", "warm", "cool", "nature", "night"];
+
+    function normalizePairTheme(value) {
+      const theme = String(value ?? "").trim().toLowerCase();
+      return PAIR_THEME_IDS.includes(theme) ? theme : "default";
+    }
+
+    function applyActivePairTheme(theme) {
+      const normalized = normalizePairTheme(theme);
+      for (const id of PAIR_THEME_IDS) {
+        document.body.classList.toggle(`pair-theme-${id}`, id === normalized && id !== "default");
+      }
+    }
+
     function getAvatarBackgroundUrl(cfg) {
       if (activeVideoPair?.backgroundImage?.url) {
         return activeVideoPair.backgroundImage.url;
@@ -1374,6 +1448,7 @@
       const bgUrl = getAvatarBackgroundUrl(cfg);
       applyAvatarStageBackground(bgUrl);
       avatar?.setBackgroundUrl(bgUrl).catch(() => {});
+      applyActivePairTheme(activeVideoPair?.theme);
       return bgUrl;
     }
 
@@ -1826,6 +1901,7 @@
         if (nextPair) {
           activeVideoPair = nextPair;
           applyActivePairBackground(cfg);
+          applyActivePairTheme(nextPair.theme);
         }
         return;
       }

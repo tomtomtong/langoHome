@@ -25,6 +25,8 @@ const VIDEO_PAIRS_MANIFEST_PATH = join(VIDEO_PAIRS_DIR, 'manifest.json');
 const AVATAR_BG_DIR = join(CONFIG_DIR, 'avatar-background');
 const GAME_ICONS_DIR = join(CONFIG_DIR, 'game-icons');
 const GAME_ICON_IDS = ['wordwhack', 'cardgame', 'findgame'];
+const PAIR_THEME_IDS = ['default', 'warm', 'cool', 'nature', 'night'];
+const DEFAULT_PAIR_THEME = 'default';
 const VIDEO_MAX_BYTES = 100 * 1024 * 1024;
 const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 
@@ -627,10 +629,16 @@ function getPairVideoInfo(pairId, basename) {
   return getPairAssetInfo(pairId, basename);
 }
 
+function normalizePairTheme(value) {
+  const theme = String(value ?? '').trim().toLowerCase();
+  return PAIR_THEME_IDS.includes(theme) ? theme : DEFAULT_PAIR_THEME;
+}
+
 function buildPairInfo(meta) {
   return {
     id: meta.id,
     text: meta.text || '',
+    theme: normalizePairTheme(meta.theme),
     startTime: meta.startTime || '00:00',
     endTime: meta.endTime || '23:59',
     loopVideo: getPairVideoInfo(meta.id, 'loop'),
@@ -638,6 +646,316 @@ function buildPairInfo(meta) {
     backgroundImage: getPairAssetInfo(meta.id, 'background'),
     order: meta.order ?? 0,
   };
+}
+
+function createPairMeta(fields, order) {
+  const startTime = normalizeTimeString(fields.startTime) || '00:00';
+  const endTime = normalizeTimeString(fields.endTime) || '23:59';
+  return {
+    id: newPairId(),
+    text: String(fields.text || '').slice(0, 500),
+    theme: normalizePairTheme(fields.theme),
+    startTime,
+    endTime,
+    order,
+  };
+}
+
+function normalizeCsvHeader(header) {
+  return String(header ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '_')
+    .replace(/[^a-z0-9_]/g, '');
+}
+
+function parseCsv(text) {
+  const content = String(text || '').replace(/^\uFEFF/, '').trim();
+  if (!content) return [];
+
+  const rows = [];
+  let row = [];
+  let field = '';
+  let i = 0;
+  let inQuotes = false;
+
+  while (i < content.length) {
+    const ch = content[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (content[i + 1] === '"') {
+          field += '"';
+          i += 2;
+          continue;
+        }
+        inQuotes = false;
+        i++;
+        continue;
+      }
+      field += ch;
+      i++;
+      continue;
+    }
+    if (ch === '"') {
+      inQuotes = true;
+      i++;
+      continue;
+    }
+    if (ch === ',') {
+      row.push(field);
+      field = '';
+      i++;
+      continue;
+    }
+    if (ch === '\r') {
+      i++;
+      continue;
+    }
+    if (ch === '\n') {
+      row.push(field);
+      if (row.some((cell) => String(cell).trim().length > 0)) rows.push(row);
+      row = [];
+      field = '';
+      i++;
+      continue;
+    }
+    field += ch;
+    i++;
+  }
+
+  row.push(field);
+  if (row.some((cell) => String(cell).trim().length > 0)) rows.push(row);
+  return rows;
+}
+
+function getCsvField(headers, row, ...names) {
+  for (const name of names) {
+    const idx = headers.indexOf(name);
+    if (idx !== -1 && row[idx] != null && String(row[idx]).trim()) {
+      return String(row[idx]).trim();
+    }
+  }
+  return '';
+}
+
+const PAIR_VIDEO_EXTS = ['.mp4', '.webm', '.mov'];
+const PAIR_IMAGE_EXTS = ['.png', '.jpg', '.jpeg', '.webp'];
+
+function isAllowedImportUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function extFromImportUrl(url) {
+  try {
+    const ext = extname(new URL(url).pathname).toLowerCase();
+    return ext || null;
+  } catch {
+    return null;
+  }
+}
+
+function extFromContentType(contentType, allowedExts) {
+  const ct = String(contentType || '').split(';')[0].trim().toLowerCase();
+  const map = {
+    'video/mp4': '.mp4',
+    'video/webm': '.webm',
+    'video/quicktime': '.mov',
+    'image/png': '.png',
+    'image/jpeg': '.jpg',
+    'image/webp': '.webp',
+  };
+  const ext = map[ct];
+  if (!ext || !allowedExts.includes(ext)) return null;
+  return ext;
+}
+
+async function downloadUrlToBuffer(url, maxBytes) {
+  const res = await fetch(url, { redirect: 'follow' });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+  if (!res.body) {
+    const buffer = Buffer.from(await res.arrayBuffer());
+    if (buffer.length > maxBytes) {
+      throw new Error(`File exceeds ${Math.round(maxBytes / (1024 * 1024))} MB limit.`);
+    }
+    return { buffer, contentType: res.headers.get('content-type') };
+  }
+
+  const reader = res.body.getReader();
+  const chunks = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.length;
+    if (total > maxBytes) {
+      throw new Error(`File exceeds ${Math.round(maxBytes / (1024 * 1024))} MB limit.`);
+    }
+    chunks.push(value);
+  }
+  return { buffer: Buffer.concat(chunks), contentType: res.headers.get('content-type') };
+}
+
+async function savePairAssetFromUrl(pairId, basename, url, { allowedExts, maxBytes, defaultExt }) {
+  if (!url) return;
+  if (!isAllowedImportUrl(url)) throw new Error(`Invalid URL "${url}". Use http:// or https://.`);
+
+  ensureVideoPairsDir();
+  const pairDir = join(VIDEO_PAIRS_DIR, pairId);
+  mkdirSync(pairDir, { recursive: true });
+  clearPairVideo(pairId, basename);
+
+  const { buffer, contentType } = await downloadUrlToBuffer(url, maxBytes);
+  let ext = extFromImportUrl(url);
+  if (!ext || !allowedExts.includes(ext)) {
+    ext = extFromContentType(contentType, allowedExts);
+  }
+  if (!ext || !allowedExts.includes(ext)) ext = defaultExt;
+
+  writeFileSync(join(pairDir, `${basename}${ext}`), buffer);
+}
+
+async function importPairMediaFromUrls(pairId, fields, rowNum, warnings) {
+  const downloads = [
+    {
+      url: fields.loopVideoUrl,
+      basename: 'loop',
+      label: 'loop_video_link',
+      options: { allowedExts: PAIR_VIDEO_EXTS, maxBytes: VIDEO_MAX_BYTES, defaultExt: '.mp4' },
+    },
+    {
+      url: fields.transitionVideoUrl,
+      basename: 'transition',
+      label: 'transit_video_link',
+      options: { allowedExts: PAIR_VIDEO_EXTS, maxBytes: VIDEO_MAX_BYTES, defaultExt: '.mp4' },
+    },
+    {
+      url: fields.backgroundImageUrl,
+      basename: 'background',
+      label: 'bg_image_link',
+      options: { allowedExts: PAIR_IMAGE_EXTS, maxBytes: IMAGE_MAX_BYTES, defaultExt: '.png' },
+    },
+  ];
+
+  for (const item of downloads) {
+    if (!item.url) continue;
+    try {
+      await savePairAssetFromUrl(pairId, item.basename, item.url, item.options);
+    } catch (e) {
+      warnings.push({
+        row: rowNum,
+        field: item.label,
+        error: e.message || 'Download failed.',
+      });
+    }
+  }
+}
+
+async function importVideoPairsFromCsv(csvText) {
+  const table = parseCsv(csvText);
+  if (!table.length) {
+    return { imported: 0, pairs: [], errors: [{ row: 0, error: 'CSV is empty.' }], warnings: [] };
+  }
+
+  const headers = table[0].map(normalizeCsvHeader);
+  const hasKnownHeader = headers.some((h) => (
+    [
+      'session_prompt', 'text', 'prompt', 'theme',
+      'start_time', 'starttime', 'end_time', 'endtime',
+      'loop_video_link', 'loop_video', 'loop_video_url',
+      'transit_video_link', 'transition_video_link', 'transition_video', 'transit_video',
+      'bg_image_link', 'background_image_link', 'background_image', 'bg_image',
+    ].includes(h)
+  ));
+  const dataRows = hasKnownHeader ? table.slice(1) : table;
+  const rowOffset = hasKnownHeader ? 2 : 1;
+
+  const manifest = loadVideoPairsManifest();
+  let nextOrder = manifest.pairs.reduce((m, p) => Math.max(m, p.order ?? 0), -1) + 1;
+  const created = [];
+  const errors = [];
+  const warnings = [];
+
+  for (let i = 0; i < dataRows.length; i++) {
+    const row = dataRows[i];
+    const rowNum = i + rowOffset;
+    const fields = {
+      text: getCsvField(headers, row, 'session_prompt', 'text', 'prompt', 'sessionprompt'),
+      theme: getCsvField(headers, row, 'theme'),
+      startTime: getCsvField(headers, row, 'start_time', 'starttime', 'start'),
+      endTime: getCsvField(headers, row, 'end_time', 'endtime', 'end'),
+      loopVideoUrl: getCsvField(headers, row, 'loop_video_link', 'loop_video', 'loop_video_url'),
+      transitionVideoUrl: getCsvField(
+        headers,
+        row,
+        'transit_video_link',
+        'transition_video_link',
+        'transition_video',
+        'transit_video',
+      ),
+      backgroundImageUrl: getCsvField(
+        headers,
+        row,
+        'bg_image_link',
+        'background_image_link',
+        'background_image',
+        'bg_image',
+      ),
+    };
+    const orderRaw = getCsvField(headers, row, 'order');
+    const order = orderRaw !== '' ? Number(orderRaw) : nextOrder++;
+
+    if (
+      !fields.text
+      && !fields.startTime
+      && !fields.endTime
+      && !fields.theme
+      && !fields.loopVideoUrl
+      && !fields.transitionVideoUrl
+      && !fields.backgroundImageUrl
+      && orderRaw === ''
+    ) {
+      continue;
+    }
+
+    if (fields.startTime && !normalizeTimeString(fields.startTime)) {
+      errors.push({ row: rowNum, error: `Invalid start time "${fields.startTime}". Use HH:MM (24-hour).` });
+      continue;
+    }
+    if (fields.endTime && !normalizeTimeString(fields.endTime)) {
+      errors.push({ row: rowNum, error: `Invalid end time "${fields.endTime}". Use HH:MM (24-hour).` });
+      continue;
+    }
+    if (orderRaw !== '' && !Number.isFinite(order)) {
+      errors.push({ row: rowNum, error: `Invalid order "${orderRaw}".` });
+      continue;
+    }
+
+    const meta = createPairMeta(fields, Number.isFinite(order) ? order : nextOrder++);
+    manifest.pairs.push(meta);
+    await importPairMediaFromUrls(meta.id, fields, rowNum, warnings);
+    created.push(buildPairInfo(meta));
+    if (orderRaw === '') nextOrder = Math.max(nextOrder, meta.order + 1);
+  }
+
+  if (!created.length) {
+    return {
+      imported: 0,
+      pairs: [],
+      errors: errors.length
+        ? errors
+        : [{ row: 0, error: 'No valid rows found. Include a header row and at least one data row.' }],
+      warnings,
+    };
+  }
+
+  saveVideoPairsManifest(manifest);
+  return { imported: created.length, pairs: created, errors, warnings };
 }
 
 function normalizeTimeString(value) {
@@ -696,6 +1014,7 @@ function migrateLegacyVideosIfNeeded() {
   manifest.pairs.push({
     id,
     text: '',
+    theme: DEFAULT_PAIR_THEME,
     startTime: '00:00',
     endTime: '23:59',
     order: 0,
@@ -882,6 +1201,7 @@ function handleVideoPairsApi(req, res, url) {
           return;
         }
         meta.text = String(parsed.text || '').slice(0, 500);
+        if (parsed.theme != null) meta.theme = normalizePairTheme(parsed.theme);
         if (parsed.startTime != null) {
           const startTime = normalizeTimeString(parsed.startTime);
           if (!startTime) {
@@ -936,13 +1256,7 @@ function handleVideoPairsApi(req, res, url) {
       readJsonBody(req, res, (parsed) => {
         const manifest = loadVideoPairsManifest();
         const maxOrder = manifest.pairs.reduce((m, p) => Math.max(m, p.order ?? 0), -1);
-        const meta = {
-          id: newPairId(),
-          text: String(parsed.text || '').slice(0, 500),
-          startTime: normalizeTimeString(parsed.startTime) || '00:00',
-          endTime: normalizeTimeString(parsed.endTime) || '23:59',
-          order: maxOrder + 1,
-        };
+        const meta = createPairMeta(parsed, maxOrder + 1);
         manifest.pairs.push(meta);
         saveVideoPairsManifest(manifest);
         sendJson(res, 200, { ok: true, pair: buildPairInfo(meta) });
@@ -950,6 +1264,32 @@ function handleVideoPairsApi(req, res, url) {
       return true;
     }
     sendJson(res, 405, { error: 'Method not allowed.' });
+    return true;
+  }
+
+  if (url === '/api/video-pairs/import' && req.method === 'POST') {
+    readJsonBody(req, res, (parsed) => {
+      const csv = typeof parsed.csv === 'string' ? parsed.csv : '';
+      if (!csv.trim()) {
+        sendJson(res, 400, { error: 'CSV content is required.' });
+        return;
+      }
+      importVideoPairsFromCsv(csv)
+        .then((result) => {
+          if (!result.imported) {
+            sendJson(res, 400, {
+              error: result.errors[0]?.error || 'Could not import any rows from CSV.',
+              errors: result.errors,
+              warnings: result.warnings || [],
+            });
+            return;
+          }
+          sendJson(res, 200, { ok: true, ...result });
+        })
+        .catch((e) => {
+          sendJson(res, 500, { error: e.message || 'CSV import failed.' });
+        });
+    });
     return true;
   }
 
