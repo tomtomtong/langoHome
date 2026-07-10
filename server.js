@@ -53,7 +53,7 @@ const STUDENT_USERS = Object.fromEntries(
 );
 
 const ADMIN_USERNAME = 'admin';
-const ADMIN_PASSWORD = '654321';
+const ADMIN_PASSWORD = 'admin';
 
 const USER_LIST = Object.keys(STUDENT_USERS);
 

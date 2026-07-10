@@ -2,6 +2,14 @@
    Game picker — shared overlay for all games
    =========================================================== */
 
+/* Return buttons — consistent top-left alignment in HUD grids */
+.hud .return-btn,
+.game-top-hud .return-btn,
+.game-top-hud #return-btn {
+  justify-self: start;
+  align-self: center;
+}
+
 .game-picker {
   position: fixed;
   top: 10px;

@@ -55,12 +55,10 @@ body {
   display: flex;
   gap: 10px;
   margin-bottom: 18px;
-  width: 100%;
+  flex-wrap: wrap;
 }
 
 .game-tab {
-  flex: 1 1 0;
-  min-width: 0;
   font-family: "Baloo 2", sans-serif;
   font-weight: 700;
   font-size: 0.95rem;
@@ -68,10 +66,9 @@ body {
   background: #fff6df;
   border: 3px solid #5e3a18;
   border-radius: 999px;
-  padding: 8px 12px;
+  padding: 8px 20px;
   cursor: pointer;
   box-shadow: 0 4px 0 rgba(0, 0, 0, 0.12);
-  text-align: center;
 }
 
 .game-tab.active {

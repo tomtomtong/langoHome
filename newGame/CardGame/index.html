@@ -21,18 +21,23 @@
 <div id="bga-custom-background" aria-hidden="true"></div>
 
 <div id="game">
-  <button id="return-btn" type="button" title="Return to conversation" aria-label="Return to conversation">
-    <img src="assets/images/return-btn.svg" alt="Return" class="return-icon">
-  </button>
-  <h1 class="title-text">Picture-Word Memory Match</h1>
-  <div id="status-row">
-    <div id="timer-display">
-      <img src="assets/images/timer.svg" alt="timer" class="timer-icon">
-      <span id="timer-text">90</span>
+  <header class="game-top-hud">
+    <button id="return-btn" class="return-btn" type="button" title="Return to conversation" aria-label="Return to conversation">
+      <img src="assets/images/return-btn.svg" alt="Return" class="return-icon">
+    </button>
+    <div class="game-top-center">
+      <h1 class="title-text">Picture-Word Memory Match</h1>
+      <div id="status-row">
+        <div id="timer-display">
+          <img src="assets/images/timer.svg" alt="timer" class="timer-icon">
+          <span id="timer-text">90</span>
+        </div>
+        <div id="pairs-display"><span id="pairs-found">0/6</span> Pairs Found</div>
+        <div id="score-display">Score: <span id="score-text">0</span></div>
+      </div>
     </div>
-    <div id="pairs-display"><span id="pairs-found">0/6</span> Pairs Found</div>
-    <div id="score-display">Score: <span id="score-text">0</span></div>
-  </div>
+    <div class="game-top-end" aria-hidden="true"></div>
+  </header>
   <div id="hud">
     <span id="timer" style="display:none;">90</span>
   </div>
