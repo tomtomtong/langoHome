@@ -38,6 +38,16 @@
       font-size: 0.875rem;
       font-family: monospace;
     }
+    select {
+      width: 100%;
+      padding: 0.625rem 0.75rem;
+      border: 1px solid #3c4043;
+      border-radius: 8px;
+      background: #0f1117;
+      color: #e8eaed;
+      font-size: 0.875rem;
+      font-family: inherit;
+    }
     textarea {
       width: 100%;
       min-height: 120px;
@@ -51,7 +61,7 @@
       resize: vertical;
       font-family: inherit;
     }
-    input:focus, textarea:focus { outline: none; border-color: #6c8cff; }
+    input:focus, textarea:focus, select:focus { outline: none; border-color: #6c8cff; }
     .field { margin-bottom: 1.25rem; }
     .field-hint {
       margin: 0.375rem 0 0;
@@ -273,7 +283,18 @@
       <div class="field">
         <label for="model">LLM Model <span style="color:#5f6368;font-weight:400">(optional)</span></label>
         <input id="model" type="text" placeholder="Default: openai/gpt-4o-mini" autocomplete="off">
-        <p class="field-hint">Provider/model pair, e.g. <code>openai/gpt-4o-mini</code> or <code>openai/gpt-4.1-nano</code>.</p>
+        <p class="field-hint">Provider/model pair for realtime voice conversations, e.g. <code>openai/gpt-4o-mini</code> or <code>openai/gpt-4.1-nano</code>.</p>
+      </div>
+      <div class="field">
+        <label for="profileSyncModel">Profile summary model</label>
+        <select id="profileSyncModel">
+          <option value="openai/gpt-4o-mini">openai/gpt-4o-mini (default)</option>
+          <option value="openai/gpt-4.1-nano">openai/gpt-4.1-nano</option>
+          <option value="openai/gpt-4o">openai/gpt-4o</option>
+          <option value="__custom__">Custom…</option>
+        </select>
+        <input id="profileSyncModelCustom" type="text" placeholder="provider/model" autocomplete="off" style="display:none; margin-top:0.5rem">
+        <p class="field-hint">Inworld LLM used after each session to summarize the conversation into the learner&rsquo;s account profile.</p>
       </div>
       <hr class="section-divider" style="margin: 1.5rem 0 1.25rem">
       <h2 style="margin: 0 0 0.375rem; font-size: 1rem">Conversation game icons</h2>
@@ -310,10 +331,18 @@
     const PROMPT_KEY = 'inworld_system_prompt';
     const VOICE_KEY = 'inworld_voice_id';
     const MODEL_KEY = 'inworld_model';
+    const PROFILE_SYNC_MODEL_KEY = 'inworld_profile_sync_model';
+    const PROFILE_SYNC_MODEL_PRESETS = [
+      'openai/gpt-4o-mini',
+      'openai/gpt-4.1-nano',
+      'openai/gpt-4o',
+    ];
     const input = document.getElementById('key');
     const prompt = document.getElementById('prompt');
     const voice = document.getElementById('voice');
     const model = document.getElementById('model');
+    const profileSyncModel = document.getElementById('profileSyncModel');
+    const profileSyncModelCustom = document.getElementById('profileSyncModelCustom');
     const status = document.getElementById('status');
     const debugReportsEl = document.getElementById('debug-reports');
     const btnRefreshLogs = document.getElementById('btn-refresh-logs');
@@ -516,6 +545,26 @@ ${linesText.replace(/</g, '&lt;')}</pre>
     btnRefreshLogs.addEventListener('click', loadDebugReports);
     loadDebugReports();
 
+    function resolveProfileSyncModelValue() {
+      if (profileSyncModel.value === '__custom__') {
+        return profileSyncModelCustom.value.trim();
+      }
+      return profileSyncModel.value.trim();
+    }
+
+    function applyProfileSyncModel(value) {
+      const trimmed = String(value || '').trim();
+      if (!trimmed || PROFILE_SYNC_MODEL_PRESETS.includes(trimmed)) {
+        profileSyncModel.value = trimmed || 'openai/gpt-4o-mini';
+        profileSyncModelCustom.style.display = 'none';
+        profileSyncModelCustom.value = '';
+        return;
+      }
+      profileSyncModel.value = '__custom__';
+      profileSyncModelCustom.style.display = 'block';
+      profileSyncModelCustom.value = trimmed;
+    }
+
     function syncLocalStorage(cfg) {
       if (cfg.apiKey) localStorage.setItem(KEY, cfg.apiKey);
       else localStorage.removeItem(KEY);
@@ -523,6 +572,7 @@ ${linesText.replace(/</g, '&lt;')}</pre>
         [PROMPT_KEY, 'instructions'],
         [VOICE_KEY, 'voice'],
         [MODEL_KEY, 'model'],
+        [PROFILE_SYNC_MODEL_KEY, 'profileSyncModel'],
       ]) {
         const v = cfg[serverKey]?.trim();
         if (v) localStorage.setItem(k, v);
@@ -535,6 +585,7 @@ ${linesText.replace(/</g, '&lt;')}</pre>
       prompt.value = cfg.instructions ?? '';
       voice.value = cfg.voice ?? '';
       model.value = cfg.model ?? '';
+      applyProfileSyncModel(cfg.profileSyncModel ?? '');
       applyGameIcons(cfg.gameIcons);
     }
 
@@ -544,6 +595,7 @@ ${linesText.replace(/</g, '&lt;')}</pre>
         instructions: localStorage.getItem(PROMPT_KEY) ?? '',
         voice: localStorage.getItem(VOICE_KEY) ?? '',
         model: localStorage.getItem(MODEL_KEY) ?? '',
+        profileSyncModel: localStorage.getItem(PROFILE_SYNC_MODEL_KEY) ?? '',
       });
     }
 
@@ -566,6 +618,7 @@ ${linesText.replace(/</g, '&lt;')}</pre>
         instructions: prompt.value.trim(),
         voice: voice.value.trim(),
         model: model.value.trim(),
+        profileSyncModel: resolveProfileSyncModelValue(),
         lipsync: serverConfig?.lipsync,
         avatar: serverConfig?.avatar,
         lighting: serverConfig?.lighting,
@@ -622,8 +675,18 @@ ${linesText.replace(/</g, '&lt;')}</pre>
     loadConfig();
 
     document.getElementById('form').addEventListener('submit', (e) => e.preventDefault());
-    [input, prompt, voice, model].forEach((el) => {
+    [input, prompt, voice, model, profileSyncModelCustom].forEach((el) => {
       el.addEventListener('input', scheduleSave);
+    });
+    profileSyncModel.addEventListener('change', () => {
+      if (profileSyncModel.value === '__custom__') {
+        profileSyncModelCustom.style.display = 'block';
+        profileSyncModelCustom.focus();
+      } else {
+        profileSyncModelCustom.style.display = 'none';
+        profileSyncModelCustom.value = '';
+      }
+      scheduleSave();
     });
   </script>
   <script src="/admin-nav.js"></script>

@@ -285,8 +285,13 @@ function saveUserProfile(username, profile) {
 
 const INWORLD_LLM_URL = 'https://api.inworld.ai/v1/chat/completions';
 const PROFILE_SYNC_MIN_USER_TURNS = 1;
-const PROFILE_SYNC_MODEL = 'openai/gpt-4o-mini';
+const DEFAULT_PROFILE_SYNC_MODEL = 'openai/gpt-4o-mini';
 const PROFILE_FIELD_KEYS = Object.keys(DEFAULT_USER_PROFILE);
+
+function getProfileSyncModel() {
+  const cfg = loadConfig();
+  return cfg.profileSyncModel?.trim() || DEFAULT_PROFILE_SYNC_MODEL;
+}
 
 function mergeProfileUpdates(profile, updates) {
   const merged = normalizeUserProfile(profile);
@@ -362,7 +367,7 @@ Update the profile based on this session.`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: PROFILE_SYNC_MODEL,
+        model: getProfileSyncModel(),
         messages: [
           { role: 'system', content: buildProfileSyncSystemPrompt() },
           { role: 'user', content: userPrompt },
@@ -2380,6 +2385,7 @@ const server = createServer((req, res) => {
         instructions: cfg.instructions ?? '',
         voice: cfg.voice ?? '',
         model: cfg.model ?? '',
+        profileSyncModel: cfg.profileSyncModel ?? '',
         avatar: normalizeAvatar(cfg.avatar),
         lipsync: normalizeLipsync(cfg.lipsync),
         lighting: normalizeLighting(cfg.lighting),
@@ -2405,6 +2411,7 @@ const server = createServer((req, res) => {
           instructions: parsed.instructions?.trim() || '',
           voice: parsed.voice?.trim() || '',
           model: parsed.model?.trim() || '',
+          profileSyncModel: parsed.profileSyncModel?.trim() || '',
           avatar: parsed.avatar != null
             ? normalizeAvatar(parsed.avatar)
             : normalizeAvatar(existing.avatar),
