@@ -6,7 +6,10 @@
   <meta name="screen-orientation" content="landscape">
   <title>Uncle Tommy — Voice Agent</title>
   <script>
-    if (new URLSearchParams(location.search).has("connect")) {
+    const initialParams = new URLSearchParams(location.search);
+    if (initialParams.get("preview") === "1") {
+      document.documentElement.classList.add("preview-mode");
+    } else if (initialParams.has("connect")) {
       document.documentElement.classList.add("game-return-connect");
     }
   </script>
@@ -69,6 +72,8 @@
     @media (orientation: portrait) and (max-width: 900px) {
       #portrait-prompt { display: flex; }
       #app { display: none !important; }
+      html.preview-mode #portrait-prompt { display: none; }
+      html.preview-mode #app { display: block !important; }
     }
 
     #app {
@@ -80,6 +85,115 @@
       overflow: hidden;
       transform: translate(-50%, -50%);
       background: #0f1117;
+    }
+
+    /* ── Host layout preview (?preview=1) ── */
+    #preview-toolbar {
+      display: none;
+      position: fixed;
+      inset: 0 0 auto;
+      z-index: 1000;
+      min-height: 196px;
+      padding: 14px 16px 16px;
+      gap: 8px;
+      flex-direction: column;
+      border: 2px solid rgba(255, 255, 255, 0.22);
+      border-radius: 0 0 16px 16px;
+      background: rgba(20, 33, 62, 0.96);
+      color: #f7f9ff;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(16px);
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+
+    html.preview-mode #preview-toolbar { display: flex; }
+
+    #preview-toolbar h2 {
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.2;
+    }
+
+    #preview-toolbar label {
+      color: #aeb8cc;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+    }
+
+    #preview-screen-select,
+    #preview-exit {
+      width: 100%;
+      min-height: 40px;
+      border-radius: 10px;
+      font: inherit;
+      font-weight: 700;
+    }
+
+    #preview-screen-select {
+      padding: 0 12px;
+      border: 2px solid rgba(255, 255, 255, 0.22);
+      background: #111b31;
+      color: #f7f9ff;
+    }
+
+    #preview-toolbar p {
+      margin: 0;
+      color: #9eabc2;
+      font-size: 12px;
+    }
+
+    #preview-exit {
+      border: 0;
+      background: #17457d;
+      color: #fff;
+      cursor: pointer;
+    }
+
+    #preview-exit:hover { background: #1d5599; }
+
+    html.preview-mode #app {
+      top: calc(196px + (100vh - 196px) / 2);
+      width: min(100vw, calc((100vh - 196px) * 4 / 3));
+      height: min(calc(100vh - 196px), calc(100vw * 3 / 4));
+      pointer-events: none;
+    }
+
+    html.preview-mode body.preview-screen-start #lango-home-root {
+      display: none;
+    }
+
+    #map-preview-frame {
+      display: none;
+      position: absolute;
+      inset: 0;
+      z-index: 40;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: #1b0e05;
+    }
+
+    html.preview-mode body.preview-screen-map #map-preview-frame {
+      display: block;
+    }
+
+    html.preview-mode body.preview-screen-map #app {
+      pointer-events: auto;
+    }
+
+    html.preview-mode body.preview-screen-rewards #app {
+      pointer-events: auto;
+    }
+
+    html.preview-mode body.preview-screen-collection-locked #app,
+    html.preview-mode body.preview-screen-collection-unlocked #app {
+      pointer-events: auto;
+    }
+
+    body.preview-screen-collection-locked #splash-screen,
+    body.preview-screen-collection-unlocked #splash-screen {
+      display: none !important;
     }
 
     /* ── Splash screen (logo while assets preload) ── */
@@ -1080,248 +1194,744 @@
     }
 
     #daily-rewards-overlay {
+      --reward-font-display: "Jomhuria", "Baloo 2", system-ui, sans-serif;
+      --reward-card-label-size: clamp(11px, 1.8cqw, 24.56px);
       display: none;
       position: fixed;
       inset: 0;
       z-index: 180;
-      align-items: center;
-      justify-content: center;
-      padding: 1rem;
-      background:
-        radial-gradient(ellipse at 30% 20%, rgba(88, 120, 200, 0.35) 0%, transparent 55%),
-        radial-gradient(ellipse at 75% 80%, rgba(220, 140, 60, 0.28) 0%, transparent 50%),
-        rgba(12, 10, 18, 0.72);
-      backdrop-filter: blur(6px);
+      overflow: hidden;
+      container-type: size;
+      isolation: isolate;
+      background: #eab253 url("/assets/daily-rewards/room-blur.png") center / cover no-repeat;
     }
 
-    #daily-rewards-overlay.visible { display: flex; }
+    #daily-rewards-overlay.visible { display: block; }
 
-    .daily-rewards-panel {
-      position: relative;
-      width: min(96vw, 820px);
-      padding: 0.35rem;
-      border-radius: 28px;
-      background: linear-gradient(180deg, #c49a5a 0%, #8b5e2a 40%, #6d4518 100%);
-      box-shadow:
-        0 20px 50px rgba(0, 0, 0, 0.45),
-        inset 0 2px 0 rgba(255, 255, 255, 0.22),
-        inset 0 -3px 0 rgba(0, 0, 0, 0.18);
-      animation: daily-reward-pop 0.45s cubic-bezier(0.34, 1.4, 0.64, 1);
+    .daily-rewards-scene {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      animation: daily-reward-scene-in 0.42s cubic-bezier(.2, .8, .2, 1) both;
     }
 
-    @keyframes daily-reward-pop {
-      0% { transform: scale(0.88) translateY(12px); opacity: 0; }
-      100% { transform: scale(1) translateY(0); opacity: 1; }
+    .daily-rewards-scene::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      background: rgba(248, 181, 69, 0.08);
+      backdrop-filter: blur(2px);
+      pointer-events: none;
     }
 
-    .daily-rewards-inner {
-      border-radius: 24px;
-      padding: 1.1rem 1rem 1.25rem;
-      background: linear-gradient(180deg, #a87338 0%, #8f5f28 100%);
-      box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.18);
+    @keyframes daily-reward-scene-in {
+      from { opacity: 0; transform: scale(1.025); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .daily-rewards-gifts,
+    .daily-rewards-character,
+    .daily-rewards-board-art,
+    .daily-rewards-quest-art,
+    .daily-rewards-return img {
+      display: block;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    .daily-rewards-gifts {
+      position: absolute;
+      z-index: 1;
+      left: -2.5%;
+      bottom: -17%;
+      width: 57%;
+      height: 74%;
+      object-fit: contain;
+      object-position: left bottom;
+    }
+
+    .daily-rewards-character {
+      position: absolute;
+      z-index: 2;
+      left: -7%;
+      bottom: -10%;
+      width: 52%;
+      height: 108%;
+      object-fit: contain;
+      object-position: left bottom;
+      filter: drop-shadow(0 8px 8px rgba(85, 34, 11, 0.22));
     }
 
     .daily-rewards-return {
       position: absolute;
-      top: -0.35rem;
-      left: 0.75rem;
-      z-index: 2;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-      padding: 0.4rem 0.85rem 0.4rem 0.65rem;
-      border: 2px solid #d4af37;
-      border-radius: 12px;
-      background: linear-gradient(180deg, #b88442 0%, #8d5a24 100%);
-      color: #fff8e7;
-      font-family: "Baloo 2", system-ui, sans-serif;
-      font-size: 0.82rem;
-      font-weight: 700;
+      z-index: 7;
+      top: 7.4%;
+      left: 5.8%;
+      width: 16.3%;
+      height: auto;
+      aspect-ratio: 241 / 79;
+      min-width: 0;
+      padding: 0;
+      border: 0;
+      border-radius: 18px;
+      background: transparent;
+      overflow: hidden;
       cursor: pointer;
-      box-shadow: 0 3px 0 #4a2a0e;
+      filter: drop-shadow(0 4px 2px rgba(83, 38, 6, 0.28));
+      transition: transform 0.14s ease, filter 0.14s ease;
     }
 
-    .daily-rewards-return svg {
-      width: 1rem;
-      height: 1rem;
+    .daily-rewards-return img {
+      position: absolute;
+      top: -35.84%;
+      left: 0;
+      width: 100%;
+      height: 172.04%;
+      max-width: none;
+      object-fit: fill;
     }
 
-    .daily-rewards-header {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.35rem;
-      margin-bottom: 0.85rem;
-      padding-top: 0.15rem;
+    .daily-rewards-return:hover { transform: scale(1.035); }
+    .daily-rewards-return:active { transform: translateY(2px) scale(.97); }
+    .daily-rewards-return:focus-visible { outline: 4px solid #fff5b2; outline-offset: 4px; }
+
+    .daily-rewards-board {
+      position: absolute;
+      z-index: 4;
+      top: 8.4%;
+      right: 3.75%;
+      width: 66.3%;
+      aspect-ratio: 1448 / 1086;
+      container-type: size;
     }
 
-    .daily-rewards-plaque {
-      padding: 0.35rem 1.75rem;
-      border: 3px solid #d4af37;
-      border-radius: 14px;
-      background: linear-gradient(180deg, #c49a5a 0%, #9a6830 100%);
-      color: #fff8e7;
-      font-family: "Baloo 2", system-ui, sans-serif;
-      font-size: clamp(1.1rem, 3vw, 1.45rem);
-      font-weight: 800;
-      letter-spacing: 0.12em;
-      text-shadow: 0 2px 0 rgba(0, 0, 0, 0.25);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    .daily-rewards-title-art {
+      position: absolute;
+      z-index: 6;
+      top: 4.4%;
+      left: 50%;
+      width: 35.5%;
+      height: 13.2%;
+      transform: translateX(-50%);
+      object-fit: contain;
+      pointer-events: none;
+      filter: drop-shadow(0 5px 3px rgba(81, 36, 10, .22));
     }
 
-    .daily-rewards-meta {
-      display: flex;
-      gap: 0.75rem;
-      flex-wrap: wrap;
-      justify-content: center;
-      color: #ffe8c2;
-      font-family: "Baloo 2", system-ui, sans-serif;
-      font-size: 0.82rem;
-      font-weight: 600;
+    .daily-rewards-board-art {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      filter: drop-shadow(0 8px 6px rgba(81, 36, 10, 0.2));
     }
 
     .daily-rewards-slots {
+      position: absolute;
+      z-index: 2;
+      /* Starts after the Today card (layout ref image 2). */
+      left: 26.4%;
+      right: 6.8%;
+      top: 42.2%;
+      height: 27.2%;
       display: grid;
-      grid-template-columns: repeat(7, minmax(0, 1fr));
-      gap: clamp(0.35rem, 1.2vw, 0.65rem);
-      margin-bottom: 1rem;
-    }
-
-    @media (max-width: 720px) {
-      .daily-rewards-slots {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-      }
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      align-items: center;
+      justify-items: center;
+      gap: 1.2%;
+      padding: 0.2% 0.2% 0.2%;
+      overflow: hidden;
+      box-sizing: border-box;
+      scrollbar-width: none;
     }
 
     .daily-reward-slot {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.35rem;
-      padding: 0.55rem 0.35rem 0.65rem;
-      border-radius: 16px;
-      border: 2px solid rgba(74, 42, 14, 0.45);
-      background: linear-gradient(180deg, #6d4518 0%, #543410 100%);
-      box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.22);
-      min-height: 7.5rem;
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .daily-reward-slot.active {
-      background: linear-gradient(180deg, #e8c07a 0%, #c89445 100%);
-      border-color: #f0d080;
-      box-shadow:
-        0 0 0 2px rgba(255, 230, 150, 0.35),
-        inset 0 2px 6px rgba(255, 255, 255, 0.18);
-      transform: translateY(-2px);
-    }
-
-    .daily-reward-slot.claimed {
-      background: linear-gradient(180deg, #8f6a35 0%, #6f5020 100%);
-      opacity: 0.88;
-    }
-
-    .daily-reward-slot.locked {
-      opacity: 0.72;
-    }
-
-    .daily-reward-slot-day {
-      color: #ffe8c2;
-      font-family: "Baloo 2", system-ui, sans-serif;
-      font-size: 0.72rem;
-      font-weight: 700;
-      opacity: 0.9;
-    }
-
-    .daily-reward-slot.active .daily-reward-slot-day { color: #5e3a18; }
-
-    .daily-reward-slot-icon {
-      width: clamp(2.2rem, 5vw, 2.75rem);
-      height: clamp(2.2rem, 5vw, 2.75rem);
+      position: relative;
+      min-width: 0;
+      width: 100%;
+      height: 100%;
       display: grid;
       place-items: center;
-      border-radius: 12px;
-      background: rgba(0, 0, 0, 0.12);
+      background: none;
+      transition: filter .18s ease, opacity .18s ease;
     }
 
-    .daily-reward-slot.active .daily-reward-slot-icon {
-      background: rgba(255, 255, 255, 0.28);
+    .daily-reward-slot:nth-child(2),
+    .daily-reward-slot:nth-child(3),
+    .daily-reward-slot:nth-child(4) {
+      margin-top: 0;
     }
 
-    .daily-reward-slot-icon svg {
-      width: 70%;
-      height: 70%;
+    .daily-reward-slot.active { transform: none; filter: saturate(1.08) brightness(1.05); }
+    .daily-reward-slot.claimed { opacity: .76; filter: grayscale(.16); }
+    .daily-reward-slot.locked { opacity: .92; }
+
+    .daily-reward-slot-day {
+      display: none;
+    }
+
+    .daily-reward-slot-icon {
+      position: absolute;
+      top: 31.34%;
+      left: 28.49%;
+      width: 43.58%;
+      aspect-ratio: 1;
+      display: grid;
+      place-items: center;
+    }
+
+    .daily-reward-slot-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      filter: drop-shadow(0 2px 1px rgba(34, 12, 2, .36));
     }
 
     .daily-reward-slot-label {
-      color: #ffe8c2;
-      font-family: "Baloo 2", system-ui, sans-serif;
-      font-size: clamp(0.68rem, 1.8vw, 0.78rem);
-      font-weight: 700;
+      position: absolute;
+      left: 9%;
+      right: 9%;
+      top: 67.6%;
+      overflow: hidden;
+      color: #fff;
+      font-family: var(--reward-font-display);
+      font-size: var(--reward-card-label-size);
+      font-weight: 400;
+      line-height: .9;
       text-align: center;
-      line-height: 1.15;
+      text-overflow: ellipsis;
+      text-shadow: 0 1px 1px #2d0d03;
+      white-space: nowrap;
     }
 
-    .daily-reward-slot.active .daily-reward-slot-label { color: #4a2a0e; }
-
-    .daily-reward-slot-stars {
-      color: #ffd666;
-      font-size: 0.68rem;
-      font-weight: 800;
+    .daily-reward-slot:nth-child(2) .daily-reward-slot-icon {
+      top: 30.36%;
+      left: 27.84%;
+      width: 44.32%;
     }
+
+    .daily-reward-slot:nth-child(2) .daily-reward-slot-label { top: 67.15%; }
+
+    .daily-reward-slot:nth-child(3) .daily-reward-slot-icon {
+      top: 32.02%;
+      left: 28.23%;
+      width: 44.32%;
+    }
+
+    .daily-reward-slot:nth-child(3) .daily-reward-slot-label { top: 68.35%; }
+
+    .daily-reward-slot-stars { display: none; }
 
     .daily-rewards-actions {
-      display: flex;
-      justify-content: center;
+      /* Lives inside the active card (JS appends it there), centered on the
+         card's bottom wooden strip (83.1%-98.2%), below the label plate. */
+      position: absolute;
+      z-index: 5;
+      left: 15%;
+      top: 85%;
+      width: 70%;
+      height: 11.2%;
     }
 
     #daily-rewards-claim-btn {
-      min-width: min(100%, 280px);
-      padding: 0.75rem 1.5rem;
-      border: 3px solid #d4af37;
-      border-radius: 16px;
-      background: linear-gradient(180deg, #5fd068 0%, #36a83f 100%);
+      width: 100%;
+      height: 100%;
+      min-width: 0;
+      padding: 0 4%;
+      border: 1px solid #f2d85b;
+      border-radius: 999px;
+      background: linear-gradient(180deg, #a8ee22 0%, #63c300 52%, #3b9d00 100%);
       color: #fff;
-      font-family: "Baloo 2", system-ui, sans-serif;
-      font-size: 1.05rem;
-      font-weight: 800;
-      cursor: pointer;
-      box-shadow: 0 5px 0 #1f6b28, 0 10px 24px rgba(0, 0, 0, 0.25);
-      transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.2s ease;
+      font-family: var(--reward-font-display);
+      font-size: clamp(12px, 2.1cqw, 26px);
+      line-height: 1;
+      text-shadow: 0 2px 1px #285b00;
+      box-shadow: inset 0 2px 2px rgba(255, 255, 255, .5), 0 2px 2px rgba(42, 18, 4, .45);
     }
 
     #daily-rewards-claim-btn:disabled {
-      opacity: 0.55;
+      opacity: .62;
       cursor: default;
-      background: linear-gradient(180deg, #9a9a9a 0%, #6e6e6e 100%);
-      box-shadow: 0 3px 0 #444;
+      filter: grayscale(.55);
     }
 
-    #daily-rewards-claim-btn:not(:disabled):active {
-      transform: translateY(3px);
-      box-shadow: 0 1px 0 #1f6b28;
+    #daily-rewards-claim-btn:not(:disabled):active { transform: translateY(2px) scale(.97); }
+
+    .daily-rewards-quest {
+      position: absolute;
+      z-index: 5;
+      left: 44.1%;
+      top: 71%;
+      width: 40%;
+      aspect-ratio: 567 / 156;
+    }
+
+    .daily-rewards-quest-art {
+      width: 100%;
+      height: 100%;
+      object-fit: fill;
+      filter: drop-shadow(0 4px 3px rgba(85, 34, 11, .18));
+    }
+
+    .daily-rewards-meta {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+    }
+
+    /* Three milestone cards fill the trough; the 7-day card is reached by scrolling.
+       Trough in reward-board.png: top 40.1%, bottom 79.4%, left 25.8%, right 94.4%.
+       Today card (baked into the art): x 8–26%, y 41.5–77%. Cards align with it. */
+    .daily-rewards-slots {
+      left: 27.9%;
+      right: 5.6%;
+      top: 41.5%;
+      /* Cards align with the Today card baked into the board art (41.5-76.7%). */
+      height: 35.2%;
+      display: flex;
+      align-items: flex-start;
+      gap: 3cqw;
+      padding: 0;
+      overflow-x: auto;
+      overflow-y: hidden;
+      border-radius: 0 1.8cqw 1.8cqw 0;
+      scroll-snap-type: x mandatory;
+      scrollbar-width: none;
+      overscroll-behavior-inline: contain;
+    }
+
+    .daily-rewards-slots::-webkit-scrollbar { display: none; }
+
+    /* Custom always-visible scrollbar (native macOS overlay bars are unreliable). */
+    .daily-rewards-scrollbar {
+      position: absolute;
+      z-index: 2;
+      left: 27.9%;
+      right: 5.6%;
+      top: 77.6%;
+      height: 1.5%;
+      border-radius: 999px;
+      background: #53210d;
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, .35);
+      pointer-events: none;
+    }
+
+    .daily-rewards-scrollbar-thumb {
+      position: absolute;
+      top: -33%;
+      height: 166%;
+      min-width: 6%;
+      border: 1px solid #6d2d13;
+      border-radius: 999px;
+      background: #da997c;
+      box-shadow: 0 1px 2px rgba(30, 10, 2, .4);
+    }
+
+    .daily-reward-slot,
+    .daily-reward-slot:nth-child(2),
+    .daily-reward-slot:nth-child(3),
+    .daily-reward-slot:nth-child(4) {
+      flex: 0 0 auto;
+      min-width: 0;
+      width: auto;
+      height: 100%;
+      max-height: none;
+      aspect-ratio: 172 / 225;
+      margin-top: 0;
+      background: none;
+      display: block;
+      align-self: flex-start;
+      scroll-snap-align: start;
+    }
+
+    .daily-reward-slot::before {
+      display: none;
+    }
+
+    .daily-reward-slot-day { display: none; }
+
+    .daily-reward-slot-art {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      display: block;
+      width: 100%;
+      height: 100%;
+      max-width: none;
+      max-height: none;
+      object-fit: fill;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .daily-rewards-track { display: none; }
+
+    .daily-reward-slot-icon,
+    .daily-reward-slot:nth-child(2) .daily-reward-slot-icon,
+    .daily-reward-slot:nth-child(3) .daily-reward-slot-icon {
+      top: 30.5%;
+      left: 27.5%;
+      width: 45%;
+      display: none;
+    }
+
+    .daily-reward-slot-icon--mole img { transform: scale(1.08); }
+    .daily-reward-slot-emoji {
+      font-size: clamp(38px, 6.6cqw, 88px);
+      line-height: 1;
+      filter: drop-shadow(0 3px 1px rgba(34, 12, 2, .42));
+    }
+
+    .daily-reward-slot-label,
+    .daily-reward-slot:nth-child(2) .daily-reward-slot-label,
+    .daily-reward-slot:nth-child(3) .daily-reward-slot-label { display: none; top: 67.4%; }
+
+    .daily-reward-check {
+      position: absolute;
+      z-index: 5;
+      top: 36%;
+      left: 50%;
+      display: grid;
+      place-items: center;
+      width: 38%;
+      aspect-ratio: 1;
+      border: .45cqw solid #eaffb8;
+      border-radius: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(#8ee73f, #31a918);
+      color: #fff;
+      font: 800 clamp(28px, 5cqw, 66px)/1 "Baloo 2", sans-serif;
+      text-shadow: 0 2px 0 #1f7511;
+      box-shadow: 0 .45cqw .7cqw rgba(37, 13, 2, .42), inset 0 0 0 .22cqw rgba(255,255,255,.28);
+    }
+
+    .daily-reward-slot.claimed .daily-reward-slot-icon { opacity: .24; }
+    .daily-reward-slot.claimed { opacity: 1; filter: none; }
+    .daily-reward-slot.locked { opacity: .9; filter: saturate(.75); }
+
+    .daily-rewards-task-progress {
+      position: absolute;
+      z-index: 2;
+      left: 15.4%;
+      top: 52%;
+      width: 8.2%;
+      transform: translateY(-50%);
+      background: #fbe4b0;
+      color: #214b78;
+      font: 800 clamp(13px, 2.45cqw, 34px)/1 "Baloo 2", sans-serif;
+      text-align: center;
+    }
+
+    .daily-reward-congrats {
+      position: absolute;
+      inset: 0;
+      z-index: 30;
+      display: grid;
+      place-items: center;
+      padding: 5%;
+      background: rgba(43, 20, 8, .66);
+      backdrop-filter: blur(5px);
+      animation: reward-modal-fade .2s ease both;
+    }
+
+    .daily-reward-congrats[hidden] { display: none; }
+
+    .daily-reward-congrats-card {
+      position: relative;
+      width: min(58cqw, 760px);
+      min-height: min(67cqh, 620px);
+      padding: min(12cqh, 92px) min(5cqw, 60px) min(4cqh, 38px);
+      border: min(.8cqw, 9px) solid #f6a62b;
+      border-radius: min(3cqw, 34px);
+      background: linear-gradient(180deg, #a84812, #7d2c0b 58%, #5d210a);
+      box-shadow: inset 0 0 0 min(.35cqw, 4px) #ffcf5f, 0 min(2cqh, 18px) min(5cqw, 54px) rgba(35, 12, 2, .55);
+      color: #fff5d2;
+      text-align: center;
+      animation: reward-modal-pop .28s cubic-bezier(.2,.8,.2,1) both;
+    }
+
+    .daily-reward-congrats-banner {
+      position: absolute;
+      top: -6%;
+      left: 50%;
+      width: 84%;
+      margin: 0;
+      padding: .28em .6em;
+      border: min(.55cqw, 7px) solid #ffbc31;
+      border-radius: 999px;
+      transform: translateX(-50%);
+      background: linear-gradient(#9a3b0e, #5b1e07);
+      font: 800 clamp(28px, 4.6cqw, 64px)/1 "Baloo 2", sans-serif;
+      text-shadow: 0 .12em 0 #321004;
+      box-shadow: inset 0 0 0 min(.22cqw, 3px) #fff099, 0 .2em .25em rgba(40, 13, 2, .45);
+    }
+
+    .daily-reward-congrats-title {
+      margin: 0 0 min(2cqh, 18px);
+      font: 800 clamp(22px, 3.2cqw, 45px)/1 "Baloo 2", sans-serif;
+    }
+
+    .daily-reward-congrats-icon {
+      display: grid;
+      place-items: center;
+      width: min(18cqw, 220px);
+      height: min(24cqh, 190px);
+      margin: 0 auto min(1.2cqh, 12px);
+      border: min(.45cqw, 5px) solid #f0b34a;
+      border-radius: min(2cqw, 24px);
+      background: radial-gradient(circle at 50% 35%, #f7d68c, #7a2c0d 72%);
+      box-shadow: inset 0 0 min(2cqw, 20px) rgba(38, 10, 1, .6);
+    }
+
+    .daily-reward-congrats-icon img { width: 78%; height: 78%; object-fit: contain; }
+    .daily-reward-congrats-icon .penguin { font-size: clamp(70px, 10cqw, 135px); filter: drop-shadow(0 5px 2px rgba(30,8,1,.45)); }
+    .daily-reward-congrats-name { margin: 0 0 min(2.5cqh, 22px); font: 800 clamp(18px, 2.4cqw, 34px)/1 "Baloo 2", sans-serif; }
+
+    #daily-reward-modal-cta {
+      min-width: 44%;
+      padding: .42em 1.3em;
+      border: min(.45cqw, 5px) solid #eaff9a;
+      border-radius: 999px;
+      background: linear-gradient(#91ed3a, #34a917);
+      color: #fff;
+      font: 800 clamp(17px, 2.5cqw, 35px)/1 "Baloo 2", sans-serif;
+      text-shadow: 0 2px 0 #206d10;
+      box-shadow: 0 .2em 0 #1c6810, inset 0 0 0 .1em rgba(255,255,255,.24);
+      cursor: pointer;
+    }
+
+    #daily-reward-modal-cta:active { transform: translateY(.16em); box-shadow: 0 .04em 0 #1c6810; }
+    @keyframes reward-modal-fade { from { opacity: 0; } }
+    @keyframes reward-modal-pop { from { opacity: 0; transform: translateY(5%) scale(.92); } }
+
+    /* Figma 719:34 — Word-Whack Blitz Congratulations screen. */
+    .daily-reward-congrats.word-whack-layout {
+      padding: 0;
+      background: rgba(35, 20, 9, .58);
+      backdrop-filter: blur(3px) saturate(.86);
+    }
+
+    .word-whack-layout .daily-reward-congrats-card {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+      color: #f7f4e3;
+      animation: reward-word-whack-pop .48s cubic-bezier(.18,.86,.25,1.18) both;
+    }
+
+    .word-whack-layout .daily-reward-congrats-card::before,
+    .word-whack-layout .daily-reward-congrats-card::after {
+      content: "★";
+      position: absolute;
+      z-index: 2;
+      color: #ffe86b;
+      font-size: clamp(22px, 3.1cqw, 52px);
+      text-shadow: 0 0 .35em #ffad19, 0 .08em 0 #a94b08;
+      pointer-events: none;
+      animation: reward-star-twinkle 1.15s ease-in-out .28s both;
+    }
+
+    .word-whack-layout .daily-reward-congrats-card::before { left: 24%; top: 32%; transform: rotate(-18deg); }
+    .word-whack-layout .daily-reward-congrats-card::after { right: 24%; top: 49%; transform: rotate(16deg) scale(.72); animation-delay: .46s; }
+
+    .word-whack-layout .daily-reward-congrats-banner {
+      top: 0;
+      left: 50%;
+      width: 69%;
+      height: 23.6%;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      transform: translateX(-50%);
+      overflow: hidden;
+      background: url("/assets/daily-rewards/congrats-banner.png") center / contain no-repeat;
+      box-shadow: none;
+      color: transparent;
+      font-size: 0;
+      text-shadow: none;
+      transform-origin: 50% 0;
+      animation: reward-banner-swing .72s cubic-bezier(.18,.86,.25,1.15) .08s both;
+    }
+
+    .word-whack-layout .daily-reward-congrats-title {
+      position: absolute;
+      top: 26.7%;
+      left: 50%;
+      width: 72%;
+      margin: 0;
+      transform: translateX(-50%);
+      color: #f7f4e3;
+      font-family: "Jomhuria", Georgia, serif;
+      font-size: 8.71cqw;
+      font-weight: 400;
+      line-height: 1;
+      text-shadow:
+        -0.13cqw -0.13cqw 0 #3e1e16,
+        0.13cqw -0.13cqw 0 #3e1e16,
+        -0.13cqw 0.13cqw 0 #3e1e16,
+        0.13cqw 0.13cqw 0 #3e1e16,
+        0 0.25cqw 0 #3e1e16;
+    }
+
+    .word-whack-layout .daily-reward-congrats-icon {
+      position: absolute;
+      top: 35.9%;
+      left: 50%;
+      display: block;
+      width: 30.1%;
+      height: auto;
+      aspect-ratio: 1264 / 842;
+      margin: 0;
+      border: 0;
+      border-radius: 0;
+      transform: translateX(-50%);
+      overflow: visible;
+      background: transparent;
+      box-shadow: none;
+      filter: drop-shadow(0 1.1cqh 1.2cqw rgba(44, 17, 4, .42));
+      animation: reward-icon-bounce .64s cubic-bezier(.15,.86,.23,1.22) .2s both;
+    }
+
+    .word-whack-layout .daily-reward-congrats-icon img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .word-whack-layout .daily-reward-congrats-name {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+    }
+
+    .word-whack-layout #daily-reward-modal-cta {
+      position: absolute;
+      top: 70.6%;
+      left: 50%;
+      width: 22.1%;
+      min-width: 0;
+      aspect-ratio: 308 / 106;
+      padding: 0;
+      border: 0;
+      border-radius: 999px;
+      transform: translateX(-50%);
+      overflow: hidden;
+      background: transparent;
+      box-shadow: none;
+      text-shadow: none;
+      animation: reward-cta-arrive .48s cubic-bezier(.18,.86,.25,1.18) .38s both;
+    }
+
+    .word-whack-layout #daily-reward-modal-cta:active { transform: translate(-50%, 2px) scale(.98); }
+
+    .daily-reward-modal-cta-art { display: none; }
+    .word-whack-layout .daily-reward-modal-cta-art {
+      position: absolute;
+      top: -72.5%;
+      left: -14.66%;
+      display: block;
+      width: 129.31%;
+      height: 250%;
+      max-width: none;
+      pointer-events: none;
+    }
+
+    .word-whack-layout .daily-reward-modal-cta-label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
     }
 
     .daily-rewards-celebrate {
       position: absolute;
       inset: 0;
+      z-index: 45;
       pointer-events: none;
       overflow: hidden;
-      border-radius: inherit;
     }
 
     .daily-rewards-sparkle {
       position: absolute;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #ffd666;
-      animation: reward-sparkle 0.9s ease-out forwards;
+      width: clamp(6px, .7cqw, 12px);
+      height: clamp(10px, 1.15cqw, 20px);
+      border-radius: 2px;
+      background: var(--reward-particle, #ffd666);
+      box-shadow: 0 0 .45em color-mix(in srgb, var(--reward-particle, #ffd666), transparent 30%);
+      animation: reward-confetti 1.8s cubic-bezier(.14,.72,.28,1) forwards;
     }
 
-    @keyframes reward-sparkle {
-      0% { transform: scale(0) translateY(0); opacity: 1; }
-      100% { transform: scale(1.4) translateY(-40px); opacity: 0; }
+    .daily-rewards-sparkle.star {
+      width: clamp(10px, 1.15cqw, 20px);
+      height: clamp(10px, 1.15cqw, 20px);
+      border-radius: 0;
+      clip-path: polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 94%,50% 72%,21% 94%,32% 57%,2% 35%,39% 35%);
+    }
+
+    @keyframes reward-confetti {
+      0% { transform: translate3d(0, 18px, 0) rotate(0) scale(0); opacity: 0; }
+      14% { opacity: 1; transform: translate3d(0, 0, 0) rotate(45deg) scale(1); }
+      100% { transform: translate3d(var(--reward-drift, 0px), 105px, 0) rotate(var(--reward-spin, 420deg)) scale(.72); opacity: 0; }
+    }
+
+    @keyframes reward-word-whack-pop {
+      from { opacity: 0; transform: scale(.965); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    @keyframes reward-banner-swing {
+      0% { opacity: 0; transform: translateX(-50%) translateY(-18%) rotate(-2.5deg); }
+      58% { opacity: 1; transform: translateX(-50%) translateY(0) rotate(1.2deg); }
+      100% { opacity: 1; transform: translateX(-50%) rotate(0); }
+    }
+
+    @keyframes reward-icon-bounce {
+      0% { opacity: 0; transform: translateX(-50%) scale(.52) rotate(-5deg); }
+      68% { opacity: 1; transform: translateX(-50%) scale(1.08) rotate(2deg); }
+      100% { opacity: 1; transform: translateX(-50%) scale(1) rotate(0); }
+    }
+
+    @keyframes reward-cta-arrive {
+      from { opacity: 0; transform: translateX(-50%) translateY(30%) scale(.82); }
+      to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+    }
+
+    @keyframes reward-star-twinkle {
+      0% { opacity: 0; scale: .25; }
+      55% { opacity: 1; scale: 1.25; }
+      100% { opacity: .92; scale: 1; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .word-whack-layout .daily-reward-congrats-card,
+      .word-whack-layout .daily-reward-congrats-banner,
+      .word-whack-layout .daily-reward-congrats-icon,
+      .word-whack-layout #daily-reward-modal-cta,
+      .word-whack-layout .daily-reward-congrats-card::before,
+      .word-whack-layout .daily-reward-congrats-card::after {
+        animation: none;
+      }
+
+      .daily-rewards-sparkle { display: none; }
     }
 
     body.in-session #daily-rewards-btn { display: none !important; }
@@ -1339,6 +1949,17 @@
       background: transparent;
     }
 
+    #daily-rewards-root {
+      position: absolute;
+      inset: 0;
+      z-index: 180;
+      pointer-events: none;
+    }
+
+    #daily-rewards-root #daily-rewards-overlay {
+      pointer-events: auto;
+    }
+
     /* The entire app is the 4:3 stage; the video fills that stage. */
     body:not(.in-session) #idle-video-screen {
       inset: 0;
@@ -1347,8 +1968,18 @@
       transform: none;
     }
 
-    body.in-session #lango-home-root,
-    html.game-return-connect #lango-home-root { display: none; }
+    /* Conversation mode keeps the shared photo frame but removes the
+       home-screen controls and room chrome. */
+    body.in-session .lango-home__clock,
+    body.in-session .lango-home__starbar,
+    body.in-session .lango-home__stars,
+    body.in-session .lango-home__button,
+    body.in-session .lango-home__nav,
+    html.game-return-connect .lango-home__clock,
+    html.game-return-connect .lango-home__starbar,
+    html.game-return-connect .lango-home__stars,
+    html.game-return-connect .lango-home__button,
+    html.game-return-connect .lango-home__nav { display: none; }
 
     .lango-home {
       --frame-padding: 4.7%;
@@ -1468,9 +2099,211 @@
     }
 
     .lango-home__nav .lango-home__button { position: relative; inset: auto; width: 31%; height: 100%; }
+
+    /* Figma frames 768:1141 / 768:1173 — Doll Collection. The artwork in
+       these frames already contains the display lettering, so the React
+       component only supplies accessible text and the two collection states. */
+    #collection-root {
+      position: absolute;
+      inset: 0;
+      z-index: 190;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    #collection-overlay {
+      display: none;
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      container-type: size;
+      isolation: isolate;
+      pointer-events: auto;
+      background: #d59a4b;
+    }
+
+    #collection-overlay.visible { display: block; }
+
+    .collection-background {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    .collection-title {
+      position: absolute;
+      z-index: 2;
+      top: 1.7%;
+      left: 25.18%;
+      display: block;
+      width: 49.56%;
+      height: 14.89%;
+      object-fit: contain;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    .collection-return {
+      position: absolute;
+      z-index: 4;
+      top: 7.45%;
+      left: 5.2%;
+      width: 17.64%;
+      aspect-ratio: 241 / 79;
+      padding: 0;
+      border: 0;
+      border-radius: 18px;
+      background: transparent;
+      overflow: hidden;
+      cursor: pointer;
+      filter: drop-shadow(0 4px 2px rgba(75, 31, 4, .24));
+      transition: transform 120ms ease, filter 120ms ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .collection-return img {
+      position: absolute;
+      top: -35.84%;
+      left: 0;
+      display: block;
+      width: 100%;
+      height: 172.04%;
+      object-fit: fill;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    .collection-return:hover { transform: scale(1.035); filter: drop-shadow(0 6px 3px rgba(75, 31, 4, .32)); }
+    .collection-return:active { transform: translateY(2px) scale(.97); }
+    .collection-return:focus-visible { outline: 4px solid #fff5b2; outline-offset: 4px; }
+
+    .collection-list {
+      position: absolute;
+      z-index: 3;
+      top: 30.19%;
+      left: 16.25%;
+      display: flex;
+      flex-direction: column;
+      gap: 2.411cqh; /* 23px in the 1366 × 954 Figma frame */
+      width: 65.74%;
+      height: 69.6%;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+      overflow-y: auto;
+      list-style: none;
+      overscroll-behavior: contain;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .collection-list::-webkit-scrollbar { display: none; }
+
+    .collection-scrollbar {
+      position: absolute;
+      z-index: 4;
+      top: 32.7%;
+      left: 82.01%;
+      width: 1.83%;
+      height: 67.1%;
+      border-radius: 70px;
+      background: #f5be86;
+      pointer-events: none;
+    }
+
+    .collection-scrollbar-thumb {
+      position: absolute;
+      top: var(--scroll-thumb-top, 0%);
+      right: 12%;
+      left: 12%;
+      height: 12.66%;
+      border-radius: 70px;
+      background: #b45919;
+    }
+
+    .collection-row {
+      position: relative;
+      flex: 0 0 var(--row-height);
+      width: 100%;
+      min-height: var(--row-height);
+    }
+
+    .collection-doll,
+    .collection-lock,
+    .collection-divider {
+      position: absolute;
+      display: block;
+      height: auto;
+      object-fit: contain;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    .collection-doll {
+      top: 0;
+      left: var(--doll-left);
+      width: var(--doll-size);
+    }
+
+    .collection-row.locked .collection-doll { opacity: .51; }
+
+    .collection-lock {
+      top: var(--lock-top);
+      left: 7.795%; /* 70px within the 898px list */
+      z-index: 2;
+      width: 5.345%; /* 48px within the 898px list */
+    }
+
+    .collection-divider {
+      right: 0;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 4.507cqh; /* 43px in the Figma frame */
+      object-fit: fill;
+    }
+
+    .collection-sr-title {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    body.in-session #collection-overlay.visible { display: none; }
   </style>
 </head>
 <body>
+  <aside id="preview-toolbar" aria-label="Host layout preview controls">
+    <h2>Host layout preview</h2>
+    <label for="preview-screen-select">SCREEN</label>
+    <select id="preview-screen-select">
+      <option value="home">Home — preview</option>
+      <option value="start">Start controls — preview</option>
+      <option value="loop">Loop video — preview</option>
+      <option value="transition">Transition video — preview</option>
+      <option value="conversation">Conversation — preview</option>
+      <option value="rewards">Daily rewards — preview</option>
+      <option value="collection-locked">Collection — locked preview</option>
+      <option value="collection-unlocked">Collection — unlocked preview</option>
+      <option value="map">Map — preview</option>
+      <option value="game">Game transition — preview</option>
+    </select>
+    <p>Add <code>?preview=1</code> to the URL. Login, microphone, and socket sessions are disabled in preview mode.</p>
+    <button id="preview-exit" type="button">Exit preview</button>
+  </aside>
+
   <div id="splash-screen" role="status" aria-live="polite" aria-busy="true" aria-label="Loading">
     <div class="splash-content">
       <img src="/langoLogo.jpeg" alt="Lango" width="420" height="420" decoding="async">
@@ -1490,6 +2323,9 @@
 
   <div id="app">
     <div id="lango-home-root"></div>
+    <div id="daily-rewards-root"></div>
+    <div id="collection-root"></div>
+    <iframe id="map-preview-frame" title="Map preview" src="/map/index.html?preview=1&amp;embedded=1"></iframe>
     <div id="idle-video-screen" aria-label="Tap to start conversation">
       <div id="hko-weather-bar" hidden aria-live="polite">
         <img id="hko-weather-icon" alt="" width="32" height="32">
@@ -1536,17 +2372,6 @@
           <button id="btn-save-camera" type="button">Save camera</button>
         </div>
       </div>
-      <nav class="overlay-games" aria-label="Games">
-        <a class="game-shortcut game-shortcut--wordwhack" data-game-id="wordwhack" href="/games/" title="Word-Whack Blitz">
-          <img data-game-icon="wordwhack" src="/games/assets/images/mole.svg" alt="Word-Whack Blitz">
-        </a>
-        <a class="game-shortcut game-shortcut--card" data-game-id="cardgame" href="/games/CardGame/" title="Picture-Word Memory Match">
-          <img data-game-icon="cardgame" src="/games/CardGame/assets/images/card-back.svg" alt="Picture-Word Memory Match">
-        </a>
-        <a class="game-shortcut game-shortcut--find" data-game-id="findgame" href="/games/FindGame/" title="Find the Object">
-          <img data-game-icon="findgame" src="/games/FindGame/assets/images/scene.svg" alt="Find the Object">
-        </a>
-      </nav>
       <div id="conversation-captions" aria-live="polite" aria-relevant="additions text">
         <div id="caption-user" class="caption-line caption-line--user" hidden>
           <span class="caption-label">You</span>
@@ -1580,6 +2405,164 @@
         }, e('img', { src: asset(image), alt: '', draggable: false }));
       }
 
+      function DailyRewards() {
+        const rewardAsset = (name) => `/assets/daily-rewards/${name}.png?v=20260713e`;
+        return e('div', {
+          id: 'daily-rewards-overlay',
+          role: 'dialog',
+          'aria-modal': 'true',
+          'aria-labelledby': 'daily-rewards-title',
+          'aria-hidden': 'true'
+        },
+          e('section', {
+            className: 'daily-rewards-scene',
+            'data-node-id': '601:415',
+            'aria-label': 'Daily rewards'
+          },
+            e('div', { className: 'daily-rewards-celebrate', id: 'daily-rewards-celebrate', 'aria-hidden': 'true' }),
+            e('img', { className: 'daily-rewards-gifts', src: rewardAsset('character'), alt: '', draggable: false }),
+            e('img', { className: 'daily-rewards-character', src: rewardAsset('gifts'), alt: '', draggable: false }),
+            e('button', { type: 'button', className: 'daily-rewards-return', id: 'daily-rewards-close', 'aria-label': 'Return home' },
+              e('img', { src: rewardAsset('return-button'), alt: '', draggable: false })
+            ),
+            e('img', { className: 'daily-rewards-title-art', src: rewardAsset('quest-strip'), alt: 'Reward', draggable: false }),
+            e('div', { className: 'daily-rewards-board' },
+              e('img', { className: 'daily-rewards-board-art', src: rewardAsset('reward-board'), alt: '', draggable: false }),
+              e('h2', { id: 'daily-rewards-title', className: 'daily-rewards-meta' }, 'Reward'),
+            e('div', { className: 'daily-rewards-slots', id: 'daily-rewards-slots', 'aria-label': 'Upcoming rewards' }),
+            e('div', { className: 'daily-rewards-scrollbar', id: 'daily-rewards-scrollbar', 'aria-hidden': 'true' },
+              e('span', { className: 'daily-rewards-scrollbar-thumb', id: 'daily-rewards-scrollbar-thumb' })
+            ),
+            e('div', { className: 'daily-rewards-track', id: 'daily-rewards-track', 'aria-hidden': 'true' },
+              e('div', { className: 'daily-rewards-track-fill', id: 'daily-rewards-track-fill' })
+            ),
+              e('div', { className: 'daily-rewards-actions' },
+                e('button', { type: 'button', id: 'daily-rewards-claim-btn' }, 'Get')
+              )
+            ),
+            e('div', { className: 'daily-rewards-quest', 'aria-hidden': 'true' },
+              e('img', { className: 'daily-rewards-quest-art', src: rewardAsset('reward-title'), alt: '', draggable: false }),
+              e('span', { className: 'daily-rewards-task-progress' }, '1/1')
+            ),
+            e('div', { className: 'daily-reward-congrats', id: 'daily-reward-congrats', hidden: true },
+              e('section', { className: 'daily-reward-congrats-card', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'daily-reward-congrats-banner', 'data-node-id': '719:34' },
+                e('h2', { className: 'daily-reward-congrats-banner', id: 'daily-reward-congrats-banner', 'data-node-id': '723:161' }, 'Congratulations!'),
+                e('p', { className: 'daily-reward-congrats-title', id: 'daily-reward-congrats-title', 'data-node-id': '719:75' }),
+                e('div', { className: 'daily-reward-congrats-icon', id: 'daily-reward-congrats-icon', 'data-node-id': '670:3076' }),
+                e('p', { className: 'daily-reward-congrats-name', id: 'daily-reward-congrats-name' }),
+                e('button', { type: 'button', id: 'daily-reward-modal-cta', 'data-node-id': '719:104' },
+                  e('img', { className: 'daily-reward-modal-cta-art', src: rewardAsset('congrats-get-button'), alt: '', draggable: false }),
+                  e('span', { className: 'daily-reward-modal-cta-label', id: 'daily-reward-modal-cta-label' }, 'Get')
+                )
+              )
+            ),
+            e('div', { className: 'daily-rewards-meta', 'aria-live': 'polite' },
+              e('span', { id: 'daily-rewards-streak-text' }, 'Streak: 0 days'),
+              e('span', { id: 'daily-rewards-stars-text' }, '0 stars')
+            )
+          )
+        );
+      }
+
+      const COLLECTION_DOLLS = [
+        { rowHeight: 188, size: 188, left: 0, lockTop: 70 },
+        { rowHeight: 164, size: 142, left: 23, lockTop: 47 },
+        { rowHeight: 164, size: 150, left: 19, lockTop: 51 },
+        { rowHeight: 177, size: 167, left: 11, lockTop: 64 },
+        { rowHeight: 187, size: 172, left: 8, lockTop: 74 },
+        { rowHeight: 177, size: 163, left: 13, lockTop: 57 },
+      ];
+
+      function Collection() {
+        const [visible, setVisible] = React.useState(false);
+        const [unlocked, setUnlocked] = React.useState(false);
+        const [scrollProgress, setScrollProgress] = React.useState(0);
+        const listRef = React.useRef(null);
+        const collectionAsset = (name) => `/assets/collections/${name}.png`;
+
+        React.useEffect(() => {
+          const close = () => setVisible(false);
+          const open = async (options = {}) => {
+            let nextUnlocked = typeof options.unlocked === 'boolean' ? options.unlocked : false;
+            if (typeof options.unlocked !== 'boolean') {
+              try {
+                const response = await fetch('/api/check-in');
+                if (response.ok) {
+                  const status = await response.json();
+                  nextUnlocked = Array.isArray(status.collection)
+                    && status.collection.includes('langomon-doll');
+                }
+              } catch { /* The locked state is the safe offline fallback. */ }
+            }
+            setUnlocked(nextUnlocked);
+            setScrollProgress(0);
+            setVisible(true);
+            requestAnimationFrame(() => {
+              if (listRef.current) listRef.current.scrollTop = 0;
+            });
+          };
+          const onOpen = (event) => { open(event.detail || {}); };
+          window.LangoCollection = { open, close };
+          window.addEventListener('lango:open-collection', onOpen);
+          return () => {
+            window.removeEventListener('lango:open-collection', onOpen);
+            if (window.LangoCollection?.open === open) delete window.LangoCollection;
+          };
+        }, []);
+
+        const closeCollection = () => {
+          setVisible(false);
+          document.querySelector('.lango-home__collections')?.focus();
+        };
+
+        return e('section', {
+          id: 'collection-overlay',
+          className: visible ? 'visible' : '',
+          role: 'dialog',
+          'aria-modal': 'true',
+          'aria-hidden': visible ? 'false' : 'true',
+          'aria-labelledby': 'collection-title',
+          'data-state': unlocked ? 'unlocked' : 'locked',
+          'data-node-id': unlocked ? '768:1173' : '768:1141'
+        },
+          e('h2', { id: 'collection-title', className: 'collection-sr-title' }, 'Doll Collection'),
+          e('img', { className: 'collection-background', src: collectionAsset('background'), alt: '', draggable: false }),
+          e('img', { className: 'collection-title', src: collectionAsset('object'), alt: '', draggable: false }),
+          e('button', { type: 'button', className: 'collection-return', onClick: closeCollection, 'aria-label': 'Return home' },
+            e('img', { src: collectionAsset('return'), alt: '', draggable: false })
+          ),
+          e('ol', {
+            ref: listRef,
+            className: 'collection-list',
+            'aria-label': unlocked ? 'Unlocked dolls' : 'Locked dolls',
+            onScroll: (event) => {
+              const list = event.currentTarget;
+              const available = list.scrollHeight - list.clientHeight;
+              setScrollProgress(available > 0 ? list.scrollTop / available : 0);
+            }
+          },
+            ...COLLECTION_DOLLS.map((doll, index) => e('li', {
+              key: index,
+              className: `collection-row ${unlocked ? 'unlocked' : 'locked'}`,
+              style: {
+                '--row-height': `${doll.rowHeight / 9.54}cqh`,
+                '--doll-left': `${doll.left / 8.98}%`,
+                '--doll-size': `${doll.size / 8.98}%`,
+                '--lock-top': `${doll.lockTop / doll.rowHeight * 100}%`,
+              },
+              'aria-label': unlocked ? `Doll ${index + 1}, unlocked` : `Doll ${index + 1}, locked`
+            },
+              e('img', { className: 'collection-doll', src: collectionAsset(`${unlocked ? 'unlocked' : 'locked'}-${index + 1}`), alt: '', draggable: false }),
+              !unlocked && e('img', { className: 'collection-lock', src: collectionAsset('lock'), alt: '', draggable: false }),
+              e('img', { className: 'collection-divider', src: collectionAsset('divider'), alt: '', draggable: false })
+            ))
+          ),
+          e('div', { className: 'collection-scrollbar', 'aria-hidden': 'true', style: { '--scroll-thumb-top': `${scrollProgress * 87.34}%` } },
+            e('span', { className: 'collection-scrollbar-thumb' })
+          )
+        );
+      }
+
       function LangoHome() {
         const startConversation = () => document.getElementById('btn-start')?.click();
         const openRewards = () => document.getElementById('daily-rewards-btn')?.click();
@@ -1591,21 +2574,40 @@
           e('img', { className: 'lango-home__starbar', src: asset('starbar'), alt: '' }),
           e('span', { className: 'lango-home__stars', 'aria-label': '30 stars' }, '30'),
           e(ImageButton, { className: 'lango-home__record', image: 'store', label: 'Record', onClick: startConversation }),
-          e(ImageButton, { className: 'lango-home__map', image: 'reward', label: 'Map', onClick: () => go('/newGame/') }),
+          e(ImageButton, { className: 'lango-home__map', image: 'reward', label: 'Map', onClick: () => go('/map') }),
           e(ImageButton, { className: 'lango-home__reward', image: 'box', label: 'Reward', onClick: openRewards }),
-          e(ImageButton, { className: 'lango-home__collections', image: 'map', label: 'Collections' }),
+          e(ImageButton, {
+            className: 'lango-home__collections',
+            image: 'map',
+            label: 'Collections',
+            onClick: () => window.dispatchEvent(new CustomEvent('lango:open-collection'))
+          }),
           e(ImageButton, { className: 'lango-home__store', image: 'chair', label: 'Store' }),
           e(ImageButton, { className: 'lango-home__box', image: 'home', label: 'Toy box', onClick: () => go('/newGame/') }),
-          e('nav', { className: 'lango-home__nav', 'aria-label': 'Room navigation' },
-            e(ImageButton, { image: 'back', label: 'Previous room' }),
-            e(ImageButton, { image: 'record', label: 'Start conversation', onClick: startConversation }),
-            e(ImageButton, { image: 'next', label: 'Next room' })
-          ),
           e('img', { className: 'lango-home__frame', src: asset('character'), alt: '', draggable: false })
         );
       }
 
       ReactDOM.createRoot(document.getElementById('lango-home-root')).render(e(LangoHome));
+      ReactDOM.createRoot(document.getElementById('daily-rewards-root')).render(e(DailyRewards));
+      ReactDOM.createRoot(document.getElementById('collection-root')).render(e(Collection));
+
+      /* Collection previews do not need to wait for the heavier avatar/video
+         module graph. This keeps both Figma states directly inspectable even
+         when those optional CDN modules are still loading. */
+      const showCollectionPreview = (screen) => {
+        if (screen !== 'collection-locked' && screen !== 'collection-unlocked') return;
+        document.getElementById('splash-screen').hidden = true;
+        document.body.classList.remove('preview-screen-collection-locked', 'preview-screen-collection-unlocked');
+        document.body.classList.add('preview-mode', `preview-screen-${screen}`);
+        window.dispatchEvent(new CustomEvent('lango:open-collection', {
+          detail: { unlocked: screen === 'collection-unlocked' }
+        }));
+      };
+      const collectionPreviewSelect = document.getElementById('preview-screen-select');
+      collectionPreviewSelect?.addEventListener('change', () => showCollectionPreview(collectionPreviewSelect.value));
+      const initialCollectionPreview = new URLSearchParams(location.search).get('screen');
+      setTimeout(() => showCollectionPreview(initialCollectionPreview), 0);
     })();
   </script>
 
@@ -1632,30 +2634,6 @@
     <span class="reward-streak-badge" id="daily-rewards-streak-badge" hidden>0</span>
   </button>
 
-  <div id="daily-rewards-overlay" role="dialog" aria-modal="true" aria-labelledby="daily-rewards-title" aria-hidden="true">
-    <div class="daily-rewards-panel">
-      <button type="button" class="daily-rewards-return" id="daily-rewards-close">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-          <path d="M15 18l-6-6 6-6"/>
-        </svg>
-        Return
-      </button>
-      <div class="daily-rewards-inner">
-        <div class="daily-rewards-celebrate" id="daily-rewards-celebrate" aria-hidden="true"></div>
-        <header class="daily-rewards-header">
-          <div class="daily-rewards-plaque" id="daily-rewards-title">REWARD</div>
-          <div class="daily-rewards-meta">
-            <span id="daily-rewards-streak-text">Streak: 0 days</span>
-            <span id="daily-rewards-stars-text">⭐ 0 stars</span>
-          </div>
-        </header>
-        <div class="daily-rewards-slots" id="daily-rewards-slots"></div>
-        <div class="daily-rewards-actions">
-          <button type="button" id="daily-rewards-claim-btn">Check in today!</button>
-        </div>
-      </div>
-    </div>
-  </div>
   </div>
 
   <script type="module">
@@ -1670,6 +2648,7 @@
     const DEFAULT_PROMPT = "You are Uncle Tommy, a friendly voice assistant. Keep responses brief.";
     const DEFAULT_VOICE = "default-zylgts2tamenvybeti3z0w__uncle_tommy";
     const DEFAULT_MODEL = "openai/gpt-4o-mini";
+    const PREVIEW_MODE = new URLSearchParams(location.search).get("preview") === "1";
 
     const btnStart = document.getElementById("btn-start");
     const btnStop = document.getElementById("btn-stop");
@@ -1715,18 +2694,69 @@
     const dailyRewardsStarsText = document.getElementById("daily-rewards-stars-text");
     const dailyRewardsStreakBadge = document.getElementById("daily-rewards-streak-badge");
     const dailyRewardsCelebrate = document.getElementById("daily-rewards-celebrate");
+    const dailyRewardCongrats = document.getElementById("daily-reward-congrats");
+    const dailyRewardCongratsTitle = document.getElementById("daily-reward-congrats-title");
+    const dailyRewardCongratsIcon = document.getElementById("daily-reward-congrats-icon");
+    const dailyRewardCongratsName = document.getElementById("daily-reward-congrats-name");
+    const dailyRewardModalCta = document.getElementById("daily-reward-modal-cta");
+    const dailyRewardModalCtaLabel = document.getElementById("daily-reward-modal-cta-label");
+    const previewScreenSelect = document.getElementById("preview-screen-select");
+    const previewExit = document.getElementById("preview-exit");
     let dailyRewardsStatus = null;
     let dailyRewardsStudent = false;
+    let previewClaimedMilestones = [];
 
-    const REWARD_ICONS = {
-      calendar: `<svg viewBox="0 0 24 24" fill="none" stroke="#5e3a18" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><text x="12" y="18" text-anchor="middle" fill="#5e3a18" stroke="none" font-size="8" font-weight="bold">1</text></svg>`,
-      game: `<svg viewBox="0 0 24 24" fill="#4a8fd4"><path d="M6 11h4v4H6v-4zm8-1h6v2h-2v2h-2v-2h-2V10zm-8 6a8 8 0 1 1 0-16 8 8 0 0 1 0 16z"/></svg>`,
-      spot: `<svg viewBox="0 0 24 24" fill="none"><path d="M4 6l8-3 8 3v12l-8 3-8-3V6z" fill="#e8a84a" stroke="#5e3a18" stroke-width="1.5"/><circle cx="12" cy="11" r="2.5" fill="#e85d4a"/></svg>`,
-      doll: `<svg viewBox="0 0 24 24"><ellipse cx="12" cy="14" rx="7" ry="8" fill="#f5f0d8" stroke="#5e3a18" stroke-width="1.5"/><ellipse cx="12" cy="14" rx="4" ry="5" fill="#8fd48a"/><circle cx="9" cy="11" r="1" fill="#5e3a18"/><circle cx="15" cy="11" r="1" fill="#5e3a18"/></svg>`,
+    const REWARD_SLOT_CARD_ASSETS = {
+      1: "1day.png",
+      3: "3days.png",
+      5: "5days.png",
+      7: "7days.png",
     };
+    function dailyRewardAsset(name) {
+      return `/assets/daily-rewards/${name}?v=20260713f`;
+    }
 
-    function rewardIconSvg(icon) {
-      return REWARD_ICONS[icon] || REWARD_ICONS.calendar;
+    function syncDailyRewardActionPosition() {
+      const rewardsActions = document.querySelector(".daily-rewards-actions");
+      const activeCard = dailyRewardsSlots.querySelector(".daily-reward-slot.active");
+      if (!rewardsActions || !activeCard || !dailyRewardsStatus?.canClaimMilestone) {
+        if (rewardsActions) rewardsActions.hidden = true;
+        return;
+      }
+      // The button lives inside the active card, so it scrolls with it and
+      // needs no coordinate math (CSS places it on the card's bottom strip).
+      if (rewardsActions.parentElement !== activeCard) activeCard.appendChild(rewardsActions);
+      rewardsActions.hidden = false;
+    }
+
+    function syncDailyRewardScrollbar() {
+      const thumb = document.getElementById("daily-rewards-scrollbar-thumb");
+      if (!thumb) return;
+      const { scrollWidth, clientWidth, scrollLeft } = dailyRewardsSlots;
+      if (!scrollWidth) return;
+      const widthPct = Math.min(100, (clientWidth / scrollWidth) * 100);
+      thumb.style.width = `${widthPct}%`;
+      thumb.style.left = `${Math.min(100 - widthPct, (scrollLeft / scrollWidth) * 100)}%`;
+    }
+
+    function previewRewardStatus() {
+      const milestones = [
+        { day: 1, id: "word-whack", label: "New Game", title: "New Game In Garden", name: "Word-Whack Blitz", icon: "mole", cta: "Get", destination: "modal", stars: 5 },
+        { day: 3, id: "langomon-doll", label: "Langomon Doll", title: "New Langomon Doll", name: "Penguin Doll", icon: "penguin", cta: "Add to collection", destination: "modal", stars: 10 },
+        { day: 5, id: "new-spot", label: "New Spot", title: "New Spot", name: "Park", icon: "spot", cta: "Explore map", destination: "map", stars: 15 },
+      ];
+      const next = milestones.find((item) => !previewClaimedMilestones.includes(item.id));
+      return {
+        currentStreak: previewClaimedMilestones.length ? 1 : 0,
+        totalStars: previewClaimedMilestones.reduce((sum, id) => sum + (milestones.find((item) => item.id === id)?.stars || 0), 0),
+        canClaimMilestone: Boolean(next),
+        nextMilestone: next || null,
+        milestones: milestones.map((item) => ({
+          ...item,
+          status: previewClaimedMilestones.includes(item.id) ? "claimed" : item.id === next?.id ? "active" : "locked",
+        })),
+        unlockedLocations: previewClaimedMilestones.includes("new-spot") ? ["park"] : [],
+      };
     }
 
     function renderDailyRewards(status) {
@@ -1743,23 +2773,59 @@
         dailyRewardsStreakBadge.hidden = true;
       }
 
-      dailyRewardsBtn.classList.toggle("has-claim", status.canCheckIn);
+      dailyRewardsBtn.classList.toggle("has-claim", status.canClaimMilestone);
 
-      dailyRewardsSlots.innerHTML = (status.slots || []).map((slot) => `
-        <div class="daily-reward-slot ${slot.status}" data-status="${slot.status}">
-          <div class="daily-reward-slot-day">Day ${slot.displayDay}</div>
-          <div class="daily-reward-slot-icon">${rewardIconSvg(slot.icon)}</div>
-          <div class="daily-reward-slot-label">${slot.label}</div>
-          <div class="daily-reward-slot-stars">+${slot.stars}⭐</div>
-        </div>
-      `).join("");
+      const milestones = [...(status.milestones || [])];
+      if (!milestones.some((slot) => slot.day === 7)) {
+        milestones.push({
+          day: 7,
+          id: "seven-day-doll",
+          label: "Langomon Doll",
+          icon: "penguin",
+          stars: 0,
+          status: "locked",
+        });
+      }
+      // Park the claim button outside the slots before wiping them, since it
+      // normally lives inside the active card.
+      const rewardsActions = document.querySelector(".daily-rewards-actions");
+      const rewardsBoard = document.querySelector(".daily-rewards-board");
+      if (rewardsActions && rewardsBoard && rewardsActions.parentElement !== rewardsBoard) {
+        rewardsBoard.appendChild(rewardsActions);
+      }
+      dailyRewardsSlots.scrollLeft = 0;
+      dailyRewardsSlots.innerHTML = milestones.map((slot) => {
+        const asset = REWARD_SLOT_CARD_ASSETS[slot.day];
+        if (!asset) return "";
+        return `
+          <article class="daily-reward-slot ${slot.status}" data-status="${slot.status}" data-day="${slot.day}" aria-label="${slot.day} day reward: ${slot.label}">
+            <img class="daily-reward-slot-art" src="${dailyRewardAsset(asset)}" alt="">
+            ${slot.status === "claimed" ? '<div class="daily-reward-check" aria-label="Claimed">✓</div>' : ''}
+            <div class="daily-reward-slot-stars">+${slot.stars}⭐</div>
+          </article>
+        `;
+      }).join("");
 
-      if (status.canCheckIn) {
+      const trackFill = document.getElementById("daily-rewards-track-fill");
+      if (trackFill) {
+        const claimedCount = milestones.filter((slot) => slot.status === "claimed").length;
+        const activeIndex = milestones.findIndex((slot) => slot.status === "active");
+        // Fill to the active card center, or through claimed cards when idle.
+        const progressIndex = activeIndex >= 0 ? activeIndex : Math.max(claimedCount - 1, 0);
+        const fillPct = milestones.length <= 1
+          ? 8
+          : ((progressIndex + 0.5) / milestones.length) * 100;
+        trackFill.style.width = `${Math.max(8, Math.min(100, fillPct))}%`;
+      }
+
+      syncDailyRewardActionPosition();
+      requestAnimationFrame(syncDailyRewardScrollbar);
+      if (status.canClaimMilestone) {
         dailyRewardsClaimBtn.disabled = false;
-        dailyRewardsClaimBtn.textContent = "Check in today!";
+        dailyRewardsClaimBtn.textContent = "Get";
       } else {
         dailyRewardsClaimBtn.disabled = true;
-        dailyRewardsClaimBtn.textContent = "Come back tomorrow!";
+        dailyRewardsClaimBtn.textContent = "Got it!";
       }
     }
 
@@ -1775,15 +2841,40 @@
 
     function celebrateDailyReward() {
       dailyRewardsCelebrate.innerHTML = "";
-      for (let i = 0; i < 18; i++) {
+      const particleColors = ["#ffe66d", "#ff7a45", "#7ee74b", "#63d9ff", "#ff73bd", "#ffffff"];
+      for (let i = 0; i < 30; i++) {
         const spark = document.createElement("span");
-        spark.className = "daily-rewards-sparkle";
-        spark.style.left = `${10 + Math.random() * 80}%`;
-        spark.style.top = `${20 + Math.random() * 50}%`;
-        spark.style.animationDelay = `${Math.random() * 0.35}s`;
+        spark.className = `daily-rewards-sparkle${i % 4 === 0 ? " star" : ""}`;
+        spark.style.left = `${12 + Math.random() * 76}%`;
+        spark.style.top = `${12 + Math.random() * 52}%`;
+        spark.style.setProperty("--reward-particle", particleColors[i % particleColors.length]);
+        spark.style.setProperty("--reward-drift", `${-55 + Math.random() * 110}px`);
+        spark.style.setProperty("--reward-spin", `${260 + Math.random() * 520}deg`);
+        spark.style.animationDelay = `${Math.random() * 0.42}s`;
         dailyRewardsCelebrate.appendChild(spark);
       }
-      setTimeout(() => { dailyRewardsCelebrate.innerHTML = ""; }, 1000);
+      setTimeout(() => { dailyRewardsCelebrate.innerHTML = ""; }, 2400);
+    }
+
+    function showRewardCongratulations(reward) {
+      const isWordWhack = reward.id === "word-whack";
+      dailyRewardCongrats.classList.toggle("word-whack-layout", isWordWhack);
+      dailyRewardCongratsTitle.textContent = reward.title;
+      dailyRewardCongratsName.textContent = reward.name;
+      dailyRewardModalCtaLabel.textContent = reward.cta;
+      dailyRewardModalCta.setAttribute("aria-label", reward.cta);
+      dailyRewardCongratsIcon.innerHTML = isWordWhack
+        ? '<img src="/assets/daily-rewards/word-whack-modal-icon.png" alt="Word-Whack Blitz">'
+        : '<span class="penguin" role="img" aria-label="Penguin doll">🐧</span>';
+      dailyRewardCongrats.hidden = false;
+      dailyRewardModalCta.focus({ preventScroll: true });
+      dailyRewardCongrats.closest(".daily-rewards-scene").scrollTop = 0;
+    }
+
+    function closeRewardCongratulations() {
+      dailyRewardCongrats.hidden = true;
+      dailyRewardsClaimBtn.focus({ preventScroll: true });
+      dailyRewardCongrats.closest(".daily-rewards-scene").scrollTop = 0;
     }
 
     async function fetchDailyRewardsStatus() {
@@ -1800,21 +2891,43 @@
     }
 
     async function claimDailyReward() {
-      if (!dailyRewardsStatus?.canCheckIn) return;
+      if (!dailyRewardsStatus?.canClaimMilestone) return;
+      if (PREVIEW_MODE) {
+        const reward = dailyRewardsStatus.nextMilestone;
+        previewClaimedMilestones = [...previewClaimedMilestones, reward.id];
+        renderDailyRewards(previewRewardStatus());
+        celebrateDailyReward();
+        if (reward.destination === "map") {
+          localStorage.setItem("lango.systemUnlockedLocations", JSON.stringify(["park"]));
+          window.location.href = "/map/?return=rewards";
+        } else {
+          showRewardCongratulations(reward);
+        }
+        return;
+      }
       dailyRewardsClaimBtn.disabled = true;
-      dailyRewardsClaimBtn.textContent = "Claiming…";
+      dailyRewardsClaimBtn.textContent = "…";
       try {
-        const res = await fetch("/api/check-in", { method: "POST" });
+        const res = await fetch("/api/check-in", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "claim-milestone" }),
+        });
         if (!res.ok) throw new Error("Could not claim reward");
         const data = await res.json();
         renderDailyRewards(data.status);
         celebrateDailyReward();
+        if (data.reward?.destination === "map") {
+          localStorage.setItem("lango.systemUnlockedLocations", JSON.stringify(data.status.unlockedLocations || []));
+          window.location.href = "/map/?return=rewards";
+          return;
+        }
         if (data.reward) {
-          dailyRewardsClaimBtn.textContent = `+${data.reward.stars} stars! See you tomorrow!`;
+          showRewardCongratulations(data.reward);
         }
       } catch {
         dailyRewardsClaimBtn.disabled = false;
-        dailyRewardsClaimBtn.textContent = "Check in today!";
+        dailyRewardsClaimBtn.textContent = "Get";
       }
     }
 
@@ -1827,7 +2940,8 @@
         dailyRewardsStudent = true;
         document.body.classList.add("rewards-enabled");
         const status = await fetchDailyRewardsStatus();
-        if (autoShow && status?.canCheckIn) {
+        const returningFromMap = new URLSearchParams(location.search).get("openRewards") === "1";
+        if (returningFromMap || (autoShow && status?.canClaimMilestone)) {
           showDailyRewardsOverlay();
         }
       } catch { /* ignore */ }
@@ -1841,6 +2955,8 @@
       if (e.target === dailyRewardsOverlay) hideDailyRewardsOverlay();
     });
     dailyRewardsClaimBtn.addEventListener("click", claimDailyReward);
+    dailyRewardModalCta.addEventListener("click", closeRewardCongratulations);
+    dailyRewardsSlots.addEventListener("scroll", () => requestAnimationFrame(syncDailyRewardScrollbar), { passive: true });
 
     const captionUserEl = document.getElementById("caption-user");
     const captionUserTextEl = document.getElementById("caption-user-text");
@@ -3471,7 +4587,8 @@
     async function getConfig(forceRefresh = false) {
       if (cachedConfig && !forceRefresh) return cachedConfig;
       try {
-        const res = await fetch("/api/config");
+        const configUrl = PREVIEW_MODE ? "/api/preview-config?preview=1" : "/api/config";
+        const res = await fetch(configUrl);
         if (res.ok) {
           const cfg = await res.json();
           if (cfg.avatar) {
@@ -4083,7 +5200,7 @@
     // resume() from a user gesture. Warm one up on the first touch so that
     // later wake-word-triggered sessions (which have no fresh gesture) can
     // resume their own context.
-    if (IS_IOS) {
+    if (IS_IOS && !PREVIEW_MODE) {
       const unlock = () => {
         try {
           const ac = new (window.AudioContext || window.webkitAudioContext)();
@@ -4147,11 +5264,174 @@
       }
     }
 
+    const PREVIEW_SCREENS = new Set([
+      "home",
+      "start",
+      "loop",
+      "transition",
+      "conversation",
+      "rewards",
+      "collection-locked",
+      "collection-unlocked",
+      "map",
+      "game",
+    ]);
+
+    function setPreviewVideo(videoEl, shouldPlay) {
+      videoEl.pause();
+      videoEl.muted = true;
+      videoEl.volume = 0;
+      videoEl.loop = shouldPlay;
+      if (!shouldPlay || !videoEl.currentSrc) return;
+      videoEl.currentTime = 0;
+      videoEl.play().catch(() => {});
+    }
+
+    function resetPreviewSurface() {
+      document.body.classList.remove(
+        "in-session",
+        "has-idle-video",
+        "idle-video-dismissed",
+        "playing-transition-video",
+        "videos-loading",
+        "rewards-enabled",
+        ...Array.from(PREVIEW_SCREENS, (screen) => `preview-screen-${screen}`),
+      );
+      inSession = false;
+      playingTransitionVideo = false;
+      setPreviewVideo(idleVideoEl, false);
+      setPreviewVideo(transitionVideoEl, false);
+      hideDailyRewardsOverlay();
+      window.LangoCollection?.close?.();
+      gameLaunchOverlay.classList.remove("visible");
+      gameLaunchOverlay.setAttribute("aria-hidden", "true");
+      captionUserEl.hidden = true;
+      captionAgentEl.hidden = true;
+    }
+
+    async function showPreviewScreen(requestedScreen) {
+      const screen = PREVIEW_SCREENS.has(requestedScreen) ? requestedScreen : "home";
+      resetPreviewSurface();
+      document.body.classList.add(`preview-screen-${screen}`);
+      previewScreenSelect.value = screen;
+
+      const url = new URL(location.href);
+      url.searchParams.set("preview", "1");
+      if (screen === "home") url.searchParams.delete("screen");
+      else url.searchParams.set("screen", screen);
+      history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+
+      if (screen === "start") {
+        setStatus('Tap "Start" to begin a conversation');
+        return;
+      }
+
+      if (screen === "loop" || screen === "home" || screen === "rewards") {
+        if (idleVideoUrl) {
+          setIdleVideoMode(true);
+          restoreIdleVideoScreen();
+          setPreviewVideo(idleVideoEl, true);
+        }
+      }
+
+      if (screen === "transition") {
+        if (transitionVideoUrl) {
+          setIdleVideoMode(true);
+          restoreIdleVideoScreen();
+          setTransitionVideoMode(true);
+          setPreviewVideo(transitionVideoEl, true);
+        } else {
+          setStatus("No transition video configured");
+        }
+        return;
+      }
+
+      if (screen === "conversation") {
+        document.body.classList.add("in-session");
+        inSession = true;
+        setStatus("Conversation preview — microphone and socket disabled", true);
+        captionUserTextEl.textContent = "Hello, Uncle Tommy!";
+        captionAgentTextEl.textContent = "Hello! What would you like to learn today?";
+        captionUserEl.hidden = false;
+        captionAgentEl.hidden = false;
+        try {
+          await ensureAvatar();
+          avatar?.refreshAfterVisible();
+        } catch (e) {
+          showErr(`Avatar preview unavailable: ${e.message}`);
+        }
+        return;
+      }
+
+      if (screen === "rewards") {
+        previewClaimedMilestones = [];
+        renderDailyRewards(previewRewardStatus());
+        showDailyRewardsOverlay();
+        return;
+      }
+
+      if (screen === "collection-locked" || screen === "collection-unlocked") {
+        await window.LangoCollection?.open?.({ unlocked: screen === "collection-unlocked" });
+        return;
+      }
+
+      if (screen === "map") {
+        return;
+      }
+
+      if (screen === "game") {
+        const game = GAME_CATALOG[0];
+        gameLaunchCard.className = `game-launch-card theme-${game.theme}`;
+        gameLaunchHeading.textContent = "Great choice!";
+        gameLaunchName.textContent = game.name;
+        gameLaunchSub.textContent = game.sub;
+        gameLaunchIcon.src = game.icon;
+        gameLaunchIcon.alt = game.name;
+        gameLaunchReel.className = "game-launch-reel landed";
+        setGameLaunchProgress(72);
+        gameLaunchOverlay.classList.add("visible");
+        gameLaunchOverlay.setAttribute("aria-hidden", "false");
+      }
+    }
+
+    async function initPreviewMode() {
+      document.body.classList.add("preview-mode");
+      wakeWordEnabled = false;
+      dismissSplash();
+      setVideosLoading(false);
+      const cfg = await getConfig();
+      applyGameIconsFromConfig(cfg.gameIcons);
+      applyActivePairBackground(cfg);
+      try {
+        await Promise.race([
+          setupIdleVideosFromConfig(cfg, { autoplay: false }),
+          new Promise((resolve) => setTimeout(resolve, 2500)),
+        ]);
+      } catch (e) {
+        console.warn("Preview video setup:", e);
+      }
+      const initialScreen = new URLSearchParams(location.search).get("screen") || "home";
+      await showPreviewScreen(initialScreen);
+    }
+
+    previewScreenSelect.addEventListener("change", () => {
+      showPreviewScreen(previewScreenSelect.value).catch((e) => {
+        console.error("Preview screen:", e);
+      });
+    });
+
+    previewExit.addEventListener("click", () => {
+      const url = new URL(location.href);
+      url.searchParams.delete("preview");
+      url.searchParams.delete("screen");
+      location.assign(`${url.pathname}${url.search}${url.hash}` || "/");
+    });
+
     // Safety net: if wake-word listening dies silently (Chrome's
     // SpeechRecognition can stop without firing onend, and iOS Safari
     // can fail to restart after getUserMedia released the mic), make
     // sure it gets restarted.
-    if (ENABLE_WAKE_WORD) {
+    if (!PREVIEW_MODE && ENABLE_WAKE_WORD) {
       setInterval(() => {
         if (wakeWordEnabled && !active && !listeningForWakeWord && !wakeWordRestartTimer) {
           uiLog("hello", "safety net restart (idle but not listening)", "warn", snapshotHelloCycleState());
@@ -4161,17 +5441,26 @@
       }, 4000);
     }
 
-    setInterval(() => {
-      refreshIdleVideosForCurrentPeriod().catch(() => {});
-    }, 60_000);
+    if (PREVIEW_MODE) {
+      uiLog("preview", "host layout preview init", "hello");
+      initPreviewMode().catch((e) => {
+        console.error(e);
+        dismissSplash();
+        showErr(`Preview failed: ${e.message}`);
+      });
+    } else {
+      setInterval(() => {
+        refreshIdleVideosForCurrentPeriod().catch(() => {});
+      }, 60_000);
 
-    uiLog("hello", "app init", "hello", { IS_IOS, WAKE_WORD_RESTART_DELAY, POST_SESSION_WAKE_DELAY });
-    initVideoSoundUnlock();
-    updateHkoDateTime();
-    setInterval(updateHkoDateTime, 1000);
-    loadHkoWeather();
-    setInterval(() => { loadHkoWeather().catch(() => {}); }, 10 * 60 * 1000);
-    init();
+      uiLog("hello", "app init", "hello", { IS_IOS, WAKE_WORD_RESTART_DELAY, POST_SESSION_WAKE_DELAY });
+      initVideoSoundUnlock();
+      updateHkoDateTime();
+      setInterval(updateHkoDateTime, 1000);
+      loadHkoWeather();
+      setInterval(() => { loadHkoWeather().catch(() => {}); }, 10 * 60 * 1000);
+      init();
+    }
   </script>
 </body>
 </html>

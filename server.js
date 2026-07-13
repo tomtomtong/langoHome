@@ -664,6 +664,46 @@ const REWARD_CYCLE = [
   { day: 7, type: 'doll', label: 'Doll', icon: 'doll', stars: 25 },
 ];
 
+const DAILY_REWARD_MILESTONES = [
+  {
+    day: 1,
+    id: 'word-whack',
+    type: 'game',
+    label: 'New Game',
+    title: 'New Game In Garden',
+    name: 'Word-Whack Blitz',
+    icon: 'mole',
+    cta: 'Get',
+    destination: 'modal',
+    stars: 5,
+  },
+  {
+    day: 3,
+    id: 'langomon-doll',
+    type: 'doll',
+    label: 'Langomon Doll',
+    title: 'New Langomon Doll',
+    name: 'Penguin Doll',
+    icon: 'penguin',
+    cta: 'Add to collection',
+    destination: 'modal',
+    stars: 10,
+  },
+  {
+    day: 5,
+    id: 'new-spot',
+    type: 'spot',
+    label: 'New Spot',
+    title: 'New Spot',
+    name: 'Park',
+    icon: 'spot',
+    cta: 'Explore map',
+    destination: 'map',
+    unlockLocation: 'park',
+    stars: 15,
+  },
+];
+
 function getTodayDateString(timezone = DEFAULT_VIDEO_PAIRS_TIMEZONE) {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: timezone,
@@ -691,6 +731,10 @@ function defaultCheckInRecord() {
     totalStars: 0,
     lastCheckInDate: '',
     cyclePosition: 0,
+    rewardFlowDate: '',
+    claimedMilestones: [],
+    collection: [],
+    unlockedLocations: [],
   };
 }
 
@@ -702,6 +746,16 @@ function normalizeCheckInRecord(raw) {
     totalStars: Math.max(0, Number(src.totalStars) || 0),
     lastCheckInDate: String(src.lastCheckInDate || '').trim(),
     cyclePosition: Math.max(0, Number(src.cyclePosition) || 0),
+    rewardFlowDate: String(src.rewardFlowDate || '').trim(),
+    claimedMilestones: Array.isArray(src.claimedMilestones)
+      ? [...new Set(src.claimedMilestones.map(String))]
+      : [],
+    collection: Array.isArray(src.collection)
+      ? [...new Set(src.collection.map(String))]
+      : [],
+    unlockedLocations: Array.isArray(src.unlockedLocations)
+      ? [...new Set(src.unlockedLocations.map(String))]
+      : [],
   };
 }
 
@@ -774,6 +828,14 @@ function getCheckInStatus(username) {
   const todayReward = getRewardForCycleDay(
     checkedInToday ? record.cyclePosition : nextRewardDay,
   );
+  const claimedMilestones = record.rewardFlowDate === today ? record.claimedMilestones : [];
+  const nextMilestone = DAILY_REWARD_MILESTONES.find((reward) => !claimedMilestones.includes(reward.id));
+  const milestones = DAILY_REWARD_MILESTONES.map((reward) => ({
+    ...reward,
+    status: claimedMilestones.includes(reward.id)
+      ? 'claimed'
+      : reward.id === nextMilestone?.id ? 'active' : 'locked',
+  }));
   return {
     timezone,
     today,
@@ -786,7 +848,52 @@ function getCheckInStatus(username) {
     cyclePosition: record.cyclePosition || nextRewardDay,
     slots: buildCheckInSlots(record, checkedInToday),
     rewards: REWARD_CYCLE,
+    taskProgress: { current: 1, target: 1, complete: true },
+    taskText: 'Finish a game or daily exercise to check-in now!',
+    milestones,
+    claimedMilestones,
+    nextMilestone: nextMilestone || null,
+    canClaimMilestone: Boolean(nextMilestone),
+    collection: record.collection,
+    unlockedLocations: record.unlockedLocations,
   };
+}
+
+function claimDailyMilestone(username) {
+  const timezone = getVideoPairsTimezone();
+  const today = getTodayDateString(timezone);
+  const yesterday = offsetDateString(today, -1, timezone);
+  const record = getCheckInRecord(username);
+  const claimedMilestones = record.rewardFlowDate === today ? [...record.claimedMilestones] : [];
+  const reward = DAILY_REWARD_MILESTONES.find((item) => !claimedMilestones.includes(item.id));
+
+  if (!reward) {
+    return { ok: true, alreadyClaimed: true, reward: null, status: getCheckInStatus(username) };
+  }
+
+  const updated = {
+    ...record,
+    rewardFlowDate: today,
+    claimedMilestones: [...claimedMilestones, reward.id],
+    totalStars: record.totalStars + reward.stars,
+  };
+
+  if (record.lastCheckInDate !== today) {
+    updated.currentStreak = record.lastCheckInDate === yesterday ? record.currentStreak + 1 : 1;
+    updated.totalCheckIns = record.totalCheckIns + 1;
+    updated.lastCheckInDate = today;
+    updated.cyclePosition = 1;
+  }
+
+  if (reward.type === 'doll' && !updated.collection.includes(reward.id)) {
+    updated.collection = [...updated.collection, reward.id];
+  }
+  if (reward.unlockLocation && !updated.unlockedLocations.includes(reward.unlockLocation)) {
+    updated.unlockedLocations = [...updated.unlockedLocations, reward.unlockLocation];
+  }
+
+  saveCheckInRecord(username, updated);
+  return { ok: true, alreadyClaimed: false, reward, status: getCheckInStatus(username) };
 }
 
 function recordCheckIn(username) {
@@ -1100,6 +1207,43 @@ function isPublicPath(url) {
     || url === '/api/login'
     || url === '/api/admin/login'
     || url === '/langoLogo.jpeg';
+}
+
+function isPreviewSafeRequest(req, url, rawUrl) {
+  const method = (req.method || 'GET').toUpperCase();
+  if (method !== 'GET' && method !== 'HEAD') return false;
+
+  const requestUrl = new URL(rawUrl, 'http://local');
+  if (url === '/' && requestUrl.searchParams.get('preview') === '1') return true;
+  if (
+    (url === '/map' || url === '/map/' || url === '/map/index.html')
+    && requestUrl.searchParams.get('preview') === '1'
+  ) return true;
+  if (url === '/api/preview-config' && requestUrl.searchParams.get('preview') === '1') return true;
+
+  let previewReferrer = false;
+  try {
+    const referrer = new URL(req.headers.referer || '', 'http://local');
+    previewReferrer = (
+      referrer.pathname === '/'
+      || referrer.pathname === '/map'
+      || referrer.pathname === '/map/'
+      || referrer.pathname === '/map/index.html'
+    ) && referrer.searchParams.get('preview') === '1';
+  } catch {}
+  if (!previewReferrer) return false;
+
+  return url.startsWith('/visme/')
+    || url.startsWith('/Animation/')
+    || url.startsWith('/assets/lango-home/')
+    || url.startsWith('/assets/daily-rewards/')
+    || url.startsWith('/assets/collections/')
+    || url.startsWith('/assets/map/')
+    || url.startsWith('/games/assets/')
+    || /^\/api\/(idle-video|transition-video|avatar-background)$/.test(url)
+    || /^\/api\/game-icons\/(wordwhack|cardgame|findgame)$/.test(url)
+    || /^\/api\/video-pairs\/[^/]+\/(loop|transition|background)$/.test(url)
+    || /^\/[^/]+\.(png|jpe?g|webp|fbx|vrm|mp4|webm|mov|css|js)$/i.test(url);
 }
 
 const ADMIN_PAGE_PATHS = new Set([
@@ -2240,6 +2384,8 @@ const pages = {
   '/video-pairs': 'video-pairs.html',
   '/conversations': 'conversations.html',
   '/visme': 'visme/index.html',
+  '/map': 'map/index.html',
+  '/map/': 'map/index.html',
 };
 
 function resolvePage(url) {
@@ -2454,7 +2600,7 @@ const server = createServer((req, res) => {
     return;
   }
 
-  if (!isPublicPath(url) && !isAuthenticated(req)) {
+  if (!isPublicPath(url) && !isPreviewSafeRequest(req, url, rawUrl) && !isAuthenticated(req)) {
     if (wantsHtml(req)) {
       redirectToLogin(res, url);
       return;
@@ -2493,7 +2639,13 @@ const server = createServer((req, res) => {
       sendJson(res, 403, { error: 'Student login required.' });
       return;
     }
-    sendJson(res, 200, recordCheckIn(session.username));
+    readJsonBody(req, res, (body) => {
+      if (body.action && body.action !== 'claim-milestone') {
+        sendJson(res, 400, { error: 'Unsupported check-in action.' });
+        return;
+      }
+      sendJson(res, 200, claimDailyMilestone(session.username));
+    });
     return;
   }
 
@@ -2643,6 +2795,24 @@ const server = createServer((req, res) => {
     return;
   }
 
+  if (url === '/api/preview-config' && req.method === 'GET') {
+    const cfg = loadConfig();
+    const videoPairs = listVideoPairs().map(({ text: _sessionPrompt, ...pair }) => pair);
+    const firstPair = videoPairs.find((p) => p.loopVideo) || null;
+    sendJson(res, 200, {
+      avatar: normalizeAvatar(cfg.avatar),
+      lipsync: normalizeLipsync(cfg.lipsync),
+      lighting: normalizeLighting(cfg.lighting),
+      videoPairs,
+      videoPairsTimezone: getVideoPairsTimezone(),
+      idleVideo: firstPair?.loopVideo ?? idleVideos.getInfo(),
+      transitionVideo: firstPair?.transitionVideo ?? transitionVideos.getInfo(),
+      avatarBackground: avatarBackgrounds.getInfo(),
+      gameIcons: getGameIconsInfo(),
+    });
+    return;
+  }
+
   if (url === '/api/config') {
     if (req.method === 'GET') {
       const cfg = loadConfig();
@@ -2768,6 +2938,24 @@ const server = createServer((req, res) => {
   const langoHomeAsset = url.match(/^\/assets\/lango-home\/([a-z0-9-]+\.png)$/i);
   if (langoHomeAsset) {
     serveFile(res, join(ROOT, 'assets', 'lango-home', langoHomeAsset[1]));
+    return;
+  }
+
+  const dailyRewardAsset = url.match(/^\/assets\/daily-rewards\/([a-z0-9-]+\.png)$/i);
+  if (dailyRewardAsset) {
+    serveFile(res, join(ROOT, 'assets', 'daily-rewards', dailyRewardAsset[1]));
+    return;
+  }
+
+  const collectionAsset = url.match(/^\/assets\/collections\/([a-z0-9-]+\.png)$/i);
+  if (collectionAsset) {
+    serveFile(res, join(ROOT, 'assets', 'collections', collectionAsset[1]));
+    return;
+  }
+
+  const mapAsset = url.match(/^\/assets\/map\/([a-z0-9-]+\.png)$/i);
+  if (mapAsset) {
+    serveFile(res, join(ROOT, 'assets', 'map', mapAsset[1]));
     return;
   }
 
