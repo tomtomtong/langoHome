@@ -1038,6 +1038,10 @@
     }
 
     #daily-rewards-btn.visible { display: flex; }
+
+    body.rewards-enabled.has-idle-video:not(.in-session):not(.idle-video-dismissed) #daily-rewards-btn {
+      display: flex !important;
+    }
     #daily-rewards-btn.has-claim {
       animation: reward-btn-glow 2s ease-in-out infinite;
     }
@@ -1381,7 +1385,6 @@
           <span id="camera-save-status" aria-live="polite"></span>
           <button id="btn-cancel-camera" type="button">Cancel</button>
           <button id="btn-save-camera" type="button">Save camera</button>
-          <a href="/admin" id="admin-link" hidden>Admin</a>
         </div>
       </div>
       <nav class="overlay-games" aria-label="Games">
@@ -1430,7 +1433,7 @@
     </div>
   </div>
 
-  <button type="button" id="daily-rewards-btn" aria-label="Daily rewards" hidden>
+  <button type="button" id="daily-rewards-btn" aria-label="Daily rewards">
     <span class="reward-btn-icon" aria-hidden="true">🎁</span>
     <span>Rewards</span>
     <span class="reward-streak-badge" id="daily-rewards-streak-badge" hidden>0</span>
@@ -1628,8 +1631,7 @@
         const me = await meRes.json();
         if (me.role !== "student") return;
         dailyRewardsStudent = true;
-        dailyRewardsBtn.hidden = false;
-        dailyRewardsBtn.classList.add("visible");
+        document.body.classList.add("rewards-enabled");
         const status = await fetchDailyRewardsStatus();
         if (autoShow && status?.canCheckIn) {
           showDailyRewardsOverlay();
@@ -2927,6 +2929,7 @@
       uiLog("hello", "returnToHelloCycle", "hello");
       showErr("");
       resumeIdleVideo();
+      if (dailyRewardsStudent) fetchDailyRewardsStatus();
       wakeWordEnabled = ENABLE_WAKE_WORD;
       wakeWordRestartAttempts = 0;
       stopWakeWordListening();
@@ -3857,16 +3860,6 @@
     }
 
     async function init() {
-      try {
-        const meRes = await fetch('/api/me');
-        if (meRes.ok) {
-          const me = await meRes.json();
-          if (me.role === 'admin') {
-            document.getElementById('admin-link').hidden = false;
-          }
-        }
-      } catch (_) { /* ignore */ }
-
       const fromGame = shouldAutoConnectFromGame();
       setSplashProgress(5);
       const cfg = await getConfig();
