@@ -1783,6 +1783,96 @@ function delegateToGameApp(req, res, pathname, query) {
   });
 }
 
+const HKO_WEATHER_API = 'https://data.weather.gov.hk/weatherAPI/opendata/weather.php';
+const HKO_ICON_BASE = 'https://www.hko.gov.hk/images/HKOWxIconOutline';
+const HKO_WEATHER_CACHE_MS = 5 * 60 * 1000;
+
+const HKO_ICON_LABELS = {
+  50: 'Sunny',
+  51: 'Sunny Periods',
+  52: 'Sunny Intervals',
+  53: 'Sunny Periods with A Few Showers',
+  54: 'Sunny Intervals with Showers',
+  60: 'Cloudy',
+  61: 'Overcast',
+  62: 'Light Rain',
+  63: 'Rain',
+  64: 'Heavy Rain',
+  65: 'Thunderstorms',
+  70: 'Fine',
+  71: 'Fine',
+  72: 'Fine',
+  73: 'Fine',
+  74: 'Fine',
+  75: 'Fine',
+  76: 'Mainly Cloudy',
+  77: 'Mainly Fine',
+  80: 'Windy',
+  81: 'Dry',
+  82: 'Humid',
+  83: 'Fog',
+  84: 'Haze',
+  85: 'Hot',
+  90: 'Warm',
+  91: 'Cool',
+  92: 'Cold',
+};
+
+const hkoWeatherCache = new Map();
+
+function getHkoIconLabel(code) {
+  const n = Number(code);
+  if (!Number.isFinite(n)) return 'Current weather';
+  return HKO_ICON_LABELS[n] || 'Current weather';
+}
+
+function parseHkoWeatherReport(data) {
+  const hkoTemp = data.temperature?.data?.find((d) => d.place === 'Hong Kong Observatory')
+    || data.temperature?.data?.[0];
+  const hkoHumidity = data.humidity?.data?.find((d) => d.place === 'Hong Kong Observatory')
+    || data.humidity?.data?.[0];
+  const iconCode = Array.isArray(data.icon) ? Number(data.icon[0]) : null;
+  const warningMessage = Array.isArray(data.warningMessage)
+    ? data.warningMessage.find((msg) => String(msg || '').trim())
+    : null;
+
+  return {
+    temperature: hkoTemp?.value ?? null,
+    temperatureUnit: hkoTemp?.unit ?? 'C',
+    humidity: hkoHumidity?.value ?? null,
+    humidityUnit: hkoHumidity?.unit === 'percent' ? '%' : (hkoHumidity?.unit ?? '%'),
+    condition: getHkoIconLabel(iconCode),
+    iconCode: Number.isFinite(iconCode) ? iconCode : null,
+    updateTime: data.updateTime || data.temperature?.recordTime || data.humidity?.recordTime || null,
+    warning: warningMessage ? String(warningMessage) : null,
+  };
+}
+
+async function fetchHkoWeather(lang = 'en') {
+  const cacheKey = lang === 'tc' || lang === 'sc' ? lang : 'en';
+  const cached = hkoWeatherCache.get(cacheKey);
+  if (cached && Date.now() - cached.fetchedAt < HKO_WEATHER_CACHE_MS) {
+    return cached.data;
+  }
+
+  const res = await fetch(`${HKO_WEATHER_API}?dataType=rhrread&lang=${cacheKey}`);
+  if (!res.ok) throw new Error(`HKO weather API returned HTTP ${res.status}`);
+  const raw = await res.json();
+  const data = parseHkoWeatherReport(raw);
+  hkoWeatherCache.set(cacheKey, { data, fetchedAt: Date.now() });
+  return data;
+}
+
+async function fetchHkoWeatherIcon(code) {
+  const iconCode = Number(code);
+  if (!Number.isFinite(iconCode) || iconCode < 0 || iconCode > 999) {
+    throw new Error('Invalid weather icon code.');
+  }
+  const res = await fetch(`${HKO_ICON_BASE}/pic${iconCode}.png`);
+  if (!res.ok) throw new Error(`HKO icon returned HTTP ${res.status}`);
+  return Buffer.from(await res.arrayBuffer());
+}
+
 const server = createServer((req, res) => {
   const rawUrl = req.url ?? '/';
   const qIndex = rawUrl.indexOf('?');
@@ -1906,6 +1996,33 @@ const server = createServer((req, res) => {
       return;
     }
     sendJson(res, 200, recordCheckIn(session.username));
+    return;
+  }
+
+  const weatherIconMatch = url.match(/^\/api\/weather\/icon\/(\d+)$/);
+  if (weatherIconMatch && req.method === 'GET') {
+    fetchHkoWeatherIcon(weatherIconMatch[1])
+      .then((buffer) => {
+        res.writeHead(200, {
+          'Content-Type': 'image/png',
+          'Cache-Control': 'public, max-age=3600',
+          ...SECURITY_HEADERS,
+        });
+        res.end(buffer);
+      })
+      .catch((e) => {
+        sendJson(res, 502, { error: e.message || 'Could not load weather icon.' });
+      });
+    return;
+  }
+
+  if (url === '/api/weather' && req.method === 'GET') {
+    const lang = new URL(rawUrl, 'http://local').searchParams.get('lang') || 'en';
+    fetchHkoWeather(lang)
+      .then((data) => sendJson(res, 200, data))
+      .catch((e) => {
+        sendJson(res, 502, { error: e.message || 'Could not load weather.' });
+      });
     return;
   }
 

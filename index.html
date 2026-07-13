@@ -637,6 +637,117 @@
       animation: idle-hint-pulse 2.4s ease-in-out infinite;
     }
 
+    #hko-weather-bar {
+      position: absolute;
+      top: max(0.75rem, env(safe-area-inset-top));
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 4;
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
+      max-width: min(92vw, 28rem);
+      padding: 0.5rem 0.875rem;
+      border-radius: 999px;
+      background: rgba(15, 17, 23, 0.72);
+      color: #e8eaed;
+      font-size: 0.875rem;
+      line-height: 1.2;
+      pointer-events: none;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
+    }
+
+    #hko-weather-bar[hidden] {
+      display: none !important;
+    }
+
+    #hko-weather-icon {
+      width: 2rem;
+      height: 2rem;
+      flex: 0 0 auto;
+      object-fit: contain;
+    }
+
+    .hko-weather-details {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.35rem 0.625rem;
+      min-width: 0;
+    }
+
+    #hko-weather-condition {
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .hko-weather-stat {
+      color: #c4c7c5;
+      white-space: nowrap;
+    }
+
+    .hko-weather-stat strong {
+      color: #e8eaed;
+      font-weight: 700;
+    }
+
+    body.has-idle-video.videos-loading #hko-weather-bar {
+      visibility: hidden;
+    }
+
+    body.pair-theme-warm #hko-weather-bar {
+      background: rgba(92, 56, 20, 0.78);
+      color: #ffe8c8;
+    }
+
+    body.pair-theme-warm .hko-weather-stat {
+      color: #ffd9a8;
+    }
+
+    body.pair-theme-warm .hko-weather-stat strong {
+      color: #fff4e8;
+    }
+
+    body.pair-theme-cool #hko-weather-bar {
+      background: rgba(18, 58, 92, 0.78);
+      color: #d8f1ff;
+    }
+
+    body.pair-theme-cool .hko-weather-stat {
+      color: #b8dff8;
+    }
+
+    body.pair-theme-cool .hko-weather-stat strong {
+      color: #eef8ff;
+    }
+
+    body.pair-theme-nature #hko-weather-bar {
+      background: rgba(24, 72, 38, 0.78);
+      color: #dff9e5;
+    }
+
+    body.pair-theme-nature .hko-weather-stat {
+      color: #bfeecf;
+    }
+
+    body.pair-theme-nature .hko-weather-stat strong {
+      color: #f2fff5;
+    }
+
+    body.pair-theme-night #hko-weather-bar {
+      background: rgba(42, 28, 82, 0.78);
+      color: #e8ddff;
+    }
+
+    body.pair-theme-night .hko-weather-stat {
+      color: #d4c4ff;
+    }
+
+    body.pair-theme-night .hko-weather-stat strong {
+      color: #f5f0ff;
+    }
+
     @keyframes idle-hint-pulse {
       0%, 100% { opacity: 0.85; }
       50% { opacity: 1; }
@@ -1211,6 +1322,14 @@
 
   <div id="app">
     <div id="idle-video-screen" aria-label="Tap to start conversation">
+      <div id="hko-weather-bar" hidden aria-live="polite">
+        <img id="hko-weather-icon" alt="" width="32" height="32">
+        <div class="hko-weather-details">
+          <span id="hko-weather-condition">--</span>
+          <span class="hko-weather-stat"><strong id="hko-weather-temp">--</strong></span>
+          <span class="hko-weather-stat">Humidity <strong id="hko-weather-humidity">--</strong></span>
+        </div>
+      </div>
       <video id="idle-video" class="screen-video" loop playsinline preload="auto"></video>
       <video id="transition-video" class="screen-video" playsinline preload="auto"></video>
       <div id="idle-video-loading">Loading videos…</div>
@@ -1355,6 +1474,11 @@
     const transitionVideoEl = document.getElementById("transition-video");
     const idleVideoLoadingEl = document.getElementById("idle-video-loading");
     const idleVideoHint = document.getElementById("idle-video-hint");
+    const hkoWeatherBar = document.getElementById("hko-weather-bar");
+    const hkoWeatherIcon = document.getElementById("hko-weather-icon");
+    const hkoWeatherCondition = document.getElementById("hko-weather-condition");
+    const hkoWeatherTemp = document.getElementById("hko-weather-temp");
+    const hkoWeatherHumidity = document.getElementById("hko-weather-humidity");
     const avatarStageEl = document.getElementById("avatar-stage");
     const gameLaunchOverlay = document.getElementById("game-launch-overlay");
     const gameLaunchCard = document.getElementById("game-launch-card");
@@ -2055,6 +2179,31 @@
       };
       window.addEventListener("pointerdown", unlock, { passive: true });
       window.addEventListener("keydown", unlock, { passive: true });
+    }
+
+    function renderHkoWeather(data) {
+      if (!hkoWeatherBar || !data || data.temperature == null || data.humidity == null) return;
+      hkoWeatherCondition.textContent = data.condition || "Current weather";
+      hkoWeatherTemp.textContent = `${data.temperature}°${data.temperatureUnit || "C"}`;
+      hkoWeatherHumidity.textContent = `${data.humidity}${data.humidityUnit || "%"}`;
+      if (data.iconCode != null) {
+        hkoWeatherIcon.src = `/api/weather/icon/${data.iconCode}`;
+        hkoWeatherIcon.alt = data.condition || "Weather icon";
+        hkoWeatherIcon.hidden = false;
+      } else {
+        hkoWeatherIcon.hidden = true;
+      }
+      hkoWeatherBar.hidden = false;
+    }
+
+    async function loadHkoWeather() {
+      try {
+        const res = await fetch("/api/weather?lang=en");
+        if (!res.ok) return;
+        renderHkoWeather(await res.json());
+      } catch (e) {
+        console.warn("HKO weather:", e);
+      }
     }
 
     function startIdleVideoPlayback() {
@@ -3673,6 +3822,8 @@
 
     uiLog("hello", "app init", "hello", { IS_IOS, WAKE_WORD_RESTART_DELAY, POST_SESSION_WAKE_DELAY });
     initVideoSoundUnlock();
+    loadHkoWeather();
+    setInterval(() => { loadHkoWeather().catch(() => {}); }, 10 * 60 * 1000);
     init();
   </script>
 </body>
