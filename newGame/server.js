@@ -9,11 +9,11 @@ const Database = require("better-sqlite3");
 const multer = require("multer");
 
 const PORT = process.env.PORT || 3000;
-const INWORLD_API_ENABLED = /^(1|true|yes|on)$/i.test(
-  process.env.INWORLD_API_ENABLED || ""
+const INWORLD_API_ENABLED = !/^(0|false|no|off)$/i.test(
+  process.env.INWORLD_API_ENABLED ?? "1"
 );
 const INWORLD_API_DISABLED_MESSAGE =
-  "Inworld API is disabled. Set INWORLD_API_ENABLED=1 to enable it.";
+  "Inworld API is disabled. Unset INWORLD_API_ENABLED=0 or set INWORLD_API_ENABLED=1.";
 const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 const DB_MAX_BYTES = 200 * 1024 * 1024;
 const DATA_DIR =

@@ -11,13 +11,13 @@ const require = createRequire(import.meta.url);
 const Database = require('better-sqlite3');
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
-// Keep paid/external Inworld calls off during development. Explicitly opt in
-// with INWORLD_API_ENABLED=1 when the integration is needed.
-const INWORLD_API_ENABLED = /^(1|true|yes|on)$/i.test(
-  process.env.INWORLD_API_ENABLED || '',
+// Enabled by default so realtime sessions work out of the box. Opt out during
+// development with INWORLD_API_ENABLED=0|false|no|off.
+const INWORLD_API_ENABLED = !/^(0|false|no|off)$/i.test(
+  process.env.INWORLD_API_ENABLED ?? '1',
 );
 const INWORLD_API_DISABLED_MESSAGE =
-  'Inworld API is disabled. Set INWORLD_API_ENABLED=1 to enable it.';
+  'Inworld API is disabled. Unset INWORLD_API_ENABLED=0 or set INWORLD_API_ENABLED=1.';
 
 // Local: ./config.json  |  Railway: mount a volume (e.g. /app/data) — uses RAILWAY_VOLUME_MOUNT_PATH
 const CONFIG_DIR = process.env.CONFIG_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH || ROOT;

@@ -2949,6 +2949,7 @@
     }
 
     function closeAfterToolEnd() {
+      if (replayingPrepMessages) return;
       if (!pendingEndConversation || ws?.readyState !== WebSocket.OPEN) {
         if (pendingEndConversation) {
           uiLog("end", "closeAfterToolEnd blocked", "warn", {
@@ -3057,7 +3058,7 @@
     }
 
     function triggerEndConversation(reason = "user said goodbye") {
-      if (pendingEndConversation || ws?.readyState !== WebSocket.OPEN) return;
+      if (replayingPrepMessages || pendingEndConversation || ws?.readyState !== WebSocket.OPEN) return;
       uiLog("end", `goodbye detected (${reason})`, "hello");
       pendingEndConversation = true;
       setStatus("Goodbye!");
@@ -3171,6 +3172,7 @@
     }
 
     function handleEndConversationTool(callId, argsJson) {
+      if (replayingPrepMessages) return;
       if (ws?.readyState !== WebSocket.OPEN) {
         uiLog("end", "end_conversation tool ignored — ws not open", "warn", { ws: wsStateLabel() });
         return;
@@ -3266,6 +3268,7 @@
       }
 
       if (name === END_CONVERSATION) {
+        if (replayingPrepMessages) return;
         uiLog("end", "function_call end_conversation received", "hello", { callId });
         handleEndConversationTool(callId, argsJson);
       }
@@ -3382,6 +3385,10 @@
       const e = JSON.parse(data);
 
       if (e.type === "client.error") {
+        if (replayingPrepMessages) {
+          uiLog("session", `client.error during prep replay (ignored): ${e.message}`, "warn");
+          return;
+        }
         uiLog("session", `client.error: ${e.message}`, "err");
         showErr(e.message);
         ws.close();
@@ -3527,12 +3534,12 @@
           prep.messageQueue.push(data);
         };
 
-        await micWork;
-        try {
-          await waitForWsOpen(prep.ws);
-        } catch (e) {
-          uiLog("hello", `connect prep ws: ${e?.message || e}`, "warn");
-        }
+        prep.ws.onclose = () => {
+          if (prep.aborted || active) return;
+          prep.aborted = true;
+        };
+
+        await Promise.all([micWork, waitForWsOpen(prep.ws)]);
         if (prep.aborted) throw new Error("Connection prep aborted");
         return prep;
       })().catch((e) => {
@@ -3713,6 +3720,17 @@
       btnStart.disabled = true;
       btnStart.textContent = "Connecting…";
       setStatus("Connecting to Uncle Tommy…");
+
+      pendingEndConversation = false;
+      pendingFunctionCalls.clear();
+      handledFunctionCallIds.clear();
+      idleNudgeCount = 0;
+      cancelIdleNudge();
+      if (endConversationCloseTimer) {
+        clearTimeout(endConversationCloseTimer);
+        endConversationCloseTimer = null;
+      }
+      byebyeAnimationPromise = null;
 
       let prep = connectPrep;
       connectPrep = null;
