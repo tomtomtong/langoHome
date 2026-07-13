@@ -3,6 +3,7 @@ node_modules/
 config.json
 sessions.json
 hello-debug-log.json
+conversations.db
 idle-video/
 video-pairs/
 avatar-background/

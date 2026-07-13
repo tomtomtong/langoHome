@@ -644,11 +644,11 @@
       transform: translateX(-50%);
       z-index: 4;
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       gap: 0.625rem;
-      max-width: min(92vw, 28rem);
+      max-width: min(94vw, 34rem);
       padding: 0.5rem 0.875rem;
-      border-radius: 999px;
+      border-radius: 1rem;
       background: rgba(15, 17, 23, 0.72);
       color: #e8eaed;
       font-size: 0.875rem;
@@ -671,10 +671,22 @@
 
     .hko-weather-details {
       display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      min-width: 0;
+    }
+
+    #hko-weather-datetime {
+      font-size: 0.8125rem;
+      color: #c4c7c5;
+      white-space: nowrap;
+    }
+
+    .hko-weather-row {
+      display: flex;
       flex-wrap: wrap;
       align-items: center;
       gap: 0.35rem 0.625rem;
-      min-width: 0;
     }
 
     #hko-weather-condition {
@@ -705,7 +717,8 @@
       color: #ffd9a8;
     }
 
-    body.pair-theme-warm .hko-weather-stat strong {
+    body.pair-theme-warm .hko-weather-stat strong,
+    body.pair-theme-warm #hko-weather-datetime {
       color: #fff4e8;
     }
 
@@ -718,7 +731,8 @@
       color: #b8dff8;
     }
 
-    body.pair-theme-cool .hko-weather-stat strong {
+    body.pair-theme-cool .hko-weather-stat strong,
+    body.pair-theme-cool #hko-weather-datetime {
       color: #eef8ff;
     }
 
@@ -731,7 +745,8 @@
       color: #bfeecf;
     }
 
-    body.pair-theme-nature .hko-weather-stat strong {
+    body.pair-theme-nature .hko-weather-stat strong,
+    body.pair-theme-nature #hko-weather-datetime {
       color: #f2fff5;
     }
 
@@ -744,7 +759,8 @@
       color: #d4c4ff;
     }
 
-    body.pair-theme-night .hko-weather-stat strong {
+    body.pair-theme-night .hko-weather-stat strong,
+    body.pair-theme-night #hko-weather-datetime {
       color: #f5f0ff;
     }
 
@@ -1325,9 +1341,12 @@
       <div id="hko-weather-bar" hidden aria-live="polite">
         <img id="hko-weather-icon" alt="" width="32" height="32">
         <div class="hko-weather-details">
-          <span id="hko-weather-condition">--</span>
-          <span class="hko-weather-stat"><strong id="hko-weather-temp">--</strong></span>
-          <span class="hko-weather-stat">Humidity <strong id="hko-weather-humidity">--</strong></span>
+          <div id="hko-weather-datetime">--</div>
+          <div class="hko-weather-row">
+            <span id="hko-weather-condition">--</span>
+            <span class="hko-weather-stat"><strong id="hko-weather-temp">--</strong></span>
+            <span class="hko-weather-stat">Humidity <strong id="hko-weather-humidity">--</strong></span>
+          </div>
         </div>
       </div>
       <video id="idle-video" class="screen-video" loop playsinline preload="auto"></video>
@@ -1479,6 +1498,7 @@
     const hkoWeatherCondition = document.getElementById("hko-weather-condition");
     const hkoWeatherTemp = document.getElementById("hko-weather-temp");
     const hkoWeatherHumidity = document.getElementById("hko-weather-humidity");
+    const hkoWeatherDatetime = document.getElementById("hko-weather-datetime");
     const avatarStageEl = document.getElementById("avatar-stage");
     const gameLaunchOverlay = document.getElementById("game-launch-overlay");
     const gameLaunchCard = document.getElementById("game-launch-card");
@@ -2095,6 +2115,7 @@
 
     function setIdleVideoMode(enabled) {
       document.body.classList.toggle("has-idle-video", enabled);
+      if (enabled) showHkoWeatherBar();
     }
 
     function setTransitionVideoMode(enabled) {
@@ -2181,6 +2202,39 @@
       window.addEventListener("keydown", unlock, { passive: true });
     }
 
+    function getHkoDisplayTimezone() {
+      return videoPairsTimezone && videoPairsTimezone !== "UTC"
+        ? videoPairsTimezone
+        : "Asia/Hong_Kong";
+    }
+
+    function updateHkoDateTime() {
+      if (!hkoWeatherDatetime) return;
+      const now = new Date();
+      const tz = getHkoDisplayTimezone();
+      const dateText = new Intl.DateTimeFormat("en-HK", {
+        timeZone: tz,
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      }).format(now);
+      const timeText = new Intl.DateTimeFormat("en-HK", {
+        timeZone: tz,
+        hour: "numeric",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true,
+      }).format(now);
+      hkoWeatherDatetime.textContent = `${dateText} · ${timeText}`;
+    }
+
+    function showHkoWeatherBar() {
+      if (!hkoWeatherBar) return;
+      updateHkoDateTime();
+      hkoWeatherBar.hidden = false;
+    }
+
     function renderHkoWeather(data) {
       if (!hkoWeatherBar || !data || data.temperature == null || data.humidity == null) return;
       hkoWeatherCondition.textContent = data.condition || "Current weather";
@@ -2193,7 +2247,7 @@
       } else {
         hkoWeatherIcon.hidden = true;
       }
-      hkoWeatherBar.hidden = false;
+      showHkoWeatherBar();
     }
 
     async function loadHkoWeather() {
@@ -3822,6 +3876,8 @@
 
     uiLog("hello", "app init", "hello", { IS_IOS, WAKE_WORD_RESTART_DELAY, POST_SESSION_WAKE_DELAY });
     initVideoSoundUnlock();
+    updateHkoDateTime();
+    setInterval(updateHkoDateTime, 1000);
     loadHkoWeather();
     setInterval(() => { loadHkoWeather().catch(() => {}); }, 10 * 60 * 1000);
     init();

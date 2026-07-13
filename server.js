@@ -8,6 +8,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import multer from 'multer';
 
 const require = createRequire(import.meta.url);
+const Database = require('better-sqlite3');
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 
@@ -19,6 +20,7 @@ const CHECK_INS_PATH = join(CONFIG_DIR, 'check-ins.json');
 const SESSIONS_PATH = join(CONFIG_DIR, 'sessions.json');
 const DEBUG_LOG_PATH = join(CONFIG_DIR, 'hello-debug-log.json');
 const DEBUG_LOG_MAX_REPORTS = 20;
+const CONVERSATIONS_DB_PATH = join(CONFIG_DIR, 'conversations.db');
 const IDLE_VIDEO_DIR = join(CONFIG_DIR, 'idle-video');
 const TRANSITION_VIDEO_DIR = join(CONFIG_DIR, 'transition-video');
 const VIDEO_PAIRS_DIR = join(CONFIG_DIR, 'video-pairs');
@@ -43,6 +45,127 @@ const GAME_DB_PATH = gameApp.DB_PATH;
 function ensureConfigDir() {
   if (CONFIG_DIR === ROOT || existsSync(CONFIG_DIR)) return;
   mkdirSync(CONFIG_DIR, { recursive: true });
+}
+
+ensureConfigDir();
+const conversationsDb = new Database(CONVERSATIONS_DB_PATH);
+conversationsDb.exec(`
+  CREATE TABLE IF NOT EXISTS conversations (
+    id TEXT PRIMARY KEY,
+    username TEXT NOT NULL,
+    role TEXT NOT NULL,
+    started_at INTEGER NOT NULL,
+    ended_at INTEGER,
+    turn_count INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE TABLE IF NOT EXISTS conversation_turns (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id TEXT NOT NULL,
+    role TEXT NOT NULL,
+    text TEXT NOT NULL,
+    event_type TEXT,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (conversation_id) REFERENCES conversations(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_conversations_started ON conversations(started_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_turns_conversation ON conversation_turns(conversation_id, created_at);
+`);
+
+const insertConversationStmt = conversationsDb.prepare(`
+  INSERT INTO conversations (id, username, role, started_at, turn_count)
+  VALUES (?, ?, ?, ?, 0)
+`);
+const endConversationStmt = conversationsDb.prepare(`
+  UPDATE conversations SET ended_at = ? WHERE id = ? AND ended_at IS NULL
+`);
+const insertTurnStmt = conversationsDb.prepare(`
+  INSERT INTO conversation_turns (conversation_id, role, text, event_type, created_at)
+  VALUES (?, ?, ?, ?, ?)
+`);
+const incrementTurnCountStmt = conversationsDb.prepare(`
+  UPDATE conversations SET turn_count = turn_count + 1 WHERE id = ?
+`);
+const listConversationsStmt = conversationsDb.prepare(`
+  SELECT id, username, role, started_at, ended_at, turn_count
+  FROM conversations
+  WHERE (? IS NULL OR username = ?)
+  ORDER BY started_at DESC
+  LIMIT ? OFFSET ?
+`);
+const countConversationsStmt = conversationsDb.prepare(`
+  SELECT COUNT(*) AS total FROM conversations WHERE (? IS NULL OR username = ?)
+`);
+const getConversationStmt = conversationsDb.prepare(`
+  SELECT id, username, role, started_at, ended_at, turn_count
+  FROM conversations WHERE id = ?
+`);
+const getConversationTurnsStmt = conversationsDb.prepare(`
+  SELECT role, text, event_type, created_at
+  FROM conversation_turns
+  WHERE conversation_id = ?
+  ORDER BY created_at ASC, id ASC
+`);
+const deleteConversationStmt = conversationsDb.prepare(`DELETE FROM conversations WHERE id = ?`);
+const deleteConversationTurnsStmt = conversationsDb.prepare(`DELETE FROM conversation_turns WHERE conversation_id = ?`);
+
+function createConversationRecord(username, role) {
+  const id = `${Date.now()}-${randomBytes(4).toString('hex')}`;
+  insertConversationStmt.run(id, username, role, Date.now());
+  return id;
+}
+
+function endConversationRecord(id) {
+  endConversationStmt.run(Date.now(), id);
+}
+
+function addConversationTurn(conversationId, role, text, eventType) {
+  const trimmed = String(text || '').trim();
+  if (!trimmed) return;
+  insertTurnStmt.run(conversationId, role, trimmed, eventType || null, Date.now());
+  incrementTurnCountStmt.run(conversationId);
+}
+
+function rowToConversation(row) {
+  return {
+    id: row.id,
+    username: row.username,
+    role: row.role,
+    startedAt: row.started_at,
+    endedAt: row.ended_at,
+    turnCount: row.turn_count,
+  };
+}
+
+function listConversationRecords({ username = null, limit = 50, offset = 0 } = {}) {
+  const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 200);
+  const safeOffset = Math.max(Number(offset) || 0, 0);
+  const filterUser = username ? String(username) : null;
+  const rows = listConversationsStmt.all(filterUser, filterUser, safeLimit, safeOffset);
+  const total = countConversationsStmt.get(filterUser, filterUser).total;
+  return {
+    conversations: rows.map(rowToConversation),
+    total,
+    limit: safeLimit,
+    offset: safeOffset,
+  };
+}
+
+function getConversationRecord(id) {
+  const row = getConversationStmt.get(id);
+  if (!row) return null;
+  const turns = getConversationTurnsStmt.all(id).map((turn) => ({
+    role: turn.role,
+    text: turn.text,
+    eventType: turn.event_type,
+    createdAt: turn.created_at,
+  }));
+  return { ...rowToConversation(row), turns };
+}
+
+function deleteConversationRecord(id) {
+  deleteConversationTurnsStmt.run(id);
+  const result = deleteConversationStmt.run(id);
+  return result.changes > 0;
 }
 
 const SECURITY_HEADERS = {
@@ -615,6 +738,7 @@ const ADMIN_PAGE_PATHS = new Set([
   '/account-config',
   '/avatar-config',
   '/video-pairs',
+  '/conversations',
 ]);
 
 function isGameConfigPage(gamePath) {
@@ -629,6 +753,7 @@ function requiresAdmin(url, method) {
   if (url === '/api/config' && m === 'POST') return true;
   if (url.startsWith('/api/user-profiles')) return true;
   if (url === '/api/debug-log' && m === 'GET') return true;
+  if (url.startsWith('/api/conversations')) return true;
 
   const uploadPaths = ['/api/idle-video', '/api/transition-video', '/api/avatar-background'];
   if (uploadPaths.includes(url) && m !== 'GET') return true;
@@ -1741,6 +1866,7 @@ const pages = {
   '/account-config': 'account-config.html',
   '/avatar-config': 'avatar-config.html',
   '/video-pairs': 'video-pairs.html',
+  '/conversations': 'conversations.html',
   '/visme': 'visme/index.html',
 };
 
@@ -2059,6 +2185,39 @@ const server = createServer((req, res) => {
       return;
     }
     sendJson(res, 405, { error: 'Method not allowed.' });
+    return;
+  }
+
+  const conversationMatch = url.match(/^\/api\/conversations\/([^/]+)$/);
+  if (conversationMatch) {
+    const conversationId = conversationMatch[1];
+    if (req.method === 'GET') {
+      const record = getConversationRecord(conversationId);
+      if (!record) {
+        sendJson(res, 404, { error: 'Conversation not found.' });
+        return;
+      }
+      sendJson(res, 200, record);
+      return;
+    }
+    if (req.method === 'DELETE') {
+      if (!deleteConversationRecord(conversationId)) {
+        sendJson(res, 404, { error: 'Conversation not found.' });
+        return;
+      }
+      sendJson(res, 200, { ok: true });
+      return;
+    }
+    sendJson(res, 405, { error: 'Method not allowed.' });
+    return;
+  }
+
+  if (url === '/api/conversations' && req.method === 'GET') {
+    const params = new URL(rawUrl, 'http://local').searchParams;
+    const username = params.get('username')?.trim() || null;
+    const limit = params.get('limit');
+    const offset = params.get('offset');
+    sendJson(res, 200, listConversationRecords({ username, limit, offset }));
     return;
   }
 
@@ -2434,17 +2593,57 @@ const GREET = JSON.stringify({
   item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Greet the user' }] }
 });
 
-function connectToInworld(apiKey, browser, session) {
+function connectToInworld(apiKey, browser, session, userInfo = {}) {
   let setup = 0;
+  let conversationFinished = false;
+  const conversationId = createConversationRecord(
+    userInfo.username || 'unknown',
+    userInfo.role || 'unknown',
+  );
+  const recordedAgentResponses = new Set();
   const sessionCfg = buildSessionCfg(session);
   const api = new WebSocket(
     `wss://api.inworld.ai/api/v1/realtime/session?key=voice-${Date.now()}&protocol=realtime`,
     { headers: { Authorization: `Basic ${apiKey}` } }
   );
 
+  const finishConversation = () => {
+    if (conversationFinished) return;
+    conversationFinished = true;
+    endConversationRecord(conversationId);
+  };
+
+  const recordInworldMessage = (parsed) => {
+    if (!parsed?.type) return;
+    const t = parsed.type;
+
+    if (t === 'conversation.item.input_audio_transcription.completed') {
+      const transcript = parsed.transcript?.trim();
+      if (transcript) addConversationTurn(conversationId, 'user', transcript, t);
+      return;
+    }
+
+    if (t === 'response.output_text.done' || t === 'response.output_audio_transcript.done') {
+      const responseId = parsed.response_id || parsed.item_id;
+      if (responseId && recordedAgentResponses.has(responseId)) return;
+      const text = (parsed.text || parsed.transcript || '').trim();
+      if (!text) return;
+      if (responseId) recordedAgentResponses.add(responseId);
+      addConversationTurn(conversationId, 'assistant', text, t);
+      return;
+    }
+
+    if (t === 'response.function_call_arguments.done') {
+      const name = parsed.name || 'tool';
+      const args = parsed.arguments || '';
+      addConversationTurn(conversationId, 'tool', `[${name}] ${args}`, t);
+    }
+  };
+
   api.on('message', (raw) => {
     let parsed;
     try { parsed = JSON.parse(raw.toString()); } catch { parsed = null; }
+    if (parsed) recordInworldMessage(parsed);
     const t = parsed?.type;
     if (setup < 2) {
       if (t === 'session.created') {
@@ -2472,10 +2671,17 @@ function connectToInworld(apiKey, browser, session) {
     if (api.readyState === WebSocket.OPEN) api.send(msg.toString());
   });
 
-  browser.on('close', () => api.close());
-  api.on('close', () => { if (browser.readyState === WebSocket.OPEN) browser.close(); });
+  browser.on('close', () => {
+    finishConversation();
+    api.close();
+  });
+  api.on('close', () => {
+    finishConversation();
+    if (browser.readyState === WebSocket.OPEN) browser.close();
+  });
   api.on('error', (e) => {
     console.error('API error:', e.message);
+    finishConversation();
     if (browser.readyState === WebSocket.OPEN) {
       browser.send(JSON.stringify({ type: 'client.error', message: e.message }));
       browser.close();
@@ -2530,6 +2736,9 @@ wss.on('connection', (browser, req) => {
       ),
       voice: parsed.voice?.trim() || saved.voice?.trim(),
       model: parsed.model?.trim() || saved.model?.trim(),
+    }, {
+      username: sessionUser?.username || 'unknown',
+      role: sessionUser?.role || 'unknown',
     });
   });
 });
@@ -2541,5 +2750,6 @@ server.listen(port, '0.0.0.0', () => {
   console.log(`Account profiles: http://0.0.0.0:${port}/account-config`);
   console.log(`Games hub:  http://0.0.0.0:${port}/games/`);
   console.log(`Game database: ${GAME_DB_PATH}`);
+  console.log(`Conversation logs: ${CONVERSATIONS_DB_PATH}`);
   if (CONFIG_DIR !== ROOT) console.log(`Config stored at ${CONFIG_PATH}`);
 });

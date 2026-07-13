@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conversations — Uncle Tommy</title>
+  <link rel="stylesheet" href="/admin-nav.css">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      margin: 0;
+      min-height: 100vh;
+      background: #0f1117;
+      color: #e8eaed;
+      padding: 1.5rem;
+    }
+    .page {
+      width: min(100%, 1100px);
+      margin: 0 auto;
+    }
+    h1 { margin: 0 0 0.25rem; font-size: 1.35rem; }
+    .lead {
+      margin: 0 0 1.5rem;
+      color: #9aa0a6;
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: end;
+      margin-bottom: 1rem;
+    }
+    .field { margin: 0; }
+    label {
+      display: block;
+      margin-bottom: 0.35rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: #9aa0a6;
+    }
+    select, button {
+      padding: 0.55rem 0.75rem;
+      border-radius: 8px;
+      border: 1px solid #3c4043;
+      background: #0f1117;
+      color: #e8eaed;
+      font-size: 0.875rem;
+    }
+    button {
+      cursor: pointer;
+      background: #6c8cff;
+      border-color: #6c8cff;
+      color: #fff;
+      font-weight: 500;
+    }
+    button:hover { background: #5a7aef; }
+    button.secondary {
+      background: transparent;
+      border-color: #3c4043;
+      color: #c4c7c5;
+    }
+    button.secondary:hover {
+      border-color: #5f6368;
+      color: #e8eaed;
+    }
+    button.danger {
+      background: transparent;
+      border-color: #8b3a3a;
+      color: #f28b82;
+    }
+    button.danger:hover {
+      background: #3a1e1e;
+      border-color: #c5221f;
+    }
+    .card {
+      background: #1a1d27;
+      border: 1px solid #2a2f3a;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .table-wrap { overflow-x: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8125rem;
+    }
+    th, td {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid #2a2f3a;
+      vertical-align: top;
+    }
+    th {
+      color: #9aa0a6;
+      font-weight: 500;
+      background: #151821;
+    }
+    tr.session-row {
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    tr.session-row:hover { background: #20242f; }
+    tr.session-row.active { background: #252b3a; }
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.45rem;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      background: #2a3348;
+      color: #c4c7c5;
+    }
+    .badge.student { background: #1e3a2f; color: #81c995; }
+    .badge.admin { background: #3a2f1e; color: #fdd663; }
+    .empty {
+      padding: 2rem 1rem;
+      text-align: center;
+      color: #9aa0a6;
+      font-size: 0.875rem;
+    }
+    .detail {
+      margin-top: 1rem;
+      padding: 1.25rem;
+      background: #1a1d27;
+      border: 1px solid #2a2f3a;
+      border-radius: 12px;
+      display: none;
+    }
+    .detail.visible { display: block; }
+    .detail-header {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem 1.25rem;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid #2a2f3a;
+    }
+    .detail-meta {
+      font-size: 0.8125rem;
+      color: #9aa0a6;
+      line-height: 1.5;
+    }
+    .detail-meta strong { color: #e8eaed; }
+    .turns {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      max-height: 60vh;
+      overflow-y: auto;
+    }
+    .turn {
+      padding: 0.75rem 0.875rem;
+      border-radius: 10px;
+      border: 1px solid #2a2f3a;
+      background: #12151c;
+    }
+    .turn.user { border-color: #2f4a6b; background: #152033; }
+    .turn.assistant { border-color: #3a4a2f; background: #1a2318; }
+    .turn.tool { border-color: #4a3a2f; background: #231c16; }
+    .turn-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-bottom: 0.35rem;
+      font-size: 0.75rem;
+      color: #9aa0a6;
+    }
+    .turn-role {
+      font-weight: 600;
+      text-transform: capitalize;
+      color: #c4c7c5;
+    }
+    .turn-text {
+      margin: 0;
+      white-space: pre-wrap;
+      line-height: 1.5;
+      font-size: 0.875rem;
+    }
+    .pager {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 1rem;
+      border-top: 1px solid #2a2f3a;
+      font-size: 0.8125rem;
+      color: #9aa0a6;
+    }
+    .status {
+      margin-top: 0.75rem;
+      font-size: 0.8125rem;
+      color: #f28b82;
+      display: none;
+    }
+    .status.visible { display: block; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1>Conversation History</h1>
+    <p class="lead">Every Inworld realtime session is recorded on the server. Review what each learner said and how Uncle Tommy replied.</p>
+
+    <div class="toolbar">
+      <div class="field">
+        <label for="user-filter">Account</label>
+        <select id="user-filter">
+          <option value="">All accounts</option>
+        </select>
+      </div>
+      <button type="button" id="refresh-btn">Refresh</button>
+    </div>
+
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Started</th>
+              <th>Account</th>
+              <th>Role</th>
+              <th>Duration</th>
+              <th>Turns</th>
+            </tr>
+          </thead>
+          <tbody id="sessions-body">
+            <tr><td colspan="5" class="empty">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pager" id="pager" hidden>
+        <button type="button" class="secondary" id="prev-btn">Previous</button>
+        <span id="pager-label"></span>
+        <button type="button" class="secondary" id="next-btn">Next</button>
+      </div>
+    </div>
+
+    <div class="detail" id="detail-panel">
+      <div class="detail-header">
+        <div class="detail-meta" id="detail-meta"></div>
+        <button type="button" class="danger" id="delete-btn">Delete session</button>
+      </div>
+      <div class="turns" id="turns"></div>
+    </div>
+
+    <p class="status" id="status"></p>
+  </div>
+
+  <script src="/admin-nav.js"></script>
+  <script>
+    const PAGE_SIZE = 25;
+    const USER_LIST = Array.from({ length: 20 }, (_, i) => `user${String(i + 1).padStart(2, '0')}`);
+
+    const userFilter = document.getElementById('user-filter');
+    const sessionsBody = document.getElementById('sessions-body');
+    const detailPanel = document.getElementById('detail-panel');
+    const detailMeta = document.getElementById('detail-meta');
+    const turnsEl = document.getElementById('turns');
+    const pager = document.getElementById('pager');
+    const pagerLabel = document.getElementById('pager-label');
+    const statusEl = document.getElementById('status');
+
+    let offset = 0;
+    let total = 0;
+    let selectedId = null;
+
+    for (const username of USER_LIST) {
+      const option = document.createElement('option');
+      option.value = username;
+      option.textContent = username;
+      userFilter.appendChild(option);
+    }
+    const adminOption = document.createElement('option');
+    adminOption.value = 'admin';
+    adminOption.textContent = 'admin';
+    userFilter.appendChild(adminOption);
+
+    function showStatus(message) {
+      statusEl.textContent = message;
+      statusEl.classList.add('visible');
+    }
+
+    function clearStatus() {
+      statusEl.textContent = '';
+      statusEl.classList.remove('visible');
+    }
+
+    function formatDate(ms) {
+      if (!ms) return '—';
+      return new Date(ms).toLocaleString();
+    }
+
+    function formatDuration(startedAt, endedAt) {
+      if (!startedAt || !endedAt) return 'In progress';
+      const seconds = Math.max(1, Math.round((endedAt - startedAt) / 1000));
+      if (seconds < 60) return `${seconds}s`;
+      const minutes = Math.floor(seconds / 60);
+      const rem = seconds % 60;
+      return rem ? `${minutes}m ${rem}s` : `${minutes}m`;
+    }
+
+    function roleBadge(role) {
+      const cls = role === 'student' ? 'student' : role === 'admin' ? 'admin' : '';
+      return `<span class="badge ${cls}">${role || 'unknown'}</span>`;
+    }
+
+    async function loadSessions() {
+      clearStatus();
+      const username = userFilter.value;
+      const params = new URLSearchParams({
+        limit: String(PAGE_SIZE),
+        offset: String(offset),
+      });
+      if (username) params.set('username', username);
+
+      const res = await fetch(`/api/conversations?${params}`);
+      if (!res.ok) {
+        showStatus('Could not load conversations.');
+        return;
+      }
+
+      const data = await res.json();
+      total = data.total || 0;
+      renderSessions(data.conversations || []);
+      updatePager();
+    }
+
+    function renderSessions(sessions) {
+      if (!sessions.length) {
+        sessionsBody.innerHTML = '<tr><td colspan="5" class="empty">No conversations recorded yet.</td></tr>';
+        return;
+      }
+
+      sessionsBody.innerHTML = sessions.map((session) => `
+        <tr class="session-row${session.id === selectedId ? ' active' : ''}" data-id="${session.id}">
+          <td>${formatDate(session.startedAt)}</td>
+          <td>${session.username}</td>
+          <td>${roleBadge(session.role)}</td>
+          <td>${formatDuration(session.startedAt, session.endedAt)}</td>
+          <td>${session.turnCount || 0}</td>
+        </tr>
+      `).join('');
+
+      sessionsBody.querySelectorAll('.session-row').forEach((row) => {
+        row.addEventListener('click', () => openSession(row.dataset.id));
+      });
+    }
+
+    function updatePager() {
+      const hasRows = total > 0;
+      pager.hidden = !hasRows;
+      if (!hasRows) return;
+      const start = offset + 1;
+      const end = Math.min(offset + PAGE_SIZE, total);
+      pagerLabel.textContent = `${start}–${end} of ${total}`;
+      document.getElementById('prev-btn').disabled = offset <= 0;
+      document.getElementById('next-btn').disabled = offset + PAGE_SIZE >= total;
+    }
+
+    async function openSession(id) {
+      selectedId = id;
+      sessionsBody.querySelectorAll('.session-row').forEach((row) => {
+        row.classList.toggle('active', row.dataset.id === id);
+      });
+
+      const res = await fetch(`/api/conversations/${encodeURIComponent(id)}`);
+      if (!res.ok) {
+        showStatus('Could not load conversation details.');
+        return;
+      }
+
+      const data = await res.json();
+      detailMeta.innerHTML = `
+        <div><strong>${data.username}</strong> (${data.role})</div>
+        <div>Started: ${formatDate(data.startedAt)}</div>
+        <div>Ended: ${formatDate(data.endedAt)}</div>
+        <div>Duration: ${formatDuration(data.startedAt, data.endedAt)}</div>
+        <div>Turns: ${data.turnCount || 0}</div>
+      `;
+
+      if (!data.turns?.length) {
+        turnsEl.innerHTML = '<div class="empty">No transcript turns captured for this session.</div>';
+      } else {
+        turnsEl.innerHTML = data.turns.map((turn) => `
+          <article class="turn ${turn.role}">
+            <div class="turn-head">
+              <span class="turn-role">${turn.role}</span>
+              <time>${formatDate(turn.createdAt)}</time>
+            </div>
+            <p class="turn-text"></p>
+          </article>
+        `).join('');
+        turnsEl.querySelectorAll('.turn').forEach((node, index) => {
+          node.querySelector('.turn-text').textContent = data.turns[index].text;
+        });
+      }
+
+      detailPanel.classList.add('visible');
+    }
+
+    async function deleteSession() {
+      if (!selectedId) return;
+      if (!confirm('Delete this conversation and all transcript turns?')) return;
+
+      const res = await fetch(`/api/conversations/${encodeURIComponent(selectedId)}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        showStatus('Could not delete conversation.');
+        return;
+      }
+
+      selectedId = null;
+      detailPanel.classList.remove('visible');
+      await loadSessions();
+    }
+
+    document.getElementById('refresh-btn').addEventListener('click', () => {
+      offset = 0;
+      loadSessions();
+    });
+    userFilter.addEventListener('change', () => {
+      offset = 0;
+      selectedId = null;
+      detailPanel.classList.remove('visible');
+      loadSessions();
+    });
+    document.getElementById('prev-btn').addEventListener('click', () => {
+      offset = Math.max(0, offset - PAGE_SIZE);
+      loadSessions();
+    });
+    document.getElementById('next-btn').addEventListener('click', () => {
+      if (offset + PAGE_SIZE < total) {
+        offset += PAGE_SIZE;
+        loadSessions();
+      }
+    });
+    document.getElementById('delete-btn').addEventListener('click', deleteSession);
+
+    loadSessions();
+  </script>
+</body>
+</html>

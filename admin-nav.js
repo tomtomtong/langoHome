@@ -5,6 +5,7 @@
     { href: '/avatar-config', label: 'Avatar', paths: ['/avatar-config'] },
     { href: '/video-pairs', label: 'Video Pairs', paths: ['/video-pairs'] },
     { href: '/account-config', label: 'Account Profiles', paths: ['/account-config'] },
+    { href: '/conversations', label: 'Conversations', paths: ['/conversations'] },
     { href: '/games/config.html', label: 'Game Assets', paths: ['/games/config.html'] },
   ];
 
