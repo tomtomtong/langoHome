@@ -72,14 +72,8 @@
     }
 
     #app {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      width: min(100vw, calc(100vh * 4 / 3));
-      height: min(100vh, calc(100vw * 3 / 4));
-      overflow: hidden;
-      transform: translate(-50%, -50%);
-      background: #0f1117;
+      width: 100%;
+      height: 100%;
     }
 
     /* ── Splash screen (logo while assets preload) ── */
@@ -1326,149 +1320,6 @@
 
     body.in-session #daily-rewards-btn { display: none !important; }
     body.in-session #daily-rewards-overlay.visible { display: none !important; }
-
-    /* Figma frame 49:62 — Lango Home */
-    #lango-home-root {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 20;
-      overflow: hidden;
-      pointer-events: none;
-      background: transparent;
-    }
-
-    /* The entire app is the 4:3 stage; the video fills that stage. */
-    body:not(.in-session) #idle-video-screen {
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      transform: none;
-    }
-
-    body.in-session #lango-home-root,
-    html.game-return-connect #lango-home-root { display: none; }
-
-    .lango-home {
-      --frame-padding: 4.7%;
-      position: absolute;
-      inset: 0;
-      overflow: hidden;
-      background: transparent;
-      font-family: 'Jomhuria', Georgia, serif;
-      isolation: isolate;
-    }
-
-    /* Continuous thin frame beneath the decorative PNG. It closes the
-       transparent corner gaps so the video always remains behind the wood. */
-    .lango-home::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      z-index: 9;
-      box-sizing: border-box;
-      border: 5.2vw solid #b65d18;
-      border-color: #c66c20 #a94f13 #b85c16 #a94f13;
-      box-shadow:
-        inset 0 0 0 3px #6f2a08,
-        inset 0 0 12px 6px rgba(92, 34, 5, .45),
-        0 0 0 3px #e79032;
-      pointer-events: none;
-    }
-
-    @supports (width: 1cqw) {
-      .lango-home { container-type: size; }
-      .lango-home::after { border-width: 5.2cqw; }
-    }
-
-    .lango-home__frame {
-      position: absolute;
-      z-index: 10;
-      /* The source PNG includes transparent export padding. Overscan it so
-         the wooden outer edge meets all four sides like a real photo frame. */
-      inset: -5.5% -6.5%;
-      width: 113%;
-      height: 111%;
-      /* Reveal only the outer bands of the oversized artwork. This keeps the
-         photo-frame edge treatment while making the wood roughly half as thick. */
-      -webkit-mask:
-        linear-gradient(#000 0 0) top / 100% 10.5% no-repeat,
-        linear-gradient(#000 0 0) bottom / 100% 10.5% no-repeat,
-        linear-gradient(#000 0 0) left / 10.5% 100% no-repeat,
-        linear-gradient(#000 0 0) right / 10.5% 100% no-repeat;
-      mask:
-        linear-gradient(#000 0 0) top / 100% 10.5% no-repeat,
-        linear-gradient(#000 0 0) bottom / 100% 10.5% no-repeat,
-        linear-gradient(#000 0 0) left / 10.5% 100% no-repeat,
-        linear-gradient(#000 0 0) right / 10.5% 100% no-repeat;
-      pointer-events: none;
-    }
-
-    .lango-home__asset,
-    .lango-home__button img { display: block; width: 100%; height: 100%; object-fit: contain; }
-
-    .lango-home__button {
-      position: absolute;
-      z-index: 20;
-      border: 0;
-      padding: 0;
-      background: transparent;
-      cursor: pointer;
-      pointer-events: auto;
-      filter: drop-shadow(0 4px 2px rgba(75, 31, 4, 0.28));
-      transition: transform 120ms ease, filter 120ms ease;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    .lango-home__button:hover { transform: scale(1.045); filter: drop-shadow(0 6px 3px rgba(75, 31, 4, 0.34)); }
-    .lango-home__button:active { transform: scale(.95); }
-    .lango-home__button:focus-visible { outline: 4px solid #fff5b2; outline-offset: 3px; border-radius: 18px; }
-
-    .lango-home__title { position: absolute; z-index: 15; top: -1.2%; left: 29.7%; width: 41.6%; height: 14.1%; object-fit: contain; }
-    .lango-home__clock { position: absolute; z-index: 16; top: 7.2%; right: 7.4%; width: 12.4%; }
-    .lango-home__starbar { position: absolute; z-index: 16; top: 17.9%; right: 7.8%; width: 12.6%; }
-    .lango-home__stars {
-      position: absolute;
-      z-index: 17;
-      top: 18.2%;
-      right: 10.1%;
-      width: 5.5%;
-      color: #fff;
-      font-family: 'Jomhuria', Georgia, serif;
-      font-size: clamp(28px, 5.8vh, 56px);
-      font-weight: 400;
-      line-height: 1;
-      text-align: center;
-      text-shadow: 0 3px 0 #7b270d;
-    }
-
-    .lango-home__record { top: 8%; left: 6.1%; width: 9.1%; height: 14.5%; }
-    .lango-home__map { top: 24%; left: 6.4%; width: 9%; height: 12.3%; }
-    .lango-home__reward { top: 38%; left: 6.4%; width: 9%; height: 12.2%; }
-    .lango-home__collections { left: 7.5%; bottom: 8.2%; width: 16.2%; height: 12%; }
-    .lango-home__store { top: 26.5%; right: 7.3%; width: 8.7%; height: 12.8%; }
-    .lango-home__box { top: 40.2%; right: 6.8%; width: 9.2%; height: 12.8%; }
-
-    .lango-home__nav {
-      position: absolute;
-      z-index: 18;
-      right: 3.2%;
-      bottom: 3.3%;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      width: 29.2%;
-      height: 17.2%;
-      padding: 1.1% 1.8%;
-      border: 4px solid #a74b0d;
-      border-radius: 26px;
-      background: linear-gradient(#d77a24, #a84f13);
-      box-shadow: inset 0 0 0 4px #ef9b37, 0 4px 3px rgba(70, 25, 3, .35);
-    }
-
-    .lango-home__nav .lango-home__button { position: relative; inset: auto; width: 31%; height: 100%; }
-
   </style>
 </head>
 <body>
@@ -1490,7 +1341,6 @@
   </div>
 
   <div id="app">
-    <div id="lango-home-root"></div>
     <div id="idle-video-screen" aria-label="Tap to start conversation">
       <div id="hko-weather-bar" hidden aria-live="polite">
         <img id="hko-weather-icon" alt="" width="32" height="32">
@@ -1564,51 +1414,7 @@
         <button id="btn-stop" type="button">End Conversation</button>
       </div>
     </div>
-
-  <script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js" crossorigin></script>
-  <script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin></script>
-  <script>
-    (() => {
-      const e = React.createElement;
-      const asset = (name) => `/assets/lango-home/${name}.png`;
-
-      function ImageButton({ className, image, label, onClick }) {
-        return e('button', {
-          type: 'button',
-          className: `lango-home__button ${className}`,
-          'aria-label': label,
-          onClick
-        }, e('img', { src: asset(image), alt: '', draggable: false }));
-      }
-
-      function LangoHome() {
-        const startConversation = () => document.getElementById('btn-start')?.click();
-        const openRewards = () => document.getElementById('daily-rewards-btn')?.click();
-        const go = (path) => { window.location.href = path; };
-
-        return e('main', { className: 'lango-home', 'data-node-id': '49:62', 'aria-label': 'Living room' },
-          e('img', { className: 'lango-home__title', src: asset('title'), alt: 'Living room' }),
-          e('img', { className: 'lango-home__clock', src: asset('clock'), alt: '00:00' }),
-          e('img', { className: 'lango-home__starbar', src: asset('starbar'), alt: '' }),
-          e('span', { className: 'lango-home__stars', 'aria-label': '30 stars' }, '30'),
-          e(ImageButton, { className: 'lango-home__record', image: 'store', label: 'Record', onClick: startConversation }),
-          e(ImageButton, { className: 'lango-home__map', image: 'reward', label: 'Map', onClick: () => go('/newGame/') }),
-          e(ImageButton, { className: 'lango-home__reward', image: 'box', label: 'Reward', onClick: openRewards }),
-          e(ImageButton, { className: 'lango-home__collections', image: 'map', label: 'Collections' }),
-          e(ImageButton, { className: 'lango-home__store', image: 'chair', label: 'Store' }),
-          e(ImageButton, { className: 'lango-home__box', image: 'home', label: 'Toy box', onClick: () => go('/newGame/') }),
-          e('nav', { className: 'lango-home__nav', 'aria-label': 'Room navigation' },
-            e(ImageButton, { image: 'back', label: 'Previous room' }),
-            e(ImageButton, { image: 'record', label: 'Start conversation', onClick: startConversation }),
-            e(ImageButton, { image: 'next', label: 'Next room' })
-          ),
-          e('img', { className: 'lango-home__frame', src: asset('character'), alt: '', draggable: false })
-        );
-      }
-
-      ReactDOM.createRoot(document.getElementById('lango-home-root')).render(e(LangoHome));
-    })();
-  </script>
+  </div>
 
   <div id="game-launch-overlay" aria-live="polite" aria-hidden="true">
     <div class="game-launch-stars" aria-hidden="true"></div>
@@ -1656,7 +1462,6 @@
         </div>
       </div>
     </div>
-  </div>
   </div>
 
   <script type="module">
@@ -3144,7 +2949,6 @@
     }
 
     function closeAfterToolEnd() {
-      if (replayingPrepMessages) return;
       if (!pendingEndConversation || ws?.readyState !== WebSocket.OPEN) {
         if (pendingEndConversation) {
           uiLog("end", "closeAfterToolEnd blocked", "warn", {
@@ -3253,7 +3057,7 @@
     }
 
     function triggerEndConversation(reason = "user said goodbye") {
-      if (replayingPrepMessages || pendingEndConversation || ws?.readyState !== WebSocket.OPEN) return;
+      if (pendingEndConversation || ws?.readyState !== WebSocket.OPEN) return;
       uiLog("end", `goodbye detected (${reason})`, "hello");
       pendingEndConversation = true;
       setStatus("Goodbye!");
@@ -3367,7 +3171,6 @@
     }
 
     function handleEndConversationTool(callId, argsJson) {
-      if (replayingPrepMessages) return;
       if (ws?.readyState !== WebSocket.OPEN) {
         uiLog("end", "end_conversation tool ignored — ws not open", "warn", { ws: wsStateLabel() });
         return;
@@ -3463,7 +3266,6 @@
       }
 
       if (name === END_CONVERSATION) {
-        if (replayingPrepMessages) return;
         uiLog("end", "function_call end_conversation received", "hello", { callId });
         handleEndConversationTool(callId, argsJson);
       }
@@ -3580,10 +3382,6 @@
       const e = JSON.parse(data);
 
       if (e.type === "client.error") {
-        if (replayingPrepMessages) {
-          uiLog("session", `client.error during prep replay (ignored): ${e.message}`, "warn");
-          return;
-        }
         uiLog("session", `client.error: ${e.message}`, "err");
         showErr(e.message);
         ws.close();
@@ -3915,17 +3713,6 @@
       btnStart.disabled = true;
       btnStart.textContent = "Connecting…";
       setStatus("Connecting to Uncle Tommy…");
-
-      pendingEndConversation = false;
-      pendingFunctionCalls.clear();
-      handledFunctionCallIds.clear();
-      idleNudgeCount = 0;
-      cancelIdleNudge();
-      if (endConversationCloseTimer) {
-        clearTimeout(endConversationCloseTimer);
-        endConversationCloseTimer = null;
-      }
-      byebyeAnimationPromise = null;
 
       let prep = connectPrep;
       connectPrep = null;
