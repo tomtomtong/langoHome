@@ -11,6 +11,13 @@ const require = createRequire(import.meta.url);
 const Database = require('better-sqlite3');
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
+// Keep paid/external Inworld calls off during development. Explicitly opt in
+// with INWORLD_API_ENABLED=1 when the integration is needed.
+const INWORLD_API_ENABLED = /^(1|true|yes|on)$/i.test(
+  process.env.INWORLD_API_ENABLED || '',
+);
+const INWORLD_API_DISABLED_MESSAGE =
+  'Inworld API is disabled. Set INWORLD_API_ENABLED=1 to enable it.';
 
 // Local: ./config.json  |  Railway: mount a volume (e.g. /app/data) — uses RAILWAY_VOLUME_MOUNT_PATH
 const CONFIG_DIR = process.env.CONFIG_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH || ROOT;
@@ -430,6 +437,7 @@ function resolveInworldApiKey(apiKey) {
 }
 
 async function fetchInworldModels(apiKey, { forceRefresh = false } = {}) {
+  if (!INWORLD_API_ENABLED) throw new Error(INWORLD_API_DISABLED_MESSAGE);
   const key = resolveInworldApiKey(apiKey);
   if (!key) {
     throw new Error('No Inworld API key configured.');
@@ -514,6 +522,16 @@ async function syncUserProfileFromConversation({ username, apiKey, conversationI
   const key = resolveInworldApiKey(apiKey);
   const model = getProfileSyncModel();
   const logBase = { conversationId, username, model };
+
+  if (!INWORLD_API_ENABLED) {
+    console.log(`[profile-sync] skipped ${username}: ${INWORLD_API_DISABLED_MESSAGE}`);
+    recordProfileSyncLog({
+      ...logBase,
+      status: 'skipped',
+      message: INWORLD_API_DISABLED_MESSAGE,
+    });
+    return;
+  }
 
   if (!key) {
     const message = 'No Inworld API key configured.';
@@ -2745,6 +2763,14 @@ const server = createServer((req, res) => {
     return;
   }
 
+  // React home overlay assets live in a nested directory. Keep the route
+  // narrowly scoped so arbitrary files below ROOT cannot be requested.
+  const langoHomeAsset = url.match(/^\/assets\/lango-home\/([a-z0-9-]+\.png)$/i);
+  if (langoHomeAsset) {
+    serveFile(res, join(ROOT, 'assets', 'lango-home', langoHomeAsset[1]));
+    return;
+  }
+
   if (url === '/ChickenDance.fbx') {
     serveFile(res, join(ROOT, 'Animation', 'Dance', 'ChickenDance.fbx'));
     return;
@@ -3092,6 +3118,15 @@ wss.on('connection', (browser, req) => {
     return;
   }
 
+  if (!INWORLD_API_ENABLED) {
+    browser.send(JSON.stringify({
+      type: 'client.error',
+      message: INWORLD_API_DISABLED_MESSAGE,
+    }));
+    browser.close(4003, 'Inworld API disabled');
+    return;
+  }
+
   let connected = false;
 
   const fail = (message) => {
@@ -3148,5 +3183,6 @@ server.listen(port, '0.0.0.0', () => {
   console.log(`Games hub:  http://0.0.0.0:${port}/games/`);
   console.log(`Game database: ${GAME_DB_PATH}`);
   console.log(`Conversation logs: ${CONVERSATIONS_DB_PATH}`);
+  console.log(`Inworld API: ${INWORLD_API_ENABLED ? 'enabled' : 'disabled'}`);
   if (CONFIG_DIR !== ROOT) console.log(`Config stored at ${CONFIG_PATH}`);
 });

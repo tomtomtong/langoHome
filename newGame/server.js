@@ -9,6 +9,11 @@ const Database = require("better-sqlite3");
 const multer = require("multer");
 
 const PORT = process.env.PORT || 3000;
+const INWORLD_API_ENABLED = /^(1|true|yes|on)$/i.test(
+  process.env.INWORLD_API_ENABLED || ""
+);
+const INWORLD_API_DISABLED_MESSAGE =
+  "Inworld API is disabled. Set INWORLD_API_ENABLED=1 to enable it.";
 const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 const DB_MAX_BYTES = 200 * 1024 * 1024;
 const DATA_DIR =
@@ -834,6 +839,7 @@ app.get("/api/settings/inworld", (_req, res) => {
   const apiKey = getSetting("inworld_api_key");
   const voiceId = getSetting("inworld_voice_id") || DEFAULT_INWORLD_VOICE_ID;
   res.json({
+    enabled: INWORLD_API_ENABLED,
     configured: Boolean(apiKey),
     voiceId,
     apiKeyPreview: maskApiKey(apiKey),
@@ -887,6 +893,9 @@ function normalizeRoundWords(words, requiredWord) {
 }
 
 app.post("/api/inworld/llm/wordwhack-round", express.json(), async (req, res) => {
+  if (!INWORLD_API_ENABLED) {
+    return res.status(503).json({ error: INWORLD_API_DISABLED_MESSAGE });
+  }
   const apiKey = getSetting("inworld_api_key");
   if (!apiKey) {
     return res.status(503).json({ error: "Inworld API key not configured." });
@@ -983,6 +992,9 @@ Create a fill-in-the-blank sentence where "${targetWord}" is one of the correct 
 });
 
 app.post("/api/inworld/tts", express.json(), async (req, res) => {
+  if (!INWORLD_API_ENABLED) {
+    return res.status(503).json({ error: INWORLD_API_DISABLED_MESSAGE });
+  }
   const apiKey = getSetting("inworld_api_key");
   if (!apiKey) {
     return res.status(503).json({ error: "Inworld API key not configured." });
