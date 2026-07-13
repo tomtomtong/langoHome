@@ -69,6 +69,20 @@ conversationsDb.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_conversations_started ON conversations(started_at DESC);
   CREATE INDEX IF NOT EXISTS idx_turns_conversation ON conversation_turns(conversation_id, created_at);
+  CREATE TABLE IF NOT EXISTS profile_sync_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id TEXT,
+    username TEXT NOT NULL,
+    model TEXT,
+    status TEXT NOT NULL,
+    message TEXT,
+    changed_fields TEXT,
+    updates_json TEXT,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_profile_sync_logs_created ON profile_sync_logs(created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_profile_sync_logs_conversation ON profile_sync_logs(conversation_id);
+  CREATE INDEX IF NOT EXISTS idx_profile_sync_logs_username ON profile_sync_logs(username, created_at DESC);
 `);
 
 const insertConversationStmt = conversationsDb.prepare(`
@@ -107,6 +121,39 @@ const getConversationTurnsStmt = conversationsDb.prepare(`
 `);
 const deleteConversationStmt = conversationsDb.prepare(`DELETE FROM conversations WHERE id = ?`);
 const deleteConversationTurnsStmt = conversationsDb.prepare(`DELETE FROM conversation_turns WHERE conversation_id = ?`);
+const deleteProfileSyncLogsForConversationStmt = conversationsDb.prepare(`
+  DELETE FROM profile_sync_logs WHERE conversation_id = ?
+`);
+const insertProfileSyncLogStmt = conversationsDb.prepare(`
+  INSERT INTO profile_sync_logs (
+    conversation_id, username, model, status, message, changed_fields, updates_json, created_at
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+`);
+const listProfileSyncLogsStmt = conversationsDb.prepare(`
+  SELECT id, conversation_id, username, model, status, message, changed_fields, updates_json, created_at
+  FROM profile_sync_logs
+  WHERE (? IS NULL OR username = ?)
+    AND (? IS NULL OR conversation_id = ?)
+  ORDER BY created_at DESC
+  LIMIT ? OFFSET ?
+`);
+const countProfileSyncLogsStmt = conversationsDb.prepare(`
+  SELECT COUNT(*) AS total
+  FROM profile_sync_logs
+  WHERE (? IS NULL OR username = ?)
+    AND (? IS NULL OR conversation_id = ?)
+`);
+const getProfileSyncLogStmt = conversationsDb.prepare(`
+  SELECT id, conversation_id, username, model, status, message, changed_fields, updates_json, created_at
+  FROM profile_sync_logs WHERE id = ?
+`);
+const getProfileSyncLogForConversationStmt = conversationsDb.prepare(`
+  SELECT id, conversation_id, username, model, status, message, changed_fields, updates_json, created_at
+  FROM profile_sync_logs
+  WHERE conversation_id = ?
+  ORDER BY created_at DESC
+  LIMIT 1
+`);
 
 function createConversationRecord(username, role) {
   const id = `${Date.now()}-${randomBytes(4).toString('hex')}`;
@@ -164,8 +211,94 @@ function getConversationRecord(id) {
 
 function deleteConversationRecord(id) {
   deleteConversationTurnsStmt.run(id);
+  deleteProfileSyncLogsForConversationStmt.run(id);
   const result = deleteConversationStmt.run(id);
   return result.changes > 0;
+}
+
+function rowToProfileSyncLog(row) {
+  let changedFields = [];
+  let updates = null;
+  try {
+    if (row.changed_fields) changedFields = JSON.parse(row.changed_fields);
+  } catch { /* ignore */ }
+  try {
+    if (row.updates_json) updates = JSON.parse(row.updates_json);
+  } catch { /* ignore */ }
+  return {
+    id: row.id,
+    conversationId: row.conversation_id,
+    username: row.username,
+    model: row.model,
+    status: row.status,
+    message: row.message,
+    changedFields: Array.isArray(changedFields) ? changedFields : [],
+    updates,
+    createdAt: row.created_at,
+  };
+}
+
+function recordProfileSyncLog({
+  conversationId = null,
+  username,
+  model = null,
+  status,
+  message = '',
+  changedFields = [],
+  updates = null,
+}) {
+  insertProfileSyncLogStmt.run(
+    conversationId,
+    username,
+    model,
+    status,
+    message || null,
+    changedFields.length ? JSON.stringify(changedFields) : null,
+    updates && typeof updates === 'object' ? JSON.stringify(updates) : null,
+    Date.now(),
+  );
+}
+
+function listProfileSyncLogRecords({
+  username = null,
+  conversationId = null,
+  limit = 50,
+  offset = 0,
+} = {}) {
+  const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 200);
+  const safeOffset = Math.max(Number(offset) || 0, 0);
+  const filterUser = username ? String(username) : null;
+  const filterConversation = conversationId ? String(conversationId) : null;
+  const rows = listProfileSyncLogsStmt.all(
+    filterUser,
+    filterUser,
+    filterConversation,
+    filterConversation,
+    safeLimit,
+    safeOffset,
+  );
+  const total = countProfileSyncLogsStmt.get(
+    filterUser,
+    filterUser,
+    filterConversation,
+    filterConversation,
+  ).total;
+  return {
+    logs: rows.map(rowToProfileSyncLog),
+    total,
+    limit: safeLimit,
+    offset: safeOffset,
+  };
+}
+
+function getProfileSyncLogRecord(id) {
+  const row = getProfileSyncLogStmt.get(id);
+  return row ? rowToProfileSyncLog(row) : null;
+}
+
+function getProfileSyncLogForConversation(conversationId) {
+  const row = getProfileSyncLogForConversationStmt.get(conversationId);
+  return row ? rowToProfileSyncLog(row) : null;
 }
 
 const SECURITY_HEADERS = {
@@ -284,9 +417,56 @@ function saveUserProfile(username, profile) {
 }
 
 const INWORLD_LLM_URL = 'https://api.inworld.ai/v1/chat/completions';
+const INWORLD_MODELS_URL = 'https://api.inworld.ai/llm/v1alpha/models';
+const INWORLD_MODELS_CACHE_MS = 5 * 60 * 1000;
 const PROFILE_SYNC_MIN_USER_TURNS = 1;
 const DEFAULT_PROFILE_SYNC_MODEL = 'openai/gpt-4o-mini';
 const PROFILE_FIELD_KEYS = Object.keys(DEFAULT_USER_PROFILE);
+
+let inworldModelsCache = { fetchedAt: 0, models: [] };
+
+function resolveInworldApiKey(apiKey) {
+  return apiKey?.trim() || loadConfig().apiKey?.trim() || process.env.INWORLD_API_KEY?.trim() || '';
+}
+
+async function fetchInworldModels(apiKey, { forceRefresh = false } = {}) {
+  const key = resolveInworldApiKey(apiKey);
+  if (!key) {
+    throw new Error('No Inworld API key configured.');
+  }
+  const now = Date.now();
+  if (!forceRefresh && inworldModelsCache.models.length && now - inworldModelsCache.fetchedAt < INWORLD_MODELS_CACHE_MS) {
+    return inworldModelsCache.models;
+  }
+
+  const upstream = await fetch(INWORLD_MODELS_URL, {
+    headers: { Authorization: `Basic ${key}` },
+  });
+  const payload = await upstream.json().catch(() => ({}));
+  if (!upstream.ok) {
+    const message = payload?.message || payload?.error?.message || payload?.error || 'Could not load models from Inworld.';
+    throw new Error(message);
+  }
+
+  const models = (Array.isArray(payload.models) ? payload.models : [])
+    .map((entry) => {
+      const provider = String(entry.provider || '').trim();
+      const model = String(entry.model || '').trim();
+      if (!provider || !model) return null;
+      return {
+        id: `${provider}/${model}`,
+        provider,
+        model,
+        modelCreator: String(entry.modelCreator || '').trim(),
+        isSupported: entry.isSupported !== false,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.id.localeCompare(b.id));
+
+  inworldModelsCache = { fetchedAt: now, models };
+  return models;
+}
 
 function getProfileSyncModel() {
   const cfg = loadConfig();
@@ -331,23 +511,36 @@ Rules:
 
 async function syncUserProfileFromConversation({ username, apiKey, conversationId }) {
   if (!STUDENT_USERS[username]) return;
-  const key = apiKey?.trim() || loadConfig().apiKey?.trim() || process.env.INWORLD_API_KEY?.trim();
+  const key = resolveInworldApiKey(apiKey);
+  const model = getProfileSyncModel();
+  const logBase = { conversationId, username, model };
+
   if (!key) {
-    console.warn(`[profile-sync] skipped ${username}: no Inworld API key`);
+    const message = 'No Inworld API key configured.';
+    console.warn(`[profile-sync] skipped ${username}: ${message}`);
+    recordProfileSyncLog({ ...logBase, status: 'skipped', message });
     return;
   }
 
   const record = getConversationRecord(conversationId);
-  if (!record) return;
+  if (!record) {
+    recordProfileSyncLog({ ...logBase, status: 'skipped', message: 'Conversation not found.' });
+    return;
+  }
 
   const userTurns = record.turns.filter((turn) => turn.role === 'user' && turn.text.trim());
   if (userTurns.length < PROFILE_SYNC_MIN_USER_TURNS) {
-    console.log(`[profile-sync] skipped ${username}: only ${userTurns.length} user turn(s)`);
+    const message = `Only ${userTurns.length} user turn(s); minimum is ${PROFILE_SYNC_MIN_USER_TURNS}.`;
+    console.log(`[profile-sync] skipped ${username}: ${message}`);
+    recordProfileSyncLog({ ...logBase, status: 'skipped', message });
     return;
   }
 
   const transcript = formatTranscriptForProfileSync(record.turns);
-  if (!transcript.trim()) return;
+  if (!transcript.trim()) {
+    recordProfileSyncLog({ ...logBase, status: 'skipped', message: 'No transcript available.' });
+    return;
+  }
 
   const currentProfile = getUserProfile(username);
   const userPrompt = `Account: ${username}
@@ -367,7 +560,7 @@ Update the profile based on this session.`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: getProfileSyncModel(),
+        model,
         messages: [
           { role: 'system', content: buildProfileSyncSystemPrompt() },
           { role: 'user', content: userPrompt },
@@ -381,12 +574,15 @@ Update the profile based on this session.`;
     if (!upstream.ok) {
       const message = payload?.error?.message || payload?.error || 'Inworld LLM request failed.';
       console.warn(`[profile-sync] failed for ${username}:`, message);
+      recordProfileSyncLog({ ...logBase, status: 'error', message: String(message) });
       return;
     }
 
     const content = payload?.choices?.[0]?.message?.content;
     if (!content) {
+      const message = 'Inworld returned empty content.';
       console.warn(`[profile-sync] empty response for ${username}`);
+      recordProfileSyncLog({ ...logBase, status: 'error', message });
       return;
     }
 
@@ -394,7 +590,9 @@ Update the profile based on this session.`;
     try {
       parsed = JSON.parse(content);
     } catch {
+      const message = 'Inworld returned invalid JSON.';
       console.warn(`[profile-sync] invalid JSON for ${username}`);
+      recordProfileSyncLog({ ...logBase, status: 'error', message });
       return;
     }
 
@@ -404,14 +602,29 @@ Update the profile based on this session.`;
     const merged = mergeProfileUpdates(currentProfile, updates);
     const changedKeys = PROFILE_FIELD_KEYS.filter((field) => merged[field] !== currentProfile[field]);
     if (!changedKeys.length) {
+      const message = 'LLM returned no profile changes.';
       console.log(`[profile-sync] no changes for ${username} (${conversationId})`);
+      recordProfileSyncLog({ ...logBase, status: 'no_changes', message, updates });
       return;
     }
 
+    const appliedUpdates = {};
+    for (const field of changedKeys) appliedUpdates[field] = merged[field];
+
     saveUserProfile(username, merged);
+    const message = `Updated ${changedKeys.length} field(s).`;
     console.log(`[profile-sync] updated ${username} (${conversationId}): ${changedKeys.join(', ')}`);
+    recordProfileSyncLog({
+      ...logBase,
+      status: 'success',
+      message,
+      changedFields: changedKeys,
+      updates: appliedUpdates,
+    });
   } catch (e) {
-    console.warn(`[profile-sync] error for ${username}:`, e.message);
+    const message = e.message || 'Profile sync failed.';
+    console.warn(`[profile-sync] error for ${username}:`, message);
+    recordProfileSyncLog({ ...logBase, status: 'error', message });
   }
 }
 
@@ -893,6 +1106,8 @@ function requiresAdmin(url, method) {
   if (url.startsWith('/api/user-profiles')) return true;
   if (url === '/api/debug-log' && m === 'GET') return true;
   if (url.startsWith('/api/conversations')) return true;
+  if (url.startsWith('/api/profile-sync-logs')) return true;
+  if (url === '/api/inworld/models') return true;
 
   const uploadPaths = ['/api/idle-video', '/api/transition-video', '/api/avatar-background'];
   if (uploadPaths.includes(url) && m !== 'GET') return true;
@@ -2336,7 +2551,10 @@ const server = createServer((req, res) => {
         sendJson(res, 404, { error: 'Conversation not found.' });
         return;
       }
-      sendJson(res, 200, record);
+      sendJson(res, 200, {
+        ...record,
+        profileSyncLog: getProfileSyncLogForConversation(conversationId),
+      });
       return;
     }
     if (req.method === 'DELETE') {
@@ -2357,6 +2575,38 @@ const server = createServer((req, res) => {
     const limit = params.get('limit');
     const offset = params.get('offset');
     sendJson(res, 200, listConversationRecords({ username, limit, offset }));
+    return;
+  }
+
+  const profileSyncLogMatch = url.match(/^\/api\/profile-sync-logs\/(\d+)$/);
+  if (profileSyncLogMatch && req.method === 'GET') {
+    const log = getProfileSyncLogRecord(Number(profileSyncLogMatch[1]));
+    if (!log) {
+      sendJson(res, 404, { error: 'Profile summary log not found.' });
+      return;
+    }
+    sendJson(res, 200, log);
+    return;
+  }
+
+  if (url === '/api/profile-sync-logs' && req.method === 'GET') {
+    const params = new URL(rawUrl, 'http://local').searchParams;
+    const username = params.get('username')?.trim() || null;
+    const conversationId = params.get('conversationId')?.trim() || null;
+    const limit = params.get('limit');
+    const offset = params.get('offset');
+    sendJson(res, 200, listProfileSyncLogRecords({ username, conversationId, limit, offset }));
+    return;
+  }
+
+  if (url === '/api/inworld/models' && req.method === 'GET') {
+    const params = new URL(rawUrl, 'http://local').searchParams;
+    const forceRefresh = params.get('refresh') === '1';
+    fetchInworldModels(null, { forceRefresh })
+      .then((models) => sendJson(res, 200, { models, cachedAt: inworldModelsCache.fetchedAt }))
+      .catch((e) => {
+        sendJson(res, 502, { error: e.message || 'Could not load models from Inworld.' });
+      });
     return;
   }
 

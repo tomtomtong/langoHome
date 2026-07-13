@@ -16,8 +16,22 @@
       padding: 1.5rem;
     }
     .page {
-      width: min(100%, 1100px);
+      width: min(100%, 1400px);
       margin: 0 auto;
+    }
+    .split-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 1rem;
+      align-items: start;
+    }
+    @media (max-width: 980px) {
+      .split-grid { grid-template-columns: 1fr; }
+    }
+    .panel-title {
+      margin: 0 0 0.75rem;
+      font-size: 0.95rem;
+      color: #c4c7c5;
     }
     h1 { margin: 0 0 0.25rem; font-size: 1.35rem; }
     .lead {
@@ -102,8 +116,15 @@
       cursor: pointer;
       transition: background 0.12s;
     }
-    tr.session-row:hover { background: #20242f; }
-    tr.session-row.active { background: #252b3a; }
+    tr.session-row:hover,
+    tr.profile-log-row:hover { background: #20242f; }
+    tr.session-row.active,
+    tr.profile-log-row.active { background: #252b3a; }
+    tr.session-row,
+    tr.profile-log-row {
+      cursor: pointer;
+      transition: background 0.12s;
+    }
     .badge {
       display: inline-block;
       padding: 0.15rem 0.45rem;
@@ -114,6 +135,10 @@
     }
     .badge.student { background: #1e3a2f; color: #81c995; }
     .badge.admin { background: #3a2f1e; color: #fdd663; }
+    .badge.success { background: #1e3a2f; color: #81c995; }
+    .badge.skipped { background: #2a3348; color: #9aa0a6; }
+    .badge.error { background: #3a1e1e; color: #f28b82; }
+    .badge.no_changes { background: #2f3a1e; color: #cddc39; }
     .empty {
       padding: 2rem 1rem;
       text-align: center;
@@ -129,6 +154,45 @@
       display: none;
     }
     .detail.visible { display: block; }
+    .detail-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    @media (max-width: 980px) {
+      .detail-grid { grid-template-columns: 1fr; }
+    }
+    .summary-block {
+      padding: 1rem;
+      background: #12151c;
+      border: 1px solid #2a2f3a;
+      border-radius: 10px;
+    }
+    .summary-block h3 {
+      margin: 0 0 0.75rem;
+      font-size: 0.875rem;
+      color: #c4c7c5;
+    }
+    .summary-kv {
+      display: grid;
+      gap: 0.35rem;
+      font-size: 0.8125rem;
+      color: #9aa0a6;
+      margin-bottom: 0.75rem;
+    }
+    .summary-kv strong { color: #e8eaed; }
+    .updates-list {
+      margin: 0;
+      padding-left: 1.1rem;
+      font-size: 0.8125rem;
+      line-height: 1.5;
+    }
+    .updates-list li { margin-bottom: 0.35rem; }
+    .updates-list code {
+      color: #8ab4f8;
+      font-size: 0.75rem;
+    }
     .detail-header {
       display: flex;
       flex-wrap: wrap;
@@ -201,8 +265,8 @@
 </head>
 <body>
   <div class="page">
-    <h1>Conversation History</h1>
-    <p class="lead">Every Inworld realtime session is recorded on the server. Review what each learner said and how Uncle Tommy replied.</p>
+    <h1>Conversations &amp; Profile Summaries</h1>
+    <p class="lead">Review voice session transcripts and the automatic profile-summary runs that happen after each student session.</p>
 
     <div class="toolbar">
       <div class="field">
@@ -214,36 +278,75 @@
       <button type="button" id="refresh-btn">Refresh</button>
     </div>
 
-    <div class="card">
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Started</th>
-              <th>Account</th>
-              <th>Role</th>
-              <th>Duration</th>
-              <th>Turns</th>
-            </tr>
-          </thead>
-          <tbody id="sessions-body">
-            <tr><td colspan="5" class="empty">Loading…</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="pager" id="pager" hidden>
-        <button type="button" class="secondary" id="prev-btn">Previous</button>
-        <span id="pager-label"></span>
-        <button type="button" class="secondary" id="next-btn">Next</button>
-      </div>
+    <div class="split-grid">
+      <section>
+        <h2 class="panel-title">Conversation history</h2>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Started</th>
+                  <th>Account</th>
+                  <th>Duration</th>
+                  <th>Turns</th>
+                </tr>
+              </thead>
+              <tbody id="sessions-body">
+                <tr><td colspan="4" class="empty">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="pager" id="pager" hidden>
+            <button type="button" class="secondary" id="prev-btn">Previous</button>
+            <span id="pager-label"></span>
+            <button type="button" class="secondary" id="next-btn">Next</button>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2 class="panel-title">Profile summary log</h2>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Account</th>
+                  <th>Status</th>
+                  <th>Model</th>
+                </tr>
+              </thead>
+              <tbody id="profile-logs-body">
+                <tr><td colspan="4" class="empty">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="pager" id="profile-pager" hidden>
+            <button type="button" class="secondary" id="profile-prev-btn">Previous</button>
+            <span id="profile-pager-label"></span>
+            <button type="button" class="secondary" id="profile-next-btn">Next</button>
+          </div>
+        </div>
+      </section>
     </div>
 
-    <div class="detail" id="detail-panel">
-      <div class="detail-header">
-        <div class="detail-meta" id="detail-meta"></div>
-        <button type="button" class="danger" id="delete-btn">Delete session</button>
+    <div class="detail-grid">
+      <div class="detail" id="detail-panel">
+        <div class="detail-header">
+          <div class="detail-meta" id="detail-meta"></div>
+          <button type="button" class="danger" id="delete-btn">Delete session</button>
+        </div>
+        <div class="turns" id="turns"></div>
       </div>
-      <div class="turns" id="turns"></div>
+
+      <div class="detail" id="profile-detail-panel">
+        <div class="detail-header">
+          <div class="detail-meta" id="profile-detail-meta"></div>
+        </div>
+        <div id="profile-detail-body"></div>
+      </div>
     </div>
 
     <p class="status" id="status"></p>
@@ -256,16 +359,25 @@
 
     const userFilter = document.getElementById('user-filter');
     const sessionsBody = document.getElementById('sessions-body');
+    const profileLogsBody = document.getElementById('profile-logs-body');
     const detailPanel = document.getElementById('detail-panel');
+    const profileDetailPanel = document.getElementById('profile-detail-panel');
     const detailMeta = document.getElementById('detail-meta');
+    const profileDetailMeta = document.getElementById('profile-detail-meta');
+    const profileDetailBody = document.getElementById('profile-detail-body');
     const turnsEl = document.getElementById('turns');
     const pager = document.getElementById('pager');
+    const profilePager = document.getElementById('profile-pager');
     const pagerLabel = document.getElementById('pager-label');
+    const profilePagerLabel = document.getElementById('profile-pager-label');
     const statusEl = document.getElementById('status');
 
     let offset = 0;
+    let profileOffset = 0;
     let total = 0;
+    let profileTotal = 0;
     let selectedId = null;
+    let selectedProfileLogId = null;
 
     for (const username of USER_LIST) {
       const option = document.createElement('option');
@@ -307,6 +419,11 @@
       return `<span class="badge ${cls}">${role || 'unknown'}</span>`;
     }
 
+    function statusBadge(status) {
+      const cls = ['success', 'skipped', 'error', 'no_changes'].includes(status) ? status : '';
+      return `<span class="badge ${cls}">${status || 'unknown'}</span>`;
+    }
+
     async function loadSessions() {
       clearStatus();
       const username = userFilter.value;
@@ -328,9 +445,33 @@
       updatePager();
     }
 
+    async function loadProfileLogs({ conversationId = null } = {}) {
+      const username = userFilter.value;
+      const params = new URLSearchParams({
+        limit: String(PAGE_SIZE),
+        offset: String(conversationId ? 0 : profileOffset),
+      });
+      if (username) params.set('username', username);
+      if (conversationId) params.set('conversationId', conversationId);
+
+      const res = await fetch(`/api/profile-sync-logs?${params}`);
+      if (!res.ok) {
+        showStatus('Could not load profile summary logs.');
+        return;
+      }
+
+      const data = await res.json();
+      if (!conversationId) {
+        profileTotal = data.total || 0;
+        renderProfileLogs(data.logs || []);
+        updateProfilePager();
+      }
+      return data.logs || [];
+    }
+
     function renderSessions(sessions) {
       if (!sessions.length) {
-        sessionsBody.innerHTML = '<tr><td colspan="5" class="empty">No conversations recorded yet.</td></tr>';
+        sessionsBody.innerHTML = '<tr><td colspan="4" class="empty">No conversations recorded yet.</td></tr>';
         return;
       }
 
@@ -338,7 +479,6 @@
         <tr class="session-row${session.id === selectedId ? ' active' : ''}" data-id="${session.id}">
           <td>${formatDate(session.startedAt)}</td>
           <td>${session.username}</td>
-          <td>${roleBadge(session.role)}</td>
           <td>${formatDuration(session.startedAt, session.endedAt)}</td>
           <td>${session.turnCount || 0}</td>
         </tr>
@@ -346,6 +486,26 @@
 
       sessionsBody.querySelectorAll('.session-row').forEach((row) => {
         row.addEventListener('click', () => openSession(row.dataset.id));
+      });
+    }
+
+    function renderProfileLogs(logs) {
+      if (!logs.length) {
+        profileLogsBody.innerHTML = '<tr><td colspan="4" class="empty">No profile summaries yet.</td></tr>';
+        return;
+      }
+
+      profileLogsBody.innerHTML = logs.map((log) => `
+        <tr class="profile-log-row${log.id === selectedProfileLogId ? ' active' : ''}" data-id="${log.id}" data-conversation-id="${log.conversationId || ''}">
+          <td>${formatDate(log.createdAt)}</td>
+          <td>${log.username}</td>
+          <td>${statusBadge(log.status)}</td>
+          <td>${log.model || '—'}</td>
+        </tr>
+      `).join('');
+
+      profileLogsBody.querySelectorAll('.profile-log-row').forEach((row) => {
+        row.addEventListener('click', () => openProfileLog(row.dataset.id, row.dataset.conversationId));
       });
     }
 
@@ -360,7 +520,77 @@
       document.getElementById('next-btn').disabled = offset + PAGE_SIZE >= total;
     }
 
-    async function openSession(id) {
+    function updateProfilePager() {
+      const hasRows = profileTotal > 0;
+      profilePager.hidden = !hasRows;
+      if (!hasRows) return;
+      const start = profileOffset + 1;
+      const end = Math.min(profileOffset + PAGE_SIZE, profileTotal);
+      profilePagerLabel.textContent = `${start}–${end} of ${profileTotal}`;
+      document.getElementById('profile-prev-btn').disabled = profileOffset <= 0;
+      document.getElementById('profile-next-btn').disabled = profileOffset + PAGE_SIZE >= profileTotal;
+    }
+
+    function renderProfileLogDetail(log) {
+      if (!log) {
+        profileDetailMeta.innerHTML = '<div>Select a profile summary log</div>';
+        profileDetailBody.innerHTML = '<div class="empty">No profile summary selected.</div>';
+        profileDetailPanel.classList.remove('visible');
+        return;
+      }
+
+      profileDetailMeta.innerHTML = `
+        <div><strong>${log.username}</strong> · ${statusBadge(log.status)}</div>
+        <div>Time: ${formatDate(log.createdAt)}</div>
+        <div>Model: ${log.model || '—'}</div>
+        <div>Conversation: ${log.conversationId || '—'}</div>
+      `;
+
+      let updatesHtml = '<div class="empty">No profile fields were updated.</div>';
+      if (log.updates && typeof log.updates === 'object' && Object.keys(log.updates).length) {
+        updatesHtml = `<ul class="updates-list">${Object.entries(log.updates).map(([key, value]) => `
+          <li><code>${key}</code>: ${value}</li>
+        `).join('')}</ul>`;
+      } else if (log.changedFields?.length) {
+        updatesHtml = `<ul class="updates-list">${log.changedFields.map((field) => `<li><code>${field}</code></li>`).join('')}</ul>`;
+      }
+
+      profileDetailBody.innerHTML = `
+        <div class="summary-block">
+          <h3>Summary result</h3>
+          <div class="summary-kv">
+            <div><strong>Status:</strong> ${log.status}</div>
+            <div><strong>Message:</strong> ${log.message || '—'}</div>
+            <div><strong>Changed fields:</strong> ${log.changedFields?.length ? log.changedFields.join(', ') : '—'}</div>
+          </div>
+          <h3>Applied updates</h3>
+          ${updatesHtml}
+        </div>
+      `;
+      profileDetailPanel.classList.add('visible');
+    }
+
+    async function openProfileLog(logId, conversationId = '') {
+      selectedProfileLogId = Number(logId);
+      profileLogsBody.querySelectorAll('.profile-log-row').forEach((row) => {
+        row.classList.toggle('active', Number(row.dataset.id) === selectedProfileLogId);
+      });
+
+      const res = await fetch(`/api/profile-sync-logs/${encodeURIComponent(logId)}`);
+      if (!res.ok) {
+        showStatus('Could not load profile summary details.');
+        return;
+      }
+
+      const log = await res.json();
+      renderProfileLogDetail(log);
+
+      if (conversationId && conversationId !== selectedId) {
+        await openSession(conversationId, { skipProfileLogFetch: true });
+      }
+    }
+
+    async function openSession(id, { skipProfileLogFetch = false } = {}) {
       selectedId = id;
       sessionsBody.querySelectorAll('.session-row').forEach((row) => {
         row.classList.toggle('active', row.dataset.id === id);
@@ -399,6 +629,27 @@
       }
 
       detailPanel.classList.add('visible');
+
+      if (!skipProfileLogFetch) {
+        if (data.profileSyncLog) {
+          selectedProfileLogId = data.profileSyncLog.id;
+          profileLogsBody.querySelectorAll('.profile-log-row').forEach((row) => {
+            row.classList.toggle('active', Number(row.dataset.id) === selectedProfileLogId);
+          });
+          renderProfileLogDetail(data.profileSyncLog);
+        } else {
+          const logs = await loadProfileLogs({ conversationId: id });
+          if (logs[0]) {
+            selectedProfileLogId = logs[0].id;
+            profileLogsBody.querySelectorAll('.profile-log-row').forEach((row) => {
+              row.classList.toggle('active', Number(row.dataset.id) === selectedProfileLogId);
+            });
+            renderProfileLogDetail(logs[0]);
+          } else {
+            renderProfileLogDetail(null);
+          }
+        }
+      }
     }
 
     async function deleteSession() {
@@ -414,19 +665,32 @@
       }
 
       selectedId = null;
+      selectedProfileLogId = null;
       detailPanel.classList.remove('visible');
+      profileDetailPanel.classList.remove('visible');
       await loadSessions();
+      await loadProfileLogs();
     }
 
-    document.getElementById('refresh-btn').addEventListener('click', () => {
+    async function refreshAll() {
       offset = 0;
-      loadSessions();
-    });
+      profileOffset = 0;
+      selectedId = null;
+      selectedProfileLogId = null;
+      detailPanel.classList.remove('visible');
+      profileDetailPanel.classList.remove('visible');
+      await Promise.all([loadSessions(), loadProfileLogs()]);
+    }
+
+    document.getElementById('refresh-btn').addEventListener('click', refreshAll);
     userFilter.addEventListener('change', () => {
       offset = 0;
+      profileOffset = 0;
       selectedId = null;
+      selectedProfileLogId = null;
       detailPanel.classList.remove('visible');
-      loadSessions();
+      profileDetailPanel.classList.remove('visible');
+      Promise.all([loadSessions(), loadProfileLogs()]);
     });
     document.getElementById('prev-btn').addEventListener('click', () => {
       offset = Math.max(0, offset - PAGE_SIZE);
@@ -438,9 +702,19 @@
         loadSessions();
       }
     });
+    document.getElementById('profile-prev-btn').addEventListener('click', () => {
+      profileOffset = Math.max(0, profileOffset - PAGE_SIZE);
+      loadProfileLogs();
+    });
+    document.getElementById('profile-next-btn').addEventListener('click', () => {
+      if (profileOffset + PAGE_SIZE < profileTotal) {
+        profileOffset += PAGE_SIZE;
+        loadProfileLogs();
+      }
+    });
     document.getElementById('delete-btn').addEventListener('click', deleteSession);
 
-    loadSessions();
+    refreshAll();
   </script>
 </body>
 </html>

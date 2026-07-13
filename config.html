@@ -281,17 +281,21 @@
         <p class="field-hint">Inworld voice ID from the portal or List Voices API.</p>
       </div>
       <div class="field">
-        <label for="model">LLM Model <span style="color:#5f6368;font-weight:400">(optional)</span></label>
-        <input id="model" type="text" placeholder="Default: openai/gpt-4o-mini" autocomplete="off">
-        <p class="field-hint">Provider/model pair for realtime voice conversations, e.g. <code>openai/gpt-4o-mini</code> or <code>openai/gpt-4.1-nano</code>.</p>
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:0.75rem; margin-bottom:0.5rem">
+          <label for="model" style="margin:0">LLM Model <span style="color:#5f6368;font-weight:400">(optional)</span></label>
+          <button type="button" id="btn-refresh-models" class="secondary" style="flex:0 0 auto; padding:0.35rem 0.65rem; font-size:0.75rem">Refresh models</button>
+        </div>
+        <select id="model">
+          <option value="">Default: openai/gpt-4o-mini</option>
+        </select>
+        <input id="modelCustom" type="text" placeholder="provider/model" autocomplete="off" style="display:none; margin-top:0.5rem">
+        <p id="models-status" class="field-hint">Loading models from Inworld…</p>
+        <p class="field-hint">Model for realtime voice conversations. List is fetched from Inworld using your API key.</p>
       </div>
       <div class="field">
         <label for="profileSyncModel">Profile summary model</label>
         <select id="profileSyncModel">
           <option value="openai/gpt-4o-mini">openai/gpt-4o-mini (default)</option>
-          <option value="openai/gpt-4.1-nano">openai/gpt-4.1-nano</option>
-          <option value="openai/gpt-4o">openai/gpt-4o</option>
-          <option value="__custom__">Custom…</option>
         </select>
         <input id="profileSyncModelCustom" type="text" placeholder="provider/model" autocomplete="off" style="display:none; margin-top:0.5rem">
         <p class="field-hint">Inworld LLM used after each session to summarize the conversation into the learner&rsquo;s account profile.</p>
@@ -332,17 +336,16 @@
     const VOICE_KEY = 'inworld_voice_id';
     const MODEL_KEY = 'inworld_model';
     const PROFILE_SYNC_MODEL_KEY = 'inworld_profile_sync_model';
-    const PROFILE_SYNC_MODEL_PRESETS = [
-      'openai/gpt-4o-mini',
-      'openai/gpt-4.1-nano',
-      'openai/gpt-4o',
-    ];
+    const DEFAULT_PROFILE_SYNC_MODEL = 'openai/gpt-4o-mini';
     const input = document.getElementById('key');
     const prompt = document.getElementById('prompt');
     const voice = document.getElementById('voice');
     const model = document.getElementById('model');
+    const modelCustom = document.getElementById('modelCustom');
     const profileSyncModel = document.getElementById('profileSyncModel');
     const profileSyncModelCustom = document.getElementById('profileSyncModelCustom');
+    const modelsStatus = document.getElementById('models-status');
+    const btnRefreshModels = document.getElementById('btn-refresh-models');
     const status = document.getElementById('status');
     const debugReportsEl = document.getElementById('debug-reports');
     const btnRefreshLogs = document.getElementById('btn-refresh-logs');
@@ -351,6 +354,118 @@
     let serverConfig = null;
     let configReady = false;
     let saveTimer = null;
+    let inworldModels = [];
+    let pendingModelValues = { model: '', profileSyncModel: DEFAULT_PROFILE_SYNC_MODEL };
+
+    function resolveModelSelectValue(selectEl, customEl) {
+      if (selectEl.value === '__custom__') return customEl.value.trim();
+      return selectEl.value.trim();
+    }
+
+    function populateModelSelect(selectEl, models, { allowEmpty = false, emptyLabel = '' } = {}) {
+      const current = selectEl.value;
+      const options = [];
+      if (allowEmpty) {
+        options.push(`<option value="">${emptyLabel}</option>`);
+      }
+      for (const entry of models) {
+        const label = entry.modelCreator
+          ? `${entry.id} — ${entry.modelCreator}`
+          : entry.id;
+        options.push(`<option value="${entry.id}">${label}</option>`);
+      }
+      options.push('<option value="__custom__">Custom…</option>');
+      selectEl.innerHTML = options.join('');
+      if ([...selectEl.options].some((opt) => opt.value === current)) {
+        selectEl.value = current;
+      }
+    }
+
+    function applyModelSelect(selectEl, customEl, value, models, { allowEmpty = false, emptyLabel = '', fallback = '' } = {}) {
+      const trimmed = String(value || '').trim();
+      populateModelSelect(selectEl, models, { allowEmpty, emptyLabel });
+      const knownIds = new Set(models.map((entry) => entry.id));
+      if (!trimmed && allowEmpty) {
+        selectEl.value = '';
+        customEl.style.display = 'none';
+        customEl.value = '';
+        return;
+      }
+      if (knownIds.has(trimmed)) {
+        selectEl.value = trimmed;
+        customEl.style.display = 'none';
+        customEl.value = '';
+        return;
+      }
+      if (!trimmed && fallback && knownIds.has(fallback)) {
+        selectEl.value = fallback;
+        customEl.style.display = 'none';
+        customEl.value = '';
+        return;
+      }
+      if (!trimmed && fallback) {
+        selectEl.value = '__custom__';
+        customEl.style.display = 'block';
+        customEl.value = fallback;
+        return;
+      }
+      selectEl.value = '__custom__';
+      customEl.style.display = 'block';
+      customEl.value = trimmed;
+    }
+
+    async function loadInworldModels({ forceRefresh = false } = {}) {
+      modelsStatus.textContent = 'Loading models from Inworld…';
+      btnRefreshModels.disabled = true;
+      try {
+        const url = forceRefresh ? '/api/inworld/models?refresh=1' : '/api/inworld/models';
+        const res = await fetch(url);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Could not load models.');
+        inworldModels = Array.isArray(data.models) ? data.models : [];
+        applyModelSelect(model, modelCustom, pendingModelValues.model, inworldModels, {
+          allowEmpty: true,
+          emptyLabel: 'Default: openai/gpt-4o-mini',
+        });
+        applyModelSelect(
+          profileSyncModel,
+          profileSyncModelCustom,
+          pendingModelValues.profileSyncModel,
+          inworldModels,
+          { fallback: DEFAULT_PROFILE_SYNC_MODEL },
+        );
+        modelsStatus.textContent = `${inworldModels.length} models loaded from Inworld.`;
+      } catch (e) {
+        modelsStatus.textContent = e.message || 'Could not load models from Inworld.';
+        applyModelSelect(model, modelCustom, pendingModelValues.model, [], {
+          allowEmpty: true,
+          emptyLabel: 'Default: openai/gpt-4o-mini',
+        });
+        applyModelSelect(
+          profileSyncModel,
+          profileSyncModelCustom,
+          pendingModelValues.profileSyncModel,
+          [],
+          { fallback: DEFAULT_PROFILE_SYNC_MODEL },
+        );
+      } finally {
+        btnRefreshModels.disabled = false;
+      }
+    }
+
+    function wireModelSelect(selectEl, customEl) {
+      selectEl.addEventListener('change', () => {
+        if (selectEl.value === '__custom__') {
+          customEl.style.display = 'block';
+          customEl.focus();
+        } else {
+          customEl.style.display = 'none';
+          customEl.value = '';
+        }
+        scheduleSave();
+      });
+      customEl.addEventListener('input', scheduleSave);
+    }
 
     const GAME_ICON_DEFS = [
       {
@@ -546,23 +661,7 @@ ${linesText.replace(/</g, '&lt;')}</pre>
     loadDebugReports();
 
     function resolveProfileSyncModelValue() {
-      if (profileSyncModel.value === '__custom__') {
-        return profileSyncModelCustom.value.trim();
-      }
-      return profileSyncModel.value.trim();
-    }
-
-    function applyProfileSyncModel(value) {
-      const trimmed = String(value || '').trim();
-      if (!trimmed || PROFILE_SYNC_MODEL_PRESETS.includes(trimmed)) {
-        profileSyncModel.value = trimmed || 'openai/gpt-4o-mini';
-        profileSyncModelCustom.style.display = 'none';
-        profileSyncModelCustom.value = '';
-        return;
-      }
-      profileSyncModel.value = '__custom__';
-      profileSyncModelCustom.style.display = 'block';
-      profileSyncModelCustom.value = trimmed;
+      return resolveModelSelectValue(profileSyncModel, profileSyncModelCustom);
     }
 
     function syncLocalStorage(cfg) {
@@ -584,8 +683,23 @@ ${linesText.replace(/</g, '&lt;')}</pre>
       input.value = cfg.apiKey ?? '';
       prompt.value = cfg.instructions ?? '';
       voice.value = cfg.voice ?? '';
-      model.value = cfg.model ?? '';
-      applyProfileSyncModel(cfg.profileSyncModel ?? '');
+      pendingModelValues = {
+        model: cfg.model ?? '',
+        profileSyncModel: cfg.profileSyncModel ?? DEFAULT_PROFILE_SYNC_MODEL,
+      };
+      if (inworldModels.length) {
+        applyModelSelect(model, modelCustom, pendingModelValues.model, inworldModels, {
+          allowEmpty: true,
+          emptyLabel: 'Default: openai/gpt-4o-mini',
+        });
+        applyModelSelect(
+          profileSyncModel,
+          profileSyncModelCustom,
+          pendingModelValues.profileSyncModel,
+          inworldModels,
+          { fallback: DEFAULT_PROFILE_SYNC_MODEL },
+        );
+      }
       applyGameIcons(cfg.gameIcons);
     }
 
@@ -617,7 +731,7 @@ ${linesText.replace(/</g, '&lt;')}</pre>
         apiKey,
         instructions: prompt.value.trim(),
         voice: voice.value.trim(),
-        model: model.value.trim(),
+        model: resolveModelSelectValue(model, modelCustom),
         profileSyncModel: resolveProfileSyncModelValue(),
         lipsync: serverConfig?.lipsync,
         avatar: serverConfig?.avatar,
@@ -669,24 +783,21 @@ ${linesText.replace(/</g, '&lt;')}</pre>
         loadFromLocalStorage();
       } finally {
         configReady = true;
+        await loadInworldModels();
       }
     }
 
     loadConfig();
 
     document.getElementById('form').addEventListener('submit', (e) => e.preventDefault());
-    [input, prompt, voice, model, profileSyncModelCustom].forEach((el) => {
+    [input, prompt, voice].forEach((el) => {
       el.addEventListener('input', scheduleSave);
     });
-    profileSyncModel.addEventListener('change', () => {
-      if (profileSyncModel.value === '__custom__') {
-        profileSyncModelCustom.style.display = 'block';
-        profileSyncModelCustom.focus();
-      } else {
-        profileSyncModelCustom.style.display = 'none';
-        profileSyncModelCustom.value = '';
-      }
-      scheduleSave();
+    wireModelSelect(model, modelCustom);
+    wireModelSelect(profileSyncModel, profileSyncModelCustom);
+    btnRefreshModels.addEventListener('click', () => loadInworldModels({ forceRefresh: true }));
+    input.addEventListener('change', () => {
+      if (resolveApiKey()) loadInworldModels({ forceRefresh: true });
     });
   </script>
   <script src="/admin-nav.js"></script>
