@@ -1779,6 +1779,7 @@
     let lastKungfuAt = 0;
     let cachedConfig = null;
     let connectPrep = null;
+    let replayingPrepMessages = false;
     const CHICKEN_DANCE_COOLDOWN_MS = 2500;
     const KUNGFU_COOLDOWN_MS = 2500;
     const CAMERA_HEIGHT_STEP = 0.05;
@@ -1918,7 +1919,7 @@
 
     function scheduleIdleNudge() {
       cancelIdleNudge();
-      if (!active || pendingEndConversation || ws?.readyState !== WebSocket.OPEN) return;
+      if (replayingPrepMessages || !active || pendingEndConversation || ws?.readyState !== WebSocket.OPEN) return;
       if (idleNudgeCount >= MAX_IDLE_NUDGES) {
         uiLog("idle", `nudge cap reached (${MAX_IDLE_NUDGES}) — scheduling end of conversation`, "warn");
         idleEndTimer = setTimeout(() => {
@@ -2606,8 +2607,11 @@
         uiLog("hello", "transition complete → connectConversation", "hello");
         await connectConversationAfterVideos();
       } catch (e) {
+        uiLog("hello", `start from idle failed: ${e?.message || e}`, "err");
         abortConnectPrep();
-        throw e;
+        abortPreparedConversationView();
+        showErr("Could not connect. Try again.");
+        resumeWakeWordListening();
       } finally {
         idleVideoStarting = false;
       }
@@ -3336,6 +3340,26 @@
       });
     }
 
+    function openSessionWebSocket(cfg, apiKey) {
+      const wsProtocol = location.protocol === "https:" ? "wss:" : "ws:";
+      const socket = new WebSocket(`${wsProtocol}//${location.host}/ws`);
+      return new Promise((resolve, reject) => {
+        socket.onopen = () => {
+          uiLog("session", "ws open", "hello");
+          socket.send(JSON.stringify({
+            type: "client.auth",
+            apiKey,
+            instructions: getSessionInstructions(cfg),
+            voice: cfg.voice?.trim() || DEFAULT_VOICE,
+            model: cfg.model?.trim() || DEFAULT_MODEL,
+          }));
+          resolve(socket);
+        };
+        socket.onerror = () => reject(new Error("WebSocket failed"));
+        socket.onclose = () => reject(new Error("WebSocket closed"));
+      });
+    }
+
     function setupMicPipeline() {
       if (ctx?.state === "suspended") ctx.resume().catch(() => {});
       source = ctx.createMediaStreamSource(stream);
@@ -3423,19 +3447,23 @@
         audioDone = true;
         maybeEndAvatarSpeech();
         closeAfterToolEnd();
-        if (!playing && queue.length === 0) scheduleIdleNudge();
+        if (!replayingPrepMessages && !playing && queue.length === 0) scheduleIdleNudge();
       } else if (e.type === "response.done") {
         audioDone = true;
         maybeEndAvatarSpeech();
         closeAfterToolEnd();
-        if (!playing && queue.length === 0) scheduleIdleNudge();
+        if (!replayingPrepMessages && !playing && queue.length === 0) scheduleIdleNudge();
       } else if (e.type === "response.function_call_arguments.done") {
         handleFunctionCall(e);
       }
     }
 
     function attachWsHandlers(socket) {
-      socket.onmessage = ({ data }) => handleWsMessage(data);
+      socket.onmessage = ({ data }) => {
+        try { handleWsMessage(data); } catch (err) {
+          uiLog("session", `message handler: ${err?.message || err}`, "err");
+        }
+      };
       socket.onclose = (event) => {
         uiLog("session", "ws closed", "hello", {
           code: event.code,
@@ -3499,12 +3527,12 @@
           prep.messageQueue.push(data);
         };
 
-        prep.ws.onclose = () => {
-          if (prep.aborted || active) return;
-          prep.aborted = true;
-        };
-
-        await Promise.all([micWork, waitForWsOpen(prep.ws)]);
+        await micWork;
+        try {
+          await waitForWsOpen(prep.ws);
+        } catch (e) {
+          uiLog("hello", `connect prep ws: ${e?.message || e}`, "warn");
+        }
         if (prep.aborted) throw new Error("Connection prep aborted");
         return prep;
       })().catch((e) => {
@@ -3691,40 +3719,35 @@
       const queuedMessages = [];
 
       try {
-        if (prep && !prep.aborted) {
-          await prep.readyPromise;
-          if (prep.aborted || prep.ws?.readyState !== WebSocket.OPEN) {
-            throw new Error("Connection prep failed");
+        if (prep) {
+          try { await prep.readyPromise; } catch (e) {
+            uiLog("session", `connect prep wait: ${e?.message || e}`, "warn");
           }
-          ctx = prep.ctx;
-          stream = prep.stream;
-          ws = prep.ws;
-          queuedMessages.push(...prep.messageQueue);
+          if (!prep.aborted && prep.stream && prep.ctx) {
+            ctx = prep.ctx;
+            stream = prep.stream;
+          }
+          if (!prep.aborted && prep.ws?.readyState === WebSocket.OPEN) {
+            ws = prep.ws;
+            queuedMessages.push(...prep.messageQueue);
+          } else {
+            try { prep.ws?.close(); } catch {}
+          }
           prep.ctx = null;
           prep.stream = null;
           prep.ws = null;
-        } else {
+          prep.messageQueue = [];
+        }
+
+        if (!stream || !ctx) {
           ctx = new AudioContext({ sampleRate: 24000 });
           stream = await navigator.mediaDevices.getUserMedia({
             audio: { sampleRate: 24000, channelCount: 1, echoCancellation: true, noiseSuppression: true },
           });
-          const wsProtocol = location.protocol === "https:" ? "wss:" : "ws:";
-          ws = new WebSocket(`${wsProtocol}//${location.host}/ws`);
-          await new Promise((resolve, reject) => {
-            ws.onopen = () => {
-              uiLog("session", "ws open", "hello");
-              ws.send(JSON.stringify({
-                type: "client.auth",
-                apiKey,
-                instructions: getSessionInstructions(cfg),
-                voice: cfg.voice?.trim() || DEFAULT_VOICE,
-                model: cfg.model?.trim() || DEFAULT_MODEL,
-              }));
-              resolve();
-            };
-            ws.onerror = () => reject(new Error("WebSocket failed"));
-            ws.onclose = () => reject(new Error("WebSocket closed"));
-          });
+        }
+
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          ws = await openSessionWebSocket(cfg, apiKey);
         }
       } catch (e) {
         const denied = e?.name === "NotAllowedError" || e?.name === "NotFoundError";
@@ -3748,8 +3771,17 @@
       setupMicPipeline();
       uiLog("session", "session live", "hello", { prep: Boolean(prep), queued: queuedMessages.length });
 
-      for (const data of queuedMessages) {
-        handleWsMessage(data);
+      if (queuedMessages.length) {
+        replayingPrepMessages = true;
+        try {
+          for (const data of queuedMessages) {
+            try { handleWsMessage(data); } catch (err) {
+              uiLog("session", `replay message: ${err?.message || err}`, "warn");
+            }
+          }
+        } finally {
+          replayingPrepMessages = false;
+        }
       }
 
       if (!preparedView && !inSession) {
