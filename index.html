@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="screen-orientation" content="landscape">
   <title>Uncle Tommy — Voice Agent</title>
+  <link rel="stylesheet" href="/assets/page-motion.css">
+  <script src="/assets/page-motion.js" defer></script>
   <script>
     const initialParams = new URLSearchParams(location.search);
     if (initialParams.get("preview") === "1") {
@@ -759,129 +761,86 @@
 
     #hko-weather-bar {
       position: absolute;
-      top: max(0.75rem, env(safe-area-inset-top));
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 4;
-      display: flex;
-      align-items: flex-start;
-      gap: 0.625rem;
-      max-width: min(94vw, 34rem);
-      padding: 0.5rem 0.875rem;
-      border-radius: 1rem;
-      background: rgba(15, 17, 23, 0.72);
-      color: #e8eaed;
-      font-size: 0.875rem;
-      line-height: 1.2;
+      z-index: 16;
+      top: 3%;
+      right: 4.6%;
+      width: 23.5%;
+      aspect-ratio: 1365 / 1024;
+      color: #fff9e8;
+      line-height: 1;
       pointer-events: none;
-      backdrop-filter: blur(8px);
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
+      filter: drop-shadow(0 4px 2px rgba(75, 31, 4, 0.24));
     }
 
     #hko-weather-bar[hidden] {
       display: none !important;
     }
 
-    #hko-weather-icon {
-      width: 2rem;
-      height: 2rem;
-      flex: 0 0 auto;
+    .lango-home__weather-frame {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
       object-fit: contain;
     }
 
     .hko-weather-details {
-      display: flex;
-      flex-direction: column;
-      gap: 0.2rem;
-      min-width: 0;
+      position: absolute;
+      z-index: 1;
+      top: 30.7%;
+      right: 15.8%;
+      bottom: 31.9%;
+      left: 15.8%;
+      box-sizing: border-box;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 0;
+      align-content: center;
+      padding: 0 3.5%;
+      overflow: hidden;
+      border-radius: 9% / 20%;
+      background: #183558;
     }
 
     #hko-weather-datetime {
-      font-size: 0.8125rem;
-      color: #c4c7c5;
+      overflow: hidden;
+      color: #d6e5f7;
+      font: 800 clamp(12px, 2.7cqh, 21px)/0.92 'Baloo 2', sans-serif;
+      text-align: center;
+      text-overflow: ellipsis;
       white-space: nowrap;
     }
 
     .hko-weather-row {
       display: flex;
-      flex-wrap: wrap;
+      min-width: 0;
       align-items: center;
-      gap: 0.35rem 0.625rem;
+      justify-content: center;
+      gap: 2.2%;
+    }
+
+    #hko-weather-icon {
+      display: none;
     }
 
     #hko-weather-condition {
-      font-weight: 600;
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      font: 800 clamp(14px, 3cqh, 24px)/0.9 'Baloo 2', sans-serif;
+      text-overflow: ellipsis;
       white-space: nowrap;
     }
 
     .hko-weather-stat {
-      color: #c4c7c5;
+      color: #d6e5f7;
+      font: 800 clamp(14px, 3cqh, 24px)/0.9 'Baloo 2', sans-serif;
       white-space: nowrap;
     }
 
     .hko-weather-stat strong {
-      color: #e8eaed;
-      font-weight: 700;
-    }
-
-    body.has-idle-video.videos-loading #hko-weather-bar {
-      visibility: hidden;
-    }
-
-    body.pair-theme-warm #hko-weather-bar {
-      background: rgba(92, 56, 20, 0.78);
-      color: #ffe8c8;
-    }
-
-    body.pair-theme-warm .hko-weather-stat {
-      color: #ffd9a8;
-    }
-
-    body.pair-theme-warm .hko-weather-stat strong,
-    body.pair-theme-warm #hko-weather-datetime {
-      color: #fff4e8;
-    }
-
-    body.pair-theme-cool #hko-weather-bar {
-      background: rgba(18, 58, 92, 0.78);
-      color: #d8f1ff;
-    }
-
-    body.pair-theme-cool .hko-weather-stat {
-      color: #b8dff8;
-    }
-
-    body.pair-theme-cool .hko-weather-stat strong,
-    body.pair-theme-cool #hko-weather-datetime {
-      color: #eef8ff;
-    }
-
-    body.pair-theme-nature #hko-weather-bar {
-      background: rgba(24, 72, 38, 0.78);
-      color: #dff9e5;
-    }
-
-    body.pair-theme-nature .hko-weather-stat {
-      color: #bfeecf;
-    }
-
-    body.pair-theme-nature .hko-weather-stat strong,
-    body.pair-theme-nature #hko-weather-datetime {
-      color: #f2fff5;
-    }
-
-    body.pair-theme-night #hko-weather-bar {
-      background: rgba(42, 28, 82, 0.78);
-      color: #e8ddff;
-    }
-
-    body.pair-theme-night .hko-weather-stat {
-      color: #d4c4ff;
-    }
-
-    body.pair-theme-night .hko-weather-stat strong,
-    body.pair-theme-night #hko-weather-datetime {
-      color: #f5f0ff;
+      color: #fff9e8;
+      font-weight: 800;
     }
 
     @keyframes idle-hint-pulse {
@@ -1497,7 +1456,7 @@
       align-items: flex-start;
       gap: 3cqw;
       padding: 0;
-      overflow-x: auto;
+      overflow-x: hidden;
       overflow-y: hidden;
       border-radius: 0 1.8cqw 1.8cqw 0;
       scroll-snap-type: x mandatory;
@@ -1507,8 +1466,11 @@
 
     .daily-rewards-slots::-webkit-scrollbar { display: none; }
 
+    .daily-rewards-slots.show-scrollbar { overflow-x: auto; }
+
     /* Custom always-visible scrollbar (native macOS overlay bars are unreliable). */
     .daily-rewards-scrollbar {
+      display: none;
       position: absolute;
       z-index: 2;
       left: 27.9%;
@@ -1520,6 +1482,8 @@
       box-shadow: inset 0 1px 2px rgba(0, 0, 0, .35);
       pointer-events: none;
     }
+
+    .daily-rewards-slots.show-scrollbar + .daily-rewards-scrollbar { display: block; }
 
     .daily-rewards-scrollbar-thumb {
       position: absolute;
@@ -2058,11 +2022,11 @@
 
     .lango-home__title { position: absolute; z-index: 15; top: -1.2%; left: 29.7%; width: 41.6%; height: 14.1%; object-fit: contain; }
     .lango-home__clock { position: absolute; z-index: 16; top: 7.2%; right: 7.4%; width: 12.4%; }
-    .lango-home__starbar { position: absolute; z-index: 16; top: 17.9%; right: 7.8%; width: 12.6%; }
+    .lango-home__starbar { position: absolute; z-index: 16; top: 22%; right: 7.8%; width: 12.6%; }
     .lango-home__stars {
       position: absolute;
       z-index: 17;
-      top: 18.2%;
+      top: 22.3%;
       right: 10.1%;
       width: 5.5%;
       color: #fff;
@@ -2078,8 +2042,8 @@
     .lango-home__map { top: 24%; left: 6.4%; width: 9%; height: 12.3%; }
     .lango-home__reward { top: 38%; left: 6.4%; width: 9%; height: 12.2%; }
     .lango-home__collections { left: 7.5%; bottom: 8.2%; width: 16.2%; height: 12%; }
-    .lango-home__store { top: 26.5%; right: 7.3%; width: 8.7%; height: 12.8%; }
-    .lango-home__box { top: 40.2%; right: 6.8%; width: 9.2%; height: 12.8%; }
+    .lango-home__store { top: 30.6%; right: 7.3%; width: 8.7%; height: 12.8%; }
+    .lango-home__box { top: 44.3%; right: 6.8%; width: 9.2%; height: 12.8%; }
 
     .lango-home__nav {
       position: absolute;
@@ -2099,6 +2063,193 @@
     }
 
     .lango-home__nav .lango-home__button { position: relative; inset: auto; width: 31%; height: 100%; }
+
+    /* Cheerful, button-specific interstitials for the home screen. */
+    .lango-fun-transition {
+      --fun-a: #ffcb4c;
+      --fun-b: #ff6f91;
+      position: absolute;
+      inset: 0;
+      z-index: 195;
+      display: grid;
+      place-items: center;
+      padding: 5%;
+      overflow: hidden;
+      pointer-events: auto;
+      background:
+        radial-gradient(circle at 18% 18%, rgba(255,255,255,.5) 0 3%, transparent 3.2%),
+        radial-gradient(circle at 82% 24%, rgba(255,255,255,.38) 0 2.2%, transparent 2.4%),
+        linear-gradient(145deg, var(--fun-a), var(--fun-b));
+      animation: fun-screen-in 220ms ease-out both;
+      font-family: "Baloo 2", system-ui, sans-serif;
+    }
+
+    .lango-fun-transition[data-kind="map"] { --fun-a: #72df86; --fun-b: #21b8a6; }
+    .lango-fun-transition[data-kind="reward"] { --fun-a: #ffd34d; --fun-b: #ff7b54; }
+    .lango-fun-transition[data-kind="collection"] { --fun-a: #ff9bd2; --fun-b: #9c70ef; }
+    .lango-fun-transition[data-kind="game"] { --fun-a: #72d8ff; --fun-b: #6657df; }
+
+    .lango-fun-transition__rays {
+      position: absolute;
+      width: 115%;
+      aspect-ratio: 1;
+      opacity: .22;
+      background: repeating-conic-gradient(from 5deg, #fff 0 10deg, transparent 10deg 24deg);
+      animation: fun-rays-spin 8s linear infinite;
+    }
+
+    .lango-fun-transition__card {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: min(64%, 520px);
+      padding: 4.5% 5%;
+      border: clamp(3px, .45vw, 7px) solid rgba(255,255,255,.78);
+      border-radius: clamp(24px, 4vw, 54px);
+      color: #fff;
+      text-align: center;
+      background: rgba(72, 36, 96, .23);
+      box-shadow: 0 1.2rem 2.4rem rgba(62, 23, 79, .25), inset 0 2px 0 rgba(255,255,255,.42);
+      backdrop-filter: blur(8px);
+      animation: fun-card-pop 520ms cubic-bezier(.2, 1.35, .4, 1) both;
+    }
+
+    .lango-fun-transition__icon {
+      display: grid;
+      place-items: center;
+      width: clamp(78px, 13cqw, 170px);
+      aspect-ratio: 1;
+      margin-bottom: 2%;
+      border-radius: 50%;
+      background: rgba(255,255,255,.92);
+      box-shadow: 0 .5rem 0 rgba(83, 38, 91, .18), 0 1rem 2rem rgba(83, 38, 91, .18);
+      font-size: clamp(48px, 8cqw, 104px);
+      line-height: 1;
+      animation: fun-icon-bounce 650ms 80ms cubic-bezier(.2, 1.45, .45, 1) both;
+    }
+
+    .lango-fun-transition__title {
+      margin: 0;
+      font-size: clamp(28px, 5.2cqw, 68px);
+      font-weight: 800;
+      line-height: 1;
+      text-shadow: 0 4px 0 rgba(79, 38, 90, .22);
+    }
+
+    .lango-fun-transition__sub {
+      margin: 1.5% 0 0;
+      font-size: clamp(15px, 2.4cqw, 32px);
+      font-weight: 700;
+      line-height: 1.15;
+    }
+
+    .lango-fun-transition__spark {
+      position: absolute;
+      z-index: 1;
+      left: var(--spark-x);
+      top: var(--spark-y);
+      color: #fff6a5;
+      font-size: clamp(20px, 3.8cqw, 50px);
+      text-shadow: 0 3px 0 rgba(91, 45, 102, .18);
+      animation: fun-spark 700ms var(--spark-delay) ease-out both;
+    }
+
+    @keyframes fun-screen-in { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fun-rays-spin { to { transform: rotate(1turn); } }
+    @keyframes fun-card-pop {
+      from { opacity: 0; transform: scale(.72) rotate(-3deg); }
+      to { opacity: 1; transform: scale(1) rotate(0); }
+    }
+    @keyframes fun-icon-bounce {
+      from { opacity: 0; transform: translateY(28%) scale(.45) rotate(-15deg); }
+      to { opacity: 1; transform: translateY(0) scale(1) rotate(0); }
+    }
+    @keyframes fun-spark {
+      0% { opacity: 0; transform: scale(.1) rotate(-25deg); }
+      55% { opacity: 1; transform: scale(1.35) rotate(12deg); }
+      100% { opacity: .9; transform: scale(1) rotate(0); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .lango-fun-transition,
+      .lango-fun-transition__rays,
+      .lango-fun-transition__card,
+      .lango-fun-transition__icon,
+      .lango-fun-transition__spark { animation: none; }
+    }
+
+    /* Matches the locked-location dialog used on the map. */
+    .coming-soon-backdrop {
+      position: absolute;
+      inset: 0;
+      z-index: 196;
+      display: grid;
+      place-items: center;
+      padding: 5%;
+      pointer-events: auto;
+      background: rgba(43, 20, 8, .56);
+      backdrop-filter: blur(4px);
+      animation: fun-screen-in 160ms ease both;
+    }
+
+    .coming-soon-card {
+      width: min(88%, 520px);
+      padding: clamp(22px, 3.2cqw, 44px);
+      border: clamp(5px, .65cqw, 9px) solid #ffca3d;
+      border-radius: clamp(22px, 3cqw, 40px);
+      color: #fff7cf;
+      text-align: center;
+      background: linear-gradient(180deg, #f39122 0%, #bd5b16 100%);
+      box-shadow: inset 0 0 0 clamp(3px, .35cqw, 5px) #7e310a, 0 18px 45px rgba(53, 19, 2, .45);
+      animation: coming-soon-card-in 220ms cubic-bezier(.2, .8, .2, 1) both;
+    }
+
+    .coming-soon-card h2 {
+      margin: 0;
+      color: #fff7c6;
+      font-size: clamp(30px, 4cqw, 55px);
+      font-weight: 800;
+      line-height: 1;
+      text-shadow: 0 .18cqw 0 #6e2b0b;
+    }
+
+    .coming-soon-card p {
+      margin: .7em 0 1.1em;
+      font-size: clamp(16px, 1.7cqw, 24px);
+      font-weight: 700;
+      line-height: 1.25;
+    }
+
+    .coming-soon-card button {
+      min-width: 38%;
+      padding: .55em 1.1em;
+      border: 4px solid #6f2a09;
+      border-radius: 999px;
+      color: #fff8d8;
+      font-size: clamp(17px, 1.8cqw, 25px);
+      font-weight: 800;
+      cursor: pointer;
+      background: #91501f;
+      box-shadow: inset 0 0 0 3px rgba(255, 255, 255, .22), 0 5px 0 #692707;
+    }
+
+    .coming-soon-card button:active {
+      transform: translateY(3px);
+      box-shadow: inset 0 0 0 3px rgba(255,255,255,.18), 0 2px 0 #692707;
+    }
+
+    .coming-soon-card button:focus-visible { outline: 4px solid #fff7a8; outline-offset: 3px; }
+
+    @keyframes coming-soon-card-in {
+      from { opacity: 0; transform: translateY(5%) scale(.92); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .coming-soon-backdrop,
+      .coming-soon-card { animation: none; }
+    }
 
     /* Figma frames 768:1141 / 768:1173 — Doll Collection. The artwork in
        these frames already contains the display lettering, so the React
@@ -2327,17 +2478,6 @@
     <div id="collection-root"></div>
     <iframe id="map-preview-frame" title="Map preview" src="/map/index.html?preview=1&amp;embedded=1"></iframe>
     <div id="idle-video-screen" aria-label="Tap to start conversation">
-      <div id="hko-weather-bar" hidden aria-live="polite">
-        <img id="hko-weather-icon" alt="" width="32" height="32">
-        <div class="hko-weather-details">
-          <div id="hko-weather-datetime">--</div>
-          <div class="hko-weather-row">
-            <span id="hko-weather-condition">--</span>
-            <span class="hko-weather-stat"><strong id="hko-weather-temp">--</strong></span>
-            <span class="hko-weather-stat">Humidity <strong id="hko-weather-humidity">--</strong></span>
-          </div>
-        </div>
-      </div>
       <video id="idle-video" class="screen-video" loop playsinline preload="auto"></video>
       <video id="transition-video" class="screen-video" playsinline preload="auto"></video>
       <div id="idle-video-loading">Loading videos…</div>
@@ -2392,17 +2532,150 @@
   <script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js" crossorigin></script>
   <script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin></script>
   <script>
+    // Lightweight UI sound layer. Each play gets its own Audio instance so
+    // quick taps and celebration cues can overlap without cutting each other off.
+    window.LangoSfx = (() => {
+      const sounds = Object.freeze({
+        next: { src: "/assets/sfx/ui-next.mp3", volume: 0.38 },
+        back: { src: "/assets/sfx/ui-back.mp3", volume: 0.38 },
+        start: { src: "/assets/sfx/game-start.mp3", volume: 0.52 },
+        loginSuccess: { src: "/assets/sfx/login-success.mp3", volume: 0.42 },
+        loginFail: { src: "/assets/sfx/login-fail.mp3", volume: 0.32 },
+        powerUp: { src: "/assets/sfx/power-up.mp3", volume: 0.58 },
+        victory: { src: "/assets/sfx/victory.mp3", volume: 0.52 },
+        weakness: { src: "/assets/sfx/weakness.mp3", volume: 0.30 },
+      });
+      const active = new Set();
+      let primed = false;
+
+      function cleanup(entry) {
+        entry.audio.removeEventListener("ended", entry.onEnded);
+        active.delete(entry);
+      }
+
+      function play(name, { volume = 1, interrupt = false } = {}) {
+        const sound = sounds[name];
+        if (!sound) return null;
+        if (interrupt) stop(name);
+
+        const audio = new Audio(sound.src);
+        audio.preload = "auto";
+        audio.volume = Math.max(0, Math.min(1, sound.volume * volume));
+        const entry = { name, audio, onEnded: null };
+        entry.onEnded = () => cleanup(entry);
+        audio.addEventListener("ended", entry.onEnded, { once: true });
+        active.add(entry);
+        audio.play().catch((error) => {
+          console.warn(`[sfx] Could not play "${name}"`, error);
+          cleanup(entry);
+        });
+        return audio;
+      }
+
+      function stop(name) {
+        for (const entry of [...active]) {
+          if (name && entry.name !== name) continue;
+          entry.audio.pause();
+          entry.audio.currentTime = 0;
+          cleanup(entry);
+        }
+      }
+
+      // Asking the browser to load the small files after the first gesture
+      // keeps the initial page light and makes later async success cues reliable.
+      function prime() {
+        if (primed) return;
+        primed = true;
+        Object.values(sounds).forEach(({ src }) => {
+          const audio = new Audio();
+          audio.preload = "auto";
+          audio.src = src;
+          audio.load();
+        });
+      }
+
+      window.addEventListener("pointerdown", prime, { once: true, passive: true });
+      window.addEventListener("keydown", prime, { once: true, passive: true });
+      window.addEventListener("pagehide", () => stop());
+      return { play, stop, prime };
+    })();
+  </script>
+  <script>
     (() => {
       const e = React.createElement;
       const asset = (name) => `/assets/lango-home/${name}.png`;
 
-      function ImageButton({ className, image, label, onClick }) {
+      function ImageButton({ className, image, label, onClick, sfx = 'next' }) {
         return e('button', {
           type: 'button',
           className: `lango-home__button ${className}`,
           'aria-label': label,
-          onClick
+          onClick: (event) => {
+            window.LangoSfx?.play(sfx);
+            onClick?.(event);
+          }
         }, e('img', { src: asset(image), alt: '', draggable: false }));
+      }
+
+      const FUN_TRANSITIONS = Object.freeze({
+        map: { icon: '🗺️', title: 'Adventure time!', sub: 'Off we go!' },
+        reward: { icon: '🎁', title: 'Surprise!', sub: 'Your rewards are here!' },
+        collection: { icon: '🧸', title: 'My collection!', sub: 'Meet your little friends!' },
+        game: { icon: '🎮', title: 'Game time!', sub: 'Ready, set, play!' },
+      });
+
+      function FunTransition({ kind }) {
+        const content = FUN_TRANSITIONS[kind];
+        if (!content) return null;
+        const sparks = [
+          ['10%', '16%', '0ms', '★'], ['82%', '12%', '90ms', '✦'],
+          ['6%', '70%', '160ms', '●'], ['88%', '68%', '220ms', '★'],
+          ['22%', '84%', '280ms', '✦'], ['73%', '85%', '120ms', '●'],
+        ];
+        return e('section', {
+          className: 'lango-fun-transition',
+          'data-kind': kind,
+          role: 'status',
+          'aria-live': 'polite',
+          'aria-label': `${content.title} ${content.sub}`
+        },
+          e('div', { className: 'lango-fun-transition__rays', 'aria-hidden': 'true' }),
+          ...sparks.map(([x, y, delay, symbol], index) => e('span', {
+            key: index,
+            className: 'lango-fun-transition__spark',
+            style: { '--spark-x': x, '--spark-y': y, '--spark-delay': delay },
+            'aria-hidden': 'true'
+          }, symbol)),
+          e('div', { className: 'lango-fun-transition__card' },
+            e('span', { className: 'lango-fun-transition__icon', 'aria-hidden': 'true' }, content.icon),
+            e('h2', { className: 'lango-fun-transition__title' }, content.title),
+            e('p', { className: 'lango-fun-transition__sub' }, content.sub)
+          )
+        );
+      }
+
+      function ComingSoonDialog({ feature, onClose }) {
+        React.useEffect(() => {
+          const onKeyDown = (event) => event.key === 'Escape' && onClose();
+          window.addEventListener('keydown', onKeyDown);
+          return () => window.removeEventListener('keydown', onKeyDown);
+        }, [onClose]);
+
+        return e('div', {
+          className: 'coming-soon-backdrop',
+          onMouseDown: (event) => event.target === event.currentTarget && onClose()
+        },
+          e('section', {
+            className: 'coming-soon-card',
+            role: 'dialog',
+            'aria-modal': 'true',
+            'aria-labelledby': 'coming-soon-title'
+          },
+            e('h2', { id: 'coming-soon-title' }, `${feature} is coming soon`),
+            e('p', null, 'We are working on it. Please check back soon!'),
+            e('button', { type: 'button', autoFocus: true, onClick: onClose }, 'Got it')
+          )
+        );
       }
 
       function DailyRewards() {
@@ -2422,7 +2695,13 @@
             e('div', { className: 'daily-rewards-celebrate', id: 'daily-rewards-celebrate', 'aria-hidden': 'true' }),
             e('img', { className: 'daily-rewards-gifts', src: rewardAsset('character'), alt: '', draggable: false }),
             e('img', { className: 'daily-rewards-character', src: rewardAsset('gifts'), alt: '', draggable: false }),
-            e('button', { type: 'button', className: 'daily-rewards-return', id: 'daily-rewards-close', 'aria-label': 'Return home' },
+            e('button', {
+              type: 'button',
+              className: 'daily-rewards-return',
+              id: 'daily-rewards-close',
+              'aria-label': 'Return home',
+              onClick: () => window.LangoSfx?.play('back')
+            },
               e('img', { src: rewardAsset('return-button'), alt: '', draggable: false })
             ),
             e('img', { className: 'daily-rewards-title-art', src: rewardAsset('quest-strip'), alt: 'Reward', draggable: false }),
@@ -2511,6 +2790,7 @@
         }, []);
 
         const closeCollection = () => {
+          window.LangoSfx?.play('back');
           setVisible(false);
           document.querySelector('.lango-home__collections')?.focus();
         };
@@ -2564,26 +2844,66 @@
       }
 
       function LangoHome() {
-        const startConversation = () => document.getElementById('btn-start')?.click();
+        const [transitionKind, setTransitionKind] = React.useState(null);
+        const [comingSoonFeature, setComingSoonFeature] = React.useState(null);
+        const transitionBusy = React.useRef(false);
         const openRewards = () => document.getElementById('daily-rewards-btn')?.click();
-        const go = (path) => { window.location.href = path; };
+        const playTransition = (kind, action, { immediate = false, duration = 1100 } = {}) => {
+          if (transitionBusy.current) return;
+          transitionBusy.current = true;
+          setTransitionKind(kind);
+          if (immediate) action?.();
+          window.setTimeout(() => {
+            if (!immediate) action?.();
+            if (immediate) {
+              setTransitionKind(null);
+              transitionBusy.current = false;
+            }
+          }, duration);
+        };
+        const go = (kind, path) => playTransition(kind, () => { window.location.href = path; });
+        const reveal = (kind, action) => playTransition(kind, () => {
+          action?.();
+          window.setTimeout(() => {
+            setTransitionKind(null);
+            transitionBusy.current = false;
+          }, 240);
+        }, { duration: 1050 });
+        const closeComingSoon = () => {
+          window.LangoSfx?.play('back');
+          setComingSoonFeature(null);
+        };
 
         return e('main', { className: 'lango-home', 'data-node-id': '49:62', 'aria-label': 'Living room' },
+          transitionKind && e(FunTransition, { kind: transitionKind }),
+          comingSoonFeature && e(ComingSoonDialog, { feature: comingSoonFeature, onClose: closeComingSoon }),
           e('img', { className: 'lango-home__title', src: asset('title'), alt: 'Living room' }),
-          e('img', { className: 'lango-home__clock', src: asset('clock'), alt: '00:00' }),
+          e('section', { id: 'hko-weather-bar', className: 'lango-home__clock', 'aria-label': 'Hong Kong weather', 'aria-live': 'polite' },
+            e('img', { className: 'lango-home__weather-frame', src: asset('clock'), alt: '', draggable: false }),
+            e('div', { className: 'hko-weather-details' },
+              e('div', { id: 'hko-weather-datetime' }, '--'),
+              e('div', { className: 'hko-weather-row' },
+                e('img', { id: 'hko-weather-icon', alt: '', width: 32, height: 32, hidden: true }),
+                e('span', { id: 'hko-weather-condition' }, 'Weather'),
+                e('span', { className: 'hko-weather-stat' }, e('strong', { id: 'hko-weather-temp' }, '--')),
+                e('span', { className: 'hko-weather-stat', 'aria-label': 'Humidity' }, '💧', e('strong', { id: 'hko-weather-humidity' }, '--'))
+              )
+            )
+          ),
           e('img', { className: 'lango-home__starbar', src: asset('starbar'), alt: '' }),
           e('span', { className: 'lango-home__stars', 'aria-label': '30 stars' }, '30'),
-          e(ImageButton, { className: 'lango-home__record', image: 'store', label: 'Record', onClick: startConversation }),
-          e(ImageButton, { className: 'lango-home__map', image: 'reward', label: 'Map', onClick: () => go('/map') }),
-          e(ImageButton, { className: 'lango-home__reward', image: 'box', label: 'Reward', onClick: openRewards }),
+          e(ImageButton, { className: 'lango-home__record', image: 'store', label: 'Record', onClick: () => setComingSoonFeature('Record'), sfx: 'weakness' }),
+          e(ImageButton, { className: 'lango-home__map', image: 'reward', label: 'Map', onClick: () => go('map', '/map') }),
+          e(ImageButton, { className: 'lango-home__reward', image: 'box', label: 'Reward', onClick: () => reveal('reward', openRewards), sfx: 'powerUp' }),
           e(ImageButton, {
             className: 'lango-home__collections',
             image: 'map',
             label: 'Collections',
-            onClick: () => window.dispatchEvent(new CustomEvent('lango:open-collection'))
+            onClick: () => reveal('collection', () => window.dispatchEvent(new CustomEvent('lango:open-collection'))),
+            sfx: 'powerUp'
           }),
-          e(ImageButton, { className: 'lango-home__store', image: 'chair', label: 'Store' }),
-          e(ImageButton, { className: 'lango-home__box', image: 'home', label: 'Toy box', onClick: () => go('/newGame/') }),
+          e(ImageButton, { className: 'lango-home__store', image: 'chair', label: 'Store', onClick: () => setComingSoonFeature('Store'), sfx: 'weakness' }),
+          e(ImageButton, { className: 'lango-home__box', image: 'home', label: 'Toy box', onClick: () => go('game', '/newGame/') }),
           e('img', { className: 'lango-home__frame', src: asset('character'), alt: '', draggable: false })
         );
       }
@@ -2649,6 +2969,7 @@
     const DEFAULT_VOICE = "default-zylgts2tamenvybeti3z0w__uncle_tommy";
     const DEFAULT_MODEL = "openai/gpt-4o-mini";
     const PREVIEW_MODE = new URLSearchParams(location.search).get("preview") === "1";
+    const sfx = window.LangoSfx;
 
     const btnStart = document.getElementById("btn-start");
     const btnStop = document.getElementById("btn-stop");
@@ -2712,6 +3033,12 @@
       5: "5days.png",
       7: "7days.png",
     };
+    const REWARD_SLOT_DEFAULTS = [
+      { day: 1, id: "word-whack", label: "New Game", icon: "mole", stars: 5 },
+      { day: 3, id: "langomon-doll", label: "Langomon Doll", icon: "penguin", stars: 10 },
+      { day: 5, id: "new-spot", label: "New Spot", icon: "spot", stars: 15 },
+      { day: 7, id: "seven-day-doll", label: "Langomon Doll", icon: "penguin", stars: 0 },
+    ];
     function dailyRewardAsset(name) {
       return `/assets/daily-rewards/${name}?v=20260713f`;
     }
@@ -2775,17 +3102,31 @@
 
       dailyRewardsBtn.classList.toggle("has-claim", status.canClaimMilestone);
 
-      const milestones = [...(status.milestones || [])];
-      if (!milestones.some((slot) => slot.day === 7)) {
-        milestones.push({
-          day: 7,
-          id: "seven-day-doll",
-          label: "Langomon Doll",
-          icon: "penguin",
-          stars: 0,
-          status: "locked",
-        });
-      }
+      // Keep the hardcoded PNG card row intact even if an older or partial
+      // check-in response omits milestones. API data only updates card state.
+      const milestoneByDay = new Map(
+        (Array.isArray(status.milestones) ? status.milestones : [])
+          .filter((slot) => REWARD_SLOT_CARD_ASSETS[Number(slot?.day)])
+          .map((slot) => [Number(slot.day), slot]),
+      );
+      const claimedIds = new Set(Array.isArray(status.claimedMilestones) ? status.claimedMilestones : []);
+      const milestones = REWARD_SLOT_DEFAULTS.map((fallback) => {
+        const apiSlot = milestoneByDay.get(fallback.day);
+        const fallbackStatus = claimedIds.has(fallback.id)
+          ? "claimed"
+          : status.nextMilestone?.id === fallback.id ? "active" : "locked";
+        return {
+          ...fallback,
+          ...(apiSlot || {}),
+          day: fallback.day,
+          status: apiSlot?.status || fallbackStatus,
+        };
+      });
+      const needsRewardScrollbar = milestones.some(
+        (slot) => slot.day === 7 && slot.status !== "locked",
+      );
+      dailyRewardsSlots.classList.toggle("show-scrollbar", needsRewardScrollbar);
+      if (!needsRewardScrollbar) dailyRewardsSlots.scrollLeft = 0;
       // Park the claim button outside the slots before wiping them, since it
       // normally lives inside the active card.
       const rewardsActions = document.querySelector(".daily-rewards-actions");
@@ -2840,6 +3181,7 @@
     }
 
     function celebrateDailyReward() {
+      sfx?.play("victory", { interrupt: true });
       dailyRewardsCelebrate.innerHTML = "";
       const particleColors = ["#ffe66d", "#ff7a45", "#7ee74b", "#63d9ff", "#ff73bd", "#ffffff"];
       for (let i = 0; i < 30; i++) {
@@ -2926,6 +3268,7 @@
           showRewardCongratulations(data.reward);
         }
       } catch {
+        sfx?.play("weakness", { interrupt: true });
         dailyRewardsClaimBtn.disabled = false;
         dailyRewardsClaimBtn.textContent = "Get";
       }
@@ -2947,15 +3290,25 @@
       } catch { /* ignore */ }
     }
 
-    dailyRewardsBtn.addEventListener("click", () => {
+    dailyRewardsBtn.addEventListener("click", (event) => {
+      if (event.isTrusted) sfx?.play("powerUp");
       fetchDailyRewardsStatus().then(() => showDailyRewardsOverlay());
     });
     dailyRewardsClose.addEventListener("click", hideDailyRewardsOverlay);
     dailyRewardsOverlay.addEventListener("click", (e) => {
-      if (e.target === dailyRewardsOverlay) hideDailyRewardsOverlay();
+      if (e.target === dailyRewardsOverlay) {
+        sfx?.play("back");
+        hideDailyRewardsOverlay();
+      }
     });
-    dailyRewardsClaimBtn.addEventListener("click", claimDailyReward);
-    dailyRewardModalCta.addEventListener("click", closeRewardCongratulations);
+    dailyRewardsClaimBtn.addEventListener("click", () => {
+      sfx?.play("next");
+      claimDailyReward();
+    });
+    dailyRewardModalCta.addEventListener("click", () => {
+      sfx?.play("next");
+      closeRewardCongratulations();
+    });
     dailyRewardsSlots.addEventListener("scroll", () => requestAnimationFrame(syncDailyRewardScrollbar), { passive: true });
 
     const captionUserEl = document.getElementById("caption-user");
@@ -3141,6 +3494,7 @@
       if (!gameLaunchOverlay || !game) return;
 
       launchingGame = true;
+      sfx?.play("start", { interrupt: true });
       gameLaunchOverlay.classList.add("visible");
       gameLaunchOverlay.setAttribute("aria-hidden", "false");
       gameLaunchCard.className = `game-launch-card theme-${game.theme}`;
@@ -3181,6 +3535,7 @@
         gameLaunchName.textContent = game.name;
         gameLaunchSub.textContent = game.sub;
         setGameLaunchProgress(72);
+        sfx?.play("powerUp", { interrupt: true });
         spawnGameLaunchConfetti();
         await waitMs(900);
       } else {
@@ -3191,12 +3546,14 @@
         gameLaunchName.textContent = game.name;
         gameLaunchSub.textContent = game.sub;
         setGameLaunchProgress(72);
+        sfx?.play("powerUp", { interrupt: true });
         await waitMs(700);
       }
 
       gameLaunchHeading.textContent = "Loading game!";
       gameLaunchSub.textContent = "Get ready to play";
       setGameLaunchProgress(100);
+      sfx?.play("next", { interrupt: true });
       await waitMs(650);
     }
 
@@ -3471,6 +3828,7 @@
       setSplashProgress(100);
       if (splashScreenEl) splashScreenEl.setAttribute("aria-busy", "false");
       document.body.classList.add("splash-dismissed");
+      window.dispatchEvent(new CustomEvent("lango:page-reveal"));
     }
 
     function applyVideoAudioSettings(videoEl) {
@@ -3529,16 +3887,13 @@
       const tz = getHkoDisplayTimezone();
       const dateText = new Intl.DateTimeFormat("en-HK", {
         timeZone: tz,
-        weekday: "short",
         day: "numeric",
         month: "short",
-        year: "numeric",
       }).format(now);
       const timeText = new Intl.DateTimeFormat("en-HK", {
         timeZone: tz,
         hour: "numeric",
         minute: "2-digit",
-        second: "2-digit",
         hour12: true,
       }).format(now);
       hkoWeatherDatetime.textContent = `${dateText} · ${timeText}`;
@@ -5020,6 +5375,7 @@
       const apiKey = cfg.apiKey?.trim();
       if (!apiKey) {
         uiLog("session", "no API key", "err");
+        sfx?.play("loginFail", { interrupt: true });
         showErr("No API key set.");
         abortConnectPrep();
         if (preparedView) abortPreparedConversationView();
@@ -5081,6 +5437,7 @@
       } catch (e) {
         const denied = e?.name === "NotAllowedError" || e?.name === "NotFoundError";
         uiLog("session", denied ? "getUserMedia denied" : `connect failed: ${e?.message}`, "err");
+        sfx?.play("loginFail", { interrupt: true });
         showErr(denied ? "Microphone access denied." : "Could not connect. Try again.");
         try { ws?.close(); } catch {}
         ws = null;
@@ -5098,6 +5455,7 @@
       attachWsHandlers(ws);
       active = true;
       setupMicPipeline();
+      sfx?.play("loginSuccess", { interrupt: true });
       uiLog("session", "session live", "hello", { prep: Boolean(prep), queued: queuedMessages.length });
 
       if (queuedMessages.length) {
@@ -5189,7 +5547,10 @@
       ]);
     });
 
-    btnStop.addEventListener("click", endConversation);
+    btnStop.addEventListener("click", () => {
+      sfx?.play("back");
+      endConversation();
+    });
     btnSendLog.addEventListener("click", sendDebugLogToServer);
 
     window.addEventListener("resize", () => {
@@ -5255,7 +5616,7 @@
         } else {
           setStatus('Tap "Start" to begin a conversation');
         }
-        initDailyRewards({ autoShow: true });
+        initDailyRewards({ autoShow: false });
       } catch (e) {
         console.error(e);
         dismissSplash();
@@ -5399,6 +5760,13 @@
       wakeWordEnabled = false;
       dismissSplash();
       setVideosLoading(false);
+      renderHkoWeather({
+        condition: "Cloudy",
+        temperature: 28,
+        temperatureUnit: "C",
+        humidity: 82,
+        humidityUnit: "%",
+      });
       const cfg = await getConfig();
       applyGameIconsFromConfig(cfg.gameIcons);
       applyActivePairBackground(cfg);

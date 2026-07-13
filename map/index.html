@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="screen-orientation" content="landscape">
   <title>Lango Map</title>
+  <link rel="stylesheet" href="/assets/page-motion.css">
+  <script src="/assets/page-motion.js" defer></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&display=swap" rel="stylesheet">
@@ -276,6 +278,29 @@
     (() => {
       const e = React.createElement;
       const STORAGE_KEY = 'lango.systemUnlockedLocations';
+      const soundEffects = Object.freeze({
+        next: { src: '/assets/sfx/ui-next.mp3', volume: 0.68 },
+        back: { src: '/assets/sfx/ui-back.mp3', volume: 0.68 },
+        unlocked: { src: '/assets/sfx/power-up.mp3', volume: 0.78 },
+        locked: { src: '/assets/sfx/weakness.mp3', volume: 0.72 }
+      });
+      const activeSounds = new Set();
+
+      const playSound = (name) => {
+        const effect = soundEffects[name];
+        if (!effect) return;
+        const audio = new Audio(effect.src);
+        audio.preload = 'auto';
+        audio.volume = effect.volume;
+        activeSounds.add(audio);
+        const cleanup = () => activeSounds.delete(audio);
+        audio.addEventListener('ended', cleanup, { once: true });
+        audio.play().catch((error) => {
+          console.warn(`[map sfx] Could not play "${name}"`, error);
+          cleanup();
+        });
+      };
+
       const locations = [
         { id: 'home', label: 'Home', image: 'location-top-left.png', unlocked: true },
         { id: 'school', label: 'School', image: 'location-top-right.png' },
@@ -335,10 +360,23 @@
 
         const chooseLocation = (location) => {
           if (!unlocked.has(location.id)) {
+            playSound('locked');
             setLockedNotice(location);
             return;
           }
+          playSound('unlocked');
           announce(`${location.label} is unlocked!`);
+        };
+
+        const closeLockedNotice = () => {
+          playSound('back');
+          setLockedNotice(null);
+        };
+
+        const leaveMap = () => {
+          playSound('back');
+          const destination = returnToRewards ? '/?openRewards=1' : '/';
+          setTimeout(() => { window.location.href = destination; }, 180);
         };
 
         const returnToRewards = new URLSearchParams(window.location.search).get('return') === 'rewards';
@@ -348,7 +386,7 @@
             e('img', { className: 'map-background', src: '/assets/map/background.png', alt: '', draggable: false }),
             e('img', { className: 'map-frame', src: '/assets/map/map-overlay.png', alt: '', draggable: false }),
             e('img', { className: 'map-title', src: '/assets/map/side-panel.png', alt: 'Map', draggable: false }),
-            e('button', { type: 'button', className: 'map-return', 'aria-label': returnToRewards ? 'Return to rewards' : 'Return home', onClick: () => { window.location.href = returnToRewards ? '/?openRewards=1' : '/'; } },
+            e('button', { type: 'button', className: 'map-return', 'aria-label': returnToRewards ? 'Return to rewards' : 'Return home', onClick: leaveMap },
               e('img', { src: '/assets/map/home-button.png', alt: '', draggable: false })
             ),
             ...locations.map((location) => e('button', {
@@ -360,7 +398,7 @@
               onClick: () => chooseLocation(location)
             }, e('img', { src: `/assets/map/${location.image}`, alt: '', draggable: false }))),
             toast && e('div', { className: 'map-toast', role: 'status' }, toast),
-            lockedNotice && e(LockedDialog, { location: lockedNotice, onClose: () => setLockedNotice(null) })
+            lockedNotice && e(LockedDialog, { location: lockedNotice, onClose: closeLockedNotice })
           )
         );
       }

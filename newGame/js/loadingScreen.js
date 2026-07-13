@@ -44,6 +44,7 @@ const GameLoadingScreen = (() => {
   async function hide() {
     if (!overlayEl) {
       document.documentElement.classList.add("game-ready");
+      window.dispatchEvent(new CustomEvent("lango:page-reveal"));
       return;
     }
 
@@ -61,6 +62,7 @@ const GameLoadingScreen = (() => {
     overlayEl.classList.add("is-hidden");
     overlayEl.setAttribute("aria-busy", "false");
     document.documentElement.classList.add("game-ready");
+    window.dispatchEvent(new CustomEvent("lango:page-reveal"));
     await wait(FADE_MS);
     overlayEl.remove();
   }

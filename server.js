@@ -1239,6 +1239,9 @@ function isPreviewSafeRequest(req, url, rawUrl) {
     || url.startsWith('/assets/daily-rewards/')
     || url.startsWith('/assets/collections/')
     || url.startsWith('/assets/map/')
+    || url.startsWith('/assets/sfx/')
+    || url === '/assets/page-motion.css'
+    || url === '/assets/page-motion.js'
     || url.startsWith('/games/assets/')
     || /^\/api\/(idle-video|transition-video|avatar-background)$/.test(url)
     || /^\/api\/game-icons\/(wordwhack|cardgame|findgame)$/.test(url)
@@ -1319,6 +1322,7 @@ const MIME = {
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
   '.webp': 'image/webp',
+  '.mp3': 'audio/mpeg',
   '.mp4': 'video/mp4',
   '.webm': 'video/webm',
   '.mov': 'video/quicktime',
@@ -2956,6 +2960,18 @@ const server = createServer((req, res) => {
   const mapAsset = url.match(/^\/assets\/map\/([a-z0-9-]+\.png)$/i);
   if (mapAsset) {
     serveFile(res, join(ROOT, 'assets', 'map', mapAsset[1]));
+    return;
+  }
+
+  const soundEffectAsset = url.match(/^\/assets\/sfx\/([a-z0-9-]+\.mp3)$/i);
+  if (soundEffectAsset) {
+    serveFile(res, join(ROOT, 'assets', 'sfx', soundEffectAsset[1]));
+    return;
+  }
+
+  const sharedMotionAsset = url.match(/^\/assets\/(page-motion\.(?:css|js))$/i);
+  if (sharedMotionAsset) {
+    serveFile(res, join(ROOT, 'assets', sharedMotionAsset[1]));
     return;
   }
 
