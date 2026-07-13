@@ -15,6 +15,7 @@ const ROOT = dirname(fileURLToPath(import.meta.url));
 const CONFIG_DIR = process.env.CONFIG_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH || ROOT;
 const CONFIG_PATH = join(CONFIG_DIR, 'config.json');
 const USER_PROFILES_PATH = join(CONFIG_DIR, 'user-profiles.json');
+const CHECK_INS_PATH = join(CONFIG_DIR, 'check-ins.json');
 const SESSIONS_PATH = join(CONFIG_DIR, 'sessions.json');
 const DEBUG_LOG_PATH = join(CONFIG_DIR, 'hello-debug-log.json');
 const DEBUG_LOG_MAX_REPORTS = 20;
@@ -159,6 +160,196 @@ function saveUserProfile(username, profile) {
   return true;
 }
 
+const REWARD_CYCLE_DAYS = 7;
+const REWARD_CYCLE = [
+  { day: 1, type: 'checkin', label: 'Check in', icon: 'calendar', stars: 5 },
+  { day: 2, type: 'game', label: 'Game', icon: 'game', stars: 8 },
+  { day: 3, type: 'spot', label: 'Spot', icon: 'spot', stars: 10 },
+  { day: 4, type: 'doll', label: 'Doll', icon: 'doll', stars: 12 },
+  { day: 5, type: 'game', label: 'Game', icon: 'game', stars: 15 },
+  { day: 6, type: 'spot', label: 'Spot', icon: 'spot', stars: 18 },
+  { day: 7, type: 'doll', label: 'Doll', icon: 'doll', stars: 25 },
+];
+
+function getTodayDateString(timezone = DEFAULT_VIDEO_PAIRS_TIMEZONE) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
+function offsetDateString(dateStr, offsetDays, timezone = DEFAULT_VIDEO_PAIRS_TIMEZONE) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const utc = Date.UTC(y, m - 1, d + offsetDays, 12);
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(utc));
+}
+
+function defaultCheckInRecord() {
+  return {
+    currentStreak: 0,
+    totalCheckIns: 0,
+    totalStars: 0,
+    lastCheckInDate: '',
+    cyclePosition: 0,
+  };
+}
+
+function normalizeCheckInRecord(raw) {
+  const src = raw && typeof raw === 'object' ? raw : {};
+  return {
+    currentStreak: Math.max(0, Number(src.currentStreak) || 0),
+    totalCheckIns: Math.max(0, Number(src.totalCheckIns) || 0),
+    totalStars: Math.max(0, Number(src.totalStars) || 0),
+    lastCheckInDate: String(src.lastCheckInDate || '').trim(),
+    cyclePosition: Math.max(0, Number(src.cyclePosition) || 0),
+  };
+}
+
+function loadCheckIns() {
+  try {
+    if (existsSync(CHECK_INS_PATH)) {
+      const data = JSON.parse(readFileSync(CHECK_INS_PATH, 'utf8'));
+      if (data && typeof data === 'object' && !Array.isArray(data)) return data;
+    }
+  } catch (e) {
+    console.warn('Could not load check-ins.json:', e.message);
+  }
+  return {};
+}
+
+function saveCheckIns(data) {
+  ensureConfigDir();
+  writeFileSync(CHECK_INS_PATH, JSON.stringify(data, null, 2) + '\n');
+}
+
+function getCheckInRecord(username) {
+  const all = loadCheckIns();
+  return normalizeCheckInRecord(all[username]);
+}
+
+function saveCheckInRecord(username, record) {
+  if (!STUDENT_USERS[username]) return false;
+  const all = loadCheckIns();
+  all[username] = normalizeCheckInRecord(record);
+  saveCheckIns(all);
+  return true;
+}
+
+function getRewardForCycleDay(cycleDay) {
+  const idx = ((cycleDay - 1) % REWARD_CYCLE_DAYS + REWARD_CYCLE_DAYS) % REWARD_CYCLE_DAYS;
+  return REWARD_CYCLE[idx];
+}
+
+function buildCheckInSlots(record, checkedInToday) {
+  const todayCycleDay = checkedInToday
+    ? record.cyclePosition
+    : (record.totalCheckIns % REWARD_CYCLE_DAYS) + 1;
+  const slots = [];
+  for (let i = 0; i < REWARD_CYCLE_DAYS; i++) {
+    const cycleDay = ((todayCycleDay - 1 + i) % REWARD_CYCLE_DAYS) + 1;
+    const reward = getRewardForCycleDay(cycleDay);
+    const status = i === 0
+      ? (checkedInToday ? 'claimed' : 'active')
+      : 'locked';
+    slots.push({
+      ...reward,
+      displayDay: i + 1,
+      cycleDay,
+      status,
+      label: i === 0 && !checkedInToday ? 'Check in' : reward.label,
+    });
+  }
+  return slots;
+}
+
+function getCheckInStatus(username) {
+  const timezone = getVideoPairsTimezone();
+  const today = getTodayDateString(timezone);
+  const record = getCheckInRecord(username);
+  const checkedInToday = record.lastCheckInDate === today;
+  const canCheckIn = !checkedInToday;
+  const nextRewardDay = checkedInToday
+    ? (record.cyclePosition % REWARD_CYCLE_DAYS) + 1
+    : (record.totalCheckIns % REWARD_CYCLE_DAYS) + 1;
+  const todayReward = getRewardForCycleDay(
+    checkedInToday ? record.cyclePosition : nextRewardDay,
+  );
+  return {
+    timezone,
+    today,
+    currentStreak: record.currentStreak,
+    totalCheckIns: record.totalCheckIns,
+    totalStars: record.totalStars,
+    checkedInToday,
+    canCheckIn,
+    todayReward,
+    cyclePosition: record.cyclePosition || nextRewardDay,
+    slots: buildCheckInSlots(record, checkedInToday),
+    rewards: REWARD_CYCLE,
+  };
+}
+
+function recordCheckIn(username) {
+  const timezone = getVideoPairsTimezone();
+  const today = getTodayDateString(timezone);
+  const yesterday = offsetDateString(today, -1, timezone);
+  const record = getCheckInRecord(username);
+
+  if (record.lastCheckInDate === today) {
+    return { ok: true, alreadyClaimed: true, status: getCheckInStatus(username) };
+  }
+
+  let newStreak = 1;
+  if (record.lastCheckInDate === yesterday) {
+    newStreak = record.currentStreak + 1;
+  }
+
+  const nextCycleDay = (record.totalCheckIns % REWARD_CYCLE_DAYS) + 1;
+  const reward = getRewardForCycleDay(nextCycleDay);
+  const updated = {
+    currentStreak: newStreak,
+    totalCheckIns: record.totalCheckIns + 1,
+    totalStars: record.totalStars + reward.stars,
+    lastCheckInDate: today,
+    cyclePosition: nextCycleDay,
+  };
+  saveCheckInRecord(username, updated);
+  return {
+    ok: true,
+    alreadyClaimed: false,
+    reward,
+    status: getCheckInStatus(username),
+  };
+}
+
+function buildCheckInContext(username) {
+  const status = getCheckInStatus(username);
+  if (!status.totalCheckIns && !status.canCheckIn) return '';
+  const lines = [
+    'Daily Check-in & Retention:',
+    `- Current streak: ${status.currentStreak} day${status.currentStreak === 1 ? '' : 's'}`,
+    `- Total check-ins: ${status.totalCheckIns}`,
+    `- Total stars earned: ${status.totalStars}`,
+  ];
+  if (status.checkedInToday) {
+    lines.push(`- They already checked in today and earned ${status.todayReward.stars} stars (${status.todayReward.label}).`);
+    lines.push('- Celebrate their streak and encourage them to come back tomorrow for the next reward.');
+  } else {
+    lines.push(`- They have NOT checked in today yet. Gently remind them to open their daily reward (${status.todayReward.label}, +${status.todayReward.stars} stars).`);
+    if (status.currentStreak > 0) {
+      lines.push(`- Warning: if they miss today, their ${status.currentStreak}-day streak will reset.`);
+    }
+  }
+  return lines.join('\n');
+}
+
 function buildProfileContext(profile) {
   const p = normalizeUserProfile(profile);
   const basic = [
@@ -275,11 +466,13 @@ function buildProfileContext(profile) {
   return lines.join('\n');
 }
 
-function mergeInstructionsWithProfile(baseInstructions, profile) {
+function mergeInstructionsWithProfile(baseInstructions, profile, username) {
   const base = (baseInstructions || DEFAULT_INSTRUCTIONS).trim();
   const profileBlock = buildProfileContext(profile);
-  if (!profileBlock) return base;
-  return `${base}\n\n${profileBlock}`;
+  const checkInBlock = username ? buildCheckInContext(username) : '';
+  const blocks = [profileBlock, checkInBlock].filter(Boolean);
+  if (!blocks.length) return base;
+  return `${base}\n\n${blocks.join('\n\n')}`;
 }
 
 function isValidUsername(username) {
@@ -1696,6 +1889,26 @@ const server = createServer((req, res) => {
     return;
   }
 
+  if (url === '/api/check-in' && req.method === 'GET') {
+    const session = getSession(req);
+    if (!session || session.role !== 'student') {
+      sendJson(res, 403, { error: 'Student login required.' });
+      return;
+    }
+    sendJson(res, 200, getCheckInStatus(session.username));
+    return;
+  }
+
+  if (url === '/api/check-in' && req.method === 'POST') {
+    const session = getSession(req);
+    if (!session || session.role !== 'student') {
+      sendJson(res, 403, { error: 'Student login required.' });
+      return;
+    }
+    sendJson(res, 200, recordCheckIn(session.username));
+    return;
+  }
+
   if (url === '/api/user-profiles' && req.method === 'GET') {
     const profiles = loadUserProfiles();
     const normalized = {};
@@ -2193,7 +2406,11 @@ wss.on('connection', (browser, req) => {
       : {};
     const baseInstructions = parsed.instructions?.trim() || saved.instructions?.trim();
     connectToInworld(apiKey, browser, {
-      instructions: mergeInstructionsWithProfile(baseInstructions, profile),
+      instructions: mergeInstructionsWithProfile(
+        baseInstructions,
+        profile,
+        sessionUser?.role === 'student' ? sessionUser.username : null,
+      ),
       voice: parsed.voice?.trim() || saved.voice?.trim(),
       model: parsed.model?.trim() || saved.model?.trim(),
     });

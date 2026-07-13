@@ -12,6 +12,9 @@
   </script>
   <link rel="preload" href="/langoLogo.jpeg" as="image">
   <link rel="preload" href="/visme/Tommyv4.vrm" as="fetch" crossorigin>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&display=swap" rel="stylesheet">
   <script type="importmap">
     {
       "imports": {
@@ -878,6 +881,314 @@
     .game-launch-card.theme-wordwhack { border-color: rgba(255, 214, 120, 0.35); }
     .game-launch-card.theme-cardgame { border-color: rgba(120, 180, 255, 0.35); }
     .game-launch-card.theme-findgame { border-color: rgba(120, 255, 180, 0.35); }
+
+    /* ── Daily rewards retention ── */
+    #daily-rewards-btn {
+      position: fixed;
+      top: max(16px, env(safe-area-inset-top));
+      right: max(16px, env(safe-area-inset-right));
+      z-index: 45;
+      display: none;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.5rem 0.85rem 0.5rem 0.65rem;
+      border: 2px solid #c9a227;
+      border-radius: 999px;
+      background: linear-gradient(180deg, #a86b2d 0%, #7a4518 100%);
+      color: #fff8e7;
+      font-family: "Baloo 2", system-ui, sans-serif;
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 0 #4a2a0e, 0 8px 20px rgba(0, 0, 0, 0.35);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    #daily-rewards-btn:hover { transform: translateY(-1px); }
+    #daily-rewards-btn:active {
+      transform: translateY(2px);
+      box-shadow: 0 1px 0 #4a2a0e, 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    #daily-rewards-btn.visible { display: flex; }
+    #daily-rewards-btn.has-claim {
+      animation: reward-btn-glow 2s ease-in-out infinite;
+    }
+
+    @keyframes reward-btn-glow {
+      0%, 100% { box-shadow: 0 4px 0 #4a2a0e, 0 0 0 0 rgba(255, 214, 102, 0.5); }
+      50% { box-shadow: 0 4px 0 #4a2a0e, 0 0 0 8px rgba(255, 214, 102, 0); }
+    }
+
+    #daily-rewards-btn .reward-btn-icon {
+      width: 1.35rem;
+      height: 1.35rem;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.18);
+      font-size: 0.85rem;
+    }
+
+    #daily-rewards-btn .reward-streak-badge {
+      min-width: 1.25rem;
+      padding: 0 0.35rem;
+      border-radius: 999px;
+      background: #ffd666;
+      color: #5e3a18;
+      font-size: 0.72rem;
+      font-weight: 800;
+      line-height: 1.35rem;
+      text-align: center;
+    }
+
+    #daily-rewards-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 180;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      background:
+        radial-gradient(ellipse at 30% 20%, rgba(88, 120, 200, 0.35) 0%, transparent 55%),
+        radial-gradient(ellipse at 75% 80%, rgba(220, 140, 60, 0.28) 0%, transparent 50%),
+        rgba(12, 10, 18, 0.72);
+      backdrop-filter: blur(6px);
+    }
+
+    #daily-rewards-overlay.visible { display: flex; }
+
+    .daily-rewards-panel {
+      position: relative;
+      width: min(96vw, 820px);
+      padding: 0.35rem;
+      border-radius: 28px;
+      background: linear-gradient(180deg, #c49a5a 0%, #8b5e2a 40%, #6d4518 100%);
+      box-shadow:
+        0 20px 50px rgba(0, 0, 0, 0.45),
+        inset 0 2px 0 rgba(255, 255, 255, 0.22),
+        inset 0 -3px 0 rgba(0, 0, 0, 0.18);
+      animation: daily-reward-pop 0.45s cubic-bezier(0.34, 1.4, 0.64, 1);
+    }
+
+    @keyframes daily-reward-pop {
+      0% { transform: scale(0.88) translateY(12px); opacity: 0; }
+      100% { transform: scale(1) translateY(0); opacity: 1; }
+    }
+
+    .daily-rewards-inner {
+      border-radius: 24px;
+      padding: 1.1rem 1rem 1.25rem;
+      background: linear-gradient(180deg, #a87338 0%, #8f5f28 100%);
+      box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.18);
+    }
+
+    .daily-rewards-return {
+      position: absolute;
+      top: -0.35rem;
+      left: 0.75rem;
+      z-index: 2;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.4rem 0.85rem 0.4rem 0.65rem;
+      border: 2px solid #d4af37;
+      border-radius: 12px;
+      background: linear-gradient(180deg, #b88442 0%, #8d5a24 100%);
+      color: #fff8e7;
+      font-family: "Baloo 2", system-ui, sans-serif;
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 3px 0 #4a2a0e;
+    }
+
+    .daily-rewards-return svg {
+      width: 1rem;
+      height: 1rem;
+    }
+
+    .daily-rewards-header {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.35rem;
+      margin-bottom: 0.85rem;
+      padding-top: 0.15rem;
+    }
+
+    .daily-rewards-plaque {
+      padding: 0.35rem 1.75rem;
+      border: 3px solid #d4af37;
+      border-radius: 14px;
+      background: linear-gradient(180deg, #c49a5a 0%, #9a6830 100%);
+      color: #fff8e7;
+      font-family: "Baloo 2", system-ui, sans-serif;
+      font-size: clamp(1.1rem, 3vw, 1.45rem);
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-shadow: 0 2px 0 rgba(0, 0, 0, 0.25);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    }
+
+    .daily-rewards-meta {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      justify-content: center;
+      color: #ffe8c2;
+      font-family: "Baloo 2", system-ui, sans-serif;
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+
+    .daily-rewards-slots {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: clamp(0.35rem, 1.2vw, 0.65rem);
+      margin-bottom: 1rem;
+    }
+
+    @media (max-width: 720px) {
+      .daily-rewards-slots {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+    }
+
+    .daily-reward-slot {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.55rem 0.35rem 0.65rem;
+      border-radius: 16px;
+      border: 2px solid rgba(74, 42, 14, 0.45);
+      background: linear-gradient(180deg, #6d4518 0%, #543410 100%);
+      box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.22);
+      min-height: 7.5rem;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .daily-reward-slot.active {
+      background: linear-gradient(180deg, #e8c07a 0%, #c89445 100%);
+      border-color: #f0d080;
+      box-shadow:
+        0 0 0 2px rgba(255, 230, 150, 0.35),
+        inset 0 2px 6px rgba(255, 255, 255, 0.18);
+      transform: translateY(-2px);
+    }
+
+    .daily-reward-slot.claimed {
+      background: linear-gradient(180deg, #8f6a35 0%, #6f5020 100%);
+      opacity: 0.88;
+    }
+
+    .daily-reward-slot.locked {
+      opacity: 0.72;
+    }
+
+    .daily-reward-slot-day {
+      color: #ffe8c2;
+      font-family: "Baloo 2", system-ui, sans-serif;
+      font-size: 0.72rem;
+      font-weight: 700;
+      opacity: 0.9;
+    }
+
+    .daily-reward-slot.active .daily-reward-slot-day { color: #5e3a18; }
+
+    .daily-reward-slot-icon {
+      width: clamp(2.2rem, 5vw, 2.75rem);
+      height: clamp(2.2rem, 5vw, 2.75rem);
+      display: grid;
+      place-items: center;
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.12);
+    }
+
+    .daily-reward-slot.active .daily-reward-slot-icon {
+      background: rgba(255, 255, 255, 0.28);
+    }
+
+    .daily-reward-slot-icon svg {
+      width: 70%;
+      height: 70%;
+    }
+
+    .daily-reward-slot-label {
+      color: #ffe8c2;
+      font-family: "Baloo 2", system-ui, sans-serif;
+      font-size: clamp(0.68rem, 1.8vw, 0.78rem);
+      font-weight: 700;
+      text-align: center;
+      line-height: 1.15;
+    }
+
+    .daily-reward-slot.active .daily-reward-slot-label { color: #4a2a0e; }
+
+    .daily-reward-slot-stars {
+      color: #ffd666;
+      font-size: 0.68rem;
+      font-weight: 800;
+    }
+
+    .daily-rewards-actions {
+      display: flex;
+      justify-content: center;
+    }
+
+    #daily-rewards-claim-btn {
+      min-width: min(100%, 280px);
+      padding: 0.75rem 1.5rem;
+      border: 3px solid #d4af37;
+      border-radius: 16px;
+      background: linear-gradient(180deg, #5fd068 0%, #36a83f 100%);
+      color: #fff;
+      font-family: "Baloo 2", system-ui, sans-serif;
+      font-size: 1.05rem;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 5px 0 #1f6b28, 0 10px 24px rgba(0, 0, 0, 0.25);
+      transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.2s ease;
+    }
+
+    #daily-rewards-claim-btn:disabled {
+      opacity: 0.55;
+      cursor: default;
+      background: linear-gradient(180deg, #9a9a9a 0%, #6e6e6e 100%);
+      box-shadow: 0 3px 0 #444;
+    }
+
+    #daily-rewards-claim-btn:not(:disabled):active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 #1f6b28;
+    }
+
+    .daily-rewards-celebrate {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+      border-radius: inherit;
+    }
+
+    .daily-rewards-sparkle {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ffd666;
+      animation: reward-sparkle 0.9s ease-out forwards;
+    }
+
+    @keyframes reward-sparkle {
+      0% { transform: scale(0) translateY(0); opacity: 1; }
+      100% { transform: scale(1.4) translateY(-40px); opacity: 0; }
+    }
+
+    body.in-session #daily-rewards-btn { display: none !important; }
+    body.in-session #daily-rewards-overlay.visible { display: none !important; }
   </style>
 </head>
 <body>
@@ -981,6 +1292,37 @@
     </div>
   </div>
 
+  <button type="button" id="daily-rewards-btn" aria-label="Daily rewards" hidden>
+    <span class="reward-btn-icon" aria-hidden="true">🎁</span>
+    <span>Rewards</span>
+    <span class="reward-streak-badge" id="daily-rewards-streak-badge" hidden>0</span>
+  </button>
+
+  <div id="daily-rewards-overlay" role="dialog" aria-modal="true" aria-labelledby="daily-rewards-title" aria-hidden="true">
+    <div class="daily-rewards-panel">
+      <button type="button" class="daily-rewards-return" id="daily-rewards-close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+        Return
+      </button>
+      <div class="daily-rewards-inner">
+        <div class="daily-rewards-celebrate" id="daily-rewards-celebrate" aria-hidden="true"></div>
+        <header class="daily-rewards-header">
+          <div class="daily-rewards-plaque" id="daily-rewards-title">REWARD</div>
+          <div class="daily-rewards-meta">
+            <span id="daily-rewards-streak-text">Streak: 0 days</span>
+            <span id="daily-rewards-stars-text">⭐ 0 stars</span>
+          </div>
+        </header>
+        <div class="daily-rewards-slots" id="daily-rewards-slots"></div>
+        <div class="daily-rewards-actions">
+          <button type="button" id="daily-rewards-claim-btn">Check in today!</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script type="module">
     import { TommyAvatar, normalizeAvatar, normalizeLipsync, normalizeLighting, DEFAULT_AVATAR } from "/visme/avatar.js";
 
@@ -1023,6 +1365,143 @@
     const gameLaunchSub = document.getElementById("game-launch-sub");
     const gameLaunchProgress = document.getElementById("game-launch-progress");
     const gameLaunchConfetti = document.getElementById("game-launch-confetti");
+    const dailyRewardsBtn = document.getElementById("daily-rewards-btn");
+    const dailyRewardsOverlay = document.getElementById("daily-rewards-overlay");
+    const dailyRewardsClose = document.getElementById("daily-rewards-close");
+    const dailyRewardsSlots = document.getElementById("daily-rewards-slots");
+    const dailyRewardsClaimBtn = document.getElementById("daily-rewards-claim-btn");
+    const dailyRewardsStreakText = document.getElementById("daily-rewards-streak-text");
+    const dailyRewardsStarsText = document.getElementById("daily-rewards-stars-text");
+    const dailyRewardsStreakBadge = document.getElementById("daily-rewards-streak-badge");
+    const dailyRewardsCelebrate = document.getElementById("daily-rewards-celebrate");
+    let dailyRewardsStatus = null;
+    let dailyRewardsStudent = false;
+
+    const REWARD_ICONS = {
+      calendar: `<svg viewBox="0 0 24 24" fill="none" stroke="#5e3a18" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><text x="12" y="18" text-anchor="middle" fill="#5e3a18" stroke="none" font-size="8" font-weight="bold">1</text></svg>`,
+      game: `<svg viewBox="0 0 24 24" fill="#4a8fd4"><path d="M6 11h4v4H6v-4zm8-1h6v2h-2v2h-2v-2h-2V10zm-8 6a8 8 0 1 1 0-16 8 8 0 0 1 0 16z"/></svg>`,
+      spot: `<svg viewBox="0 0 24 24" fill="none"><path d="M4 6l8-3 8 3v12l-8 3-8-3V6z" fill="#e8a84a" stroke="#5e3a18" stroke-width="1.5"/><circle cx="12" cy="11" r="2.5" fill="#e85d4a"/></svg>`,
+      doll: `<svg viewBox="0 0 24 24"><ellipse cx="12" cy="14" rx="7" ry="8" fill="#f5f0d8" stroke="#5e3a18" stroke-width="1.5"/><ellipse cx="12" cy="14" rx="4" ry="5" fill="#8fd48a"/><circle cx="9" cy="11" r="1" fill="#5e3a18"/><circle cx="15" cy="11" r="1" fill="#5e3a18"/></svg>`,
+    };
+
+    function rewardIconSvg(icon) {
+      return REWARD_ICONS[icon] || REWARD_ICONS.calendar;
+    }
+
+    function renderDailyRewards(status) {
+      dailyRewardsStatus = status;
+      if (!status) return;
+
+      dailyRewardsStreakText.textContent = `Streak: ${status.currentStreak} day${status.currentStreak === 1 ? "" : "s"}`;
+      dailyRewardsStarsText.textContent = `⭐ ${status.totalStars} stars`;
+
+      if (status.currentStreak > 0) {
+        dailyRewardsStreakBadge.hidden = false;
+        dailyRewardsStreakBadge.textContent = String(status.currentStreak);
+      } else {
+        dailyRewardsStreakBadge.hidden = true;
+      }
+
+      dailyRewardsBtn.classList.toggle("has-claim", status.canCheckIn);
+
+      dailyRewardsSlots.innerHTML = (status.slots || []).map((slot) => `
+        <div class="daily-reward-slot ${slot.status}" data-status="${slot.status}">
+          <div class="daily-reward-slot-day">Day ${slot.displayDay}</div>
+          <div class="daily-reward-slot-icon">${rewardIconSvg(slot.icon)}</div>
+          <div class="daily-reward-slot-label">${slot.label}</div>
+          <div class="daily-reward-slot-stars">+${slot.stars}⭐</div>
+        </div>
+      `).join("");
+
+      if (status.canCheckIn) {
+        dailyRewardsClaimBtn.disabled = false;
+        dailyRewardsClaimBtn.textContent = "Check in today!";
+      } else {
+        dailyRewardsClaimBtn.disabled = true;
+        dailyRewardsClaimBtn.textContent = "Come back tomorrow!";
+      }
+    }
+
+    function showDailyRewardsOverlay() {
+      dailyRewardsOverlay.classList.add("visible");
+      dailyRewardsOverlay.setAttribute("aria-hidden", "false");
+    }
+
+    function hideDailyRewardsOverlay() {
+      dailyRewardsOverlay.classList.remove("visible");
+      dailyRewardsOverlay.setAttribute("aria-hidden", "true");
+    }
+
+    function celebrateDailyReward() {
+      dailyRewardsCelebrate.innerHTML = "";
+      for (let i = 0; i < 18; i++) {
+        const spark = document.createElement("span");
+        spark.className = "daily-rewards-sparkle";
+        spark.style.left = `${10 + Math.random() * 80}%`;
+        spark.style.top = `${20 + Math.random() * 50}%`;
+        spark.style.animationDelay = `${Math.random() * 0.35}s`;
+        dailyRewardsCelebrate.appendChild(spark);
+      }
+      setTimeout(() => { dailyRewardsCelebrate.innerHTML = ""; }, 1000);
+    }
+
+    async function fetchDailyRewardsStatus() {
+      if (!dailyRewardsStudent) return null;
+      try {
+        const res = await fetch("/api/check-in");
+        if (!res.ok) return null;
+        const data = await res.json();
+        renderDailyRewards(data);
+        return data;
+      } catch {
+        return null;
+      }
+    }
+
+    async function claimDailyReward() {
+      if (!dailyRewardsStatus?.canCheckIn) return;
+      dailyRewardsClaimBtn.disabled = true;
+      dailyRewardsClaimBtn.textContent = "Claiming…";
+      try {
+        const res = await fetch("/api/check-in", { method: "POST" });
+        if (!res.ok) throw new Error("Could not claim reward");
+        const data = await res.json();
+        renderDailyRewards(data.status);
+        celebrateDailyReward();
+        if (data.reward) {
+          dailyRewardsClaimBtn.textContent = `+${data.reward.stars} stars! See you tomorrow!`;
+        }
+      } catch {
+        dailyRewardsClaimBtn.disabled = false;
+        dailyRewardsClaimBtn.textContent = "Check in today!";
+      }
+    }
+
+    async function initDailyRewards({ autoShow = false } = {}) {
+      try {
+        const meRes = await fetch("/api/me");
+        if (!meRes.ok) return;
+        const me = await meRes.json();
+        if (me.role !== "student") return;
+        dailyRewardsStudent = true;
+        dailyRewardsBtn.hidden = false;
+        dailyRewardsBtn.classList.add("visible");
+        const status = await fetchDailyRewardsStatus();
+        if (autoShow && status?.canCheckIn) {
+          showDailyRewardsOverlay();
+        }
+      } catch { /* ignore */ }
+    }
+
+    dailyRewardsBtn.addEventListener("click", () => {
+      fetchDailyRewardsStatus().then(() => showDailyRewardsOverlay());
+    });
+    dailyRewardsClose.addEventListener("click", hideDailyRewardsOverlay);
+    dailyRewardsOverlay.addEventListener("click", (e) => {
+      if (e.target === dailyRewardsOverlay) hideDailyRewardsOverlay();
+    });
+    dailyRewardsClaimBtn.addEventListener("click", claimDailyReward);
+
     const captionUserEl = document.getElementById("caption-user");
     const captionUserTextEl = document.getElementById("caption-user-text");
     const captionAgentEl = document.getElementById("caption-agent");
@@ -3142,6 +3621,7 @@
         setIdleVideoMode(false);
         setVideosLoading(false);
         preloadMediaAssets(cfg).catch((e) => console.warn("background preload:", e));
+        initDailyRewards({ autoShow: false });
         try {
           await autoConnectFromGameReturn();
         } catch (e) {
@@ -3164,6 +3644,7 @@
         } else {
           setStatus('Tap "Start" to begin a conversation');
         }
+        initDailyRewards({ autoShow: true });
       } catch (e) {
         console.error(e);
         dismissSplash();
