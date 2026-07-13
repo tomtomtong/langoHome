@@ -1761,6 +1761,8 @@
     let byebyeAnimationPromise = null;
     let endConversationCloseTimer = null;
     const pendingFunctionCalls = new Map();
+    const handledFunctionCallIds = new Set();
+    const END_CONVERSATION_FORCE_CLOSE_MS = 12000;
 
     // Client-side fallback: Inworld's idle_timeout_ms is not firing, so we
     // nudge the AI ourselves after the user stays silent post-response.
@@ -2873,6 +2875,7 @@
       active = false;
       pendingEndConversation = false;
       pendingFunctionCalls.clear();
+      handledFunctionCallIds.clear();
       cancelIdleNudge();
       idleNudgeCount = 0;
       if (endConversationCloseTimer) {
@@ -2951,16 +2954,22 @@
       }
       if (playing || queue.length > 0) {
         uiLog("end", "closeAfterToolEnd waiting for audio", "hello", { playing, queueLen: queue.length });
+        if (!endConversationCloseTimer) scheduleForceCloseAfterTool();
         return;
+      }
+      if (endConversationCloseTimer) {
+        clearTimeout(endConversationCloseTimer);
+        endConversationCloseTimer = null;
       }
       uiLog("end", "closeAfterToolEnd → ws.close()", "hello");
       ws.close();
     }
 
     function scheduleForceCloseAfterTool() {
-      if (endConversationCloseTimer) clearTimeout(endConversationCloseTimer);
-      uiLog("end", "schedule force close in 4s", "hello");
+      if (endConversationCloseTimer) return;
+      uiLog("end", `schedule force close in ${END_CONVERSATION_FORCE_CLOSE_MS / 1000}s`, "hello");
       endConversationCloseTimer = setTimeout(() => {
+        endConversationCloseTimer = null;
         if (!pendingEndConversation || ws?.readyState !== WebSocket.OPEN) {
           uiLog("end", "force close skipped", "warn", snapshotHelloCycleState());
           return;
@@ -2968,7 +2977,7 @@
         uiLog("end", "force close → stopAudio + ws.close()", "warn");
         stopAudio();
         ws.close();
-      }, 4000);
+      }, END_CONVERSATION_FORCE_CLOSE_MS);
     }
 
     function trackFunctionCallItem(item) {
@@ -3020,6 +3029,35 @@
         return /\b(do|can you|please|let'?s|show|want to|wanna|for me|uncle tommy|tommy|with me)\b/.test(t);
       }
       return /\b(do a fight|fight move|fighting stance|show me your moves)\b/.test(t);
+    }
+
+    function isGoodbyeRequest(text) {
+      const t = text.toLowerCase().trim();
+      if (!t) return false;
+      if (
+        /\b(don'?t|dont|not|never|no)\b.*\b(bye|goodbye|leave|go)\b/.test(t) ||
+        /\b(bye|goodbye|leave|go)\b.*\b(don'?t|dont|not|never|no)\b/.test(t)
+      ) {
+        return false;
+      }
+      if (/\b(bye[\s-]?bye|good[\s-]?bye)\b/.test(t)) return true;
+      if (/^bye!?\.?$/i.test(t)) return true;
+      if (/\bsee you\b|\bsee ya\b|\bcya\b/.test(t)) return true;
+      if (/\b(gotta go|got to go|have to go|need to go|i'?m leaving|im leaving|time to go|must go)\b/.test(t)) return true;
+      if (/\b(that'?s all|thats all|we'?re done|were done|stop talking|end (the )?conversation)\b/.test(t)) return true;
+      if (/\b(nice to see you|good to see you|take care of|talk later about)\b/.test(t)) return false;
+      return false;
+    }
+
+    function triggerEndConversation(reason = "user said goodbye") {
+      if (pendingEndConversation || ws?.readyState !== WebSocket.OPEN) return;
+      uiLog("end", `goodbye detected (${reason})`, "hello");
+      pendingEndConversation = true;
+      setStatus("Goodbye!");
+      startByebyeAnimation();
+      closeAfterToolEnd();
+      setTimeout(closeAfterToolEnd, 1500);
+      scheduleForceCloseAfterTool();
     }
 
     function triggerChickenDance(reason = "user asked to dance") {
@@ -3137,8 +3175,13 @@
         if (args.reason) reason = args.reason;
       } catch {}
 
+      if (callId) sendFunctionOutput(callId, { success: true, reason });
+      if (pendingEndConversation) {
+        uiLog("end", `end_conversation tool duplicate (${reason})`, "hello");
+        return;
+      }
+
       uiLog("end", `end_conversation tool (${reason})`, "hello");
-      sendFunctionOutput(callId, { success: true, reason });
       pendingEndConversation = true;
       setStatus("Goodbye!");
       startByebyeAnimation();
@@ -3155,6 +3198,8 @@
         console.warn("Function call missing name or call_id", event);
         return;
       }
+      if (handledFunctionCallIds.has(callId)) return;
+      handledFunctionCallIds.add(callId);
 
       if (name === HAPPY) {
         let reason = "user asked to dance";
@@ -3345,10 +3390,19 @@
         trackFunctionCallItem(e.item);
       } else if (e.type === "response.output_item.done") {
         trackFunctionCallItem(e.item);
+        if (e.item?.type === "function_call") {
+          handleFunctionCall({
+            name: e.item.name,
+            call_id: e.item.call_id || e.item.id,
+            item_id: e.item.id,
+            arguments: e.item.arguments || "{}",
+          });
+        }
       } else if (e.type === "conversation.item.input_audio_transcription.completed") {
         if (e.transcript?.trim()) showUserHeard(e.transcript);
         if (isDanceRequest(e.transcript)) triggerChickenDance(e.transcript);
         if (isFightRequest(e.transcript)) triggerKungfu(e.transcript);
+        if (isGoodbyeRequest(e.transcript)) triggerEndConversation(e.transcript);
       } else if (e.type === "session.updated" || e.type === "session.created") {
         setStatus("Conversation active — speak anytime", true);
         avatar?.refreshAfterVisible();

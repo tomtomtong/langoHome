@@ -283,6 +283,140 @@ function saveUserProfile(username, profile) {
   return true;
 }
 
+const INWORLD_LLM_URL = 'https://api.inworld.ai/v1/chat/completions';
+const PROFILE_SYNC_MIN_USER_TURNS = 1;
+const PROFILE_SYNC_MODEL = 'openai/gpt-4o-mini';
+const PROFILE_FIELD_KEYS = Object.keys(DEFAULT_USER_PROFILE);
+
+function mergeProfileUpdates(profile, updates) {
+  const merged = normalizeUserProfile(profile);
+  if (!updates || typeof updates !== 'object') return merged;
+  for (const key of PROFILE_FIELD_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(updates, key)) continue;
+    const value = String(updates[key] ?? '').trim();
+    if (value) merged[key] = value;
+  }
+  return merged;
+}
+
+function formatTranscriptForProfileSync(turns) {
+  return turns
+    .filter((turn) => turn.role === 'user' || turn.role === 'assistant')
+    .map((turn) => `${turn.role === 'user' ? 'Child' : 'Uncle Tommy'}: ${turn.text}`)
+    .join('\n');
+}
+
+function buildProfileSyncSystemPrompt() {
+  return `You update a child learner profile for a voice tutoring app based on ONE completed conversation.
+Return ONLY valid JSON with this shape:
+{ "updates": { "fieldKey": "new value" } }
+
+Rules:
+- Include ONLY profile fields that should change based on NEW evidence from this conversation.
+- Valid field keys: ${PROFILE_FIELD_KEYS.join(', ')}
+- Keep existing profile values unless the conversation clearly adds or corrects information.
+- Always refresh conversation-memory fields when there is relevant session content:
+  recentlyMentioned, recentAchievement, recentMistake, recentEmotion, recentPromise, nextFollowUp
+- Update favorites, learning level, school, and emotional fields only when the child clearly stated them or they were demonstrated in this chat.
+- Keep each value concise (under 140 characters).
+- Use simple English unless the child mainly spoke another language.
+- Do not invent facts. If nothing new was learned for a field, omit it from updates.
+- If the session was too short or empty to learn anything, return { "updates": {} }`;
+}
+
+async function syncUserProfileFromConversation({ username, apiKey, conversationId }) {
+  if (!STUDENT_USERS[username]) return;
+  const key = apiKey?.trim() || loadConfig().apiKey?.trim() || process.env.INWORLD_API_KEY?.trim();
+  if (!key) {
+    console.warn(`[profile-sync] skipped ${username}: no Inworld API key`);
+    return;
+  }
+
+  const record = getConversationRecord(conversationId);
+  if (!record) return;
+
+  const userTurns = record.turns.filter((turn) => turn.role === 'user' && turn.text.trim());
+  if (userTurns.length < PROFILE_SYNC_MIN_USER_TURNS) {
+    console.log(`[profile-sync] skipped ${username}: only ${userTurns.length} user turn(s)`);
+    return;
+  }
+
+  const transcript = formatTranscriptForProfileSync(record.turns);
+  if (!transcript.trim()) return;
+
+  const currentProfile = getUserProfile(username);
+  const userPrompt = `Account: ${username}
+Current profile JSON:
+${JSON.stringify(currentProfile, null, 2)}
+
+Conversation transcript:
+${transcript}
+
+Update the profile based on this session.`;
+
+  try {
+    const upstream = await fetch(INWORLD_LLM_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: PROFILE_SYNC_MODEL,
+        messages: [
+          { role: 'system', content: buildProfileSyncSystemPrompt() },
+          { role: 'user', content: userPrompt },
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0.3,
+      }),
+    });
+
+    const payload = await upstream.json();
+    if (!upstream.ok) {
+      const message = payload?.error?.message || payload?.error || 'Inworld LLM request failed.';
+      console.warn(`[profile-sync] failed for ${username}:`, message);
+      return;
+    }
+
+    const content = payload?.choices?.[0]?.message?.content;
+    if (!content) {
+      console.warn(`[profile-sync] empty response for ${username}`);
+      return;
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      console.warn(`[profile-sync] invalid JSON for ${username}`);
+      return;
+    }
+
+    const updates = parsed?.updates && typeof parsed.updates === 'object'
+      ? parsed.updates
+      : parsed;
+    const merged = mergeProfileUpdates(currentProfile, updates);
+    const changedKeys = PROFILE_FIELD_KEYS.filter((field) => merged[field] !== currentProfile[field]);
+    if (!changedKeys.length) {
+      console.log(`[profile-sync] no changes for ${username} (${conversationId})`);
+      return;
+    }
+
+    saveUserProfile(username, merged);
+    console.log(`[profile-sync] updated ${username} (${conversationId}): ${changedKeys.join(', ')}`);
+  } catch (e) {
+    console.warn(`[profile-sync] error for ${username}:`, e.message);
+  }
+}
+
+function queueProfileSyncFromConversation({ username, role, apiKey, conversationId }) {
+  if (role !== 'student' || !STUDENT_USERS[username]) return;
+  syncUserProfileFromConversation({ username, apiKey, conversationId }).catch((e) => {
+    console.warn(`[profile-sync] unhandled error for ${username}:`, e.message);
+  });
+}
+
 const REWARD_CYCLE_DAYS = 7;
 const REWARD_CYCLE = [
   { day: 1, type: 'checkin', label: 'Check in', icon: 'calendar', stars: 5 },
@@ -2458,7 +2592,7 @@ const KUNGFU_TOOL_INSTRUCTION =
   ' Call the kungfu tool whenever the user asks Uncle Tommy to fight, do kung fu, punch, karate, martial arts, or show fighting moves. Trigger on phrases like "kung fu", "do a punch", "fight", "fight me", "show me your moves", or "can you fight". Keep it playful and kid-friendly — Tommy is showing off moves, not real violence.';
 
 const LEAVE_TOOL_INSTRUCTION =
-  ' Call end_conversation only when the user clearly wants to stop the session — e.g. says goodbye, bye bye, see you later, I have to go, or I\'m leaving. Do NOT call it for casual phrases like "nice to see you", "take care of", or "talk later about…". When they clearly want to leave, give a brief farewell and call end_conversation in the same turn.';
+  ' When the user says goodbye, bye bye, bye, see you later, see ya, gotta go, I have to go, or that they are leaving, you MUST call end_conversation in that same turn after a brief farewell. Never end a session with only spoken words — always call the tool. Do NOT call it for casual phrases like "nice to see you", "take care of", or "talk later about…".';
 
 const GAME_TOOLS_INSTRUCTION =
   ' Three games are available: (1) Word-Whack Blitz — call play_wordwhack when they want whack-a-word, sentence completion, or "word whack". (2) Picture-Word Memory Match — call play_cardgame when they want the card game, memory match, flip cards, or picture-word match. (3) Find the Object — call play_findgame when they want find-the-object, tap to find, or spotting game. If they only say "let\'s play" or "play a game" without naming one, ask which of the three they want; call the matching tool once they choose or name a game clearly.';
@@ -2611,6 +2745,12 @@ function connectToInworld(apiKey, browser, session, userInfo = {}) {
     if (conversationFinished) return;
     conversationFinished = true;
     endConversationRecord(conversationId);
+    queueProfileSyncFromConversation({
+      username: userInfo.username,
+      role: userInfo.role,
+      apiKey,
+      conversationId,
+    });
   };
 
   const recordInworldMessage = (parsed) => {
