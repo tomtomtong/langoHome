@@ -1,4 +1,6 @@
 node_modules/
+.DS_Store
+/langoHome/
 .env
 config.json
 sessions.json
