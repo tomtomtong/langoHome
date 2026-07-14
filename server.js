@@ -1507,6 +1507,9 @@ function isPreviewStaticAsset(url) {
     || /^\/assets\/(?:lango-home|daily-rewards|collections|map|sfx)\/.+\.(?:png|jpe?g|webp|svg|mp3|wav)$/i.test(url)
     || url === '/assets/page-motion.css'
     || url === '/assets/page-motion.js'
+    || url === '/assets/webview-compat.css'
+    || url === '/assets/webview-compat.js'
+    || url.startsWith('/assets/legacy/')
     || /^\/games\/.+\.(?:css|js|svg|png|jpe?g|webp|gif|mp3|wav)$/i.test(url)
     || url === '/vocab-game-app.css'
     || url === '/vocab-game-app.js';
@@ -1570,6 +1573,9 @@ function isPreviewSafeRequest(req, url, rawUrl) {
     || url.startsWith('/assets/sfx/')
     || url === '/assets/page-motion.css'
     || url === '/assets/page-motion.js'
+    || url === '/assets/webview-compat.css'
+    || url === '/assets/webview-compat.js'
+    || url.startsWith('/assets/legacy/')
     || url.startsWith('/games/assets/')
     || /^\/games\/.+\.(?:css|js|svg|png|jpe?g|webp|gif|mp3|wav)$/i.test(url)
     || /^\/api\/(idle-video|transition-video|avatar-background)$/.test(url)
@@ -1638,6 +1644,36 @@ function denyAdminAccess(req, res, nextUrl) {
 function wantsHtml(req) {
   const accept = req.headers.accept || '';
   return accept.includes('text/html') || accept === '*/*' || !accept.includes('application/json');
+}
+
+const WEBVIEW_COMPAT_SNIPPET =
+  '<script src="/assets/webview-compat.js"></script><link rel="stylesheet" href="/assets/webview-compat.css">';
+
+function isLegacyWebviewRequest(req) {
+  const ua = String(req.headers['user-agent'] || '');
+  const chromeMatch = ua.match(/Chrom(?:e|ium)\/(\d+)/);
+  const chromeVersion = chromeMatch ? Number(chromeMatch[1]) : 0;
+  if (/mediatek\.webview/i.test(ua)) return true;
+  if (chromeVersion > 0 && chromeVersion < 64) return true;
+  try {
+    const requestUrl = new URL(req.url || '/', 'http://local');
+    if (requestUrl.searchParams.get('legacy') === '1') return true;
+  } catch {}
+  return false;
+}
+
+function injectWebviewCompat(html) {
+  if (html.includes('webview-compat.js')) return html;
+  if (/<head[^>]*>/i.test(html)) {
+    return html.replace(/<head([^>]*)>/i, `<head$1>${WEBVIEW_COMPAT_SNIPPET}`);
+  }
+  return `${WEBVIEW_COMPAT_SNIPPET}${html}`;
+}
+
+function resolveLegacyHtmlPath(filePath) {
+  if (!filePath.endsWith('.html')) return null;
+  const legacyPath = filePath.replace(/\.html$/, '.legacy.html');
+  return existsSync(legacyPath) ? legacyPath : null;
 }
 
 const MIME = {
@@ -2682,6 +2718,27 @@ function serveFile(res, filePath) {
   res.end(readFileSync(filePath));
 }
 
+function serveHtmlFile(res, filePath, req) {
+  if (!existsSync(filePath)) {
+    res.writeHead(404, SECURITY_HEADERS).end();
+    return;
+  }
+
+  let htmlPath = filePath;
+  if (req && isLegacyWebviewRequest(req)) {
+    const legacyPath = resolveLegacyHtmlPath(filePath);
+    if (legacyPath) htmlPath = legacyPath;
+  }
+
+  let html = readFileSync(htmlPath, 'utf8');
+  html = injectWebviewCompat(html);
+  res.writeHead(200, {
+    'Content-Type': 'text/html; charset=utf-8',
+    ...SECURITY_HEADERS,
+  });
+  res.end(html);
+}
+
 const pages = {
   '/': 'index.html',
   '/login': 'login.html',
@@ -3351,9 +3408,15 @@ const server = createServer((req, res) => {
     return;
   }
 
-  const sharedMotionAsset = url.match(/^\/assets\/(page-motion\.(?:css|js))$/i);
+  const sharedMotionAsset = url.match(/^\/assets\/((?:page-motion|webview-compat)\.(?:css|js))$/i);
   if (sharedMotionAsset) {
     serveFile(res, join(ROOT, 'assets', sharedMotionAsset[1]));
+    return;
+  }
+
+  const legacyBundleAsset = url.match(/^\/assets\/legacy\/([a-z0-9.-]+\.js)$/i);
+  if (legacyBundleAsset) {
+    serveFile(res, join(ROOT, 'assets', 'legacy', legacyBundleAsset[1]));
     return;
   }
 
@@ -3369,7 +3432,7 @@ const server = createServer((req, res) => {
   }
 
   const file = resolvePage(url);
-  serveFile(res, join(ROOT, file));
+  serveHtmlFile(res, join(ROOT, file), req);
 });
 
 const wss = new WebSocketServer({ server, path: '/ws' });

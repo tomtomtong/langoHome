@@ -212,52 +212,6 @@
     </section>
   </div>
 
-  <script>
-    const form = document.getElementById("login-form");
-    const errorEl = document.getElementById("error");
-    const submitBtn = document.getElementById("submit-btn");
-    const nextUrl = new URLSearchParams(location.search).get("next") || "/";
-
-    function showError(message) {
-      errorEl.textContent = message;
-      errorEl.classList.add("visible");
-    }
-
-    function clearError() {
-      errorEl.textContent = "";
-      errorEl.classList.remove("visible");
-    }
-
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      clearError();
-      submitBtn.disabled = true;
-      submitBtn.textContent = "Signing in…";
-
-      try {
-        const res = await fetch("/api/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            username: document.getElementById("username").value.trim(),
-            password: document.getElementById("password").value,
-          }),
-        });
-
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          showError(data.error || "Login failed. Please try again.");
-          return;
-        }
-
-        location.href = nextUrl.startsWith("/") ? nextUrl : "/";
-      } catch (err) {
-        showError("Could not reach the server. Please try again.");
-      } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = "Sign in";
-      }
-    });
-  </script>
+  <script src="/assets/legacy/login.bundle.js"></script>
 </body>
 </html>

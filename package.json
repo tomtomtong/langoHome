@@ -4,12 +4,17 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "build:legacy": "node scripts/build-legacy.mjs",
+    "prestart": "node scripts/build-legacy.mjs"
   },
   "dependencies": {
     "better-sqlite3": "^11.8.1",
     "express": "^4.21.2",
     "multer": "^1.4.5-lts.1",
     "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
   }
 }
