@@ -69,19 +69,32 @@ const VocaConfig = (() => {
   }
 
   function pickRoundPairs(count = 6) {
-    const pool = items
-      .map(normalizeItem)
-      .filter((item) => item.word);
+    const normalized = items.map(normalizeItem).filter((item) => item.word);
+    const withImages = normalized.filter((item) => item.imageUrl);
+    const pool = withImages.length ? withImages : normalized;
     if (!pool.length) return [];
     const shuffled = shuffle(pool.slice());
     return shuffled.slice(0, Math.min(count, shuffled.length)).map((item) => ({
       word: item.word,
-      textOnly: true,
+      imageUrl: item.imageUrl || "",
+      textOnly: !item.imageUrl,
     }));
   }
 
-  async function preloadImages() {
-    return Promise.resolve();
+  async function preloadImages(configItems) {
+    const urls = (configItems || items)
+      .map((item) => normalizeItem(item).imageUrl)
+      .filter(Boolean);
+    await Promise.all(
+      urls.map(
+        (url) =>
+          new Promise((resolve) => {
+            const img = new Image();
+            img.onload = img.onerror = () => resolve();
+            img.src = url;
+          })
+      )
+    );
   }
 
   return {

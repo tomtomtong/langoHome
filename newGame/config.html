@@ -111,7 +111,7 @@
       <div class="voca-header">
         <div>
           <h2 class="voca-heading">Vocabulary library</h2>
-          <p class="voca-desc">Import vocabulary from CSV with columns: <code>Import No., Type, Level, Language Code, Category, Sub Category, Content, Keywords</code>. Import replaces the entire list.</p>
+          <p class="voca-desc">Import vocabulary from CSV with columns: <code>Import No., Type, Level, Language Code, Category, Sub Category, Content, Keywords</code>. Images are looked up from Lango during import. Import replaces the entire list.</p>
         </div>
         <div class="voca-actions">
           <button type="button" class="btn-voca-import" id="importVocaBtn">Import CSV</button>
@@ -148,6 +148,7 @@
               <th>Sub Category</th>
               <th>Content</th>
               <th>Keywords</th>
+              <th>Image</th>
               <th></th>
             </tr>
           </thead>
@@ -174,6 +175,7 @@
                 <th>Sub Category</th>
                 <th>Content</th>
                 <th>Keywords</th>
+                <th>Image</th>
               </tr>
             </thead>
             <tbody id="vocaImportPreviewBody"></tbody>
@@ -1295,6 +1297,13 @@
         });
       }
 
+      function renderVocaImageCell(imageUrl) {
+        if (!imageUrl) {
+          return '<span class="voca-image-missing">No image</span>';
+        }
+        return `<img class="voca-image-thumb" src="${escapeAttr(imageUrl)}" alt="" loading="lazy" />`;
+      }
+
       function renderVocaTableRow(item, includeDelete = true) {
         return `
           <tr>
@@ -1306,6 +1315,7 @@
             <td>${escapeHtml(item.subCategory)}</td>
             <td>${escapeHtml(item.content)}</td>
             <td>${escapeHtml(item.keywords)}</td>
+            <td>${renderVocaImageCell(item.imageUrl)}</td>
             ${
               includeDelete
                 ? `<td><button type="button" class="btn-voca-delete" data-id="${item.id}">Delete</button></td>`
@@ -1356,13 +1366,14 @@
         vocaImportErrors.classList.add("hidden");
         vocaImportErrors.textContent = "";
         confirmVocaImportBtn.disabled = false;
+        confirmVocaImportBtn.textContent = "Replace vocabulary";
       }
 
       function openVocaImportModal(items) {
         pendingVocaImport = items;
         vocaImportSummary.textContent = `${items.length} valid row${
           items.length === 1 ? "" : "s"
-        } ready to import. This will permanently replace the current vocabulary list.`;
+        } ready to import. Lango will be queried for images by content. This will permanently replace the current vocabulary list.`;
         vocaImportPreviewBody.innerHTML = items
           .slice(0, 12)
           .map((item) => renderVocaTableRow(item, false))
@@ -1370,7 +1381,7 @@
         if (items.length > 12) {
           vocaImportPreviewBody.insertAdjacentHTML(
             "beforeend",
-            `<tr><td colspan="9">…and ${items.length - 12} more rows</td></tr>`
+            `<tr><td colspan="10">…and ${items.length - 12} more rows</td></tr>`
           );
         }
         vocaImportModal.classList.remove("hidden");
@@ -1379,20 +1390,30 @@
       async function confirmVocaImport() {
         if (!pendingVocaImport.length) return;
         confirmVocaImportBtn.disabled = true;
+        confirmVocaImportBtn.textContent = "Fetching images…";
         try {
           const res = await fetch("/api/voca/import", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ items: pendingVocaImport, replace: true }),
+            body: JSON.stringify({
+              items: pendingVocaImport,
+              replace: true,
+              fetchImages: true,
+            }),
           });
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || "Import failed");
           vocaItems = data.items || [];
           renderVocaList();
           closeVocaImportModal();
-          showToast(`Replaced vocabulary with ${data.count} items`);
+          const imageMsg =
+            data.imageCount != null
+              ? ` (${data.imageCount} with images)`
+              : "";
+          showToast(`Replaced vocabulary with ${data.count} items${imageMsg}`);
         } catch (err) {
           confirmVocaImportBtn.disabled = false;
+          confirmVocaImportBtn.textContent = "Replace vocabulary";
           showToast(err.message || "Import failed");
         }
       }

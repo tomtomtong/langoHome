@@ -1015,6 +1015,20 @@ body.hotspot-dragging {
   border-bottom: none;
 }
 
+.voca-image-thumb {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 2px solid #c9a06a;
+  background: #fff;
+}
+
+.voca-image-missing {
+  font-size: 0.8rem;
+  color: #8a5a2d;
+}
+
 .voca-empty {
   margin-top: 8px;
   font-size: 0.9rem;

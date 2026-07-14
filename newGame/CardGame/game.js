@@ -66,7 +66,8 @@ function pickRoundPairs() {
     if (picked.length) {
       roundPairs = picked.map((item) => ({
         word: item.word,
-        textOnly: item.textOnly !== false,
+        img: item.imageUrl || "",
+        textOnly: item.textOnly !== false && !item.imageUrl,
       }));
       totalPairs = roundPairs.length;
       return;
@@ -405,7 +406,10 @@ async function initGame() {
     await VocaConfig.loadFromServer();
     pickRoundPairs();
     if (VocaConfig.hasItems()) {
-      await VocaConfig.preloadImages();
+      await VocaConfig.preloadImages(roundPairs.map((pair) => ({
+        imageUrl: pair.img,
+        word: pair.word,
+      })));
     }
   }
   if (typeof CardImageConfig !== 'undefined') {
