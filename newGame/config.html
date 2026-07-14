@@ -114,30 +114,15 @@
           <p class="voca-desc">
             Import a CSV with columns
             <code>Import No., Type, Level, Language Code, Category, Sub Category, Content, Keywords</code>.
-            Images are fetched from <code>dev.lango.ai</code> after import. Used by Word-Whack Blitz and Picture-Word Memory Match.
+            Used by Word-Whack Blitz and Picture-Word Memory Match. Import replaces the current list.
           </p>
         </div>
         <div class="voca-actions">
-          <button type="button" class="btn-voca-fetch" id="fetchVocaImagesBtn">Fetch images</button>
           <button type="button" class="btn-voca-import" id="importVocaBtn">Import CSV</button>
           <button type="button" class="btn-voca-export" id="exportVocaBtn">Export CSV</button>
           <button type="button" class="btn-voca-delete" id="clearVocaBtn">Clear all</button>
           <input type="file" id="importVocaInput" accept=".csv,text/csv" hidden />
         </div>
-      </div>
-      <div class="lango-section" id="langoSection">
-        <div class="lango-header">
-          <div>
-            <h3 class="lango-heading">Lango material images</h3>
-            <p class="lango-desc">Fetches vocabulary images from <code>dev.lango.ai</code> using your API key.</p>
-          </div>
-          <span class="lango-badge" id="langoStatusBadge">Not configured</span>
-        </div>
-        <label class="lango-field">
-          <span>API key</span>
-          <input type="password" id="langoApiKey" autocomplete="off" placeholder="Paste Lango API key" />
-          <small class="lango-hint" id="langoKeyHint"></small>
-        </label>
       </div>
       <div class="voca-toolbar">
         <label class="voca-filter">
@@ -162,7 +147,6 @@
         <table class="voca-table">
           <thead>
             <tr>
-              <th class="voca-col-image">Image</th>
               <th>Import No.</th>
               <th>Level</th>
               <th>Category</th>
@@ -422,7 +406,6 @@
         }
         if (isVocabulary) {
           loadVocaList();
-          loadLangoSettings();
         } else {
           buildGrid();
         }
@@ -1063,26 +1046,7 @@
       const vocaTableBody = document.getElementById("vocaTableBody");
       const vocaCount = document.getElementById("vocaCount");
       const vocaEmpty = document.getElementById("vocaEmpty");
-      const fetchVocaImagesBtn = document.getElementById("fetchVocaImagesBtn");
       const importVocaBtn = document.getElementById("importVocaBtn");
-      const langoApiKeyInput = document.getElementById("langoApiKey");
-      const langoStatusBadge = document.getElementById("langoStatusBadge");
-      const langoKeyHint = document.getElementById("langoKeyHint");
-      let langoSaveReady = false;
-      let langoSaveTimer = null;
-      let langoConfigured = false;
-
-      function vocaImageCell(item) {
-        if (item.imageUrl) {
-          return `<img class="voca-thumb" src="${escapeAttr(item.imageUrl)}" alt="${escapeAttr(item.content)}" loading="lazy" />`;
-        }
-        return `<span class="voca-thumb-missing" title="No image yet">—</span>`;
-      }
-
-      function vocaImageSummary() {
-        const withImages = vocaItems.filter((item) => item.imageUrl).length;
-        return `${withImages}/${vocaItems.length} with images`;
-      }
       const exportVocaBtn = document.getElementById("exportVocaBtn");
       const clearVocaBtn = document.getElementById("clearVocaBtn");
       const importVocaInput = document.getElementById("importVocaInput");
@@ -1290,13 +1254,12 @@
         const visible = filteredVocaItems();
         const total = vocaItems.length;
         vocaCount.textContent = total
-          ? `${visible.length} shown · ${total} total word${total === 1 ? "" : "s"} · ${vocaImageSummary()}`
+          ? `${visible.length} shown · ${total} total word${total === 1 ? "" : "s"}`
           : "0 words";
         vocaTableBody.innerHTML = visible
           .map(
             (item) => `
           <tr>
-            <td class="voca-col-image">${vocaImageCell(item)}</td>
             <td class="voca-col-id">${escapeHtml(item.importNo || "—")}</td>
             <td class="voca-col-level">${item.level != null ? escapeHtml(item.level) : "—"}</td>
             <td>${escapeHtml(item.category || "—")}</td>
@@ -1324,86 +1287,6 @@
         }
       }
 
-      async function loadLangoSettings() {
-        langoSaveReady = false;
-        try {
-          const res = await fetch("/api/settings/lango");
-          const data = await parseJsonResponse(res);
-          if (!res.ok) throw new Error(data.error || "Load failed");
-          langoConfigured = Boolean(data.configured);
-          langoKeyHint.textContent = data.configured
-            ? `Saved key ending in ${data.apiKeyPreview.slice(-4)} — leave blank to keep it`
-            : "No API key saved yet";
-          langoStatusBadge.textContent = data.configured ? "Configured" : "Not configured";
-          langoStatusBadge.classList.toggle("configured", data.configured);
-        } catch (err) {
-          langoKeyHint.textContent = err.message || "Could not load Lango settings";
-        } finally {
-          langoSaveReady = true;
-        }
-      }
-
-      async function saveLangoSettings() {
-        const apiKey = langoApiKeyInput.value.trim();
-        if (!apiKey) return;
-
-        try {
-          const res = await fetch("/api/settings/lango", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ apiKey }),
-          });
-          const data = await parseJsonResponse(res);
-          if (!res.ok) throw new Error(data.error || "Save failed");
-          langoApiKeyInput.value = "";
-          langoConfigured = Boolean(data.configured);
-          langoKeyHint.textContent = data.configured
-            ? `Saved key ending in ${data.apiKeyPreview.slice(-4)} — leave blank to keep it`
-            : "No API key saved yet";
-          langoStatusBadge.textContent = data.configured ? "Configured" : "Not configured";
-          langoStatusBadge.classList.toggle("configured", data.configured);
-          showToast("Lango API key saved");
-        } catch (err) {
-          showToast(err.message || "Save failed");
-        }
-      }
-
-      function scheduleLangoSave() {
-        if (!langoSaveReady) return;
-        clearTimeout(langoSaveTimer);
-        langoSaveTimer = setTimeout(saveLangoSettings, 500);
-      }
-
-      async function fetchVocaImages({ silent = false } = {}) {
-        if (!langoConfigured) {
-          showToast("Add your Lango API key first");
-          return null;
-        }
-        fetchVocaImagesBtn.disabled = true;
-        importVocaBtn.disabled = true;
-        if (!silent) showToast("Fetching images from Lango…");
-        try {
-          const res = await fetch("/api/voca/fetch-images", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ missingOnly: true }),
-          });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || "Image fetch failed");
-          vocaItems = data.items || vocaItems;
-          renderVocaList();
-          if (!silent) {
-            showToast(
-              `Images fetched: ${data.fetched} found, ${data.missed} missing (${data.total} looked up)`
-            );
-          }
-          return data;
-        } finally {
-          fetchVocaImagesBtn.disabled = false;
-          importVocaBtn.disabled = false;
-        }
-      }
-
       async function importVocaCsv(file) {
         const text = await file.text();
         let items;
@@ -1427,24 +1310,14 @@
         const res = await fetch("/api/voca/import", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ items, replace: true, fetchImages: langoConfigured }),
+          body: JSON.stringify({ items, replace: true }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Import failed");
         vocaItems = data.items || [];
         populateVocaFilters();
         renderVocaList();
-        if (data.imageStats) {
-          showToast(
-            `Saved ${data.count} words — ${data.imageStats.fetched} images fetched, ${data.imageStats.missed} missing`
-          );
-        } else {
-          showToast(
-            langoConfigured
-              ? `Saved ${data.count} words`
-              : `Saved ${data.count} words — add Lango API key to fetch images`
-          );
-        }
+        showToast(`Saved ${data.count} words — games will use the updated list`);
       }
 
       function exportVocaCsv() {
@@ -1482,14 +1355,10 @@
       }
 
       importVocaBtn.addEventListener("click", () => importVocaInput.click());
-      fetchVocaImagesBtn.addEventListener("click", () => {
-        fetchVocaImages().catch((err) => showToast(err.message || "Image fetch failed"));
-      });
       exportVocaBtn.addEventListener("click", exportVocaCsv);
       clearVocaBtn.addEventListener("click", () => {
         clearVocaList().catch((err) => showToast(err.message || "Clear failed"));
       });
-      langoApiKeyInput.addEventListener("input", scheduleLangoSave);
       importVocaInput.addEventListener("change", () => {
         const file = importVocaInput.files?.[0];
         if (file) {

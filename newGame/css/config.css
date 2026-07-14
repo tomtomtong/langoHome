@@ -926,7 +926,6 @@ body.hotspot-dragging {
 
 .btn-voca-add,
 .btn-voca-import,
-.btn-voca-fetch,
 .btn-voca-export,
 .btn-voca-save,
 .btn-voca-delete {
@@ -946,11 +945,8 @@ body.hotspot-dragging {
   background: linear-gradient(180deg, #8a4fd0, #5a2da0);
 }
 
-.btn-voca-fetch {
-  background: linear-gradient(180deg, #4db7dc, #2f8fb8);
-}
-
 .btn-voca-import,
+.btn-voca-export,
 .btn-voca-delete {
   background: linear-gradient(180deg, #ff8a3d, #ef5f23);
 }
@@ -961,104 +957,10 @@ body.hotspot-dragging {
 
 .btn-voca-add:hover,
 .btn-voca-import:hover,
-.btn-voca-fetch:hover,
 .btn-voca-export:hover,
 .btn-voca-save:hover,
 .btn-voca-delete:hover {
   transform: translateY(-1px);
-}
-
-.lango-section {
-  background: #fff;
-  border: 2px solid #c9a06a;
-  border-radius: 12px;
-  padding: 14px 16px;
-  margin-bottom: 14px;
-}
-
-.lango-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-bottom: 10px;
-}
-
-.lango-heading {
-  margin: 0;
-  font-family: "Baloo 2", sans-serif;
-  font-size: 1rem;
-  color: #5a2da0;
-}
-
-.lango-desc {
-  margin: 4px 0 0;
-  font-size: 0.82rem;
-  color: #6b4a28;
-}
-
-.lango-badge {
-  font-size: 0.78rem;
-  font-weight: 700;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: #ffd6d6;
-  color: #8a2020;
-}
-
-.lango-badge.configured {
-  background: #d8f5e4;
-  color: #1f6b3f;
-}
-
-.lango-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 0.82rem;
-  color: #5e3a18;
-}
-
-.lango-field input {
-  font-family: inherit;
-  font-size: 0.9rem;
-  border: 2px solid #c9a06a;
-  border-radius: 8px;
-  padding: 6px 8px;
-  color: #3a2410;
-  background: #fff;
-}
-
-.lango-hint {
-  color: #6b4a28;
-  font-size: 0.78rem;
-}
-
-.voca-col-image {
-  width: 72px;
-}
-
-.voca-thumb {
-  width: 56px;
-  height: 56px;
-  object-fit: cover;
-  border-radius: 8px;
-  border: 2px solid #c9a06a;
-  background: #f3f8ff;
-  display: block;
-}
-
-.voca-thumb-missing {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 56px;
-  height: 56px;
-  border-radius: 8px;
-  border: 2px dashed #c9a06a;
-  color: #9a7a52;
-  font-size: 1.1rem;
 }
 
 .voca-toolbar {

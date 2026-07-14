@@ -76,7 +76,7 @@ const VocaConfig = (() => {
       return {
         word,
         content: word,
-        imageUrl: imageUrl || hint,
+        imageUrl,
         hint,
       };
     });

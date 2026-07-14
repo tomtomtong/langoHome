@@ -164,18 +164,6 @@ db.exec(`
 const DEFAULT_INWORLD_VOICE_ID = "default-zylgts2tamenvybeti3z0w__uncle_tommy";
 const INWORLD_TTS_URL = "https://api.inworld.ai/tts/v1/voice";
 const INWORLD_LLM_URL = "https://api.inworld.ai/v1/chat/completions";
-const LANGO_API_BASE = (process.env.LANGO_API_BASE_URL || "https://dev.lango.ai").replace(
-  /\/$/,
-  ""
-);
-const LANGO_API_VERSION = (process.env.LANGO_API_VERSION || "v1").replace(/^\//, "").replace(
-  /\/$/,
-  ""
-);
-const LANGO_IMAGE_FETCH_CONCURRENCY = Math.max(
-  1,
-  Math.min(10, Number(process.env.LANGO_IMAGE_FETCH_CONCURRENCY) || 5)
-);
 
 const getSettingStmt = db.prepare(
   "SELECT setting_value FROM game_settings WHERE setting_key = ?"
@@ -216,9 +204,6 @@ const updateVocaStmt = db.prepare(`
     import_no = ?, type = ?, level = ?, language_code = ?, category = ?, sub_category = ?,
     content = ?, keywords = ?, image_url = ?, sort_order = ?, updated_at = ?
   WHERE id = ?
-`);
-const updateVocaImageStmt = db.prepare(`
-  UPDATE voca_items SET image_url = ?, updated_at = ? WHERE id = ?
 `);
 const deleteVocaStmt = db.prepare("DELETE FROM voca_items WHERE id = ?");
 const deleteAllVocaStmt = db.prepare("DELETE FROM voca_items");
@@ -328,107 +313,6 @@ function vocaValuesForInsert(item, sortOrder, updatedAt) {
 
 function vocaValuesForUpdate(item, sortOrder, updatedAt, id) {
   return [...vocaValuesForInsert(item, sortOrder, updatedAt), id];
-}
-
-function getLangoApiKey() {
-  return getSetting("lango_api_key") || process.env.LANGO_API_KEY || "";
-}
-
-function seedLangoApiKeyFromEnv() {
-  if (!getSetting("lango_api_key") && process.env.LANGO_API_KEY) {
-    setSetting("lango_api_key", String(process.env.LANGO_API_KEY).trim());
-  }
-}
-
-seedLangoApiKeyFromEnv();
-
-function langoMaterialImageUrl(content, type = "vocabulary") {
-  const url = new URL(
-    `${LANGO_API_BASE}/${LANGO_API_VERSION}/materialImage/getImages`
-  );
-  url.searchParams.set("content", content);
-  url.searchParams.set("type", type || "vocabulary");
-  return url;
-}
-
-async function fetchLangoMaterialImageUrl(content, type = "vocabulary") {
-  const apiKey = getLangoApiKey();
-  const query = String(content || "").trim();
-  if (!apiKey || !query) return null;
-
-  try {
-    const upstream = await fetch(langoMaterialImageUrl(query, type), {
-      headers: { authorization: apiKey },
-    });
-    if (!upstream.ok) return null;
-
-    const payload = await upstream.json();
-    if (!payload?.success || !Array.isArray(payload.images) || !payload.images.length) {
-      return null;
-    }
-
-    const imageUrl = String(payload.images[0]?.url || "").trim();
-    return /^https?:\/\//i.test(imageUrl) ? imageUrl : null;
-  } catch {
-    return null;
-  }
-}
-
-async function mapWithConcurrency(items, concurrency, mapper) {
-  const results = new Array(items.length);
-  let nextIndex = 0;
-
-  async function worker() {
-    while (nextIndex < items.length) {
-      const current = nextIndex;
-      nextIndex += 1;
-      results[current] = await mapper(items[current], current);
-    }
-  }
-
-  const workers = Array.from(
-    { length: Math.min(concurrency, items.length) },
-    () => worker()
-  );
-  await Promise.all(workers);
-  return results;
-}
-
-async function fetchImagesForVocaItems({ missingOnly = true } = {}) {
-  const apiKey = getLangoApiKey();
-  if (!apiKey) {
-    throw new Error("Lango API key not configured.");
-  }
-
-  const rows = listVocaStmt.all().filter((row) => {
-    const content = String(row.content ?? "").trim();
-    if (!content) return false;
-    if (!missingOnly) return true;
-    return !String(row.image_url || "").trim();
-  });
-
-  if (!rows.length) {
-    return { fetched: 0, missed: 0, total: 0 };
-  }
-
-  const now = Date.now();
-  let fetched = 0;
-  let missed = 0;
-
-  await mapWithConcurrency(rows, LANGO_IMAGE_FETCH_CONCURRENCY, async (row) => {
-    const imageUrl = await fetchLangoMaterialImageUrl(
-      row.content,
-      row.type || "vocabulary"
-    );
-    if (imageUrl) {
-      updateVocaImageStmt.run(imageUrl, now, row.id);
-      fetched += 1;
-    } else {
-      missed += 1;
-    }
-  });
-
-  return { fetched, missed, total: rows.length };
 }
 
 function maskApiKey(key) {
@@ -1003,11 +887,10 @@ app.delete("/api/voca/:id", (req, res) => {
   res.json({ ok: true, id });
 });
 
-app.post("/api/voca/import", express.json(), async (req, res) => {
+app.post("/api/voca/import", express.json(), (req, res) => {
   try {
     const items = req.body?.items;
     const replace = req.body?.replace !== false;
-    const fetchImages = req.body?.fetchImages === true;
     if (!Array.isArray(items)) {
       return res.status(400).json({ error: "items array is required." });
     }
@@ -1021,68 +904,11 @@ app.post("/api/voca/import", express.json(), async (req, res) => {
       });
     });
     importMany(normalized);
-
-    let imageStats = null;
-    if (fetchImages && normalized.length) {
-      imageStats = await fetchImagesForVocaItems({ missingOnly: true });
-    }
-
     const rows = listVocaStmt.all();
-    res.json({
-      ok: true,
-      count: rows.length,
-      items: rows.map(rowToVocaItem),
-      imageStats,
-    });
+    res.json({ ok: true, count: rows.length, items: rows.map(rowToVocaItem) });
   } catch (err) {
     res.status(400).json({ error: err.message || "Import failed." });
   }
-});
-
-app.post("/api/voca/fetch-images", express.json(), async (req, res) => {
-  try {
-    const missingOnly = req.body?.missingOnly !== false;
-    const imageStats = await fetchImagesForVocaItems({ missingOnly });
-    const rows = listVocaStmt.all();
-    res.json({
-      ok: true,
-      ...imageStats,
-      items: rows.map(rowToVocaItem),
-    });
-  } catch (err) {
-    res.status(400).json({ error: err.message || "Image fetch failed." });
-  }
-});
-
-app.get("/api/settings/lango", (_req, res) => {
-  const apiKey = getLangoApiKey();
-  res.json({
-    configured: Boolean(apiKey),
-    baseUrl: LANGO_API_BASE,
-    apiVersion: LANGO_API_VERSION,
-    apiKeyPreview: maskApiKey(apiKey),
-  });
-});
-
-app.put("/api/settings/lango", express.json(), (req, res) => {
-  const { apiKey } = req.body || {};
-
-  if (apiKey != null) {
-    const trimmed = String(apiKey).trim();
-    if (!trimmed) {
-      return res.status(400).json({ error: "API key cannot be empty." });
-    }
-    setSetting("lango_api_key", trimmed);
-  }
-
-  const savedKey = getLangoApiKey();
-  res.json({
-    ok: true,
-    configured: Boolean(savedKey),
-    baseUrl: LANGO_API_BASE,
-    apiVersion: LANGO_API_VERSION,
-    apiKeyPreview: maskApiKey(savedKey),
-  });
 });
 
 app.get("/api/settings/inworld", (_req, res) => {
