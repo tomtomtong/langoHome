@@ -1617,6 +1617,7 @@ function requiresAdmin(url, method) {
     if (m === 'GET') {
       if (url === '/api/game-data/export') return true;
       if (url === '/api/settings/inworld') return true;
+      if (url === '/api/settings/lango-image') return true;
       return false;
     }
     return true;
@@ -2715,6 +2716,7 @@ const GAME_API_PREFIXES = [
   '/api/findgame',
   '/api/voca',
   '/api/settings/inworld',
+  '/api/settings/lango-image',
   '/api/inworld/tts',
   '/api/inworld/llm',
   '/api/game-data',

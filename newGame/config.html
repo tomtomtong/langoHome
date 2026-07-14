@@ -111,11 +111,35 @@
       <div class="voca-header">
         <div>
           <h2 class="voca-heading">Vocabulary library</h2>
-          <p class="voca-desc">Import vocabulary from CSV with columns: <code>Import No., Type, Level, Language Code, Category, Sub Category, Content, Keywords</code>. Images are looked up from Lango during import. Import replaces the entire list.</p>
+          <p class="voca-desc">Import vocabulary from CSV with columns: <code>Import No., Type, Level, Language Code, Category, Sub Category, Content, Keywords</code>. Images are looked up from the Lango material image API during import. Import replaces the entire list.</p>
         </div>
         <div class="voca-actions">
           <button type="button" class="btn-voca-import" id="importVocaBtn">Import CSV</button>
           <input type="file" id="importVocaInput" accept=".csv,text/csv" hidden />
+        </div>
+      </div>
+
+      <div class="voca-api-settings">
+        <div class="voca-api-header">
+          <h3 class="voca-api-heading">Image search API</h3>
+          <span class="voca-api-badge" id="langoImageStatusBadge">Not configured</span>
+        </div>
+        <p class="voca-api-desc">CSV import queries <code id="langoImageEndpointPreview">https://dev.api.lango.ai/v1/materialImage/getImages</code> using each row's <code>Content</code> and <code>Type</code>.</p>
+        <div class="voca-api-fields">
+          <label class="voca-api-field">
+            <span>Base URL</span>
+            <input type="url" id="langoImageBaseUrl" placeholder="https://dev.api.lango.ai" />
+          </label>
+          <label class="voca-api-field">
+            <span>API version</span>
+            <input type="text" id="langoImageApiVersion" placeholder="v1" />
+          </label>
+          <label class="voca-api-field">
+            <span>API key</span>
+            <input type="password" id="langoImageApiKey" autocomplete="off" placeholder="Paste Lango API key" />
+            <small class="voca-api-hint" id="langoImageKeyHint"></small>
+          </label>
+          <p class="voca-api-hint">Changes save automatically.</p>
         </div>
       </div>
 
@@ -1076,6 +1100,93 @@
       inworldApiKeyInput.addEventListener("input", scheduleInworldSave);
       inworldVoiceIdInput.addEventListener("input", scheduleInworldSave);
 
+      /* ---- Lango image API settings ---- */
+      const langoImageBaseUrlInput = document.getElementById("langoImageBaseUrl");
+      const langoImageApiVersionInput = document.getElementById("langoImageApiVersion");
+      const langoImageApiKeyInput = document.getElementById("langoImageApiKey");
+      const langoImageStatusBadge = document.getElementById("langoImageStatusBadge");
+      const langoImageKeyHint = document.getElementById("langoImageKeyHint");
+      const langoImageEndpointPreview = document.getElementById("langoImageEndpointPreview");
+      let langoImageSaveReady = false;
+      let langoImageSaveTimer = null;
+
+      function updateLangoImageEndpointPreview(baseUrl, apiVersion) {
+        const trimmedBase = String(baseUrl || "").trim().replace(/\/$/, "");
+        const trimmedVersion = String(apiVersion || "").trim().replace(/^\/|\/$/g, "");
+        if (!trimmedBase || !trimmedVersion) return;
+        langoImageEndpointPreview.textContent = `${trimmedBase}/${trimmedVersion}/materialImage/getImages`;
+      }
+
+      async function loadLangoImageSettings() {
+        langoImageSaveReady = false;
+        try {
+          const res = await fetch("/api/settings/lango-image");
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Failed to load Lango image settings");
+          langoImageBaseUrlInput.value = data.baseUrl || "";
+          langoImageApiVersionInput.value = data.apiVersion || "";
+          langoImageKeyHint.textContent = data.configured
+            ? `Saved key: ${data.apiKeyPreview}`
+            : "No API key saved yet.";
+          langoImageStatusBadge.textContent = data.configured ? "Configured" : "Not configured";
+          langoImageStatusBadge.classList.toggle("configured", data.configured);
+          updateLangoImageEndpointPreview(data.baseUrl, data.apiVersion);
+        } catch (err) {
+          langoImageKeyHint.textContent =
+            err.message || "Could not load Lango image settings — is the server running?";
+        } finally {
+          langoImageSaveReady = true;
+        }
+      }
+
+      async function saveLangoImageSettings() {
+        const baseUrl = langoImageBaseUrlInput.value.trim();
+        const apiVersion = langoImageApiVersionInput.value.trim();
+        const apiKey = langoImageApiKeyInput.value.trim();
+        const payload = {};
+        if (baseUrl) payload.baseUrl = baseUrl;
+        if (apiVersion) payload.apiVersion = apiVersion;
+        if (apiKey) payload.apiKey = apiKey;
+        if (!Object.keys(payload).length) return;
+
+        try {
+          const res = await fetch("/api/settings/lango-image", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Save failed");
+          langoImageApiKeyInput.value = "";
+          langoImageBaseUrlInput.value = data.baseUrl || "";
+          langoImageApiVersionInput.value = data.apiVersion || "";
+          langoImageKeyHint.textContent = data.configured
+            ? `Saved key: ${data.apiKeyPreview}`
+            : "No API key saved yet.";
+          langoImageStatusBadge.textContent = data.configured ? "Configured" : "Not configured";
+          langoImageStatusBadge.classList.toggle("configured", data.configured);
+          updateLangoImageEndpointPreview(data.baseUrl, data.apiVersion);
+          showToast("Lango image API settings saved");
+        } catch (err) {
+          showToast(err.message || "Failed to save Lango image settings");
+        }
+      }
+
+      function scheduleLangoImageSave() {
+        if (!langoImageSaveReady) return;
+        updateLangoImageEndpointPreview(
+          langoImageBaseUrlInput.value,
+          langoImageApiVersionInput.value
+        );
+        clearTimeout(langoImageSaveTimer);
+        langoImageSaveTimer = setTimeout(saveLangoImageSettings, 500);
+      }
+
+      langoImageBaseUrlInput.addEventListener("input", scheduleLangoImageSave);
+      langoImageApiVersionInput.addEventListener("input", scheduleLangoImageSave);
+      langoImageApiKeyInput.addEventListener("input", scheduleLangoImageSave);
+      loadLangoImageSettings();
+
       /* ---- Vocabulary library ---- */
       const VOCA_CSV_COLUMNS = [
         { key: "importNo", labels: ["import no.", "import no"] },
@@ -1373,7 +1484,7 @@
         pendingVocaImport = items;
         vocaImportSummary.textContent = `${items.length} valid row${
           items.length === 1 ? "" : "s"
-        } ready to import. Lango will be queried for images by content. This will permanently replace the current vocabulary list.`;
+        } ready to import. Images will be fetched from <code>${escapeHtml(langoImageEndpointPreview.textContent)}</code>. This will permanently replace the current vocabulary list.`;
         vocaImportPreviewBody.innerHTML = items
           .slice(0, 12)
           .map((item) => renderVocaTableRow(item, false))

@@ -190,13 +190,29 @@ const DEFAULT_INWORLD_VOICE_ID = "default-zylgts2tamenvybeti3z0w__uncle_tommy";
 const INWORLD_TTS_URL = "https://api.inworld.ai/tts/v1/voice";
 const INWORLD_LLM_URL = "https://api.inworld.ai/v1/chat/completions";
 const LANGO_API_BASE_URL = (
-  process.env.LANGO_API_BASE_URL || "https://dev.lango.ai"
+  process.env.LANGO_API_BASE_URL || "https://dev.api.lango.ai"
 ).replace(/\/$/, "");
 const LANGO_API_VERSION = (
-  process.env.LANGO_API_VERSION || "api/v1"
+  process.env.LANGO_API_VERSION || "v1"
 ).replace(/^\/|\/$/g, "");
 const LANGO_API_KEY =
   process.env.LANGO_API_KEY || "agtwrxMuJ8Kp3LNZk4X97AqhvfVC6ERPsnG2";
+
+function getLangoImageApiConfig() {
+  const baseUrl = (
+    getSetting("lango_image_api_base_url") || LANGO_API_BASE_URL
+  ).replace(/\/$/, "");
+  const apiVersion = (
+    getSetting("lango_image_api_version") || LANGO_API_VERSION
+  ).replace(/^\/|\/$/g, "");
+  const apiKey = getSetting("lango_image_api_key") || LANGO_API_KEY;
+  return {
+    baseUrl,
+    apiVersion,
+    apiKey,
+    imageSearchPath: `${baseUrl}/${apiVersion}/materialImage/getImages`,
+  };
+}
 
 const getSettingStmt = db.prepare(
   "SELECT setting_value FROM game_settings WHERE setting_key = ?"
@@ -275,22 +291,26 @@ function normalizeImageUrl(value) {
   return imageUrl;
 }
 
-async function fetchLangoMaterialImage(content, type = "vocabulary") {
+async function lookupLangoMaterialImages(content, type = "vocabulary") {
+  const { imageSearchPath, apiKey } = getLangoImageApiConfig();
   const query = new URLSearchParams({
     content: String(content).trim(),
     type: String(type || "vocabulary").trim() || "vocabulary",
   });
-  const url = `${LANGO_API_BASE_URL}/${LANGO_API_VERSION}/materialImage/getImages?${query}`;
+  const url = `${imageSearchPath}?${query}`;
   const response = await fetch(url, {
     headers: {
-      authorization: LANGO_API_KEY,
+      authorization: apiKey,
     },
   });
   if (!response.ok) {
     throw new Error(`Image lookup failed (${response.status}) for "${content}".`);
   }
+  return response.json();
+}
 
-  const data = await response.json();
+async function fetchLangoMaterialImage(content, type = "vocabulary") {
+  const data = await lookupLangoMaterialImages(content, type);
   const images = Array.isArray(data?.images) ? data.images : [];
   if (!images.length) return "";
 
@@ -911,6 +931,29 @@ app.get("/api/voca", (_req, res) => {
   res.json({ items: rows.map(rowToVocaItem) });
 });
 
+app.get("/api/voca/image-search", async (req, res) => {
+  try {
+    const content = String(req.query?.content ?? "").trim();
+    const type = String(req.query?.type ?? "vocabulary").trim() || "vocabulary";
+    if (!content) {
+      return res.status(400).json({ error: "content query parameter is required." });
+    }
+
+    const data = await lookupLangoMaterialImages(content, type);
+    const imageUrl = await fetchLangoMaterialImage(content, type).catch(() => "");
+    const { imageSearchPath } = getLangoImageApiConfig();
+    res.json({
+      content,
+      type,
+      imageUrl,
+      endpoint: imageSearchPath,
+      ...data,
+    });
+  } catch (err) {
+    res.status(502).json({ error: err.message || "Image search failed." });
+  }
+});
+
 app.post("/api/voca", express.json(), (req, res) => {
   try {
     const row = normalizeVocaInput(req.body || {}, "Item");
@@ -1079,6 +1122,58 @@ app.put("/api/settings/inworld", express.json(), (req, res) => {
     configured: Boolean(savedKey),
     voiceId: savedVoice,
     apiKeyPreview: maskApiKey(savedKey),
+  });
+});
+
+app.get("/api/settings/lango-image", (_req, res) => {
+  const config = getLangoImageApiConfig();
+  res.json({
+    configured: Boolean(config.apiKey),
+    baseUrl: config.baseUrl,
+    apiVersion: config.apiVersion,
+    imageSearchPath: config.imageSearchPath,
+    apiKeyPreview: maskApiKey(config.apiKey),
+  });
+});
+
+app.put("/api/settings/lango-image", express.json(), (req, res) => {
+  const { baseUrl, apiVersion, apiKey } = req.body || {};
+
+  if (baseUrl != null) {
+    const trimmed = String(baseUrl).trim().replace(/\/$/, "");
+    if (!trimmed) {
+      return res.status(400).json({ error: "Base URL cannot be empty." });
+    }
+    if (!/^https?:\/\//i.test(trimmed)) {
+      return res.status(400).json({ error: "Base URL must start with http:// or https://." });
+    }
+    setSetting("lango_image_api_base_url", trimmed);
+  }
+
+  if (apiVersion != null) {
+    const trimmedVersion = String(apiVersion).trim().replace(/^\/|\/$/g, "");
+    if (!trimmedVersion) {
+      return res.status(400).json({ error: "API version cannot be empty." });
+    }
+    setSetting("lango_image_api_version", trimmedVersion);
+  }
+
+  if (apiKey != null) {
+    const trimmedKey = String(apiKey).trim();
+    if (!trimmedKey) {
+      return res.status(400).json({ error: "API key cannot be empty." });
+    }
+    setSetting("lango_image_api_key", trimmedKey);
+  }
+
+  const config = getLangoImageApiConfig();
+  res.json({
+    ok: true,
+    configured: Boolean(config.apiKey),
+    baseUrl: config.baseUrl,
+    apiVersion: config.apiVersion,
+    imageSearchPath: config.imageSearchPath,
+    apiKeyPreview: maskApiKey(config.apiKey),
   });
 });
 

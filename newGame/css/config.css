@@ -931,6 +931,90 @@ body.hotspot-dragging {
   margin-bottom: 14px;
 }
 
+.voca-api-settings {
+  background: #fff;
+  border: 3px solid #c9a06a;
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 14px;
+}
+
+.voca-api-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.voca-api-heading {
+  font-family: "Baloo 2", sans-serif;
+  font-size: 1.05rem;
+  color: #5a2da0;
+}
+
+.voca-api-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #ffd6d6;
+  color: #8b1a1a;
+  white-space: nowrap;
+}
+
+.voca-api-badge.configured {
+  background: #d4edda;
+  color: #1e6b3a;
+}
+
+.voca-api-desc {
+  font-size: 0.85rem;
+  color: #5e3a18;
+  line-height: 1.45;
+  margin-bottom: 12px;
+}
+
+.voca-api-desc code,
+.voca-desc code {
+  background: rgba(255, 255, 255, 0.45);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+
+.voca-api-fields {
+  display: grid;
+  gap: 12px;
+  max-width: 640px;
+}
+
+.voca-api-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #5e3a18;
+}
+
+.voca-api-field input {
+  font-family: inherit;
+  font-size: 0.9rem;
+  padding: 8px 10px;
+  border: 2px solid #c9a06a;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.voca-api-hint {
+  font-weight: 500;
+  font-size: 0.8rem;
+  color: #7a5a30;
+}
+
 .voca-search,
 .voca-filter {
   width: 100%;
