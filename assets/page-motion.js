@@ -1,4 +1,5 @@
 (() => {
+  document.documentElement.classList.add('lango-motion-booting');
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const visualSelector = [
     'body > *',
@@ -39,7 +40,10 @@
   }
 
   function animatePageElements() {
-    if (reducedMotion.matches) return;
+    if (reducedMotion.matches) {
+      document.documentElement.classList.remove('lango-motion-booting', 'lango-motion-revealing');
+      return;
+    }
 
     const candidates = [...new Set(document.querySelectorAll(visualSelector))]
       .filter((element) => !element.matches(excludedSelector))
@@ -49,10 +53,12 @@
     candidates.forEach((element, index) => {
       // Existing CSS/game animations keep ownership of their element.
       if (getComputedStyle(element).animationName !== 'none') return;
-      const delay = Math.min(index * 24, 300);
+      const delay = Math.min(index * 22, 260);
       element.style.setProperty('--lango-enter-delay', `${delay}ms`);
       element.classList.add('lango-page-enter');
     });
+
+    document.documentElement.classList.remove('lango-motion-booting', 'lango-motion-revealing');
   }
 
   function start() {
@@ -61,6 +67,7 @@
   }
 
   function replayAfterReveal() {
+    document.documentElement.classList.add('lango-motion-revealing');
     document.querySelectorAll('.lango-page-enter').forEach((element) => {
       element.classList.remove('lango-page-enter');
     });

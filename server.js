@@ -37,6 +37,7 @@ const GAME_ICONS_DIR = join(CONFIG_DIR, 'game-icons');
 const GAME_ICON_IDS = ['wordwhack', 'cardgame', 'findgame'];
 const PAIR_THEME_IDS = ['default', 'warm', 'cool', 'nature', 'night'];
 const DEFAULT_PAIR_THEME = 'default';
+const DEFAULT_ROOM_SCENE = 'livingroom';
 const DEFAULT_VIDEO_PAIRS_TIMEZONE = 'UTC';
 const VIDEO_MAX_BYTES = 100 * 1024 * 1024;
 const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
@@ -1748,10 +1749,28 @@ function normalizePairTheme(value) {
   return PAIR_THEME_IDS.includes(theme) ? theme : DEFAULT_PAIR_THEME;
 }
 
+function inferRoomSceneFromPrompt(value) {
+  const prompt = String(value ?? '').trim().toLowerCase();
+  if (!prompt) return DEFAULT_ROOM_SCENE;
+
+  const sceneMatchers = [
+    ['washroom', /\b(?:wash\s*room|bath\s*room|rest\s*room|toilet)\b|洗手間|浴室|廁所/],
+    ['livingroom', /\b(?:living\s*room|lounge|sitting\s*room)\b|客廳|起居室/],
+    ['classroom', /\b(?:class\s*room|school|lesson)\b|課室|教室|學校/],
+    ['library', /\b(?:library|libary)\b|圖書館/],
+    ['bedroom', /\b(?:bed\s*room)\b|睡房|臥室/],
+    ['garden', /\b(?:garden|back\s*yard|courtyard)\b|花園|庭院/],
+    ['kitchen', /\b(?:kitchen)\b|廚房/],
+  ];
+
+  return sceneMatchers.find(([, matcher]) => matcher.test(prompt))?.[0] || DEFAULT_ROOM_SCENE;
+}
+
 function buildPairInfo(meta) {
   return {
     id: meta.id,
     text: meta.text || '',
+    scene: inferRoomSceneFromPrompt(meta.text),
     theme: normalizePairTheme(meta.theme),
     startTime: meta.startTime || '00:00',
     endTime: meta.endTime || '23:59',
@@ -2642,6 +2661,8 @@ const pages = {
   '/visme': 'visme/index.html',
   '/map': 'map/index.html',
   '/map/': 'map/index.html',
+  '/vocab-game': 'vocab-game/index.html',
+  '/vocab-game/': 'vocab-game/index.html',
 };
 
 function resolvePage(url) {

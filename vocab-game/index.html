@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>英文生字拆字 Game</title>
+    <link rel="stylesheet" href="/assets/page-motion.css" />
+    <script src="/assets/page-motion.js"></script>
+    <script type="module" crossorigin src="/vocab-game-app.js"></script>
+    <link rel="stylesheet" crossorigin href="/vocab-game-app.css">
+    <style>
+      #vocab-completion[hidden] { display: none; }
+
+      #vocab-completion {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        padding: 24px;
+        background: rgba(53, 24, 6, .66);
+        backdrop-filter: blur(8px);
+        animation: vocab-finish-backdrop .45s ease both;
+      }
+
+      .vocab-completion__rays {
+        position: absolute;
+        width: min(105vmax, 1200px);
+        aspect-ratio: 1;
+        border-radius: 50%;
+        opacity: .62;
+        background: repeating-conic-gradient(
+          from 0deg,
+          rgba(255, 236, 111, .72) 0 9deg,
+          rgba(255, 255, 255, 0) 9deg 19deg
+        );
+        animation: vocab-finish-rays 18s linear infinite;
+      }
+
+      .vocab-completion__card {
+        position: relative;
+        z-index: 2;
+        width: min(560px, 88vw);
+        padding: clamp(30px, 6vw, 58px) clamp(24px, 6vw, 56px) clamp(26px, 5vw, 46px);
+        overflow: hidden;
+        border: clamp(6px, 1vw, 10px) solid #ffc83d;
+        border-radius: clamp(28px, 5vw, 48px);
+        color: #fff9d9;
+        text-align: center;
+        background: linear-gradient(180deg, #ef9226 0%, #bd5314 100%);
+        box-shadow:
+          inset 0 0 0 4px #7a2b08,
+          inset 0 8px 18px rgba(255, 255, 255, .26),
+          0 24px 70px rgba(55, 17, 1, .55);
+        animation: vocab-finish-card .7s cubic-bezier(.18, .9, .22, 1.22) both;
+      }
+
+      .vocab-completion__trophy {
+        display: block;
+        margin-bottom: 8px;
+        font-size: clamp(72px, 15vw, 128px);
+        line-height: 1;
+        filter: drop-shadow(0 8px 3px rgba(77, 30, 3, .32));
+        animation: vocab-finish-trophy .8s cubic-bezier(.18, .9, .22, 1.28) .2s both;
+      }
+
+      .vocab-completion__card h1 {
+        margin: 0;
+        color: #fff7b0;
+        font-size: clamp(38px, 8vw, 68px);
+        font-weight: 950;
+        line-height: 1;
+        text-shadow: 0 4px 0 #762a0a;
+      }
+
+      .vocab-completion__card p {
+        margin: .8em 0 1.25em;
+        font-size: clamp(18px, 3.6vw, 27px);
+        font-weight: 800;
+        line-height: 1.25;
+        text-shadow: 0 2px 0 rgba(83, 27, 4, .55);
+      }
+
+      #vocab-completion-done {
+        min-width: min(260px, 76%);
+        padding: .62em 1.5em;
+        border: 5px solid #6f2708;
+        border-radius: 999px;
+        color: #fffbe4;
+        font: 950 clamp(24px, 5vw, 36px)/1.05 inherit;
+        cursor: pointer;
+        background: linear-gradient(180deg, #65d95f, #239b36);
+        box-shadow: inset 0 0 0 3px rgba(255, 255, 255, .28), 0 7px 0 #176225;
+        transition: transform .12s ease, filter .12s ease;
+      }
+
+      #vocab-completion-done:hover { filter: brightness(1.08); transform: scale(1.035); }
+      #vocab-completion-done:active { transform: translateY(5px); box-shadow: inset 0 0 0 3px rgba(255, 255, 255, .25), 0 2px 0 #176225; }
+      #vocab-completion-done:focus-visible { outline: 5px solid #fff8a8; outline-offset: 5px; }
+
+      .vocab-completion__confetti span {
+        position: absolute;
+        z-index: 1;
+        top: -12%;
+        left: var(--x);
+        width: clamp(9px, 1.5vw, 16px);
+        height: clamp(18px, 2.8vw, 29px);
+        border-radius: 3px;
+        background: var(--color);
+        animation: vocab-finish-confetti 2.4s ease-in var(--delay) infinite;
+      }
+
+      #vocab-completion.is-leaving { animation: vocab-finish-leave .38s ease forwards; }
+
+      @keyframes vocab-finish-backdrop { from { opacity: 0; } }
+      @keyframes vocab-finish-rays { to { transform: rotate(1turn); } }
+      @keyframes vocab-finish-card {
+        from { opacity: 0; transform: translateY(16%) scale(.58) rotate(-4deg); }
+        70% { transform: translateY(-2%) scale(1.04) rotate(1deg); }
+        to { opacity: 1; transform: translateY(0) scale(1) rotate(0); }
+      }
+      @keyframes vocab-finish-trophy {
+        from { opacity: 0; transform: translateY(-45%) scale(.3) rotate(-18deg); }
+        to { opacity: 1; transform: translateY(0) scale(1) rotate(0); }
+      }
+      @keyframes vocab-finish-confetti {
+        0% { opacity: 0; transform: translateY(-10vh) rotate(0); }
+        12% { opacity: 1; }
+        to { opacity: .9; transform: translateY(125vh) rotate(650deg); }
+      }
+      @keyframes vocab-finish-leave { to { opacity: 0; transform: scale(1.03); } }
+
+      @media (prefers-reduced-motion: reduce) {
+        #vocab-completion,
+        .vocab-completion__rays,
+        .vocab-completion__card,
+        .vocab-completion__trophy,
+        .vocab-completion__confetti span { animation: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <section id="vocab-completion" role="dialog" aria-modal="true" aria-labelledby="vocab-completion-title" hidden>
+      <div class="vocab-completion__rays" aria-hidden="true"></div>
+      <div class="vocab-completion__confetti" aria-hidden="true">
+        <span style="--x:5%;--delay:.05s;--color:#ffdd45"></span>
+        <span style="--x:13%;--delay:.65s;--color:#54dcff"></span>
+        <span style="--x:22%;--delay:.22s;--color:#ff6d6d"></span>
+        <span style="--x:31%;--delay:.9s;--color:#77e36b"></span>
+        <span style="--x:40%;--delay:.38s;--color:#d98cff"></span>
+        <span style="--x:49%;--delay:.72s;--color:#fff08a"></span>
+        <span style="--x:58%;--delay:.12s;--color:#4ed9cd"></span>
+        <span style="--x:67%;--delay:.82s;--color:#ff8d44"></span>
+        <span style="--x:76%;--delay:.3s;--color:#65a8ff"></span>
+        <span style="--x:84%;--delay:1s;--color:#ff6eb5"></span>
+        <span style="--x:92%;--delay:.5s;--color:#ffdc45"></span>
+      </div>
+      <div class="vocab-completion__card">
+        <span class="vocab-completion__trophy" aria-hidden="true">🏆</span>
+        <h1 id="vocab-completion-title">Amazing!</h1>
+        <p>You finished all 10 words!</p>
+        <button id="vocab-completion-done" type="button">完成</button>
+      </div>
+    </section>
+    <script>
+      const markVocabGamePlayed = () => {
+        try {
+          window.localStorage.setItem('lango-vocab-game-played', '1');
+        } catch {
+          // The game remains playable when storage is unavailable.
+        }
+      };
+
+      const completionModal = document.getElementById('vocab-completion');
+      const completionDone = document.getElementById('vocab-completion-done');
+      let completionScheduled = false;
+
+      const detectCompletedGame = () => {
+        if (completionScheduled) return;
+        const progress = document.querySelector('.lango-home__progress-count')?.textContent.trim();
+        const message = document.querySelector('.lango-home__message')?.textContent || '';
+        if (progress !== '10/10' || !message.includes('Correct!')) return;
+
+        completionScheduled = true;
+        window.setTimeout(() => {
+          completionModal.hidden = false;
+          completionDone.focus();
+        }, 720);
+      };
+
+      new MutationObserver(detectCompletedGame).observe(document.getElementById('root'), {
+        subtree: true,
+        childList: true,
+        characterData: true,
+        attributes: true,
+        attributeFilter: ['class'],
+      });
+
+      completionDone.addEventListener('click', () => {
+        markVocabGamePlayed();
+        completionModal.classList.add('is-leaving');
+        window.setTimeout(() => { window.location.href = '/'; }, 380);
+      });
+
+      // The supplied game used the Return artwork to skip a round. When the
+      // game is hosted inside LangoHome, that control should return home.
+      document.addEventListener('click', (event) => {
+        if (!event.target.closest('.lango-home__return')) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        window.location.href = '/';
+      }, true);
+    </script>
+  </body>
+</html>
