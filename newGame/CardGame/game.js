@@ -65,14 +65,18 @@ function pickRoundPairs() {
     const picked = VocaConfig.pickRoundPairs(ROUND_PAIR_COUNT);
     if (picked.length) {
       roundPairs = picked.map((item) => ({
-        img: item.imageUrl,
         word: item.word,
+        textOnly: item.textOnly !== false,
       }));
       totalPairs = roundPairs.length;
       return;
     }
   }
-  roundPairs = DEFAULT_PAIRS.slice();
+  roundPairs = DEFAULT_PAIRS.map((pair) => ({
+    word: pair.word,
+    img: pair.img,
+    textOnly: false,
+  }));
   totalPairs = roundPairs.length;
 }
 
@@ -141,6 +145,11 @@ function applyCardBackStyle(el) {
 function buildDeck() {
   deck = [];
   roundPairs.forEach((p, idx) => {
+    if (p.textOnly) {
+      deck.push({ pairId: idx, type: 'word', content: p.word, matched: false });
+      deck.push({ pairId: idx, type: 'word', content: p.word, matched: false });
+      return;
+    }
     deck.push({ pairId: idx, type: 'img', content: p.img, matched: false });
     deck.push({ pairId: idx, type: 'word', content: p.word, matched: false });
   });
@@ -396,10 +405,7 @@ async function initGame() {
     await VocaConfig.loadFromServer();
     pickRoundPairs();
     if (VocaConfig.hasItems()) {
-      await VocaConfig.preloadImages(roundPairs.map((pair) => ({
-        imageUrl: pair.img,
-        word: pair.word,
-      })));
+      await VocaConfig.preloadImages();
     }
   }
   if (typeof CardImageConfig !== 'undefined') {

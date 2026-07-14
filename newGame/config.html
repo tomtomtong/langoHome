@@ -110,18 +110,81 @@
     <section class="voca-section hidden" id="vocaSection">
       <div class="voca-header">
         <div>
-          <h2 class="voca-heading">Vocabulary list</h2>
-          <p class="voca-desc">Word + image pairs used by Word-Whack Blitz and Picture-Word Memory Match. Import a CSV with <code>content,url</code> columns — it saves automatically.</p>
+          <h2 class="voca-heading">Vocabulary library</h2>
+          <p class="voca-desc">Import vocabulary from CSV with columns: <code>Import No., Type, Level, Language Code, Category, Sub Category, Content, Keywords</code>. Import replaces the entire list.</p>
         </div>
         <div class="voca-actions">
-          <button type="button" class="btn-voca-add" id="addVocaBtn">+ Add word</button>
           <button type="button" class="btn-voca-import" id="importVocaBtn">Import CSV</button>
           <input type="file" id="importVocaInput" accept=".csv,text/csv" hidden />
         </div>
       </div>
+
+      <div class="voca-toolbar">
+        <input type="search" class="voca-search" id="vocaSearch" placeholder="Search content, keywords, import no…" />
+        <select class="voca-filter" id="vocaFilterType">
+          <option value="">All types</option>
+        </select>
+        <select class="voca-filter" id="vocaFilterLevel">
+          <option value="">All levels</option>
+        </select>
+        <select class="voca-filter" id="vocaFilterLanguage">
+          <option value="">All languages</option>
+        </select>
+        <select class="voca-filter" id="vocaFilterCategory">
+          <option value="">All categories</option>
+        </select>
+      </div>
+
       <p class="voca-count" id="vocaCount">Loading…</p>
-      <div class="voca-grid" id="vocaGrid"></div>
+      <div class="voca-table-wrap">
+        <table class="voca-table">
+          <thead>
+            <tr>
+              <th>Import No.</th>
+              <th>Type</th>
+              <th>Level</th>
+              <th>Language</th>
+              <th>Category</th>
+              <th>Sub Category</th>
+              <th>Content</th>
+              <th>Keywords</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="vocaTableBody"></tbody>
+        </table>
+      </div>
+      <p class="voca-empty hidden" id="vocaEmpty">No vocabulary items yet. Import a CSV to get started.</p>
     </section>
+
+    <div class="voca-modal hidden" id="vocaImportModal" role="dialog" aria-modal="true" aria-labelledby="vocaImportTitle">
+      <div class="voca-modal-panel">
+        <h3 class="voca-modal-title" id="vocaImportTitle">Import vocabulary CSV</h3>
+        <p class="voca-modal-desc" id="vocaImportSummary">Review the parsed rows before replacing the current vocabulary list.</p>
+        <div class="voca-modal-errors hidden" id="vocaImportErrors"></div>
+        <div class="voca-modal-preview-wrap">
+          <table class="voca-table voca-preview-table">
+            <thead>
+              <tr>
+                <th>Import No.</th>
+                <th>Type</th>
+                <th>Level</th>
+                <th>Language</th>
+                <th>Category</th>
+                <th>Sub Category</th>
+                <th>Content</th>
+                <th>Keywords</th>
+              </tr>
+            </thead>
+            <tbody id="vocaImportPreviewBody"></tbody>
+          </table>
+        </div>
+        <div class="voca-modal-actions">
+          <button type="button" class="btn-voca-cancel" id="cancelVocaImportBtn">Cancel</button>
+          <button type="button" class="btn-voca-confirm" id="confirmVocaImportBtn">Replace vocabulary</button>
+        </div>
+      </div>
+    </div>
 
     <div class="slot-grid" id="slotGrid"></div>
   </div>
@@ -824,6 +887,14 @@
         return String(str).replace(/"/g, "&quot;");
       }
 
+      function escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
       async function saveLevel(id) {
         const lv = findLevels.find((l) => l.id === id);
         if (!lv) return;
@@ -1003,49 +1074,256 @@
       inworldApiKeyInput.addEventListener("input", scheduleInworldSave);
       inworldVoiceIdInput.addEventListener("input", scheduleInworldSave);
 
-      /* ---- Vocabulary list ---- */
+      /* ---- Vocabulary library ---- */
+      const VOCA_CSV_COLUMNS = [
+        { key: "importNo", labels: ["import no.", "import no"] },
+        { key: "type", labels: ["type"] },
+        { key: "level", labels: ["level"] },
+        { key: "languageCode", labels: ["language code", "language"] },
+        { key: "category", labels: ["category"] },
+        { key: "subCategory", labels: ["sub category", "subcategory"] },
+        { key: "content", labels: ["content"] },
+        { key: "keywords", labels: ["keywords", "keyword"] },
+      ];
+
       let vocaItems = [];
-      const vocaGrid = document.getElementById("vocaGrid");
+      let pendingVocaImport = [];
+      const vocaTableBody = document.getElementById("vocaTableBody");
       const vocaCount = document.getElementById("vocaCount");
+      const vocaEmpty = document.getElementById("vocaEmpty");
       const importVocaBtn = document.getElementById("importVocaBtn");
       const importVocaInput = document.getElementById("importVocaInput");
+      const vocaSearch = document.getElementById("vocaSearch");
+      const vocaFilterType = document.getElementById("vocaFilterType");
+      const vocaFilterLevel = document.getElementById("vocaFilterLevel");
+      const vocaFilterLanguage = document.getElementById("vocaFilterLanguage");
+      const vocaFilterCategory = document.getElementById("vocaFilterCategory");
+      const vocaImportModal = document.getElementById("vocaImportModal");
+      const vocaImportSummary = document.getElementById("vocaImportSummary");
+      const vocaImportErrors = document.getElementById("vocaImportErrors");
+      const vocaImportPreviewBody = document.getElementById("vocaImportPreviewBody");
+      const cancelVocaImportBtn = document.getElementById("cancelVocaImportBtn");
+      const confirmVocaImportBtn = document.getElementById("confirmVocaImportBtn");
+
+      function normalizeHeaderLabel(label) {
+        return String(label || "").trim().toLowerCase();
+      }
+
+      function mapVocaCsvHeaders(headers) {
+        const mapping = {};
+        headers.forEach((header, index) => {
+          const normalized = normalizeHeaderLabel(header);
+          const column = VOCA_CSV_COLUMNS.find((entry) =>
+            entry.labels.includes(normalized)
+          );
+          if (column) mapping[column.key] = index;
+        });
+        return mapping;
+      }
+
+      function parseCsvRecords(text) {
+        const rows = [];
+        let row = [];
+        let field = "";
+        let inQuotes = false;
+
+        for (let i = 0; i < text.length; i++) {
+          const char = text[i];
+          const next = text[i + 1];
+
+          if (inQuotes) {
+            if (char === '"' && next === '"') {
+              field += '"';
+              i += 1;
+            } else if (char === '"') {
+              inQuotes = false;
+            } else {
+              field += char;
+            }
+            continue;
+          }
+
+          if (char === '"') {
+            inQuotes = true;
+          } else if (char === ",") {
+            row.push(field);
+            field = "";
+          } else if (char === "\n") {
+            row.push(field);
+            rows.push(row);
+            row = [];
+            field = "";
+          } else if (char !== "\r") {
+            field += char;
+          }
+        }
+
+        if (field.length || row.length) {
+          row.push(field);
+          rows.push(row);
+        }
+
+        return rows.filter((record) => record.some((cell) => String(cell).trim()));
+      }
+
+      function rowFromCsvRecord(record, mapping, rowNumber) {
+        const getValue = (key) => {
+          const index = mapping[key];
+          return index == null ? "" : String(record[index] ?? "").trim();
+        };
+        const levelRaw = getValue("level");
+        const level = levelRaw ? Number(levelRaw) : 1;
+        if (!Number.isFinite(level) || level < 1) {
+          throw new Error(`Row ${rowNumber}: Level must be a positive number.`);
+        }
+
+        const item = {
+          importNo: getValue("importNo"),
+          type: getValue("type") || "vocabulary",
+          level: Math.floor(level),
+          languageCode: (getValue("languageCode") || "en").toLowerCase(),
+          category: getValue("category"),
+          subCategory: getValue("subCategory"),
+          content: getValue("content"),
+          keywords: getValue("keywords"),
+        };
+
+        if (!item.importNo) {
+          throw new Error(`Row ${rowNumber}: Import No. is required.`);
+        }
+        if (!item.content) {
+          throw new Error(`Row ${rowNumber}: Content is required.`);
+        }
+        return item;
+      }
 
       function parseVocaCsv(text) {
-        const lines = text.trim().split(/\r?\n/);
-        const items = [];
-        for (let i = 1; i < lines.length; i++) {
-          const line = lines[i].trim();
-          if (!line) continue;
-          const commaIdx = line.indexOf(",");
-          if (commaIdx < 0) continue;
-          const word = line.slice(0, commaIdx).trim();
-          const imageUrl = line.slice(commaIdx + 1).trim();
-          if (word && imageUrl) items.push({ word, imageUrl });
+        const records = parseCsvRecords(text.trim());
+        if (!records.length) return [];
+
+        const mapping = mapVocaCsvHeaders(records[0]);
+        if (mapping.content == null || mapping.importNo == null) {
+          throw new Error(
+            "CSV must include Import No. and Content columns in the header row."
+          );
         }
+
+        const items = [];
+        const seenImportNos = new Set();
+        const seenContent = new Set();
+
+        for (let i = 1; i < records.length; i++) {
+          const rowNumber = i + 1;
+          const item = rowFromCsvRecord(records[i], mapping, rowNumber);
+          const importKey = item.importNo.toLowerCase();
+          const contentKey = item.content.toLowerCase();
+          if (seenImportNos.has(importKey)) {
+            throw new Error(`Row ${rowNumber}: Duplicate Import No. "${item.importNo}".`);
+          }
+          if (seenContent.has(contentKey)) {
+            throw new Error(`Row ${rowNumber}: Duplicate Content "${item.content}".`);
+          }
+          seenImportNos.add(importKey);
+          seenContent.add(contentKey);
+          items.push(item);
+        }
+
         return items;
       }
 
-      function renderVocaList() {
-        vocaCount.textContent = `${vocaItems.length} word${vocaItems.length === 1 ? "" : "s"}`;
-        vocaGrid.innerHTML = "";
-        vocaItems.forEach((item) => {
-          const card = document.createElement("article");
-          card.className = "voca-card";
-          card.innerHTML = `
-            <div class="voca-preview">
-              <img src="${escapeAttr(item.imageUrl)}" alt="${escapeAttr(item.word)}" loading="lazy" />
-            </div>
-            <div class="voca-body">
-              <input type="text" class="voca-word" data-id="${item.id}" value="${escapeAttr(item.word)}" />
-              <input type="url" class="voca-url" data-id="${item.id}" value="${escapeAttr(item.imageUrl)}" />
-              <div class="voca-card-actions">
-                <button type="button" class="btn-voca-save" data-id="${item.id}">Save</button>
-                <button type="button" class="btn-voca-delete" data-id="${item.id}">Delete</button>
-              </div>
-            </div>
-          `;
-          vocaGrid.appendChild(card);
+      function uniqueSorted(values) {
+        return [...new Set(values.filter(Boolean))].sort((a, b) =>
+          String(a).localeCompare(String(b), undefined, { numeric: true })
+        );
+      }
+
+      function populateVocaFilters(items) {
+        const fillSelect = (select, values, labelPrefix) => {
+          const current = select.value;
+          select.innerHTML = `<option value="">${labelPrefix}</option>`;
+          values.forEach((value) => {
+            const option = document.createElement("option");
+            option.value = String(value);
+            option.textContent = String(value);
+            select.appendChild(option);
+          });
+          if ([...select.options].some((option) => option.value === current)) {
+            select.value = current;
+          }
+        };
+
+        fillSelect(vocaFilterType, uniqueSorted(items.map((item) => item.type)), "All types");
+        fillSelect(vocaFilterLevel, uniqueSorted(items.map((item) => item.level)), "All levels");
+        fillSelect(
+          vocaFilterLanguage,
+          uniqueSorted(items.map((item) => item.languageCode)),
+          "All languages"
+        );
+        fillSelect(
+          vocaFilterCategory,
+          uniqueSorted(items.map((item) => item.category)),
+          "All categories"
+        );
+      }
+
+      function getFilteredVocaItems() {
+        const query = vocaSearch.value.trim().toLowerCase();
+        return vocaItems.filter((item) => {
+          if (vocaFilterType.value && item.type !== vocaFilterType.value) return false;
+          if (vocaFilterLevel.value && String(item.level) !== vocaFilterLevel.value) {
+            return false;
+          }
+          if (vocaFilterLanguage.value && item.languageCode !== vocaFilterLanguage.value) {
+            return false;
+          }
+          if (vocaFilterCategory.value && item.category !== vocaFilterCategory.value) {
+            return false;
+          }
+          if (!query) return true;
+          const haystack = [
+            item.importNo,
+            item.type,
+            item.languageCode,
+            item.category,
+            item.subCategory,
+            item.content,
+            item.keywords,
+          ]
+            .join(" ")
+            .toLowerCase();
+          return haystack.includes(query);
         });
+      }
+
+      function renderVocaTableRow(item, includeDelete = true) {
+        return `
+          <tr>
+            <td>${escapeHtml(item.importNo)}</td>
+            <td>${escapeHtml(item.type)}</td>
+            <td>${escapeHtml(item.level)}</td>
+            <td>${escapeHtml(item.languageCode)}</td>
+            <td>${escapeHtml(item.category)}</td>
+            <td>${escapeHtml(item.subCategory)}</td>
+            <td>${escapeHtml(item.content)}</td>
+            <td>${escapeHtml(item.keywords)}</td>
+            ${
+              includeDelete
+                ? `<td><button type="button" class="btn-voca-delete" data-id="${item.id}">Delete</button></td>`
+                : "<td></td>"
+            }
+          </tr>
+        `;
+      }
+
+      function renderVocaList() {
+        const filtered = getFilteredVocaItems();
+        populateVocaFilters(vocaItems);
+        vocaCount.textContent = `${filtered.length} of ${vocaItems.length} item${
+          vocaItems.length === 1 ? "" : "s"
+        }`;
+        vocaTableBody.innerHTML = filtered.map((item) => renderVocaTableRow(item)).join("");
+        vocaEmpty.classList.toggle("hidden", vocaItems.length > 0);
+        document.querySelector(".voca-table-wrap").classList.toggle("hidden", vocaItems.length === 0);
       }
 
       async function loadVocaList() {
@@ -1061,25 +1339,6 @@
         }
       }
 
-      async function saveVocaItem(id) {
-        const wordInput = vocaGrid.querySelector(`.voca-word[data-id="${id}"]`);
-        const urlInput = vocaGrid.querySelector(`.voca-url[data-id="${id}"]`);
-        const res = await fetch(`/api/voca/${id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            word: wordInput.value.trim(),
-            imageUrl: urlInput.value.trim(),
-          }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Save failed");
-        const idx = vocaItems.findIndex((item) => item.id === id);
-        if (idx >= 0) vocaItems[idx] = data.item;
-        renderVocaList();
-        showToast("Saved");
-      }
-
       async function deleteVocaItem(id) {
         if (!confirm("Delete this vocabulary item?")) return;
         const res = await fetch(`/api/voca/${id}`, { method: "DELETE" });
@@ -1090,46 +1349,77 @@
         showToast("Deleted");
       }
 
-      async function addVocaItem() {
-        const word = prompt("Word:");
-        if (!word || !word.trim()) return;
-        const imageUrl = prompt("Image URL:");
-        if (!imageUrl || !imageUrl.trim()) return;
-        const res = await fetch("/api/voca", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ word: word.trim(), imageUrl: imageUrl.trim() }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Add failed");
-        vocaItems.push(data.item);
-        renderVocaList();
-        showToast("Word added");
+      function closeVocaImportModal() {
+        vocaImportModal.classList.add("hidden");
+        pendingVocaImport = [];
+        vocaImportPreviewBody.innerHTML = "";
+        vocaImportErrors.classList.add("hidden");
+        vocaImportErrors.textContent = "";
+        confirmVocaImportBtn.disabled = false;
+      }
+
+      function openVocaImportModal(items) {
+        pendingVocaImport = items;
+        vocaImportSummary.textContent = `${items.length} valid row${
+          items.length === 1 ? "" : "s"
+        } ready to import. This will permanently replace the current vocabulary list.`;
+        vocaImportPreviewBody.innerHTML = items
+          .slice(0, 12)
+          .map((item) => renderVocaTableRow(item, false))
+          .join("");
+        if (items.length > 12) {
+          vocaImportPreviewBody.insertAdjacentHTML(
+            "beforeend",
+            `<tr><td colspan="9">…and ${items.length - 12} more rows</td></tr>`
+          );
+        }
+        vocaImportModal.classList.remove("hidden");
+      }
+
+      async function confirmVocaImport() {
+        if (!pendingVocaImport.length) return;
+        confirmVocaImportBtn.disabled = true;
+        try {
+          const res = await fetch("/api/voca/import", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ items: pendingVocaImport, replace: true }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Import failed");
+          vocaItems = data.items || [];
+          renderVocaList();
+          closeVocaImportModal();
+          showToast(`Replaced vocabulary with ${data.count} items`);
+        } catch (err) {
+          confirmVocaImportBtn.disabled = false;
+          showToast(err.message || "Import failed");
+        }
       }
 
       async function importVocaCsv(file) {
         const text = await file.text();
-        const items = parseVocaCsv(text);
+        let items = [];
+        try {
+          items = parseVocaCsv(text);
+        } catch (err) {
+          vocaImportErrors.textContent = err.message || "CSV parse failed";
+          vocaImportErrors.classList.remove("hidden");
+          vocaImportSummary.textContent = "Fix the CSV errors below and try again.";
+          vocaImportPreviewBody.innerHTML = "";
+          pendingVocaImport = [];
+          vocaImportModal.classList.remove("hidden");
+          confirmVocaImportBtn.disabled = true;
+          return;
+        }
+
         if (!items.length) {
           showToast("No valid rows found in CSV");
           return;
         }
-        showToast(`Importing ${items.length} words…`);
-        const res = await fetch("/api/voca/import", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ items, replace: true }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Import failed");
-        vocaItems = data.items || [];
-        renderVocaList();
-        showToast(`Saved ${data.count} words — games will use the updated list`);
+        openVocaImportModal(items);
       }
 
-      document.getElementById("addVocaBtn").addEventListener("click", () => {
-        addVocaItem().catch((err) => showToast(err.message || "Add failed"));
-      });
       importVocaBtn.addEventListener("click", () => importVocaInput.click());
       importVocaInput.addEventListener("change", () => {
         const file = importVocaInput.files?.[0];
@@ -1141,19 +1431,27 @@
             });
         }
       });
-      vocaGrid.addEventListener("click", (e) => {
-        const saveBtn = e.target.closest(".btn-voca-save");
-        const deleteBtn = e.target.closest(".btn-voca-delete");
-        if (saveBtn) {
-          saveVocaItem(Number(saveBtn.dataset.id)).catch((err) =>
-            showToast(err.message || "Save failed")
-          );
-        } else if (deleteBtn) {
+      cancelVocaImportBtn.addEventListener("click", closeVocaImportModal);
+      confirmVocaImportBtn.addEventListener("click", () => {
+        confirmVocaImport().catch((err) => showToast(err.message || "Import failed"));
+      });
+      vocaImportModal.addEventListener("click", (event) => {
+        if (event.target === vocaImportModal) closeVocaImportModal();
+      });
+      vocaTableBody.addEventListener("click", (event) => {
+        const deleteBtn = event.target.closest(".btn-voca-delete");
+        if (deleteBtn) {
           deleteVocaItem(Number(deleteBtn.dataset.id)).catch((err) =>
             showToast(err.message || "Delete failed")
           );
         }
       });
+      [vocaSearch, vocaFilterType, vocaFilterLevel, vocaFilterLanguage, vocaFilterCategory].forEach(
+        (control) => control.addEventListener("input", renderVocaList)
+      );
+      [vocaFilterType, vocaFilterLevel, vocaFilterLanguage, vocaFilterCategory].forEach(
+        (control) => control.addEventListener("change", renderVocaList)
+      );
 
       /* ---- Database import / export ---- */
       const exportDbBtn = document.getElementById("exportDbBtn");

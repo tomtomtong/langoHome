@@ -144,15 +144,41 @@ db.exec(`
     updated_at    INTEGER NOT NULL
   )
 `);
-db.exec(`
-  CREATE TABLE IF NOT EXISTS voca_items (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    word        TEXT NOT NULL,
-    image_url   TEXT NOT NULL,
-    sort_order  INTEGER NOT NULL DEFAULT 0,
-    updated_at  INTEGER NOT NULL
-  )
-`);
+function ensureVocaItemsSchema() {
+  const tableExists = db
+    .prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='voca_items'"
+    )
+    .get();
+  if (tableExists) {
+    const cols = db.prepare("PRAGMA table_info(voca_items)").all();
+    const colNames = new Set(cols.map((c) => c.name));
+    if (!colNames.has("content") || !colNames.has("import_no")) {
+      db.exec("DROP TABLE voca_items");
+    }
+  }
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS voca_items (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      import_no       TEXT NOT NULL,
+      type            TEXT NOT NULL DEFAULT 'vocabulary',
+      level           INTEGER NOT NULL DEFAULT 1,
+      language_code   TEXT NOT NULL DEFAULT 'en',
+      category        TEXT NOT NULL DEFAULT '',
+      sub_category    TEXT NOT NULL DEFAULT '',
+      content         TEXT NOT NULL,
+      keywords        TEXT NOT NULL DEFAULT '',
+      sort_order      INTEGER NOT NULL DEFAULT 0,
+      updated_at      INTEGER NOT NULL
+    )
+  `);
+  db.exec(
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_voca_import_no ON voca_items(import_no)"
+  );
+}
+
+ensureVocaItemsSchema();
 
 const DEFAULT_INWORLD_VOICE_ID = "default-zylgts2tamenvybeti3z0w__uncle_tommy";
 const INWORLD_TTS_URL = "https://api.inworld.ai/tts/v1/voice";
@@ -178,18 +204,28 @@ function setSetting(key, value) {
   upsertSettingStmt.run(key, value, Date.now());
 }
 
-const listVocaStmt = db.prepare(
-  "SELECT id, word, image_url, sort_order, updated_at FROM voca_items ORDER BY sort_order, id"
-);
-const getVocaStmt = db.prepare(
-  "SELECT id, word, image_url, sort_order, updated_at FROM voca_items WHERE id = ?"
-);
+const listVocaStmt = db.prepare(`
+  SELECT id, import_no, type, level, language_code, category, sub_category,
+         content, keywords, sort_order, updated_at
+  FROM voca_items
+  ORDER BY sort_order, id
+`);
+const getVocaStmt = db.prepare(`
+  SELECT id, import_no, type, level, language_code, category, sub_category,
+         content, keywords, sort_order, updated_at
+  FROM voca_items WHERE id = ?
+`);
 const insertVocaStmt = db.prepare(`
-  INSERT INTO voca_items (word, image_url, sort_order, updated_at)
-  VALUES (?, ?, ?, ?)
+  INSERT INTO voca_items (
+    import_no, type, level, language_code, category, sub_category,
+    content, keywords, sort_order, updated_at
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
 const updateVocaStmt = db.prepare(`
-  UPDATE voca_items SET word = ?, image_url = ?, sort_order = ?, updated_at = ?
+  UPDATE voca_items SET
+    import_no = ?, type = ?, level = ?, language_code = ?,
+    category = ?, sub_category = ?, content = ?, keywords = ?,
+    sort_order = ?, updated_at = ?
   WHERE id = ?
 `);
 const deleteVocaStmt = db.prepare("DELETE FROM voca_items WHERE id = ?");
@@ -201,50 +237,87 @@ const maxVocaSortStmt = db.prepare(
 function rowToVocaItem(row) {
   return {
     id: row.id,
-    word: row.word,
-    imageUrl: row.image_url,
+    importNo: row.import_no,
+    type: row.type,
+    level: row.level,
+    languageCode: row.language_code,
+    category: row.category,
+    subCategory: row.sub_category,
+    content: row.content,
+    keywords: row.keywords,
+    word: row.content,
     sortOrder: row.sort_order,
     updatedAt: row.updated_at,
   };
 }
 
-function normalizeVocaInput(item) {
-  const word = String(item?.word ?? "").trim();
-  const imageUrl = String(item?.imageUrl ?? item?.image_url ?? item?.url ?? "").trim();
-  if (!word) throw new Error("word is required.");
-  if (!imageUrl) throw new Error("imageUrl is required.");
-  if (!/^https?:\/\//i.test(imageUrl)) {
-    throw new Error("imageUrl must be an http(s) URL.");
+function normalizeVocaInput(item, rowLabel = "Row") {
+  const importNo = String(
+    item?.importNo ?? item?.import_no ?? item?.["Import No."] ?? ""
+  ).trim();
+  const content = String(item?.content ?? item?.word ?? "").trim();
+  const type = String(item?.type ?? "vocabulary").trim() || "vocabulary";
+  const languageCode = String(
+    item?.languageCode ?? item?.language_code ?? item?.["Language Code"] ?? "en"
+  )
+    .trim()
+    .toLowerCase() || "en";
+  const category = String(item?.category ?? item?.Category ?? "").trim();
+  const subCategory = String(
+    item?.subCategory ?? item?.sub_category ?? item?.["Sub Category"] ?? ""
+  ).trim();
+  const keywords = String(item?.keywords ?? item?.Keywords ?? "").trim();
+
+  let level = Number(item?.level ?? item?.Level ?? 1);
+  if (!Number.isFinite(level) || level < 1) {
+    throw new Error(`${rowLabel}: Level must be a positive number.`);
   }
-  return { word, imageUrl };
+  level = Math.floor(level);
+
+  if (!importNo) {
+    throw new Error(`${rowLabel}: Import No. is required.`);
+  }
+  if (!content) {
+    throw new Error(`${rowLabel}: Content is required.`);
+  }
+
+  return {
+    importNo,
+    type,
+    level,
+    languageCode,
+    category,
+    subCategory,
+    content,
+    keywords,
+  };
 }
 
-function seedVocaItemsIfEmpty() {
-  const count = db.prepare("SELECT COUNT(*) AS n FROM voca_items").get().n;
-  if (count > 0) return;
+function validateVocaImportBatch(items) {
+  const normalized = [];
+  const seenImportNos = new Set();
+  const seenContent = new Set();
 
-  const seedPath = path.join(__dirname, "data", "default-voca.json");
-  if (!fs.existsSync(seedPath)) return;
+  items.forEach((item, index) => {
+    const rowLabel = `Row ${index + 1}`;
+    const row = normalizeVocaInput(item, rowLabel);
+    const importKey = row.importNo.toLowerCase();
+    const contentKey = row.content.toLowerCase();
 
-  let items;
-  try {
-    items = JSON.parse(fs.readFileSync(seedPath, "utf8"));
-  } catch {
-    return;
-  }
-  if (!Array.isArray(items) || !items.length) return;
+    if (seenImportNos.has(importKey)) {
+      throw new Error(`${rowLabel}: Duplicate Import No. "${row.importNo}".`);
+    }
+    if (seenContent.has(contentKey)) {
+      throw new Error(`${rowLabel}: Duplicate Content "${row.content}".`);
+    }
 
-  const now = Date.now();
-  const insertMany = db.transaction((rows) => {
-    rows.forEach((item, index) => {
-      const { word, imageUrl } = normalizeVocaInput(item);
-      insertVocaStmt.run(word, imageUrl, index, now);
-    });
+    seenImportNos.add(importKey);
+    seenContent.add(contentKey);
+    normalized.push(row);
   });
-  insertMany(items);
-}
 
-seedVocaItemsIfEmpty();
+  return normalized;
+}
 
 function maskApiKey(key) {
   if (!key || key.length < 8) return key ? "••••" : "";
@@ -767,15 +840,26 @@ app.get("/api/voca", (_req, res) => {
 
 app.post("/api/voca", express.json(), (req, res) => {
   try {
-    const { word, imageUrl } = normalizeVocaInput(req.body || {});
+    const row = normalizeVocaInput(req.body || {}, "Item");
     const sortOrder =
       req.body?.sortOrder != null
         ? Number(req.body.sortOrder)
         : maxVocaSortStmt.get().max_order + 1;
     const now = Date.now();
-    const result = insertVocaStmt.run(word, imageUrl, sortOrder, now);
-    const row = getVocaStmt.get(result.lastInsertRowid);
-    res.status(201).json({ item: rowToVocaItem(row) });
+    const result = insertVocaStmt.run(
+      row.importNo,
+      row.type,
+      row.level,
+      row.languageCode,
+      row.category,
+      row.subCategory,
+      row.content,
+      row.keywords,
+      sortOrder,
+      now
+    );
+    const saved = getVocaStmt.get(result.lastInsertRowid);
+    res.status(201).json({ item: rowToVocaItem(saved) });
   } catch (err) {
     res.status(400).json({ error: err.message || "Invalid vocabulary item." });
   }
@@ -788,14 +872,35 @@ app.put("/api/voca/:id", express.json(), (req, res) => {
     if (!existing) {
       return res.status(404).json({ error: "Vocabulary item not found." });
     }
-    const { word, imageUrl } = normalizeVocaInput({
-      word: req.body?.word ?? existing.word,
-      imageUrl: req.body?.imageUrl ?? existing.image_url,
-    });
+    const row = normalizeVocaInput(
+      {
+        importNo: req.body?.importNo ?? existing.import_no,
+        type: req.body?.type ?? existing.type,
+        level: req.body?.level ?? existing.level,
+        languageCode: req.body?.languageCode ?? existing.language_code,
+        category: req.body?.category ?? existing.category,
+        subCategory: req.body?.subCategory ?? existing.sub_category,
+        content: req.body?.content ?? existing.content,
+        keywords: req.body?.keywords ?? existing.keywords,
+      },
+      "Item"
+    );
     const sortOrder =
       req.body?.sortOrder != null ? Number(req.body.sortOrder) : existing.sort_order;
     const now = Date.now();
-    updateVocaStmt.run(word, imageUrl, sortOrder, now, id);
+    updateVocaStmt.run(
+      row.importNo,
+      row.type,
+      row.level,
+      row.languageCode,
+      row.category,
+      row.subCategory,
+      row.content,
+      row.keywords,
+      sortOrder,
+      now,
+      id
+    );
     res.json({ item: rowToVocaItem(getVocaStmt.get(id)) });
   } catch (err) {
     res.status(400).json({ error: err.message || "Invalid vocabulary item." });
@@ -819,12 +924,23 @@ app.post("/api/voca/import", express.json(), (req, res) => {
       return res.status(400).json({ error: "items array is required." });
     }
 
-    const normalized = items.map((item) => normalizeVocaInput(item));
+    const normalized = validateVocaImportBatch(items);
     const now = Date.now();
     const importMany = db.transaction((rows) => {
       if (replace) deleteAllVocaStmt.run();
       rows.forEach((item, index) => {
-        insertVocaStmt.run(item.word, item.imageUrl, index, now);
+        insertVocaStmt.run(
+          item.importNo,
+          item.type,
+          item.level,
+          item.languageCode,
+          item.category,
+          item.subCategory,
+          item.content,
+          item.keywords,
+          index,
+          now
+        );
       });
     });
     importMany(normalized);

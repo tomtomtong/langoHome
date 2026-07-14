@@ -20,7 +20,7 @@ const VocaConfig = (() => {
         if (!res.ok) throw new Error("fetch failed");
         const data = await res.json();
         items = Array.isArray(data.items)
-          ? data.items.filter((item) => item?.word)
+          ? data.items.map(normalizeItem).filter((item) => item.word)
           : [];
         loaded = true;
       } catch {
@@ -31,8 +31,17 @@ const VocaConfig = (() => {
     return loadPromise;
   }
 
+  function normalizeItem(item) {
+    const content = String(item?.content ?? item?.word ?? "").trim();
+    return {
+      ...item,
+      content,
+      word: content,
+    };
+  }
+
   function getItems() {
-    return items.slice();
+    return items.map(normalizeItem);
   }
 
   function hasItems() {
@@ -44,43 +53,35 @@ const VocaConfig = (() => {
       ? items.filter((item) => item.word !== excludeWord)
       : items.slice();
     shuffle(pool);
-    return pool.slice(0, Math.max(0, count));
+    return pool.slice(0, Math.max(0, count)).map(normalizeItem);
   }
 
   function pickRandomOne(lastWord) {
     if (!items.length) return null;
-    if (items.length === 1) return items[0];
+    if (items.length === 1) return normalizeItem(items[0]);
     let pick = items[0];
     let guard = 0;
     do {
       pick = items[Math.floor(Math.random() * items.length)];
       guard += 1;
     } while (pick.word === lastWord && guard < 20);
-    return pick;
+    return normalizeItem(pick);
   }
 
   function pickRoundPairs(count = 6) {
-    const pool = items.filter((item) => item?.word && item?.imageUrl);
+    const pool = items
+      .map(normalizeItem)
+      .filter((item) => item.word);
     if (!pool.length) return [];
     const shuffled = shuffle(pool.slice());
     return shuffled.slice(0, Math.min(count, shuffled.length)).map((item) => ({
       word: item.word,
-      imageUrl: item.imageUrl,
+      textOnly: true,
     }));
   }
 
-  async function preloadImages(configItems) {
-    const urls = (configItems || items).map((item) => item.imageUrl).filter(Boolean);
-    await Promise.all(
-      urls.map(
-        (url) =>
-          new Promise((resolve) => {
-            const img = new Image();
-            img.onload = img.onerror = () => resolve();
-            img.src = url;
-          })
-      )
-    );
+  async function preloadImages() {
+    return Promise.resolve();
   }
 
   return {
