@@ -1555,6 +1555,7 @@ function isPreviewSafeRequest(req, url, rawUrl) {
 
   if (
     url === '/api/voca'
+    || /^\/api\/voca\/\d+\/image$/.test(url)
     || url === '/api/images'
     || /^\/api\/images\/[^/]+$/.test(url)
     || url === '/api/findgame/levels'

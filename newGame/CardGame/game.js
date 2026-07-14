@@ -64,11 +64,14 @@ function pickRoundPairs() {
   if (typeof VocaConfig !== 'undefined' && VocaConfig.hasItems()) {
     const picked = VocaConfig.pickRoundPairs(ROUND_PAIR_COUNT);
     if (picked.length) {
-      roundPairs = picked.map((item) => ({
-        word: item.word,
-        img: item.imageUrl || "",
-        textOnly: item.textOnly !== false && !item.imageUrl,
-      }));
+      roundPairs = picked.map((item) => {
+        const img = item.imageUrl || item.imageProxyUrl || '';
+        return {
+          word: item.word,
+          img,
+          textOnly: !img,
+        };
+      });
       totalPairs = roundPairs.length;
       return;
     }
@@ -81,8 +84,11 @@ function pickRoundPairs() {
   totalPairs = roundPairs.length;
 }
 
-function isImageContent(content) {
-  return typeof content === 'string' && /^https?:\/\//i.test(content);
+function isRenderableImage(content) {
+  if (typeof content !== 'string') return false;
+  const value = content.trim();
+  if (!value) return false;
+  return /^https?:\/\//i.test(value) || value.startsWith('/api/voca/');
 }
 
 function setCardFace(el, card) {
@@ -98,12 +104,12 @@ function setCardFace(el, card) {
     return;
   }
 
-  if (isImageContent(card.content)) {
+  if (isRenderableImage(card.content)) {
     el.classList.add('img-card');
     const img = document.createElement('img');
     img.className = 'card-voca-img';
     img.src = card.content;
-    img.alt = '';
+    img.alt = card.content.startsWith('/api/voca/') ? '' : card.content;
     el.appendChild(img);
     return;
   }
@@ -405,8 +411,8 @@ async function initGame() {
   if (typeof VocaConfig !== 'undefined') {
     await VocaConfig.loadFromServer();
     pickRoundPairs();
-    if (VocaConfig.hasItems()) {
-      await VocaConfig.preloadImages(roundPairs.map((pair) => ({
+    if (VocaConfig.hasImageItems()) {
+      await VocaConfig.preloadImages(roundPairs.filter((pair) => pair.img).map((pair) => ({
         imageUrl: pair.img,
         word: pair.word,
       })));

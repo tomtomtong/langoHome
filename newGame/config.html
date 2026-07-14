@@ -1408,11 +1408,12 @@
         });
       }
 
-      function renderVocaImageCell(imageUrl) {
-        if (!imageUrl) {
+      function renderVocaImageCell(item) {
+        const proxyUrl = item?.imageProxyUrl || (item?.id && item?.imageUrl ? `/api/voca/${item.id}/image` : "");
+        if (!proxyUrl) {
           return '<span class="voca-image-missing">No image</span>';
         }
-        return `<img class="voca-image-thumb" src="${escapeAttr(imageUrl)}" alt="" loading="lazy" />`;
+        return `<img class="voca-image-thumb" src="${escapeAttr(proxyUrl)}" alt="" loading="lazy" />`;
       }
 
       function renderVocaTableRow(item, includeDelete = true) {
@@ -1426,7 +1427,7 @@
             <td>${escapeHtml(item.subCategory)}</td>
             <td>${escapeHtml(item.content)}</td>
             <td>${escapeHtml(item.keywords)}</td>
-            <td>${renderVocaImageCell(item.imageUrl)}</td>
+            <td>${renderVocaImageCell(item)}</td>
             ${
               includeDelete
                 ? `<td><button type="button" class="btn-voca-delete" data-id="${item.id}">Delete</button></td>`

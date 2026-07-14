@@ -265,6 +265,7 @@ const maxVocaSortStmt = db.prepare(
 );
 
 function rowToVocaItem(row) {
+  const imageUrl = row.image_url || "";
   return {
     id: row.id,
     importNo: row.import_no,
@@ -275,7 +276,8 @@ function rowToVocaItem(row) {
     subCategory: row.sub_category,
     content: row.content,
     keywords: row.keywords,
-    imageUrl: row.image_url || "",
+    imageUrl,
+    imageProxyUrl: imageUrl ? `/api/voca/${row.id}/image` : "",
     word: row.content,
     sortOrder: row.sort_order,
     updatedAt: row.updated_at,
@@ -951,6 +953,30 @@ app.get("/api/voca/image-search", async (req, res) => {
     });
   } catch (err) {
     res.status(502).json({ error: err.message || "Image search failed." });
+  }
+});
+
+app.get("/api/voca/:id/image", async (req, res) => {
+  const id = Number(req.params.id);
+  const row = getVocaStmt.get(id);
+  if (!row?.image_url) {
+    return res.status(404).end();
+  }
+
+  try {
+    const response = await fetch(row.image_url);
+    if (!response.ok) {
+      return res.status(502).end();
+    }
+
+    const contentType = response.headers.get("content-type") || "image/jpeg";
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    const buffer = Buffer.from(await response.arrayBuffer());
+    res.send(buffer);
+  } catch {
+    res.status(502).end();
   }
 });
 

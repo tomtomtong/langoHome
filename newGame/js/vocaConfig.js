@@ -33,10 +33,15 @@ const VocaConfig = (() => {
 
   function normalizeItem(item) {
     const content = String(item?.content ?? item?.word ?? "").trim();
+    const imageUrl = String(item?.imageUrl ?? "").trim();
+    const imageProxyUrl =
+      item?.imageProxyUrl || (item?.id && imageUrl ? `/api/voca/${item.id}/image` : "");
     return {
       ...item,
       content,
       word: content,
+      imageUrl,
+      imageProxyUrl,
     };
   }
 
@@ -70,20 +75,31 @@ const VocaConfig = (() => {
 
   function pickRoundPairs(count = 6) {
     const normalized = items.map(normalizeItem).filter((item) => item.word);
-    const withImages = normalized.filter((item) => item.imageUrl);
+    const withImages = normalized.filter((item) => item.imageProxyUrl || item.imageUrl);
     const pool = withImages.length ? withImages : normalized;
     if (!pool.length) return [];
     const shuffled = shuffle(pool.slice());
     return shuffled.slice(0, Math.min(count, shuffled.length)).map((item) => ({
       word: item.word,
-      imageUrl: item.imageUrl || "",
-      textOnly: !item.imageUrl,
+      imageUrl: item.imageProxyUrl || item.imageUrl || "",
+      imageProxyUrl: item.imageProxyUrl || "",
+      textOnly: !(item.imageProxyUrl || item.imageUrl),
     }));
+  }
+
+  function hasImageItems() {
+    return items.some((item) => {
+      const normalized = normalizeItem(item);
+      return Boolean(normalized.imageProxyUrl || normalized.imageUrl);
+    });
   }
 
   async function preloadImages(configItems) {
     const urls = (configItems || items)
-      .map((item) => normalizeItem(item).imageUrl)
+      .map((item) => {
+        const normalized = normalizeItem(item);
+        return normalized.imageProxyUrl || normalized.imageUrl;
+      })
       .filter(Boolean);
     await Promise.all(
       urls.map(
@@ -105,6 +121,7 @@ const VocaConfig = (() => {
     pickRandomOne,
     pickRoundPairs,
     preloadImages,
+    hasImageItems,
     isLoaded: () => loaded,
   };
 })();
