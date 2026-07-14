@@ -65,7 +65,7 @@ function pickRoundPairs() {
     const picked = VocaConfig.pickRoundPairs(ROUND_PAIR_COUNT);
     if (picked.length) {
       roundPairs = picked.map((item) => ({
-        img: item.imageUrl || item.hint || item.word,
+        img: item.imageUrl,
         word: item.word,
       }));
       totalPairs = roundPairs.length;
