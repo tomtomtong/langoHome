@@ -180,7 +180,32 @@
       display: block;
     }
 
+    #game-preview-frame {
+      display: none;
+      position: absolute;
+      inset: 0;
+      z-index: 40;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: #0f1117;
+    }
+
+    html.preview-mode body.preview-screen-game-wordchop #game-preview-frame,
+    html.preview-mode body.preview-screen-game-wordwhack #game-preview-frame,
+    html.preview-mode body.preview-screen-game-cardgame #game-preview-frame,
+    html.preview-mode body.preview-screen-game-findgame #game-preview-frame {
+      display: block;
+    }
+
     html.preview-mode body.preview-screen-map #app {
+      pointer-events: auto;
+    }
+
+    html.preview-mode body.preview-screen-game-wordchop #app,
+    html.preview-mode body.preview-screen-game-wordwhack #app,
+    html.preview-mode body.preview-screen-game-cardgame #app,
+    html.preview-mode body.preview-screen-game-findgame #app {
       pointer-events: auto;
     }
 
@@ -595,13 +620,18 @@
     /* ── Conversation captions (what avatar hears / says) ── */
     #conversation-captions {
       position: absolute;
-      left: max(1rem, env(safe-area-inset-left));
-      bottom: calc(5.75rem + env(safe-area-inset-bottom));
+      /* Keep the bubbles inside the wooden frame. Percentages are relative to
+         the 4:3 app stage, unlike vw which includes any surrounding letterbox. */
+      left: calc(5.2% + max(0.75rem, env(safe-area-inset-left)));
+      bottom: max(
+        calc(5.75rem + env(safe-area-inset-bottom)),
+        calc(6.94% + 0.75rem)
+      );
       z-index: 1;
       display: flex;
       flex-direction: column;
       gap: 0.5rem;
-      width: min(420px, calc(100vw - 8rem - env(safe-area-inset-left) - env(safe-area-inset-right)));
+      width: min(420px, calc(89.6% - max(0.75rem, env(safe-area-inset-left)) - max(0.75rem, env(safe-area-inset-right))));
       max-height: 38vh;
       overflow-y: auto;
       pointer-events: none;
@@ -2519,6 +2549,10 @@
       <option value="collection-unlocked">Collection — unlocked preview</option>
       <option value="map">Map — preview</option>
       <option value="game">Game transition — preview</option>
+      <option value="game-wordchop">Game — Word Chop</option>
+      <option value="game-wordwhack">Game — Word-Whack Blitz</option>
+      <option value="game-cardgame">Game — Picture-Word Memory Match</option>
+      <option value="game-findgame">Game — Find the Object</option>
     </select>
     <p>Add <code>?preview=1</code> to the URL. Login, microphone, and socket sessions are disabled in preview mode.</p>
     <button id="preview-exit" type="button">Exit preview</button>
@@ -2546,6 +2580,7 @@
     <div id="daily-rewards-root"></div>
     <div id="collection-root"></div>
     <iframe id="map-preview-frame" title="Map preview" src="/map/index.html?preview=1&amp;embedded=1"></iframe>
+    <iframe id="game-preview-frame" title="Game preview"></iframe>
     <div id="idle-video-screen" aria-label="Tap to start conversation">
       <video id="idle-video" class="screen-video" loop playsinline preload="auto"></video>
       <video id="transition-video" class="screen-video" playsinline preload="auto"></video>
@@ -3145,6 +3180,7 @@
     const dailyRewardModalCta = document.getElementById("daily-reward-modal-cta");
     const dailyRewardModalCtaLabel = document.getElementById("daily-reward-modal-cta-label");
     const previewScreenSelect = document.getElementById("preview-screen-select");
+    const gamePreviewFrame = document.getElementById("game-preview-frame");
     const previewExit = document.getElementById("preview-exit");
     let dailyRewardsStatus = null;
     let dailyRewardsStudent = false;
@@ -5830,6 +5866,25 @@
       }
     }
 
+    const PREVIEW_GAMES = new Map([
+      ["game-wordchop", {
+        name: "Word Chop",
+        url: "/vocab-game/index.html?preview=1&embedded=1",
+      }],
+      ["game-wordwhack", {
+        name: "Word-Whack Blitz",
+        url: "/games/?preview=1&embedded=1",
+      }],
+      ["game-cardgame", {
+        name: "Picture-Word Memory Match",
+        url: "/games/CardGame/?preview=1&embedded=1",
+      }],
+      ["game-findgame", {
+        name: "Find the Object",
+        url: "/games/FindGame/?preview=1&embedded=1",
+      }],
+    ]);
+
     const PREVIEW_SCREENS = new Set([
       "home",
       "start",
@@ -5841,6 +5896,7 @@
       "collection-unlocked",
       "map",
       "game",
+      ...PREVIEW_GAMES.keys(),
     ]);
 
     function setPreviewVideo(videoEl, shouldPlay) {
@@ -5942,6 +5998,16 @@
       }
 
       if (screen === "map") {
+        return;
+      }
+
+      const previewGame = PREVIEW_GAMES.get(screen);
+      if (previewGame) {
+        if (gamePreviewFrame.dataset.previewScreen !== screen) {
+          gamePreviewFrame.src = previewGame.url;
+          gamePreviewFrame.dataset.previewScreen = screen;
+        }
+        gamePreviewFrame.title = `${previewGame.name} preview`;
         return;
       }
 

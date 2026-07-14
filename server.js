@@ -1462,17 +1462,40 @@ function isPublicPath(url) {
     || url === '/langoLogo.jpeg';
 }
 
+function isPreviewStaticAsset(url) {
+  return /^\/visme\/.+\.(?:js|mjs|vrm|fbx|wasm|json)$/i.test(url)
+    || /^\/Animation\/.+\.fbx$/i.test(url)
+    || /^\/assets\/(?:lango-home|daily-rewards|collections|map|sfx)\/.+\.(?:png|jpe?g|webp|svg|mp3|wav)$/i.test(url)
+    || url === '/assets/page-motion.css'
+    || url === '/assets/page-motion.js'
+    || /^\/games\/.+\.(?:css|js|svg|png|jpe?g|webp|gif|mp3|wav)$/i.test(url)
+    || url === '/vocab-game-app.css'
+    || url === '/vocab-game-app.js';
+}
+
 function isPreviewSafeRequest(req, url, rawUrl) {
   const method = (req.method || 'GET').toUpperCase();
   if (method !== 'GET' && method !== 'HEAD') return false;
 
   const requestUrl = new URL(rawUrl, 'http://local');
-  if (url === '/' && requestUrl.searchParams.get('preview') === '1') return true;
-  if (
-    (url === '/map' || url === '/map/' || url === '/map/index.html')
-    && requestUrl.searchParams.get('preview') === '1'
-  ) return true;
+  const isDirectPreview = requestUrl.searchParams.get('preview') === '1';
+  const isPreviewPage = (
+    url === '/'
+    || url === '/map'
+    || url === '/map/'
+    || url === '/map/index.html'
+    || url === '/vocab-game'
+    || url === '/vocab-game/'
+    || url === '/vocab-game/index.html'
+    || url === '/games'
+    || url.startsWith('/games/')
+  );
+  if (isDirectPreview && isPreviewPage) return true;
   if (url === '/api/preview-config' && requestUrl.searchParams.get('preview') === '1') return true;
+  // Static preview files may import other static files. Those nested requests
+  // no longer carry the original `?preview=1` referrer, so keep this narrowly
+  // limited to executable/media extensions and never include HTML or data.
+  if (isPreviewStaticAsset(url)) return true;
 
   let previewReferrer = false;
   try {
@@ -1482,9 +1505,21 @@ function isPreviewSafeRequest(req, url, rawUrl) {
       || referrer.pathname === '/map'
       || referrer.pathname === '/map/'
       || referrer.pathname === '/map/index.html'
+      || referrer.pathname === '/vocab-game'
+      || referrer.pathname === '/vocab-game/'
+      || referrer.pathname === '/vocab-game/index.html'
+      || referrer.pathname === '/games'
+      || referrer.pathname.startsWith('/games/')
     ) && referrer.searchParams.get('preview') === '1';
   } catch {}
   if (!previewReferrer) return false;
+
+  if (
+    url === '/api/voca'
+    || url === '/api/images'
+    || /^\/api\/images\/[^/]+$/.test(url)
+    || url === '/api/findgame/levels'
+  ) return true;
 
   return url.startsWith('/visme/')
     || url.startsWith('/Animation/')
@@ -1496,6 +1531,7 @@ function isPreviewSafeRequest(req, url, rawUrl) {
     || url === '/assets/page-motion.css'
     || url === '/assets/page-motion.js'
     || url.startsWith('/games/assets/')
+    || /^\/games\/.+\.(?:css|js|svg|png|jpe?g|webp|gif|mp3|wav)$/i.test(url)
     || /^\/api\/(idle-video|transition-video|avatar-background)$/.test(url)
     || /^\/api\/game-icons\/(wordwhack|cardgame|findgame)$/.test(url)
     || /^\/api\/video-pairs\/[^/]+\/(loop|transition|background)$/.test(url)
@@ -2656,6 +2692,9 @@ function isGameStaticRoute(url) {
 function delegateToGameApp(req, res, pathname, query) {
   const savedUrl = req.url;
   req.url = `${pathname}${query}`;
+  for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+    res.setHeader(name, value);
+  }
   gameApp(req, res, () => {
     req.url = savedUrl;
     res.writeHead(404, SECURITY_HEADERS).end();
