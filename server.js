@@ -1459,7 +1459,46 @@ function isPublicPath(url) {
     || url === '/admin/login'
     || url === '/api/login'
     || url === '/api/admin/login'
-    || url === '/langoLogo.jpeg';
+    || url === '/langoLogo.jpeg'
+    || url === '/preview'
+    || url.startsWith('/preview/');
+}
+
+const PREVIEW_PAGE_REDIRECTS = {
+  '/preview': '/?preview=1',
+  '/preview/': '/?preview=1',
+  '/preview/home': '/?preview=1',
+  '/preview/map': '/map?preview=1',
+  '/preview/wordchop': '/vocab-game?preview=1',
+  '/preview/wordwhack': '/games/?preview=1',
+  '/preview/cardgame': '/games/CardGame/?preview=1',
+  '/preview/findgame': '/games/FindGame/?preview=1',
+};
+
+const PREVIEW_HOME_SCREENS = new Set([
+  'start',
+  'loop',
+  'transition',
+  'conversation',
+  'rewards',
+  'collection-locked',
+  'collection-unlocked',
+  'game',
+  'game-wordchop',
+  'game-wordwhack',
+  'game-cardgame',
+  'game-findgame',
+]);
+
+function resolvePreviewRedirect(url) {
+  if (PREVIEW_PAGE_REDIRECTS[url]) return PREVIEW_PAGE_REDIRECTS[url];
+  const screenMatch = url.match(/^\/preview\/([a-z0-9-]+)$/);
+  if (!screenMatch) return null;
+  const screen = screenMatch[1];
+  if (PREVIEW_HOME_SCREENS.has(screen)) {
+    return `/?preview=1&screen=${encodeURIComponent(screen)}`;
+  }
+  return null;
 }
 
 function isPreviewStaticAsset(url) {
@@ -2796,6 +2835,13 @@ const server = createServer((req, res) => {
   const qIndex = rawUrl.indexOf('?');
   const url = qIndex === -1 ? rawUrl : rawUrl.slice(0, qIndex);
   const query = qIndex === -1 ? '' : rawUrl.slice(qIndex);
+
+  const previewRedirect = resolvePreviewRedirect(url);
+  if (previewRedirect && (req.method === 'GET' || req.method === 'HEAD')) {
+    res.writeHead(302, { Location: previewRedirect, ...SECURITY_HEADERS });
+    res.end();
+    return;
+  }
 
   if (url === '/api/login' && req.method === 'POST') {
     readJsonBody(req, res, (parsed) => {
