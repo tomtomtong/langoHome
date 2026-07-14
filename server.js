@@ -3275,7 +3275,7 @@ const server = createServer((req, res) => {
 
   // React home overlay assets live in a nested directory. Keep the route
   // narrowly scoped so arbitrary files below ROOT cannot be requested.
-  const langoHomeAsset = url.match(/^\/assets\/lango-home\/([a-z0-9-]+\.png)$/i);
+  const langoHomeAsset = url.match(/^\/assets\/lango-home\/([a-z0-9_-]+\.png)$/i);
   if (langoHomeAsset) {
     serveFile(res, join(ROOT, 'assets', 'lango-home', langoHomeAsset[1]));
     return;
