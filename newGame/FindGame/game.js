@@ -444,6 +444,9 @@
     overlayTitle.textContent = "Time's up!";
     overlayMsg.textContent = `You found ${foundCount} object${foundCount === 1 ? "" : "s"}. Score: ${score}`;
     overlay.classList.remove("hidden");
+    if (typeof GameScoreReporter !== "undefined") {
+      GameScoreReporter.reportGameScore("findgame", score, { foundCount, timeLeft });
+    }
   }
 
   function startGame() {

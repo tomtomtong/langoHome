@@ -6,6 +6,7 @@
     { href: '/video-pairs', label: 'Video Pairs', paths: ['/video-pairs'] },
     { href: '/account-config', label: 'Account Profiles', paths: ['/account-config'] },
     { href: '/conversations', label: 'Conversations', paths: ['/conversations'] },
+    { href: '/game-plays', label: 'Game Plays', paths: ['/game-plays'] },
     { href: '/games/config.html', label: 'Game Assets', paths: ['/games/config.html'] },
   ];
 

@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Game Plays — Uncle Tommy</title>
+  <link rel="stylesheet" href="/admin-nav.css">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      margin: 0;
+      min-height: 100vh;
+      background: #0f1117;
+      color: #e8eaed;
+      padding: 1.5rem;
+    }
+    .page { width: min(100%, 1400px); margin: 0 auto; }
+    h1 { margin: 0 0 0.25rem; font-size: 1.35rem; }
+    .lead {
+      margin: 0 0 1.5rem;
+      color: #9aa0a6;
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: end;
+      margin-bottom: 1rem;
+    }
+    .field { margin: 0; }
+    label {
+      display: block;
+      margin-bottom: 0.35rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: #9aa0a6;
+    }
+    select, input, button {
+      padding: 0.55rem 0.75rem;
+      border-radius: 8px;
+      border: 1px solid #3c4043;
+      background: #0f1117;
+      color: #e8eaed;
+      font-size: 0.875rem;
+    }
+    button {
+      cursor: pointer;
+      background: #6c8cff;
+      border-color: #6c8cff;
+      color: #fff;
+      font-weight: 500;
+    }
+    button:hover { background: #5a7aef; }
+    button.secondary {
+      background: transparent;
+      border-color: #3c4043;
+      color: #c4c7c5;
+    }
+    .card {
+      background: #1a1d27;
+      border: 1px solid #2a2f3a;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 1rem;
+    }
+    .card-head {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid #2a2f3a;
+      font-size: 0.95rem;
+      color: #c4c7c5;
+    }
+    .table-wrap { overflow-x: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8125rem;
+    }
+    th, td {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid #2a2f3a;
+      vertical-align: top;
+    }
+    th {
+      color: #9aa0a6;
+      font-weight: 500;
+      background: #151821;
+    }
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.45rem;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      background: #2a3348;
+      color: #c4c7c5;
+    }
+    .badge.wordwhack { background: #1e2f3a; color: #8ab4f8; }
+    .badge.cardgame { background: #2f1e3a; color: #d7aefb; }
+    .badge.findgame { background: #1e3a2f; color: #81c995; }
+    .scores {
+      color: #9aa0a6;
+      font-size: 0.75rem;
+      margin-top: 0.2rem;
+    }
+    .empty {
+      padding: 2rem 1rem;
+      text-align: center;
+      color: #9aa0a6;
+      font-size: 0.875rem;
+    }
+    .status {
+      margin-top: 0.75rem;
+      font-size: 0.8125rem;
+      color: #9aa0a6;
+    }
+    .status.err { color: #f28b82; }
+    .pager {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      justify-content: flex-end;
+      padding: 0.75rem 1rem;
+      border-top: 1px solid #2a2f3a;
+      font-size: 0.8125rem;
+      color: #9aa0a6;
+    }
+    .pager button { padding: 0.35rem 0.65rem; font-size: 0.8125rem; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1>Game Plays</h1>
+    <p class="lead">
+      Daily game activity for learner accounts user01–user20. Each completed round is saved with the score when a student is signed in.
+    </p>
+
+    <div class="toolbar">
+      <div class="field">
+        <label for="user-filter">Account</label>
+        <select id="user-filter">
+          <option value="">All accounts</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="date-filter">Date</label>
+        <input id="date-filter" type="date">
+      </div>
+      <div class="field">
+        <label for="game-filter">Game</label>
+        <select id="game-filter">
+          <option value="">All games</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="days-filter">Summary days</label>
+        <select id="days-filter">
+          <option value="1">Today only</option>
+          <option value="7" selected>Last 7 days</option>
+          <option value="14">Last 14 days</option>
+          <option value="30">Last 30 days</option>
+        </select>
+      </div>
+      <button type="button" id="reload-btn">Reload</button>
+    </div>
+
+    <div class="card">
+      <div class="card-head">Daily summary</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Account</th>
+              <th>Game</th>
+              <th>Plays</th>
+              <th>Best score</th>
+              <th>Total score</th>
+              <th>Scores</th>
+            </tr>
+          </thead>
+          <tbody id="summary-body">
+            <tr><td colspan="7" class="empty">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">Individual plays</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Date</th>
+              <th>Account</th>
+              <th>Game</th>
+              <th>Score</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+          <tbody id="plays-body">
+            <tr><td colspan="6" class="empty">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <button type="button" class="secondary" id="prev-btn" disabled>Previous</button>
+        <span id="pager-label">—</span>
+        <button type="button" class="secondary" id="next-btn" disabled>Next</button>
+      </div>
+    </div>
+
+    <p id="status" class="status" role="status"></p>
+  </div>
+
+  <script>
+    const userFilter = document.getElementById('user-filter');
+    const dateFilter = document.getElementById('date-filter');
+    const gameFilter = document.getElementById('game-filter');
+    const daysFilter = document.getElementById('days-filter');
+    const summaryBody = document.getElementById('summary-body');
+    const playsBody = document.getElementById('plays-body');
+    const statusEl = document.getElementById('status');
+    const pagerLabel = document.getElementById('pager-label');
+    const prevBtn = document.getElementById('prev-btn');
+    const nextBtn = document.getElementById('next-btn');
+
+    const PAGE_SIZE = 50;
+    let offset = 0;
+    let totalPlays = 0;
+    let meta = { games: [], users: [] };
+
+    function showStatus(message, isError) {
+      statusEl.textContent = message || '';
+      statusEl.className = `status${isError ? ' err' : ''}`;
+    }
+
+    function formatTime(ts) {
+      if (!ts) return '—';
+      return new Date(ts).toLocaleString();
+    }
+
+    function formatDetails(details) {
+      if (!details || typeof details !== 'object') return '—';
+      return Object.entries(details)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join(', ');
+    }
+
+    function populateFilters() {
+      for (const user of meta.users || []) {
+        const opt = document.createElement('option');
+        opt.value = user;
+        opt.textContent = user;
+        userFilter.appendChild(opt);
+      }
+      for (const game of meta.games || []) {
+        const opt = document.createElement('option');
+        opt.value = game.id;
+        opt.textContent = game.label;
+        gameFilter.appendChild(opt);
+      }
+    }
+
+    function renderSummary(data) {
+      const rows = [];
+      for (const day of data.days || []) {
+        for (const user of day.users || []) {
+          for (const game of user.games || []) {
+            rows.push(`
+              <tr>
+                <td>${day.date}</td>
+                <td>${user.username}</td>
+                <td><span class="badge ${game.gameId}">${game.gameLabel}</span></td>
+                <td>${game.plays}</td>
+                <td>${game.bestScore}</td>
+                <td>${game.totalScore}</td>
+                <td>
+                  ${game.scores.join(', ')}
+                  <div class="scores">${game.scores.length} round${game.scores.length === 1 ? '' : 's'}</div>
+                </td>
+              </tr>
+            `);
+          }
+        }
+      }
+      summaryBody.innerHTML = rows.length
+        ? rows.join('')
+        : '<tr><td colspan="7" class="empty">No game plays for this period.</td></tr>';
+    }
+
+    function renderPlays(data) {
+      totalPlays = data.total || 0;
+      const rows = (data.plays || []).map((play) => `
+        <tr>
+          <td>${formatTime(play.playedAt)}</td>
+          <td>${play.playDate}</td>
+          <td>${play.username}</td>
+          <td><span class="badge ${play.gameId}">${play.gameLabel}</span></td>
+          <td>${play.score}</td>
+          <td>${formatDetails(play.details)}</td>
+        </tr>
+      `);
+      playsBody.innerHTML = rows.length
+        ? rows.join('')
+        : '<tr><td colspan="6" class="empty">No individual plays match these filters.</td></tr>';
+
+      const start = totalPlays ? offset + 1 : 0;
+      const end = Math.min(offset + PAGE_SIZE, totalPlays);
+      pagerLabel.textContent = totalPlays ? `${start}–${end} of ${totalPlays}` : '0 plays';
+      prevBtn.disabled = offset <= 0;
+      nextBtn.disabled = offset + PAGE_SIZE >= totalPlays;
+    }
+
+    function queryParams() {
+      const params = new URLSearchParams();
+      if (userFilter.value) params.set('username', userFilter.value);
+      if (dateFilter.value) params.set('date', dateFilter.value);
+      if (gameFilter.value) params.set('gameId', gameFilter.value);
+      return params;
+    }
+
+    async function loadData() {
+      showStatus('');
+      summaryBody.innerHTML = '<tr><td colspan="7" class="empty">Loading…</td></tr>';
+      playsBody.innerHTML = '<tr><td colspan="6" class="empty">Loading…</td></tr>';
+
+      const summaryParams = queryParams();
+      summaryParams.set('days', daysFilter.value || '7');
+      if (!dateFilter.value) summaryParams.delete('date');
+
+      const playsParams = queryParams();
+      playsParams.set('limit', String(PAGE_SIZE));
+      playsParams.set('offset', String(offset));
+
+      try {
+        const [summaryRes, playsRes] = await Promise.all([
+          fetch(`/api/game-plays/daily-summary?${summaryParams}`),
+          fetch(`/api/game-plays?${playsParams}`),
+        ]);
+        if (!summaryRes.ok || !playsRes.ok) {
+          throw new Error('Could not load game play data.');
+        }
+        const summary = await summaryRes.json();
+        const plays = await playsRes.json();
+        if (!meta.users.length) {
+          meta = summary;
+          populateFilters();
+        }
+        renderSummary(summary);
+        renderPlays(plays);
+      } catch (e) {
+        showStatus(e.message || 'Load failed.', true);
+        summaryBody.innerHTML = '<tr><td colspan="7" class="empty">Could not load summary.</td></tr>';
+        playsBody.innerHTML = '<tr><td colspan="6" class="empty">Could not load plays.</td></tr>';
+      }
+    }
+
+    function reload() {
+      offset = 0;
+      loadData();
+    }
+
+    document.getElementById('reload-btn').addEventListener('click', reload);
+    userFilter.addEventListener('change', reload);
+    dateFilter.addEventListener('change', reload);
+    gameFilter.addEventListener('change', reload);
+    daysFilter.addEventListener('change', reload);
+    prevBtn.addEventListener('click', () => {
+      offset = Math.max(0, offset - PAGE_SIZE);
+      loadData();
+    });
+    nextBtn.addEventListener('click', () => {
+      offset += PAGE_SIZE;
+      loadData();
+    });
+
+    reload();
+  </script>
+  <script src="/admin-nav.js"></script>
+</body>
+</html>

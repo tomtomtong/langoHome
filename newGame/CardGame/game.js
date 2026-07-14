@@ -304,6 +304,13 @@ function endGame() {
   if (completeStarsEl) completeStarsEl.textContent = starRating();
   if (completeScoreEl) completeScoreEl.textContent = score;
   if (levelCompleteEl) levelCompleteEl.classList.remove('hidden');
+  if (typeof GameScoreReporter !== 'undefined') {
+    GameScoreReporter.reportGameScore('cardgame', score, {
+      stars: starRating(),
+      matchedCount,
+      timeLeft,
+    });
+  }
   if (typeof window.__bgaMarkDirty === 'function') window.__bgaMarkDirty();
 }
 

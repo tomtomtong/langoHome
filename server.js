@@ -90,6 +90,18 @@ conversationsDb.exec(`
   CREATE INDEX IF NOT EXISTS idx_profile_sync_logs_created ON profile_sync_logs(created_at DESC);
   CREATE INDEX IF NOT EXISTS idx_profile_sync_logs_conversation ON profile_sync_logs(conversation_id);
   CREATE INDEX IF NOT EXISTS idx_profile_sync_logs_username ON profile_sync_logs(username, created_at DESC);
+  CREATE TABLE IF NOT EXISTS game_plays (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL,
+    game_id TEXT NOT NULL,
+    score INTEGER NOT NULL DEFAULT 0,
+    play_date TEXT NOT NULL,
+    played_at INTEGER NOT NULL,
+    details_json TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_game_plays_username_date ON game_plays(username, play_date DESC);
+  CREATE INDEX IF NOT EXISTS idx_game_plays_played_at ON game_plays(played_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_game_plays_date_game ON game_plays(play_date, game_id);
 `);
 
 const insertConversationStmt = conversationsDb.prepare(`
@@ -306,6 +318,177 @@ function getProfileSyncLogRecord(id) {
 function getProfileSyncLogForConversation(conversationId) {
   const row = getProfileSyncLogForConversationStmt.get(conversationId);
   return row ? rowToProfileSyncLog(row) : null;
+}
+
+const VALID_GAME_IDS = new Set(['wordwhack', 'cardgame', 'findgame']);
+const GAME_LABELS = {
+  wordwhack: 'Word-Whack Blitz',
+  cardgame: 'Picture-Word Memory Match',
+  findgame: 'Find the Object',
+};
+
+const insertGamePlayStmt = conversationsDb.prepare(`
+  INSERT INTO game_plays (username, game_id, score, play_date, played_at, details_json)
+  VALUES (?, ?, ?, ?, ?, ?)
+`);
+const getGamePlayStmt = conversationsDb.prepare(`
+  SELECT id, username, game_id, score, play_date, played_at, details_json
+  FROM game_plays WHERE id = ?
+`);
+
+function rowToGamePlay(row) {
+  let details = null;
+  try {
+    if (row.details_json) details = JSON.parse(row.details_json);
+  } catch { /* ignore */ }
+  return {
+    id: row.id,
+    username: row.username,
+    gameId: row.game_id,
+    gameLabel: GAME_LABELS[row.game_id] || row.game_id,
+    score: row.score,
+    playDate: row.play_date,
+    playedAt: row.played_at,
+    details,
+  };
+}
+
+function recordGamePlay(username, { gameId, score, details } = {}) {
+  if (!STUDENT_USERS[username]) return { ok: false, error: 'Invalid user.' };
+  const normalizedGameId = String(gameId || '').trim();
+  if (!VALID_GAME_IDS.has(normalizedGameId)) {
+    return { ok: false, error: 'Invalid game.' };
+  }
+  const safeScore = Math.max(0, Math.round(Number(score) || 0));
+  const timezone = getVideoPairsTimezone();
+  const playDate = getTodayDateString(timezone);
+  const playedAt = Date.now();
+  const detailsJson = details && typeof details === 'object'
+    ? JSON.stringify(details)
+    : null;
+  const result = insertGamePlayStmt.run(
+    username,
+    normalizedGameId,
+    safeScore,
+    playDate,
+    playedAt,
+    detailsJson,
+  );
+  const play = rowToGamePlay(getGamePlayStmt.get(result.lastInsertRowid));
+  console.log(`[game-play] ${username} ${normalizedGameId} score=${safeScore} date=${playDate}`);
+  return { ok: true, play };
+}
+
+function listGamePlays({
+  username = null,
+  playDate = null,
+  gameId = null,
+  limit = 50,
+  offset = 0,
+} = {}) {
+  const conditions = [];
+  const params = [];
+  if (username) {
+    conditions.push('username = ?');
+    params.push(String(username));
+  }
+  if (playDate) {
+    conditions.push('play_date = ?');
+    params.push(String(playDate));
+  }
+  if (gameId && VALID_GAME_IDS.has(gameId)) {
+    conditions.push('game_id = ?');
+    params.push(String(gameId));
+  }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 200);
+  const safeOffset = Math.max(Number(offset) || 0, 0);
+  const total = conversationsDb.prepare(
+    `SELECT COUNT(*) AS total FROM game_plays ${where}`,
+  ).get(...params).total;
+  const rows = conversationsDb.prepare(`
+    SELECT id, username, game_id, score, play_date, played_at, details_json
+    FROM game_plays
+    ${where}
+    ORDER BY played_at DESC
+    LIMIT ? OFFSET ?
+  `).all(...params, safeLimit, safeOffset);
+  return {
+    plays: rows.map(rowToGamePlay),
+    total,
+    limit: safeLimit,
+    offset: safeOffset,
+  };
+}
+
+function getGamePlayDailySummary({
+  username = null,
+  playDate = null,
+  days = 14,
+} = {}) {
+  const timezone = getVideoPairsTimezone();
+  const endDate = playDate || getTodayDateString(timezone);
+  const safeDays = Math.min(Math.max(Number(days) || 14, 1), 90);
+  const startDate = offsetDateString(endDate, -(safeDays - 1), timezone);
+  const conditions = ['play_date >= ?', 'play_date <= ?'];
+  const params = [startDate, endDate];
+  if (username) {
+    conditions.push('username = ?');
+    params.push(String(username));
+  }
+  const where = conditions.join(' AND ');
+  const rows = conversationsDb.prepare(`
+    SELECT username, play_date, game_id,
+           COUNT(*) AS plays,
+           MAX(score) AS best_score,
+           SUM(score) AS total_score,
+           GROUP_CONCAT(score) AS scores
+    FROM game_plays
+    WHERE ${where}
+    GROUP BY username, play_date, game_id
+    ORDER BY play_date DESC, username ASC, game_id ASC
+  `).all(...params);
+
+  const byDate = new Map();
+  for (const row of rows) {
+    if (!byDate.has(row.play_date)) byDate.set(row.play_date, new Map());
+    const byUser = byDate.get(row.play_date);
+    if (!byUser.has(row.username)) {
+      byUser.set(row.username, { username: row.username, games: [], totalPlays: 0 });
+    }
+    const entry = byUser.get(row.username);
+    const scores = String(row.scores || '')
+      .split(',')
+      .map((n) => Number(n))
+      .filter((n) => Number.isFinite(n));
+    entry.games.push({
+      gameId: row.game_id,
+      gameLabel: GAME_LABELS[row.game_id] || row.game_id,
+      plays: row.plays,
+      bestScore: row.best_score,
+      totalScore: row.total_score,
+      scores,
+    });
+    entry.totalPlays += row.plays;
+  }
+
+  const daysOut = [];
+  for (const [date, byUser] of byDate) {
+    daysOut.push({
+      date,
+      users: [...byUser.values()].sort((a, b) => a.username.localeCompare(b.username)),
+    });
+  }
+  daysOut.sort((a, b) => b.date.localeCompare(a.date));
+
+  return {
+    timezone,
+    startDate,
+    endDate,
+    days: daysOut,
+    games: [...VALID_GAME_IDS].map((id) => ({ id, label: GAME_LABELS[id] })),
+    users: USER_LIST,
+  };
 }
 
 const SECURITY_HEADERS = {
@@ -1256,6 +1439,7 @@ const ADMIN_PAGE_PATHS = new Set([
   '/avatar-config',
   '/video-pairs',
   '/conversations',
+  '/game-plays',
 ]);
 
 function isGameConfigPage(gamePath) {
@@ -1272,6 +1456,7 @@ function requiresAdmin(url, method) {
   if (url === '/api/debug-log' && m === 'GET') return true;
   if (url.startsWith('/api/conversations')) return true;
   if (url.startsWith('/api/profile-sync-logs')) return true;
+  if (url.startsWith('/api/game-plays') && m !== 'POST') return true;
   if (url === '/api/inworld/models') return true;
 
   const uploadPaths = ['/api/idle-video', '/api/transition-video', '/api/avatar-background'];
@@ -2387,6 +2572,7 @@ const pages = {
   '/avatar-config': 'avatar-config.html',
   '/video-pairs': 'video-pairs.html',
   '/conversations': 'conversations.html',
+  '/game-plays': 'game-plays.html',
   '/visme': 'visme/index.html',
   '/map': 'map/index.html',
   '/map/': 'map/index.html',
@@ -2650,6 +2836,69 @@ const server = createServer((req, res) => {
       }
       sendJson(res, 200, claimDailyMilestone(session.username));
     });
+    return;
+  }
+
+  if (url === '/api/game-plays' && req.method === 'POST') {
+    const session = getSession(req);
+    if (!session || session.role !== 'student') {
+      sendJson(res, 403, { error: 'Student login required.' });
+      return;
+    }
+    readJsonBody(req, res, (parsed) => {
+      const result = recordGamePlay(session.username, {
+        gameId: parsed.gameId,
+        score: parsed.score,
+        details: parsed.details,
+      });
+      if (!result.ok) {
+        sendJson(res, 400, { error: result.error || 'Could not record game play.' });
+        return;
+      }
+      sendJson(res, 200, result);
+    });
+    return;
+  }
+
+  if (url === '/api/game-plays/daily-summary' && req.method === 'GET') {
+    const session = getSession(req);
+    if (!session) {
+      sendJson(res, 401, { error: 'Login required.' });
+      return;
+    }
+    const params = new URL(rawUrl, 'http://local').searchParams;
+    let username = params.get('username')?.trim() || null;
+    if (session.role === 'student') {
+      username = session.username;
+    } else if (username && !STUDENT_USERS[username]) {
+      sendJson(res, 400, { error: 'Invalid username.' });
+      return;
+    }
+    const playDate = params.get('date')?.trim() || null;
+    const days = params.get('days');
+    sendJson(res, 200, getGamePlayDailySummary({ username, playDate, days }));
+    return;
+  }
+
+  if (url === '/api/game-plays' && req.method === 'GET') {
+    const session = getSession(req);
+    if (!session) {
+      sendJson(res, 401, { error: 'Login required.' });
+      return;
+    }
+    const params = new URL(rawUrl, 'http://local').searchParams;
+    let username = params.get('username')?.trim() || null;
+    if (session.role === 'student') {
+      username = session.username;
+    } else if (username && !STUDENT_USERS[username]) {
+      sendJson(res, 400, { error: 'Invalid username.' });
+      return;
+    }
+    const playDate = params.get('date')?.trim() || null;
+    const gameId = params.get('gameId')?.trim() || null;
+    const limit = params.get('limit');
+    const offset = params.get('offset');
+    sendJson(res, 200, listGamePlays({ username, playDate, gameId, limit, offset }));
     return;
   }
 

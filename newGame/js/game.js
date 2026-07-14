@@ -559,6 +559,13 @@
     resetHoles();
 
     const stars = getStarsEarned();
+    if (typeof GameScoreReporter !== 'undefined') {
+      GameScoreReporter.reportGameScore('wordwhack', state.score, {
+        stars,
+        questionsAnswered: state.questionsAnswered,
+        maxCombo: state.maxCombo,
+      });
+    }
     showOverlay({
       title: "Time's up!",
       subtitle: "Round over. Here's your score:",
