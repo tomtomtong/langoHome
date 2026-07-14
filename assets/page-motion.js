@@ -40,12 +40,12 @@
   }
 
   function animatePageElements() {
-    if (window.__LANGO_LEGACY_WEBVIEW__ || reducedMotion.matches) {
+    if (reducedMotion.matches) {
       document.documentElement.classList.remove('lango-motion-booting', 'lango-motion-revealing');
       return;
     }
 
-    const candidates = Array.from(new Set(Array.from(document.querySelectorAll(visualSelector))))
+    const candidates = [...new Set(document.querySelectorAll(visualSelector))]
       .filter((element) => !element.matches(excludedSelector))
       .filter((element) => !element.closest('[hidden], [aria-hidden="true"]'))
       .filter(isVisible);

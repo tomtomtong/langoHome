@@ -4,8 +4,6 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login — Uncle Tommy</title>
-  <script src="/assets/webview-compat.js"></script>
-  <link rel="stylesheet" href="/assets/webview-compat.css">
   <link rel="stylesheet" href="/assets/page-motion.css">
   <script src="/assets/page-motion.js"></script>
   <link rel="preload" href="/langoLogo.jpeg" as="image">
@@ -28,8 +26,7 @@
     }
 
     .login-card {
-      width: 100%;
-      max-width: 400px;
+      width: min(100%, 400px);
       padding: 2.5rem 2rem;
       border-radius: 16px;
       background: #1a1d27;
@@ -44,8 +41,7 @@
     }
 
     .logo-wrap img {
-      width: 60vw;
-      max-width: 200px;
+      width: min(60vw, 200px);
       height: auto;
       object-fit: contain;
     }
@@ -152,10 +148,8 @@
       list-style: none;
       margin: 0;
       padding: 0;
-    }
-
-    .guest-links ul > li + li {
-      margin-top: 0.5rem;
+      display: grid;
+      gap: 0.5rem;
     }
 
     .guest-links a {
@@ -251,7 +245,7 @@
         }
 
         location.href = nextUrl.startsWith("/") ? nextUrl : "/";
-      } catch (err) {
+      } catch {
         showError("Could not reach the server. Please try again.");
       } finally {
         submitBtn.disabled = false;
