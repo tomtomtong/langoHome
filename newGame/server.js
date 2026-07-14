@@ -146,17 +146,36 @@ db.exec(`
 `);
 db.exec(`
   CREATE TABLE IF NOT EXISTS voca_items (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    word        TEXT NOT NULL,
-    image_url   TEXT NOT NULL,
-    sort_order  INTEGER NOT NULL DEFAULT 0,
-    updated_at  INTEGER NOT NULL
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    import_no     TEXT,
+    type          TEXT NOT NULL DEFAULT 'vocabulary',
+    level         INTEGER,
+    language_code TEXT,
+    category      TEXT,
+    sub_category  TEXT,
+    content       TEXT NOT NULL,
+    keywords      TEXT,
+    image_url     TEXT,
+    sort_order    INTEGER NOT NULL DEFAULT 0,
+    updated_at    INTEGER NOT NULL
   )
 `);
 
 const DEFAULT_INWORLD_VOICE_ID = "default-zylgts2tamenvybeti3z0w__uncle_tommy";
 const INWORLD_TTS_URL = "https://api.inworld.ai/tts/v1/voice";
 const INWORLD_LLM_URL = "https://api.inworld.ai/v1/chat/completions";
+const LANGO_API_BASE = (process.env.LANGO_API_BASE_URL || "https://dev.lango.ai").replace(
+  /\/$/,
+  ""
+);
+const LANGO_API_VERSION = (process.env.LANGO_API_VERSION || "v1").replace(/^\//, "").replace(
+  /\/$/,
+  ""
+);
+const LANGO_IMAGE_FETCH_CONCURRENCY = Math.max(
+  1,
+  Math.min(10, Number(process.env.LANGO_IMAGE_FETCH_CONCURRENCY) || 5)
+);
 
 const getSettingStmt = db.prepare(
   "SELECT setting_value FROM game_settings WHERE setting_key = ?"
@@ -178,19 +197,28 @@ function setSetting(key, value) {
   upsertSettingStmt.run(key, value, Date.now());
 }
 
+const VOCA_SELECT =
+  "id, import_no, type, level, language_code, category, sub_category, content, keywords, image_url, sort_order, updated_at";
+
 const listVocaStmt = db.prepare(
-  "SELECT id, word, image_url, sort_order, updated_at FROM voca_items ORDER BY sort_order, id"
+  `SELECT ${VOCA_SELECT} FROM voca_items ORDER BY sort_order, id`
 );
 const getVocaStmt = db.prepare(
-  "SELECT id, word, image_url, sort_order, updated_at FROM voca_items WHERE id = ?"
+  `SELECT ${VOCA_SELECT} FROM voca_items WHERE id = ?`
 );
 const insertVocaStmt = db.prepare(`
-  INSERT INTO voca_items (word, image_url, sort_order, updated_at)
-  VALUES (?, ?, ?, ?)
+  INSERT INTO voca_items (
+    import_no, type, level, language_code, category, sub_category, content, keywords, image_url, sort_order, updated_at
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
 const updateVocaStmt = db.prepare(`
-  UPDATE voca_items SET word = ?, image_url = ?, sort_order = ?, updated_at = ?
+  UPDATE voca_items SET
+    import_no = ?, type = ?, level = ?, language_code = ?, category = ?, sub_category = ?,
+    content = ?, keywords = ?, image_url = ?, sort_order = ?, updated_at = ?
   WHERE id = ?
+`);
+const updateVocaImageStmt = db.prepare(`
+  UPDATE voca_items SET image_url = ?, updated_at = ? WHERE id = ?
 `);
 const deleteVocaStmt = db.prepare("DELETE FROM voca_items WHERE id = ?");
 const deleteAllVocaStmt = db.prepare("DELETE FROM voca_items");
@@ -198,53 +226,210 @@ const maxVocaSortStmt = db.prepare(
   "SELECT COALESCE(MAX(sort_order), -1) AS max_order FROM voca_items"
 );
 
+function migrateVocaItemsSchema() {
+  const cols = db.prepare("PRAGMA table_info(voca_items)").all();
+  const colNames = new Set(cols.map((c) => c.name));
+  const hadLegacySchema = colNames.has("word") && !colNames.has("content");
+
+  const additions = [
+    ["import_no", "TEXT"],
+    ["type", "TEXT NOT NULL DEFAULT 'vocabulary'"],
+    ["level", "INTEGER"],
+    ["language_code", "TEXT"],
+    ["category", "TEXT"],
+    ["sub_category", "TEXT"],
+    ["content", "TEXT"],
+    ["keywords", "TEXT"],
+    ["image_url", "TEXT"],
+  ];
+
+  for (const [name, def] of additions) {
+    if (!colNames.has(name)) {
+      db.exec(`ALTER TABLE voca_items ADD COLUMN ${name} ${def}`);
+    }
+  }
+
+  if (hadLegacySchema) {
+    db.exec(
+      "UPDATE voca_items SET content = word WHERE content IS NULL OR TRIM(content) = ''"
+    );
+    deleteAllVocaStmt.run();
+  }
+}
+
+migrateVocaItemsSchema();
+
 function rowToVocaItem(row) {
+  const content = String(row.content ?? row.word ?? "").trim();
   return {
     id: row.id,
-    word: row.word,
-    imageUrl: row.image_url,
+    importNo: row.import_no || "",
+    type: row.type || "vocabulary",
+    level: row.level != null ? row.level : null,
+    languageCode: row.language_code || "",
+    category: row.category || "",
+    subCategory: row.sub_category || "",
+    content,
+    word: content,
+    keywords: row.keywords || "",
+    imageUrl: row.image_url || "",
     sortOrder: row.sort_order,
     updatedAt: row.updated_at,
   };
 }
 
 function normalizeVocaInput(item) {
-  const word = String(item?.word ?? "").trim();
-  const imageUrl = String(item?.imageUrl ?? item?.image_url ?? item?.url ?? "").trim();
-  if (!word) throw new Error("word is required.");
-  if (!imageUrl) throw new Error("imageUrl is required.");
-  if (!/^https?:\/\//i.test(imageUrl)) {
-    throw new Error("imageUrl must be an http(s) URL.");
+  const content = String(
+    item?.content ?? item?.word ?? item?.Content ?? ""
+  ).trim();
+  if (!content) throw new Error("content is required.");
+
+  const imageUrl = String(item?.imageUrl ?? item?.image_url ?? "").trim();
+  if (imageUrl && !/^https?:\/\//i.test(imageUrl)) {
+    throw new Error("imageUrl must be an http(s) URL when provided.");
   }
-  return { word, imageUrl };
+
+  const levelRaw = item?.level ?? item?.Level;
+  const level =
+    levelRaw === "" || levelRaw == null ? null : Number.parseInt(levelRaw, 10);
+
+  return {
+    importNo: String(item?.importNo ?? item?.import_no ?? item?.["Import No."] ?? "").trim(),
+    type: String(item?.type ?? item?.Type ?? "vocabulary").trim() || "vocabulary",
+    level: Number.isFinite(level) ? level : null,
+    languageCode: String(
+      item?.languageCode ?? item?.language_code ?? item?.["Language Code"] ?? ""
+    ).trim(),
+    category: String(item?.category ?? item?.Category ?? "").trim(),
+    subCategory: String(
+      item?.subCategory ?? item?.sub_category ?? item?.["Sub Category"] ?? ""
+    ).trim(),
+    content,
+    keywords: String(item?.keywords ?? item?.Keywords ?? "").trim(),
+    imageUrl,
+  };
 }
 
-function seedVocaItemsIfEmpty() {
-  const count = db.prepare("SELECT COUNT(*) AS n FROM voca_items").get().n;
-  if (count > 0) return;
+function vocaValuesForInsert(item, sortOrder, updatedAt) {
+  return [
+    item.importNo || null,
+    item.type,
+    item.level,
+    item.languageCode || null,
+    item.category || null,
+    item.subCategory || null,
+    item.content,
+    item.keywords || null,
+    item.imageUrl || null,
+    sortOrder,
+    updatedAt,
+  ];
+}
 
-  const seedPath = path.join(__dirname, "data", "default-voca.json");
-  if (!fs.existsSync(seedPath)) return;
+function vocaValuesForUpdate(item, sortOrder, updatedAt, id) {
+  return [...vocaValuesForInsert(item, sortOrder, updatedAt), id];
+}
 
-  let items;
-  try {
-    items = JSON.parse(fs.readFileSync(seedPath, "utf8"));
-  } catch {
-    return;
+function getLangoApiKey() {
+  return getSetting("lango_api_key") || process.env.LANGO_API_KEY || "";
+}
+
+function seedLangoApiKeyFromEnv() {
+  if (!getSetting("lango_api_key") && process.env.LANGO_API_KEY) {
+    setSetting("lango_api_key", String(process.env.LANGO_API_KEY).trim());
   }
-  if (!Array.isArray(items) || !items.length) return;
+}
+
+seedLangoApiKeyFromEnv();
+
+function langoMaterialImageUrl(content, type = "vocabulary") {
+  const url = new URL(
+    `${LANGO_API_BASE}/${LANGO_API_VERSION}/materialImage/getImages`
+  );
+  url.searchParams.set("content", content);
+  url.searchParams.set("type", type || "vocabulary");
+  return url;
+}
+
+async function fetchLangoMaterialImageUrl(content, type = "vocabulary") {
+  const apiKey = getLangoApiKey();
+  const query = String(content || "").trim();
+  if (!apiKey || !query) return null;
+
+  try {
+    const upstream = await fetch(langoMaterialImageUrl(query, type), {
+      headers: { authorization: apiKey },
+    });
+    if (!upstream.ok) return null;
+
+    const payload = await upstream.json();
+    if (!payload?.success || !Array.isArray(payload.images) || !payload.images.length) {
+      return null;
+    }
+
+    const imageUrl = String(payload.images[0]?.url || "").trim();
+    return /^https?:\/\//i.test(imageUrl) ? imageUrl : null;
+  } catch {
+    return null;
+  }
+}
+
+async function mapWithConcurrency(items, concurrency, mapper) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const current = nextIndex;
+      nextIndex += 1;
+      results[current] = await mapper(items[current], current);
+    }
+  }
+
+  const workers = Array.from(
+    { length: Math.min(concurrency, items.length) },
+    () => worker()
+  );
+  await Promise.all(workers);
+  return results;
+}
+
+async function fetchImagesForVocaItems({ missingOnly = true } = {}) {
+  const apiKey = getLangoApiKey();
+  if (!apiKey) {
+    throw new Error("Lango API key not configured.");
+  }
+
+  const rows = listVocaStmt.all().filter((row) => {
+    const content = String(row.content ?? "").trim();
+    if (!content) return false;
+    if (!missingOnly) return true;
+    return !String(row.image_url || "").trim();
+  });
+
+  if (!rows.length) {
+    return { fetched: 0, missed: 0, total: 0 };
+  }
 
   const now = Date.now();
-  const insertMany = db.transaction((rows) => {
-    rows.forEach((item, index) => {
-      const { word, imageUrl } = normalizeVocaInput(item);
-      insertVocaStmt.run(word, imageUrl, index, now);
-    });
-  });
-  insertMany(items);
-}
+  let fetched = 0;
+  let missed = 0;
 
-seedVocaItemsIfEmpty();
+  await mapWithConcurrency(rows, LANGO_IMAGE_FETCH_CONCURRENCY, async (row) => {
+    const imageUrl = await fetchLangoMaterialImageUrl(
+      row.content,
+      row.type || "vocabulary"
+    );
+    if (imageUrl) {
+      updateVocaImageStmt.run(imageUrl, now, row.id);
+      fetched += 1;
+    } else {
+      missed += 1;
+    }
+  });
+
+  return { fetched, missed, total: rows.length };
+}
 
 function maskApiKey(key) {
   if (!key || key.length < 8) return key ? "••••" : "";
@@ -767,13 +952,13 @@ app.get("/api/voca", (_req, res) => {
 
 app.post("/api/voca", express.json(), (req, res) => {
   try {
-    const { word, imageUrl } = normalizeVocaInput(req.body || {});
+    const item = normalizeVocaInput(req.body || {});
     const sortOrder =
       req.body?.sortOrder != null
         ? Number(req.body.sortOrder)
         : maxVocaSortStmt.get().max_order + 1;
     const now = Date.now();
-    const result = insertVocaStmt.run(word, imageUrl, sortOrder, now);
+    const result = insertVocaStmt.run(...vocaValuesForInsert(item, sortOrder, now));
     const row = getVocaStmt.get(result.lastInsertRowid);
     res.status(201).json({ item: rowToVocaItem(row) });
   } catch (err) {
@@ -788,14 +973,21 @@ app.put("/api/voca/:id", express.json(), (req, res) => {
     if (!existing) {
       return res.status(404).json({ error: "Vocabulary item not found." });
     }
-    const { word, imageUrl } = normalizeVocaInput({
-      word: req.body?.word ?? existing.word,
+    const item = normalizeVocaInput({
+      importNo: req.body?.importNo ?? existing.import_no,
+      type: req.body?.type ?? existing.type,
+      level: req.body?.level ?? existing.level,
+      languageCode: req.body?.languageCode ?? existing.language_code,
+      category: req.body?.category ?? existing.category,
+      subCategory: req.body?.subCategory ?? existing.sub_category,
+      content: req.body?.content ?? req.body?.word ?? existing.content,
+      keywords: req.body?.keywords ?? existing.keywords,
       imageUrl: req.body?.imageUrl ?? existing.image_url,
     });
     const sortOrder =
       req.body?.sortOrder != null ? Number(req.body.sortOrder) : existing.sort_order;
     const now = Date.now();
-    updateVocaStmt.run(word, imageUrl, sortOrder, now, id);
+    updateVocaStmt.run(...vocaValuesForUpdate(item, sortOrder, now, id));
     res.json({ item: rowToVocaItem(getVocaStmt.get(id)) });
   } catch (err) {
     res.status(400).json({ error: err.message || "Invalid vocabulary item." });
@@ -811,11 +1003,12 @@ app.delete("/api/voca/:id", (req, res) => {
   res.json({ ok: true, id });
 });
 
-app.post("/api/voca/import", express.json(), (req, res) => {
+app.post("/api/voca/import", express.json(), async (req, res) => {
   try {
     const items = req.body?.items;
     const replace = req.body?.replace !== false;
-    if (!Array.isArray(items) || !items.length) {
+    const fetchImages = req.body?.fetchImages === true;
+    if (!Array.isArray(items)) {
       return res.status(400).json({ error: "items array is required." });
     }
 
@@ -824,15 +1017,72 @@ app.post("/api/voca/import", express.json(), (req, res) => {
     const importMany = db.transaction((rows) => {
       if (replace) deleteAllVocaStmt.run();
       rows.forEach((item, index) => {
-        insertVocaStmt.run(item.word, item.imageUrl, index, now);
+        insertVocaStmt.run(...vocaValuesForInsert(item, index, now));
       });
     });
     importMany(normalized);
+
+    let imageStats = null;
+    if (fetchImages && normalized.length) {
+      imageStats = await fetchImagesForVocaItems({ missingOnly: true });
+    }
+
     const rows = listVocaStmt.all();
-    res.json({ ok: true, count: rows.length, items: rows.map(rowToVocaItem) });
+    res.json({
+      ok: true,
+      count: rows.length,
+      items: rows.map(rowToVocaItem),
+      imageStats,
+    });
   } catch (err) {
     res.status(400).json({ error: err.message || "Import failed." });
   }
+});
+
+app.post("/api/voca/fetch-images", express.json(), async (req, res) => {
+  try {
+    const missingOnly = req.body?.missingOnly !== false;
+    const imageStats = await fetchImagesForVocaItems({ missingOnly });
+    const rows = listVocaStmt.all();
+    res.json({
+      ok: true,
+      ...imageStats,
+      items: rows.map(rowToVocaItem),
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message || "Image fetch failed." });
+  }
+});
+
+app.get("/api/settings/lango", (_req, res) => {
+  const apiKey = getLangoApiKey();
+  res.json({
+    configured: Boolean(apiKey),
+    baseUrl: LANGO_API_BASE,
+    apiVersion: LANGO_API_VERSION,
+    apiKeyPreview: maskApiKey(apiKey),
+  });
+});
+
+app.put("/api/settings/lango", express.json(), (req, res) => {
+  const { apiKey } = req.body || {};
+
+  if (apiKey != null) {
+    const trimmed = String(apiKey).trim();
+    if (!trimmed) {
+      return res.status(400).json({ error: "API key cannot be empty." });
+    }
+    setSetting("lango_api_key", trimmed);
+  }
+
+  const savedKey = getLangoApiKey();
+  res.json({
+    ok: true,
+    configured: Boolean(savedKey),
+    baseUrl: LANGO_API_BASE,
+    apiVersion: LANGO_API_VERSION,
+    apiKeyPreview: maskApiKey(savedKey),
+  });
 });
 
 app.get("/api/settings/inworld", (_req, res) => {

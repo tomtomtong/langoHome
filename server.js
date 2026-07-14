@@ -2715,6 +2715,7 @@ const GAME_API_PREFIXES = [
   '/api/findgame',
   '/api/voca',
   '/api/settings/inworld',
+  '/api/settings/lango',
   '/api/inworld/tts',
   '/api/inworld/llm',
   '/api/game-data',

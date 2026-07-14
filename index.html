@@ -110,6 +110,65 @@
 
     html.preview-mode #preview-toolbar { display: flex; }
 
+    .preview-toolbar-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    #preview-toolbar-hide,
+    #preview-toolbar-show {
+      border: 2px solid rgba(255, 255, 255, 0.22);
+      border-radius: 10px;
+      background: #111b31;
+      color: #f7f9ff;
+      font: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    #preview-toolbar-hide {
+      flex: 0 0 auto;
+      min-height: 32px;
+      padding: 0 12px;
+    }
+
+    #preview-toolbar-hide:hover,
+    #preview-toolbar-show:hover {
+      border-color: rgba(255, 255, 255, 0.38);
+      background: #18243d;
+    }
+
+    #preview-toolbar-show {
+      display: none;
+      position: fixed;
+      top: 12px;
+      left: 50%;
+      z-index: 1001;
+      min-height: 36px;
+      padding: 0 14px;
+      transform: translateX(-50%);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+
+    html.preview-mode.preview-toolbar-collapsed #preview-toolbar {
+      display: none;
+    }
+
+    html.preview-mode.preview-toolbar-collapsed #preview-toolbar-show {
+      display: block;
+    }
+
+    html.preview-mode.preview-toolbar-collapsed #app {
+      top: 50%;
+      width: min(100vw, calc(100vh * 4 / 3));
+      height: min(100vh, calc(100vw * 3 / 4));
+      pointer-events: auto;
+    }
+
     #preview-toolbar h2 {
       margin: 0;
       font-size: 15px;
@@ -2536,7 +2595,10 @@
 </head>
 <body>
   <aside id="preview-toolbar" aria-label="Host layout preview controls">
-    <h2>Host layout preview</h2>
+    <div class="preview-toolbar-head">
+      <h2>Host layout preview</h2>
+      <button id="preview-toolbar-hide" type="button" aria-label="Hide preview bar">Hide bar</button>
+    </div>
     <label for="preview-screen-select">SCREEN</label>
     <select id="preview-screen-select">
       <option value="home">Home — preview</option>
@@ -2557,6 +2619,7 @@
     <p>Add <code>?preview=1</code> to the URL. Login, microphone, and socket sessions are disabled in preview mode.</p>
     <button id="preview-exit" type="button">Exit preview</button>
   </aside>
+  <button id="preview-toolbar-show" type="button" hidden aria-label="Show preview bar">Show preview bar</button>
 
   <div id="splash-screen" role="status" aria-live="polite" aria-busy="true" aria-label="Loading">
     <div class="splash-content">
@@ -3182,6 +3245,9 @@
     const previewScreenSelect = document.getElementById("preview-screen-select");
     const gamePreviewFrame = document.getElementById("game-preview-frame");
     const previewExit = document.getElementById("preview-exit");
+    const previewToolbarHide = document.getElementById("preview-toolbar-hide");
+    const previewToolbarShow = document.getElementById("preview-toolbar-show");
+    const PREVIEW_TOOLBAR_COLLAPSED_KEY = "preview-toolbar-collapsed";
     let dailyRewardsStatus = null;
     let dailyRewardsStudent = false;
     let previewClaimedMilestones = [];
@@ -6065,6 +6131,25 @@
       url.searchParams.delete("screen");
       location.assign(`${url.pathname}${url.search}${url.hash}` || "/");
     });
+
+    function setPreviewToolbarCollapsed(collapsed) {
+      document.documentElement.classList.toggle("preview-toolbar-collapsed", collapsed);
+      if (previewToolbarShow) previewToolbarShow.hidden = !collapsed;
+      try {
+        sessionStorage.setItem(PREVIEW_TOOLBAR_COLLAPSED_KEY, collapsed ? "1" : "0");
+      } catch {}
+    }
+
+    previewToolbarHide?.addEventListener("click", () => setPreviewToolbarCollapsed(true));
+    previewToolbarShow?.addEventListener("click", () => setPreviewToolbarCollapsed(false));
+
+    if (PREVIEW_MODE) {
+      try {
+        if (sessionStorage.getItem(PREVIEW_TOOLBAR_COLLAPSED_KEY) === "1") {
+          setPreviewToolbarCollapsed(true);
+        }
+      } catch {}
+    }
 
     // Safety net: if wake-word listening dies silently (Chrome's
     // SpeechRecognition can stop without firing onend, and iOS Safari

@@ -195,18 +195,18 @@
 
   async function pickVocaRound() {
     const vocabItems = VocaConfig.getItems()
-      .map((item) => item.word.trim())
+      .map((item) => String(item.content || item.word || "").trim())
       .filter(Boolean);
     if (vocabItems.length < 3) {
       return pickBuiltinPuzzle();
     }
 
     const targetItem = VocaConfig.pickRandomOne(state.lastTargetWord);
-    if (!targetItem?.word) {
+    if (!targetItem?.content && !targetItem?.word) {
       return pickBuiltinPuzzle();
     }
 
-    const targetWord = targetItem.word.trim();
+    const targetWord = String(targetItem.content || targetItem.word || "").trim();
     state.lastTargetWord = targetWord;
     const otherWords = vocabItems.filter(
       (word) => word.toLowerCase() !== targetWord.toLowerCase()

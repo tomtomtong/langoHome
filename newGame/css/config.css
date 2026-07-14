@@ -926,6 +926,8 @@ body.hotspot-dragging {
 
 .btn-voca-add,
 .btn-voca-import,
+.btn-voca-fetch,
+.btn-voca-export,
 .btn-voca-save,
 .btn-voca-delete {
   font-family: "Baloo 2", sans-serif;
@@ -944,74 +946,227 @@ body.hotspot-dragging {
   background: linear-gradient(180deg, #8a4fd0, #5a2da0);
 }
 
+.btn-voca-fetch {
+  background: linear-gradient(180deg, #4db7dc, #2f8fb8);
+}
+
 .btn-voca-import,
 .btn-voca-delete {
   background: linear-gradient(180deg, #ff8a3d, #ef5f23);
 }
 
+.btn-voca-export {
+  background: linear-gradient(180deg, #4caf7d, #2f8f5d);
+}
+
 .btn-voca-add:hover,
 .btn-voca-import:hover,
+.btn-voca-fetch:hover,
+.btn-voca-export:hover,
 .btn-voca-save:hover,
 .btn-voca-delete:hover {
   transform: translateY(-1px);
 }
 
-.voca-count {
+.lango-section {
+  background: #fff;
+  border: 2px solid #c9a06a;
+  border-radius: 12px;
+  padding: 14px 16px;
   margin-bottom: 14px;
-  font-size: 0.9rem;
+}
+
+.lango-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.lango-heading {
+  margin: 0;
+  font-family: "Baloo 2", sans-serif;
+  font-size: 1rem;
+  color: #5a2da0;
+}
+
+.lango-desc {
+  margin: 4px 0 0;
+  font-size: 0.82rem;
+  color: #6b4a28;
+}
+
+.lango-badge {
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #ffd6d6;
+  color: #8a2020;
+}
+
+.lango-badge.configured {
+  background: #d8f5e4;
+  color: #1f6b3f;
+}
+
+.lango-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.82rem;
   color: #5e3a18;
 }
 
-.voca-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 14px;
-}
-
-.voca-card {
-  background: #fff;
-  border: 3px solid #c9a06a;
-  border-radius: 14px;
-  overflow: hidden;
-  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.08);
-}
-
-.voca-preview {
-  height: 120px;
-  background: #e8f4ff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
-
-.voca-preview img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.voca-body {
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.voca-word,
-.voca-url {
-  width: 100%;
+.lango-field input {
   font-family: inherit;
   font-size: 0.9rem;
   border: 2px solid #c9a06a;
   border-radius: 8px;
   padding: 6px 8px;
   color: #3a2410;
+  background: #fff;
 }
 
-.voca-card-actions {
+.lango-hint {
+  color: #6b4a28;
+  font-size: 0.78rem;
+}
+
+.voca-col-image {
+  width: 72px;
+}
+
+.voca-thumb {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 2px solid #c9a06a;
+  background: #f3f8ff;
+  display: block;
+}
+
+.voca-thumb-missing {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  border: 2px dashed #c9a06a;
+  color: #9a7a52;
+  font-size: 1.1rem;
+}
+
+.voca-toolbar {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
+  align-items: flex-end;
+}
+
+.voca-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: #5e3a18;
+  min-width: 140px;
+}
+
+.voca-filter--search {
+  flex: 1 1 220px;
+  min-width: 200px;
+}
+
+.voca-filter select,
+.voca-filter input {
+  font-family: inherit;
+  font-size: 0.9rem;
+  border: 2px solid #c9a06a;
+  border-radius: 8px;
+  padding: 6px 8px;
+  color: #3a2410;
+  background: #fff;
+}
+
+.voca-table-wrap {
+  background: #fff;
+  border: 3px solid #c9a06a;
+  border-radius: 14px;
+  overflow: auto;
+  max-height: 520px;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.08);
+}
+
+.voca-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.voca-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.voca-table th {
+  text-align: left;
+  padding: 10px 12px;
+  background: #f3e4c8;
+  color: #5a2da0;
+  font-family: "Baloo 2", sans-serif;
+  font-weight: 700;
+  border-bottom: 2px solid #c9a06a;
+  white-space: nowrap;
+}
+
+.voca-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid #ead9bc;
+  color: #3a2410;
+  vertical-align: top;
+}
+
+.voca-table tbody tr:hover {
+  background: #fff9ee;
+}
+
+.voca-col-id {
+  font-family: ui-monospace, monospace;
+  font-size: 0.78rem;
+  color: #6b4a28;
+  white-space: nowrap;
+}
+
+.voca-col-level {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.voca-col-content strong {
+  color: #5a2da0;
+}
+
+.voca-col-keywords {
+  color: #6b4a28;
+  font-size: 0.82rem;
+}
+
+.voca-empty {
+  padding: 28px 16px;
+  text-align: center;
+  color: #6b4a28;
+  font-size: 0.95rem;
+}
+
+.voca-empty.hidden {
+  display: none;
 }
 
 .slot-grid.hidden {
