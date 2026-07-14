@@ -38,7 +38,7 @@ const GAME_ICON_IDS = ['wordwhack', 'cardgame', 'findgame'];
 const PAIR_THEME_IDS = ['default', 'warm', 'cool', 'nature', 'night'];
 const DEFAULT_PAIR_THEME = 'default';
 const DEFAULT_ROOM_SCENE = 'livingroom';
-const DEFAULT_VIDEO_PAIRS_TIMEZONE = 'UTC';
+const DEFAULT_VIDEO_PAIRS_TIMEZONE = 'Asia/Hong_Kong';
 const VIDEO_MAX_BYTES = 100 * 1024 * 1024;
 const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 
@@ -497,12 +497,15 @@ const SECURITY_HEADERS = {
   'Cross-Origin-Embedder-Policy': 'require-corp',
 };
 
-const STUDENT_USERS = Object.fromEntries(
-  Array.from({ length: 20 }, (_, i) => {
-    const username = `user${String(i + 1).padStart(2, '0')}`;
-    return [username, 'password123'];
-  }),
-);
+const STUDENT_USERS = {
+  demo: 'demo',
+  ...Object.fromEntries(
+    Array.from({ length: 20 }, (_, i) => {
+      const username = `user${String(i + 1).padStart(2, '0')}`;
+      return [username, 'password123'];
+    }),
+  ),
+};
 
 const ADMIN_USERNAME = 'admin';
 const ADMIN_PASSWORD = 'admin';
@@ -1533,7 +1536,6 @@ function requiresAdmin(url, method) {
 
   if (url.startsWith('/api/video-pairs') && m !== 'GET') return true;
   if (url === '/api/video-pairs' && m === 'POST') return true;
-  if (url === '/api/video-pairs/settings' && m === 'PUT') return true;
 
   if (isGameApiRoute(url)) {
     if (m === 'POST' && (url === '/api/inworld/tts' || url === '/api/inworld/llm/wordwhack-round')) return false;
@@ -1679,20 +1681,8 @@ function newPairId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function normalizeTimezone(value) {
-  const tz = String(value ?? '').trim();
-  if (!tz) return null;
-  try {
-    Intl.DateTimeFormat(undefined, { timeZone: tz });
-    return tz;
-  } catch {
-    return null;
-  }
-}
-
 function getVideoPairsTimezone() {
-  const manifest = loadVideoPairsManifest();
-  return manifest.timezone || DEFAULT_VIDEO_PAIRS_TIMEZONE;
+  return DEFAULT_VIDEO_PAIRS_TIMEZONE;
 }
 
 function loadVideoPairsManifest() {
@@ -1701,18 +1691,17 @@ function loadVideoPairsManifest() {
     if (existsSync(VIDEO_PAIRS_MANIFEST_PATH)) {
       const data = JSON.parse(readFileSync(VIDEO_PAIRS_MANIFEST_PATH, 'utf8'));
       if (!Array.isArray(data.pairs)) {
-        return { pairs: [], timezone: DEFAULT_VIDEO_PAIRS_TIMEZONE };
+        return { pairs: [] };
       }
       return {
         pairs: data.pairs,
         legacyMigrated: data.legacyMigrated,
-        timezone: normalizeTimezone(data.timezone) || DEFAULT_VIDEO_PAIRS_TIMEZONE,
       };
     }
   } catch (e) {
     console.warn('Could not load video-pairs manifest:', e.message);
   }
-  return { pairs: [], timezone: DEFAULT_VIDEO_PAIRS_TIMEZONE };
+  return { pairs: [] };
 }
 
 function saveVideoPairsManifest(manifest) {
@@ -1999,7 +1988,6 @@ async function importVideoPairsFromCsv(csvText) {
   const hasKnownHeader = headers.some((h) => (
     [
       'session_prompt', 'text', 'prompt', 'theme',
-      'timezone', 'time_zone', 'tz',
       'start_time', 'starttime', 'start',
       'end_time', 'endtime', 'end',
       'loop_video_link', 'loop_video', 'loop_video_url',
@@ -2015,15 +2003,12 @@ async function importVideoPairsFromCsv(csvText) {
   const created = [];
   const errors = [];
   const warnings = [];
-  let importedTimezone = null;
-
   for (let i = 0; i < dataRows.length; i++) {
     const row = dataRows[i];
     const rowNum = i + rowOffset;
     const fields = {
       text: getCsvField(headers, row, 'session_prompt', 'text', 'prompt', 'sessionprompt'),
       theme: getCsvField(headers, row, 'theme'),
-      timezone: getCsvField(headers, row, 'timezone', 'time_zone', 'tz'),
       startTime: getCsvField(headers, row, 'start_time', 'starttime', 'start'),
       endTime: getCsvField(headers, row, 'end_time', 'endtime', 'end'),
       loopVideoUrl: getCsvField(headers, row, 'loop_video_link', 'loop_video', 'loop_video_url'),
@@ -2082,17 +2067,6 @@ async function importVideoPairsFromCsv(csvText) {
       }
       fields.endTime = endTime;
     }
-    if (fields.timezone) {
-      const timezone = normalizeTimezone(fields.timezone);
-      if (!timezone) {
-        errors.push({
-          row: rowNum,
-          error: `Invalid timezone "${fields.timezone}". Use an IANA name such as Asia/Hong_Kong or UTC.`,
-        });
-        continue;
-      }
-      importedTimezone = timezone;
-    }
     if (orderRaw !== '' && !Number.isFinite(order)) {
       errors.push({ row: rowNum, error: `Invalid order "${orderRaw}".` });
       continue;
@@ -2116,14 +2090,13 @@ async function importVideoPairsFromCsv(csvText) {
     };
   }
 
-  if (importedTimezone) manifest.timezone = importedTimezone;
   saveVideoPairsManifest(manifest);
   return {
     imported: created.length,
     pairs: created,
     errors,
     warnings,
-    timezone: importedTimezone || manifest.timezone || DEFAULT_VIDEO_PAIRS_TIMEZONE,
+    timezone: DEFAULT_VIDEO_PAIRS_TIMEZONE,
   };
 }
 
@@ -2459,21 +2432,6 @@ function handleVideoPairsApi(req, res, url) {
       return true;
     }
     sendJson(res, 405, { error: 'Method not allowed.' });
-    return true;
-  }
-
-  if (url === '/api/video-pairs/settings' && req.method === 'PUT') {
-    readJsonBody(req, res, (parsed) => {
-      const timezone = normalizeTimezone(parsed.timezone);
-      if (!timezone) {
-        sendJson(res, 400, { error: 'Invalid timezone. Use an IANA name such as Asia/Hong_Kong or UTC.' });
-        return;
-      }
-      const manifest = loadVideoPairsManifest();
-      manifest.timezone = timezone;
-      saveVideoPairsManifest(manifest);
-      sendJson(res, 200, { ok: true, timezone });
-    });
     return true;
   }
 
