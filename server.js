@@ -606,6 +606,71 @@ function saveUserProfile(username, profile) {
   return true;
 }
 
+const REPO_USER_PROFILES_PATH = join(ROOT, 'user-profiles.json');
+const PROFILE_SEED_IDENTITY_FIELDS = ['childName', 'nickname', 'grade', 'schoolGrade'];
+
+function loadRepoUserProfiles() {
+  try {
+    if (!existsSync(REPO_USER_PROFILES_PATH)) return {};
+    const data = JSON.parse(readFileSync(REPO_USER_PROFILES_PATH, 'utf8'));
+    if (data && typeof data === 'object' && !Array.isArray(data)) return data;
+  } catch (e) {
+    console.warn('Could not load bundled user-profiles.json:', e.message);
+  }
+  return {};
+}
+
+/** When CONFIG_DIR is on a Railway volume, copy/merge git-bundled profiles into the volume. */
+function seedUserProfilesFromRepo() {
+  if (CONFIG_DIR === ROOT) return;
+
+  const repoProfiles = loadRepoUserProfiles();
+  if (!Object.keys(repoProfiles).length) return;
+
+  const mode = String(process.env.USER_PROFILES_SEED || 'merge').toLowerCase();
+  const force = mode === 'force' || mode === 'overwrite';
+  const volumeProfiles = existsSync(USER_PROFILES_PATH) ? loadUserProfiles() : {};
+  const updatedUsers = [];
+
+  for (const username of USER_LIST) {
+    const repoProfile = normalizeUserProfile(repoProfiles[username]);
+    const hasRepoIdentity = PROFILE_SEED_IDENTITY_FIELDS.some((key) => repoProfile[key]);
+    if (!hasRepoIdentity) continue;
+
+    if (force) {
+      volumeProfiles[username] = repoProfile;
+      updatedUsers.push(username);
+      continue;
+    }
+
+    if (!volumeProfiles[username]) {
+      volumeProfiles[username] = repoProfile;
+      updatedUsers.push(username);
+      continue;
+    }
+
+    const merged = normalizeUserProfile(volumeProfiles[username]);
+    let userChanged = false;
+    for (const key of PROFILE_SEED_IDENTITY_FIELDS) {
+      if (!merged[key] && repoProfile[key]) {
+        merged[key] = repoProfile[key];
+        userChanged = true;
+      }
+    }
+    if (userChanged) {
+      volumeProfiles[username] = merged;
+      updatedUsers.push(username);
+    }
+  }
+
+  if (updatedUsers.length) {
+    saveUserProfiles(volumeProfiles);
+    console.log(
+      `[profiles-seed] updated ${updatedUsers.length} account(s) on volume from bundled user-profiles.json (mode=${mode})`,
+    );
+  }
+}
+
 const INWORLD_LLM_URL = 'https://api.inworld.ai/v1/chat/completions';
 const INWORLD_MODELS_URL = 'https://api.inworld.ai/llm/v1alpha/models';
 const INWORLD_MODELS_CACHE_MS = 5 * 60 * 1000;
@@ -1296,6 +1361,7 @@ function deleteSession(token) {
 }
 
 loadSessions();
+seedUserProfilesFromRepo();
 
 function parseCookies(req) {
   const cookies = {};
