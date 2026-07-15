@@ -116,6 +116,28 @@
       color: #888;
     }
     .hint a { color: #1a73e8; }
+    .section {
+      margin-top: 1.5rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid #ddd;
+    }
+    .section h2 {
+      margin: 0 0 0.75rem;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+    #rec-status {
+      font-size: 0.85rem;
+      color: #666;
+      margin-bottom: 0.5rem;
+    }
+    #rec-status.recording { color: #d93025; }
+    #playback {
+      width: 100%;
+      margin-top: 0.5rem;
+      display: none;
+    }
+    #playback.show { display: block; }
   </style>
 </head>
 <body>
@@ -150,6 +172,17 @@
       <div class="caption"><strong>You:</strong> <span id="user-text">—</span></div>
       <div class="caption"><strong>Agent:</strong> <span id="agent-text">—</span></div>
     </div>
+
+    <section class="section">
+      <h2>Audio recorder</h2>
+      <p class="sub" style="margin-bottom: 0.75rem;">Record from mic, then play back.</p>
+      <div class="row">
+        <button type="button" id="btn-record" class="primary">Record</button>
+        <button type="button" id="btn-play-rec" disabled>Play</button>
+      </div>
+      <div id="rec-status">Ready</div>
+      <audio id="playback" controls></audio>
+    </section>
 
     <p class="hint">Requires login for WebSocket. <a href="/login">Log in</a> · <a href="/config">Config</a> · <a href="/">Main app</a></p>
   </main>
@@ -504,6 +537,98 @@
     btnDisconnect.addEventListener("click", () => {
       try { ws?.close(); } catch {}
       cleanup();
+    });
+
+    // --- Simple audio recorder ---
+    const btnRecord = $("btn-record");
+    const btnPlayRec = $("btn-play-rec");
+    const recStatusEl = $("rec-status");
+    const playbackEl = $("playback");
+
+    let mediaRecorder = null;
+    let recStream = null;
+    let recChunks = [];
+    let recBlobUrl = null;
+
+    function setRecStatus(text, recording = false) {
+      recStatusEl.textContent = text;
+      recStatusEl.className = recording ? "recording" : "";
+    }
+
+    function clearRecording() {
+      if (recBlobUrl) {
+        URL.revokeObjectURL(recBlobUrl);
+        recBlobUrl = null;
+      }
+      recChunks = [];
+      playbackEl.removeAttribute("src");
+      playbackEl.classList.remove("show");
+      btnPlayRec.disabled = true;
+    }
+
+    async function startRecording() {
+      if (mediaRecorder?.state === "recording") return;
+      clearRecording();
+
+      try {
+        recStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (e) {
+        const denied = e?.name === "NotAllowedError" || e?.name === "NotFoundError";
+        setRecStatus(denied ? "Microphone denied" : "Could not access mic");
+        return;
+      }
+
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";
+      mediaRecorder = mimeType ? new MediaRecorder(recStream, { mimeType }) : new MediaRecorder(recStream);
+      recChunks = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) recChunks.push(e.data);
+      };
+
+      mediaRecorder.onstop = () => {
+        recStream?.getTracks().forEach((t) => t.stop());
+        recStream = null;
+
+        const blob = new Blob(recChunks, { type: mediaRecorder.mimeType || "audio/webm" });
+        recBlobUrl = URL.createObjectURL(blob);
+        playbackEl.src = recBlobUrl;
+        playbackEl.classList.add("show");
+        btnPlayRec.disabled = false;
+        btnRecord.textContent = "Record";
+        btnRecord.classList.add("primary");
+        btnRecord.classList.remove("danger");
+        setRecStatus("Recorded — tap Play or use player below");
+      };
+
+      mediaRecorder.start();
+      btnRecord.textContent = "Stop";
+      btnRecord.classList.remove("primary");
+      btnRecord.classList.add("danger");
+      setRecStatus("Recording…", true);
+    }
+
+    function stopRecording() {
+      if (mediaRecorder?.state === "recording") {
+        mediaRecorder.stop();
+        setRecStatus("Processing…");
+      }
+    }
+
+    btnRecord.addEventListener("click", () => {
+      if (mediaRecorder?.state === "recording") stopRecording();
+      else startRecording();
+    });
+
+    btnPlayRec.addEventListener("click", () => {
+      if (!recBlobUrl) return;
+      playbackEl.play().catch(() => setRecStatus("Playback blocked — use player below"));
+    });
+
+    playbackEl.addEventListener("loadedmetadata", () => {
+      if (recBlobUrl && playbackEl.duration && isFinite(playbackEl.duration)) {
+        setRecStatus(`Recorded (${playbackEl.duration.toFixed(1)}s) — tap Play or use player below`);
+      }
     });
 
     voiceEl.value = DEFAULT_VOICE;
