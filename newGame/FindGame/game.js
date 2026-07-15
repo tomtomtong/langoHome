@@ -24,11 +24,11 @@
   let questionAudioUrl = null;
   let speakRequestId = 0;
   let audioUnlocked = false;
+  let sceneCrop = { x: 0, y: 0, width: 1, height: 1 };
 
   const sentenceEl = document.getElementById("sentence");
   const questionVoiceEl = document.getElementById("questionVoice");
   const voiceStatusEl = document.getElementById("voiceStatus");
-  const foundValEl = document.getElementById("foundVal");
   const timerValEl = document.getElementById("timerVal");
   const timerWrapEl = document.getElementById("timerWrap");
   const scoreValEl = document.getElementById("scoreVal");
@@ -55,6 +55,7 @@
     const scale = Math.min(winW / DESIGN_W, winH / DESIGN_H, 4);
     gameEl.style.transform = `scale(${scale})`;
     gameEl.style.transformOrigin = "center center";
+    renderCurrentMarkers();
   }
 
   fitGameToScreen();
@@ -80,6 +81,7 @@
   }
 
   function applyLevelScene(lv) {
+    sceneCrop = { x: 0, y: 0, width: 1, height: 1 };
     const url = levelSceneUrl(lv);
     if (url) {
       sceneImg.src = url;
@@ -88,6 +90,10 @@
     }
     sceneImg.style.transform = "";
     sceneImg.style.transformOrigin = "";
+    sceneImg.style.left = "0";
+    sceneImg.style.top = "0";
+    sceneImg.style.width = "100%";
+    sceneImg.style.height = "100%";
   }
 
   async function loadLevels() {
@@ -155,13 +161,16 @@
       return;
     }
 
+    const geometry = getLocalImageGeometry();
+
     hotspots.forEach((hs, index) => {
       const el = document.createElement("div");
       el.className = "position-marker" + (SHOW_DEBUG_HINTS ? " position-marker--debug" : "");
-      el.style.left = `${hs.x * 100}%`;
-      el.style.top = `${hs.y * 100}%`;
-      el.style.width = `${hs.radius * 200}%`;
-      el.style.height = `${hs.radius * 200}%`;
+      const marker = hotspotToDisplay(hs, geometry);
+      el.style.left = `${marker.x}px`;
+      el.style.top = `${marker.y}px`;
+      el.style.width = `${marker.size}px`;
+      el.style.height = `${marker.size}px`;
       el.style.setProperty("--flash-delay", `${index * 0.45}s`);
 
       el.innerHTML = `
@@ -188,10 +197,11 @@
 
     const el = document.createElement("div");
     el.className = "position-marker position-marker--answer";
-    el.style.left = `${hs.x * 100}%`;
-    el.style.top = `${hs.y * 100}%`;
-    el.style.width = `${hs.radius * 320}%`;
-    el.style.height = `${hs.radius * 320}%`;
+    const marker = hotspotToDisplay(hs, getLocalImageGeometry(), 1.6);
+    el.style.left = `${marker.x}px`;
+    el.style.top = `${marker.y}px`;
+    el.style.width = `${marker.size}px`;
+    el.style.height = `${marker.size}px`;
     el.innerHTML = `
       <span class="position-marker-label" aria-hidden="true">HERE!</span>
       <span class="position-marker-ripple"></span>
@@ -346,7 +356,6 @@
     sceneWrap.classList.remove("answer-reveal");
     wrongAttempts = 0;
     sentenceEl.textContent = lv.sentence;
-    foundValEl.textContent = String(foundCount);
     scoreValEl.textContent = String(score);
     applyLevelScene(lv);
     renderPositionMarkers(levelHotspots(lv));
@@ -382,6 +391,158 @@
     });
   }
 
+  function imageGeometry(boxWidth, boxHeight) {
+    const imageWidth = sceneImg.naturalWidth || boxWidth || 1;
+    const imageHeight = sceneImg.naturalHeight || boxHeight || 1;
+    const cropX = sceneCrop.x * imageWidth;
+    const cropY = sceneCrop.y * imageHeight;
+    const cropWidth = sceneCrop.width * imageWidth;
+    const cropHeight = sceneCrop.height * imageHeight;
+    const scale = Math.max(boxWidth / cropWidth, boxHeight / cropHeight);
+    const renderedWidth = imageWidth * scale;
+    const renderedHeight = imageHeight * scale;
+    return {
+      renderedWidth,
+      renderedHeight,
+      offsetX: (boxWidth - cropWidth * scale) / 2 - cropX * scale,
+      offsetY: (boxHeight - cropHeight * scale) / 2 - cropY * scale,
+    };
+  }
+
+  function applySceneImageLayout() {
+    if (!sceneImg.naturalWidth || !sceneImg.naturalHeight) return;
+    const geometry = getLocalImageGeometry();
+    sceneImg.style.left = `${geometry.offsetX}px`;
+    sceneImg.style.top = `${geometry.offsetY}px`;
+    sceneImg.style.width = `${geometry.renderedWidth}px`;
+    sceneImg.style.height = `${geometry.renderedHeight}px`;
+  }
+
+  function detectLightBorderCrop() {
+    const naturalWidth = sceneImg.naturalWidth;
+    const naturalHeight = sceneImg.naturalHeight;
+    if (!naturalWidth || !naturalHeight) {
+      return { x: 0, y: 0, width: 1, height: 1 };
+    }
+
+    const sampleWidth = Math.min(512, naturalWidth);
+    const sampleHeight = Math.max(1, Math.round(sampleWidth * naturalHeight / naturalWidth));
+    const canvas = document.createElement("canvas");
+    canvas.width = sampleWidth;
+    canvas.height = sampleHeight;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return { x: 0, y: 0, width: 1, height: 1 };
+
+    try {
+      ctx.drawImage(sceneImg, 0, 0, sampleWidth, sampleHeight);
+      const data = ctx.getImageData(0, 0, sampleWidth, sampleHeight).data;
+      const corners = [
+        0,
+        (sampleWidth - 1) * 4,
+        (sampleHeight - 1) * sampleWidth * 4,
+        (sampleHeight * sampleWidth - 1) * 4,
+      ];
+      const background = corners.reduce(
+        (sum, index) => ({
+          r: sum.r + data[index],
+          g: sum.g + data[index + 1],
+          b: sum.b + data[index + 2],
+        }),
+        { r: 0, g: 0, b: 0 }
+      );
+      background.r /= corners.length;
+      background.g /= corners.length;
+      background.b /= corners.length;
+
+      if (Math.min(background.r, background.g, background.b) < 225) {
+        return { x: 0, y: 0, width: 1, height: 1 };
+      }
+
+      const differsFromBorder = (x, y) => {
+        const index = (y * sampleWidth + x) * 4;
+        const dr = data[index] - background.r;
+        const dg = data[index + 1] - background.g;
+        const db = data[index + 2] - background.b;
+        const distance = Math.sqrt(dr * dr + dg * dg + db * db);
+        const brightness = (data[index] + data[index + 1] + data[index + 2]) / 3;
+        return distance > 34 || brightness < 232;
+      };
+
+      const rowHasContent = (y) => {
+        let content = 0;
+        for (let x = 0; x < sampleWidth; x += 1) {
+          if (differsFromBorder(x, y)) content += 1;
+        }
+        return content / sampleWidth > 0.08;
+      };
+      const columnHasContent = (x) => {
+        let content = 0;
+        for (let y = 0; y < sampleHeight; y += 1) {
+          if (differsFromBorder(x, y)) content += 1;
+        }
+        return content / sampleHeight > 0.08;
+      };
+
+      let top = 0;
+      let bottom = sampleHeight - 1;
+      let left = 0;
+      let right = sampleWidth - 1;
+      while (top < bottom && !rowHasContent(top)) top += 1;
+      while (bottom > top && !rowHasContent(bottom)) bottom -= 1;
+      while (left < right && !columnHasContent(left)) left += 1;
+      while (right > left && !columnHasContent(right)) right -= 1;
+
+      const width = (right - left + 1) / sampleWidth;
+      const height = (bottom - top + 1) / sampleHeight;
+      const trimmed = left > sampleWidth * 0.015 || top > sampleHeight * 0.015 ||
+        right < sampleWidth * 0.985 || bottom < sampleHeight * 0.985;
+      if (!trimmed || width < 0.5 || height < 0.5) {
+        return { x: 0, y: 0, width: 1, height: 1 };
+      }
+
+      return {
+        x: left / sampleWidth,
+        y: top / sampleHeight,
+        width,
+        height,
+      };
+    } catch {
+      return { x: 0, y: 0, width: 1, height: 1 };
+    }
+  }
+
+  function handleSceneImageLoad() {
+    sceneCrop = detectLightBorderCrop();
+    applySceneImageLayout();
+    renderCurrentMarkers();
+  }
+
+  function getLocalImageGeometry() {
+    return imageGeometry(sceneWrap.clientWidth, sceneWrap.clientHeight);
+  }
+
+  function hotspotToDisplay(hs, geometry, sizeScale = 1) {
+    const diameter = hs.radius * 2 * Math.min(
+      geometry.renderedWidth,
+      geometry.renderedHeight
+    ) * sizeScale;
+    return {
+      x: geometry.offsetX + hs.x * geometry.renderedWidth,
+      y: geometry.offsetY + hs.y * geometry.renderedHeight,
+      size: Math.max(24, diameter),
+    };
+  }
+
+  function renderCurrentMarkers() {
+    const lv = currentLevel();
+    if (!lv || !sceneImg.complete || !sceneImg.naturalWidth) return;
+    if (locked && sceneWrap.classList.contains("answer-reveal")) {
+      renderCorrectAnswer(lv);
+      return;
+    }
+    if (!locked) renderPositionMarkers(levelHotspots(lv));
+  }
+
   function isCorrectHit(hitIndex, lv) {
     if (hitIndex < 0) return false;
     return hitIndex === correctIndexForLevel(lv);
@@ -393,9 +554,10 @@
     const hotspots = levelHotspots(lv);
     if (!hotspots.length) return;
 
-    const rect = sceneImg.getBoundingClientRect();
-    const nx = (e.clientX - rect.left) / rect.width;
-    const ny = (e.clientY - rect.top) / rect.height;
+    const rect = sceneWrap.getBoundingClientRect();
+    const geometry = imageGeometry(rect.width, rect.height);
+    const nx = (e.clientX - rect.left - geometry.offsetX) / geometry.renderedWidth;
+    const ny = (e.clientY - rect.top - geometry.offsetY) / geometry.renderedHeight;
 
     if (nx < 0 || nx > 1 || ny < 0 || ny > 1) return;
 
@@ -411,7 +573,6 @@
       score += POINTS_PER_LEVEL;
       foundCount += 1;
       scoreValEl.textContent = String(score);
-      foundValEl.textContent = String(foundCount);
       setTimeout(advanceLevel, 500);
     } else {
       wrongAttempts += 1;
@@ -441,11 +602,16 @@
     stopTimer();
     stopQuestionSpeech();
     renderPositionMarkers([]);
-    overlayTitle.textContent = "Time's up!";
-    overlayMsg.textContent = `You found ${foundCount} object${foundCount === 1 ? "" : "s"}. Score: ${score}`;
-    overlay.classList.remove("hidden");
+    const stars = score >= 500 ? 3 : score >= 300 ? 2 : 1;
+    if (typeof GameResult !== "undefined") {
+      GameResult.show({ stars, score, onNext: startGame });
+    } else {
+      overlayTitle.textContent = "Time's up!";
+      overlayMsg.textContent = `Score: ${score}`;
+      overlay.classList.remove("hidden");
+    }
     if (typeof GameScoreReporter !== "undefined") {
-      GameScoreReporter.reportGameScore("findgame", score, { foundCount, timeLeft });
+      GameScoreReporter.reportGameScore("findgame", score, { stars, foundCount, timeLeft });
     }
   }
 
@@ -475,6 +641,7 @@
     }
 
     sceneWrap.addEventListener("click", onSceneClick);
+    sceneImg.addEventListener("load", handleSceneImageLoad);
     replayBtn.addEventListener("click", replayQuestion);
     overlayBtn.addEventListener("click", () => {
       audioUnlocked = true;

@@ -57,7 +57,7 @@ const FindImageConfig = (() => {
     find_returnBtn: {
       label: "Return button",
       description: "Top-left restart button",
-      default: "assets/images/return-btn.svg",
+      default: "assets/images/return-button.png",
       sizeMode: "img",
       apply: (url, scale = DEFAULT_SCALE) => {
         document.querySelectorAll(".return-icon").forEach((img) => {

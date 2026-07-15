@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="/assets/page-motion.css" />
     <script src="/assets/page-motion.js"></script>
     <script type="module" crossorigin src="/vocab-game-app.js"></script>
+    <script src="/games/js/gameScoreReporter.js"></script>
+    <script src="/games/assets/game-result.js"></script>
     <link rel="stylesheet" crossorigin href="/vocab-game-app.css">
     <style>
       html,
@@ -211,17 +213,40 @@
       const completionModal = document.getElementById('vocab-completion');
       const completionDone = document.getElementById('vocab-completion-done');
       let completionScheduled = false;
+      let vocabPenalties = 0;
+      let messageWasBad = false;
 
       const detectCompletedGame = () => {
+        const messageEl = document.querySelector('.lango-home__message');
+        const messageIsBad = Boolean(messageEl?.classList.contains('is-bad'));
+        if (messageIsBad && !messageWasBad) vocabPenalties += 1;
+        messageWasBad = messageIsBad;
+
         if (completionScheduled) return;
         const progress = document.querySelector('.lango-home__progress-count')?.textContent.trim();
-        const message = document.querySelector('.lango-home__message')?.textContent || '';
+        const message = messageEl?.textContent || '';
         if (progress !== '10/10' || !message.includes('Correct!')) return;
 
         completionScheduled = true;
         window.setTimeout(() => {
-          completionModal.hidden = false;
-          completionDone.focus();
+          const stars = vocabPenalties === 0 ? 3 : vocabPenalties <= 3 ? 2 : 1;
+          const score = Math.max(0, 100 - vocabPenalties * 10);
+          if (typeof GameScoreReporter !== 'undefined') {
+            GameScoreReporter.reportGameScore('wordchop', score, { stars, penalties: vocabPenalties });
+          }
+          if (typeof GameResult !== 'undefined') {
+            GameResult.show({
+              stars,
+              score,
+              onNext: () => {
+                markVocabGamePlayed();
+                window.location.href = '/';
+              },
+            });
+          } else {
+            completionModal.hidden = false;
+            completionDone.focus();
+          }
         }, 720);
       };
 
@@ -242,6 +267,8 @@
       // The supplied game used the Return artwork to skip a round. When the
       // game is hosted inside LangoHome, that control should return home.
       document.addEventListener('click', (event) => {
+        const action = event.target.closest('.lango-home__action');
+        if (action?.querySelector('img[alt="hint"]')) vocabPenalties += 1;
         if (!event.target.closest('.lango-home__return')) return;
         event.preventDefault();
         event.stopImmediatePropagation();

@@ -321,11 +321,12 @@ function getProfileSyncLogForConversation(conversationId) {
   return row ? rowToProfileSyncLog(row) : null;
 }
 
-const VALID_GAME_IDS = new Set(['wordwhack', 'cardgame', 'findgame']);
+const VALID_GAME_IDS = new Set(['wordwhack', 'cardgame', 'findgame', 'wordchop']);
 const GAME_LABELS = {
   wordwhack: 'Word-Whack Blitz',
   cardgame: 'Picture-Word Memory Match',
   findgame: 'Find the Object',
+  wordchop: 'Word Chop',
 };
 
 const insertGamePlayStmt = conversationsDb.prepare(`
@@ -906,6 +907,7 @@ function queueProfileSyncFromConversation({ username, role, apiKey, conversation
 }
 
 const REWARD_CYCLE_DAYS = 7;
+const LANGOMON_DOLL_IDS = Array.from({ length: 6 }, (_, index) => `doll-${index + 1}`);
 const REWARD_CYCLE = [
   { day: 1, type: 'checkin', label: 'Check in', icon: 'calendar', stars: 5 },
   { day: 2, type: 'game', label: 'Game', icon: 'game', stars: 8 },
@@ -932,10 +934,10 @@ const DAILY_REWARD_MILESTONES = [
   {
     day: 3,
     id: 'langomon-doll',
-    type: 'doll',
+    type: 'random-doll',
     label: 'Langomon Doll',
     title: 'New Langomon Doll',
-    name: 'Penguin Doll',
+    name: 'Mystery Langomon Doll',
     icon: 'penguin',
     cta: 'Add to collection',
     destination: 'modal',
@@ -953,6 +955,18 @@ const DAILY_REWARD_MILESTONES = [
     destination: 'map',
     unlockLocation: 'park',
     stars: 15,
+  },
+  {
+    day: 7,
+    id: 'seven-day-doll',
+    type: 'random-doll',
+    label: 'Langomon Doll',
+    title: 'New Langomon Doll',
+    name: 'Mystery Langomon Doll',
+    icon: 'penguin',
+    cta: 'Add to collection',
+    destination: 'modal',
+    stars: 0,
   },
 ];
 
@@ -1123,11 +1137,30 @@ function claimDailyMilestone(username) {
     return { ok: true, alreadyClaimed: true, reward: null, status: getCheckInStatus(username) };
   }
 
+  let claimedReward = reward;
+  let collection = record.collection;
+  if (reward.type === 'random-doll') {
+    const lockedDolls = LANGOMON_DOLL_IDS.filter((id) => !record.collection.includes(id));
+    const collectionItemId = lockedDolls.length
+      ? lockedDolls[Math.floor(Math.random() * lockedDolls.length)]
+      : null;
+    if (collectionItemId) collection = [...record.collection, collectionItemId];
+    const dollNumber = collectionItemId ? Number(collectionItemId.split('-')[1]) : null;
+    claimedReward = {
+      ...reward,
+      collectionItemId,
+      collectionAsset: collectionItemId ? `/assets/collections/unlocked-${dollNumber}.png` : '',
+      name: collectionItemId ? `Langomon Doll ${dollNumber}` : 'Langomon Collection Complete',
+      collectionComplete: !collectionItemId,
+    };
+  }
+
   const updated = {
     ...record,
     rewardFlowDate: today,
     claimedMilestones: [...claimedMilestones, reward.id],
     totalStars: record.totalStars + reward.stars,
+    collection,
   };
 
   if (record.lastCheckInDate !== today) {
@@ -1137,15 +1170,12 @@ function claimDailyMilestone(username) {
     updated.cyclePosition = 1;
   }
 
-  if (reward.type === 'doll' && !updated.collection.includes(reward.id)) {
-    updated.collection = [...updated.collection, reward.id];
-  }
   if (reward.unlockLocation && !updated.unlockedLocations.includes(reward.unlockLocation)) {
     updated.unlockedLocations = [...updated.unlockedLocations, reward.unlockLocation];
   }
 
   saveCheckInRecord(username, updated);
-  return { ok: true, alreadyClaimed: false, reward, status: getCheckInStatus(username) };
+  return { ok: true, alreadyClaimed: false, reward: claimedReward, status: getCheckInStatus(username) };
 }
 
 function recordCheckIn(username) {
@@ -1459,54 +1489,16 @@ function isPublicPath(url) {
     || url === '/admin/login'
     || url === '/api/login'
     || url === '/api/admin/login'
-    || url === '/langoLogo.jpeg'
-    || url === '/preview'
-    || url.startsWith('/preview/');
-}
-
-const PREVIEW_PAGE_REDIRECTS = {
-  '/preview': '/?preview=1',
-  '/preview/': '/?preview=1',
-  '/preview/home': '/?preview=1',
-  '/preview/map': '/map?preview=1',
-  '/preview/wordchop': '/vocab-game?preview=1',
-  '/preview/wordwhack': '/games/?preview=1',
-  '/preview/cardgame': '/games/CardGame/?preview=1',
-  '/preview/findgame': '/games/FindGame/?preview=1',
-};
-
-const PREVIEW_HOME_SCREENS = new Set([
-  'start',
-  'loop',
-  'transition',
-  'conversation',
-  'rewards',
-  'collection-locked',
-  'collection-unlocked',
-  'game',
-  'game-wordchop',
-  'game-wordwhack',
-  'game-cardgame',
-  'game-findgame',
-]);
-
-function resolvePreviewRedirect(url) {
-  if (PREVIEW_PAGE_REDIRECTS[url]) return PREVIEW_PAGE_REDIRECTS[url];
-  const screenMatch = url.match(/^\/preview\/([a-z0-9-]+)$/);
-  if (!screenMatch) return null;
-  const screen = screenMatch[1];
-  if (PREVIEW_HOME_SCREENS.has(screen)) {
-    return `/?preview=1&screen=${encodeURIComponent(screen)}`;
-  }
-  return null;
+    || url === '/langoLogo.jpeg';
 }
 
 function isPreviewStaticAsset(url) {
   return /^\/visme\/.+\.(?:js|mjs|vrm|fbx|wasm|json)$/i.test(url)
     || /^\/Animation\/.+\.fbx$/i.test(url)
-    || /^\/assets\/(?:lango-home|daily-rewards|collections|map|sfx)\/.+\.(?:png|jpe?g|webp|svg|mp3|wav)$/i.test(url)
+    || /^\/assets\/(?:lango-home|daily-rewards|collections|map|sfx)\/.+\.(?:png|jpe?g|webp|svg|json|mp3|wav)$/i.test(url)
     || url === '/assets/page-motion.css'
     || url === '/assets/page-motion.js'
+    || url === '/assets/vendor/lottie_light.min.js'
     || /^\/games\/.+\.(?:css|js|svg|png|jpe?g|webp|gif|mp3|wav)$/i.test(url)
     || url === '/vocab-game-app.css'
     || url === '/vocab-game-app.js';
@@ -2677,6 +2669,7 @@ function serveFile(res, filePath) {
   const ext = extname(filePath);
   res.writeHead(200, {
     'Content-Type': MIME[ext] || 'application/octet-stream',
+    ...(ext === '.html' ? { 'Cache-Control': 'no-store' } : {}),
     ...SECURITY_HEADERS,
   });
   res.end(readFileSync(filePath));
@@ -2838,13 +2831,6 @@ const server = createServer((req, res) => {
   const qIndex = rawUrl.indexOf('?');
   const url = qIndex === -1 ? rawUrl : rawUrl.slice(0, qIndex);
   const query = qIndex === -1 ? '' : rawUrl.slice(qIndex);
-
-  const previewRedirect = resolvePreviewRedirect(url);
-  if (previewRedirect && (req.method === 'GET' || req.method === 'HEAD')) {
-    res.writeHead(302, { Location: previewRedirect, ...SECURITY_HEADERS });
-    res.end();
-    return;
-  }
 
   if (url === '/api/login' && req.method === 'POST') {
     readJsonBody(req, res, (parsed) => {
@@ -3327,7 +3313,7 @@ const server = createServer((req, res) => {
     return;
   }
 
-  const dailyRewardAsset = url.match(/^\/assets\/daily-rewards\/([a-z0-9-]+\.png)$/i);
+  const dailyRewardAsset = url.match(/^\/assets\/daily-rewards\/([a-z0-9-]+\.(?:png|json))$/i);
   if (dailyRewardAsset) {
     serveFile(res, join(ROOT, 'assets', 'daily-rewards', dailyRewardAsset[1]));
     return;
@@ -3354,6 +3340,11 @@ const server = createServer((req, res) => {
   const sharedMotionAsset = url.match(/^\/assets\/(page-motion\.(?:css|js))$/i);
   if (sharedMotionAsset) {
     serveFile(res, join(ROOT, 'assets', sharedMotionAsset[1]));
+    return;
+  }
+
+  if (url === '/assets/vendor/lottie_light.min.js') {
+    serveFile(res, join(ROOT, 'assets', 'vendor', 'lottie_light.min.js'));
     return;
   }
 

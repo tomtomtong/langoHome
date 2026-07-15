@@ -94,7 +94,7 @@
       margin-top: 0.5rem;
       border: none;
       border-radius: 8px;
-      background: #6c8cff;
+      background: #3c4048;
       color: #fff;
       font-size: 1rem;
       font-weight: 600;
@@ -103,7 +103,7 @@
     }
 
     button:hover:not(:disabled) {
-      background: #5a7aef;
+      background: #4a505b;
     }
 
     button:disabled {
@@ -127,55 +127,6 @@
       display: block;
     }
 
-    .guest-links {
-      margin-top: 1.75rem;
-      padding-top: 1.5rem;
-      border-top: 1px solid #2a2f3d;
-    }
-
-    .guest-links h2 {
-      margin: 0 0 0.35rem;
-      font-size: 0.95rem;
-      font-weight: 600;
-      text-align: center;
-    }
-
-    .guest-links p {
-      margin: 0 0 1rem;
-      font-size: 0.82rem;
-      color: #9aa0a6;
-      text-align: center;
-      line-height: 1.45;
-    }
-
-    .guest-links ul {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-    }
-
-    .guest-links ul > li + li {
-      margin-top: 0.5rem;
-    }
-
-    .guest-links a {
-      display: block;
-      padding: 0.7rem 0.9rem;
-      border-radius: 8px;
-      border: 1px solid #3c4048;
-      background: #0f1117;
-      color: #c4c7ce;
-      font-size: 0.9rem;
-      text-align: center;
-      text-decoration: none;
-      transition: border-color 0.15s, color 0.15s, background 0.15s;
-    }
-
-    .guest-links a:hover {
-      border-color: #6c8cff;
-      color: #e8eaed;
-      background: rgba(108, 140, 255, 0.08);
-    }
   </style>
 </head>
 <body>
@@ -198,18 +149,6 @@
       <button type="submit" id="submit-btn">Sign in</button>
     </form>
 
-    <section class="guest-links" aria-label="Browse without signing in">
-      <h2>Browse without signing in</h2>
-      <p>Open these pages directly — no login required.</p>
-      <ul>
-        <li><a href="/preview">Home preview</a></li>
-        <li><a href="/preview/map">Map</a></li>
-        <li><a href="/preview/wordchop">Word Chop</a></li>
-        <li><a href="/preview/wordwhack">Word-Whack Blitz</a></li>
-        <li><a href="/preview/cardgame">Picture-Word Memory Match</a></li>
-        <li><a href="/preview/findgame">Find the Object</a></li>
-      </ul>
-    </section>
   </div>
 
   <script src="/assets/legacy/login.bundle.js"></script>

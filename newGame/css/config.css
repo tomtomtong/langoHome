@@ -330,7 +330,7 @@ body {
 
 .btn-level-add {
   color: #fff;
-  background: linear-gradient(180deg, #48cae4, #2e86ab);
+  background: linear-gradient(180deg, #ff8a3d, #ef5f23);
 }
 
 .btn-level-reset {
@@ -452,7 +452,7 @@ body.hotspot-dragging {
   font-weight: 700;
   font-size: 0.75rem;
   color: #fff;
-  background: linear-gradient(180deg, #48cae4, #2e86ab);
+  background: linear-gradient(180deg, #ff8a3d, #ef5f23);
   border: 2px solid #5e3a18;
   border-radius: 999px;
   padding: 4px 10px;

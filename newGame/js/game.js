@@ -566,6 +566,14 @@
         maxCombo: state.maxCombo,
       });
     }
+    if (typeof GameResult !== "undefined") {
+      GameResult.show({
+        stars: Math.max(1, stars),
+        score: state.score,
+        onNext: startGame,
+      });
+      return;
+    }
     showOverlay({
       title: "Time's up!",
       subtitle: "Round over. Here's your score:",

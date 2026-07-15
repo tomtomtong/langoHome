@@ -49,6 +49,8 @@
     wireReturnButtons();
 
     const current = getCurrentGameId();
+    if (current === "findgame") return;
+
     const theme = current === "cardgame" ? "cardgame" : current === "findgame" ? "findgame" : "wordwhack";
 
     const root = document.createElement("div");

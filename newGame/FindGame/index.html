@@ -26,7 +26,7 @@
   <div id="bga-custom-background" aria-hidden="true"></div>
 
   <button type="button" class="return-btn" id="returnBtn" title="Return to conversation" aria-label="Return to conversation">
-    <img src="assets/images/return-btn.svg" alt="" class="return-icon" />
+    <img src="assets/images/return-button.png" alt="" class="return-icon" />
   </button>
 
   <div id="game" class="scene">
@@ -45,10 +45,11 @@
 
       <div class="hud-meta">
         <div class="timer-chip" id="timerWrap">
-          <span id="timerVal" class="timer-num">90</span>
-          <span class="timer-unit">sec</span>
+          <span class="timer-readout">
+            <span id="timerVal" class="timer-num">90</span>
+            <span class="timer-unit">sec</span>
+          </span>
         </div>
-        <div class="level-chip">Found <span id="foundVal">0</span></div>
       </div>
     </header>
 
@@ -69,7 +70,7 @@
     <div id="overlay" class="overlay hidden">
       <div class="panel">
         <h2 id="overlayTitle">Great job!</h2>
-        <p id="overlayMsg">You found them all.</p>
+        <p id="overlayMsg">Score: 0</p>
         <button type="button" class="btn" id="overlayBtn">Play again</button>
       </div>
     </div>
@@ -79,6 +80,7 @@
   <script src="js/imageConfig.js"></script>
   <script src="../js/gamePicker.js"></script>
   <script src="../js/gameScoreReporter.js"></script>
+  <script src="../assets/game-result.js"></script>
   <script src="game.js"></script>
 </body>
 </html>

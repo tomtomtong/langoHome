@@ -206,12 +206,12 @@
 
     #preview-exit {
       border: 0;
-      background: #17457d;
+      background: #3c4048;
       color: #fff;
       cursor: pointer;
     }
 
-    #preview-exit:hover { background: #1d5599; }
+    #preview-exit:hover { background: #4a505b; }
 
     html.preview-mode #app {
       top: calc(196px + (100vh - 196px) / 2);
@@ -517,14 +517,14 @@
       padding: 0.65rem 1.25rem;
       border: none;
       border-radius: 8px;
-      background: #6c8cff;
+      background: #3c4048;
       color: #fff;
       font-size: 0.9375rem;
       font-weight: 500;
       cursor: pointer;
     }
 
-    button:hover:not(:disabled) { background: #5a7aef; }
+    button:hover:not(:disabled) { background: #4a505b; }
     button:disabled { opacity: 0.6; cursor: not-allowed; }
 
     #btn-stop {
@@ -632,7 +632,7 @@
     }
 
     #camera-height-controls button:active {
-      background: rgba(108, 140, 255, 0.35);
+      background: rgba(255, 255, 255, 0.22);
     }
 
     #camera-save-status.err { color: #f28b82; }
@@ -1770,14 +1770,14 @@
     @keyframes reward-modal-fade { from { opacity: 0; } }
     @keyframes reward-modal-pop { from { opacity: 0; transform: translateY(5%) scale(.92); } }
 
-    /* Figma 719:34 — Word-Whack Blitz Congratulations screen. */
-    .daily-reward-congrats.word-whack-layout {
+    /* Every reward reveal uses the Day 1 full-screen Congratulations layout. */
+    .daily-reward-congrats {
       padding: 0;
       background: rgba(35, 20, 9, .58);
       backdrop-filter: blur(3px) saturate(.86);
     }
 
-    .word-whack-layout .daily-reward-congrats-card {
+    .daily-reward-congrats .daily-reward-congrats-card {
       position: absolute;
       inset: 0;
       width: 100%;
@@ -1792,8 +1792,8 @@
       animation: reward-word-whack-pop .48s cubic-bezier(.18,.86,.25,1.18) both;
     }
 
-    .word-whack-layout .daily-reward-congrats-card::before,
-    .word-whack-layout .daily-reward-congrats-card::after {
+    .daily-reward-congrats .daily-reward-congrats-card::before,
+    .daily-reward-congrats .daily-reward-congrats-card::after {
       content: "★";
       position: absolute;
       z-index: 2;
@@ -1804,10 +1804,10 @@
       animation: reward-star-twinkle 1.15s ease-in-out .28s both;
     }
 
-    .word-whack-layout .daily-reward-congrats-card::before { left: 24%; top: 32%; transform: rotate(-18deg); }
-    .word-whack-layout .daily-reward-congrats-card::after { right: 24%; top: 49%; transform: rotate(16deg) scale(.72); animation-delay: .46s; }
+    .daily-reward-congrats .daily-reward-congrats-card::before { left: 24%; top: 32%; transform: rotate(-18deg); }
+    .daily-reward-congrats .daily-reward-congrats-card::after { right: 24%; top: 49%; transform: rotate(16deg) scale(.72); animation-delay: .46s; }
 
-    .word-whack-layout .daily-reward-congrats-banner {
+    .daily-reward-congrats .daily-reward-congrats-banner {
       top: 0;
       left: 50%;
       width: 69%;
@@ -1826,7 +1826,7 @@
       animation: reward-banner-swing .72s cubic-bezier(.18,.86,.25,1.15) .08s both;
     }
 
-    .word-whack-layout .daily-reward-congrats-title {
+    .daily-reward-congrats .daily-reward-congrats-title {
       position: absolute;
       top: 26.7%;
       left: 50%;
@@ -1846,7 +1846,7 @@
         0 0.25cqw 0 #3e1e16;
     }
 
-    .word-whack-layout .daily-reward-congrats-icon {
+    .daily-reward-congrats .daily-reward-congrats-icon {
       position: absolute;
       top: 35.9%;
       left: 50%;
@@ -1865,14 +1865,68 @@
       animation: reward-icon-bounce .64s cubic-bezier(.15,.86,.23,1.22) .2s both;
     }
 
-    .word-whack-layout .daily-reward-congrats-icon img {
+    .daily-reward-congrats .daily-reward-congrats-icon img {
       display: block;
       width: 100%;
       height: 100%;
       object-fit: contain;
     }
 
-    .word-whack-layout .daily-reward-congrats-name {
+    .daily-reward-mystery-stage {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    .daily-reward-mystery-button {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      width: 100%;
+      height: 100%;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      cursor: pointer;
+      filter: drop-shadow(0 0 1.2cqw rgba(99, 217, 255, .7));
+      animation: reward-gamepad-nudge 1.05s ease-in-out infinite, reward-gamepad-flash 1.7s ease-in-out infinite;
+    }
+
+    .daily-reward-mystery-button:focus-visible {
+      outline: .35cqw solid #fff5b2;
+      outline-offset: .35cqw;
+      border-radius: 20%;
+    }
+
+    .daily-reward-mystery-stage.is-exploding .daily-reward-mystery-button {
+      pointer-events: none;
+      animation: reward-gamepad-open .34s cubic-bezier(.2,.8,.2,1) forwards;
+    }
+
+    .daily-reward-bubble-explosion {
+      position: absolute;
+      z-index: 4;
+      inset: -42%;
+      pointer-events: none;
+    }
+
+    .daily-reward-revealed-doll {
+      position: absolute;
+      z-index: 3;
+      inset: -12% 0;
+      width: 100%;
+      height: 124%;
+      object-fit: contain;
+      opacity: 0;
+      transform: scale(.35) rotate(-5deg);
+      filter: drop-shadow(0 1.1cqh 1.2cqw rgba(44, 17, 4, .42));
+    }
+
+    .daily-reward-mystery-stage.is-revealed .daily-reward-revealed-doll {
+      animation: reward-doll-reveal .7s cubic-bezier(.15,.86,.23,1.22) forwards;
+    }
+
+    .daily-reward-congrats .daily-reward-congrats-name {
       position: absolute;
       width: 1px;
       height: 1px;
@@ -1882,7 +1936,7 @@
       white-space: nowrap;
     }
 
-    .word-whack-layout #daily-reward-modal-cta {
+    .daily-reward-congrats #daily-reward-modal-cta {
       position: absolute;
       top: 70.6%;
       left: 50%;
@@ -1900,10 +1954,11 @@
       animation: reward-cta-arrive .48s cubic-bezier(.18,.86,.25,1.18) .38s both;
     }
 
-    .word-whack-layout #daily-reward-modal-cta:active { transform: translate(-50%, 2px) scale(.98); }
+    .daily-reward-congrats #daily-reward-modal-cta:active { transform: translate(-50%, 2px) scale(.98); }
+    .daily-reward-congrats #daily-reward-modal-cta[hidden] { display: none; }
 
     .daily-reward-modal-cta-art { display: none; }
-    .word-whack-layout .daily-reward-modal-cta-art {
+    .daily-reward-congrats .daily-reward-modal-cta-art {
       position: absolute;
       top: -72.5%;
       left: -14.66%;
@@ -1914,7 +1969,7 @@
       pointer-events: none;
     }
 
-    .word-whack-layout .daily-reward-modal-cta-label {
+    .daily-reward-congrats .daily-reward-modal-cta-label {
       position: absolute;
       width: 1px;
       height: 1px;
@@ -1971,6 +2026,31 @@
       100% { opacity: 1; transform: translateX(-50%) scale(1) rotate(0); }
     }
 
+    @keyframes reward-gamepad-nudge {
+      0%, 100% { transform: translateX(0) rotate(0); }
+      18% { transform: translateX(-2.4%) rotate(-2.2deg); }
+      36% { transform: translateX(2.4%) rotate(2.2deg); }
+      54% { transform: translateX(-1.2%) rotate(-1deg); }
+      72% { transform: translateX(1.2%) rotate(1deg); }
+    }
+
+    @keyframes reward-gamepad-flash {
+      0%, 60%, 100% { filter: brightness(1) drop-shadow(0 0 .5cqw rgba(99, 217, 255, .45)); }
+      78% { filter: brightness(1.45) drop-shadow(0 0 1.8cqw rgba(255, 245, 178, .95)); }
+    }
+
+    @keyframes reward-gamepad-open {
+      0% { opacity: 1; transform: scale(1); filter: brightness(1); }
+      55% { opacity: 1; transform: scale(1.18); filter: brightness(2); }
+      100% { opacity: 0; transform: scale(.72); filter: brightness(2.4); }
+    }
+
+    @keyframes reward-doll-reveal {
+      0% { opacity: 0; transform: scale(.35) rotate(-5deg); }
+      68% { opacity: 1; transform: scale(1.1) rotate(2deg); }
+      100% { opacity: 1; transform: scale(1) rotate(0); }
+    }
+
     @keyframes reward-cta-arrive {
       from { opacity: 0; transform: translateX(-50%) translateY(30%) scale(.82); }
       to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
@@ -1983,14 +2063,18 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
-      .word-whack-layout .daily-reward-congrats-card,
-      .word-whack-layout .daily-reward-congrats-banner,
-      .word-whack-layout .daily-reward-congrats-icon,
-      .word-whack-layout #daily-reward-modal-cta,
-      .word-whack-layout .daily-reward-congrats-card::before,
-      .word-whack-layout .daily-reward-congrats-card::after {
+      .daily-reward-congrats .daily-reward-congrats-card,
+      .daily-reward-congrats .daily-reward-congrats-banner,
+      .daily-reward-congrats .daily-reward-congrats-icon,
+      .daily-reward-congrats #daily-reward-modal-cta,
+      .daily-reward-congrats .daily-reward-congrats-card::before,
+      .daily-reward-congrats .daily-reward-congrats-card::after {
         animation: none;
       }
+
+      .daily-reward-mystery-button { animation: none; }
+      .daily-reward-mystery-stage.is-exploding .daily-reward-mystery-button { display: none; }
+      .daily-reward-mystery-stage.is-revealed .daily-reward-revealed-doll { animation: none; opacity: 1; transform: none; }
 
       .daily-rewards-sparkle { display: none; }
     }
@@ -2698,6 +2782,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js" crossorigin></script>
   <script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="/assets/vendor/lottie_light.min.js"></script>
   <script>
     // Lightweight UI sound layer. Each play gets its own Audio instance so
     // quick taps and celebration cues can overlap without cutting each other off.
@@ -2930,7 +3015,7 @@
 
       function Collection() {
         const [visible, setVisible] = React.useState(false);
-        const [unlocked, setUnlocked] = React.useState(false);
+        const [unlockedDolls, setUnlockedDolls] = React.useState([]);
         const [scrollProgress, setScrollProgress] = React.useState(0);
         const listRef = React.useRef(null);
         const collectionAsset = (name) => `/assets/collections/${name}.png`;
@@ -2938,18 +3023,19 @@
         React.useEffect(() => {
           const close = () => setVisible(false);
           const open = async (options = {}) => {
-            let nextUnlocked = typeof options.unlocked === 'boolean' ? options.unlocked : false;
+            let nextUnlockedDolls = options.unlocked === true
+              ? COLLECTION_DOLLS.map((_, index) => `doll-${index + 1}`)
+              : Array.isArray(options.unlockedDolls) ? options.unlockedDolls : [];
             if (typeof options.unlocked !== 'boolean') {
               try {
                 const response = await fetch('/api/check-in');
                 if (response.ok) {
                   const status = await response.json();
-                  nextUnlocked = Array.isArray(status.collection)
-                    && status.collection.includes('langomon-doll');
+                  nextUnlockedDolls = Array.isArray(status.collection) ? status.collection : [];
                 }
               } catch { /* The locked state is the safe offline fallback. */ }
             }
-            setUnlocked(nextUnlocked);
+            setUnlockedDolls(nextUnlockedDolls);
             setScrollProgress(0);
             setVisible(true);
             requestAnimationFrame(() => {
@@ -2971,6 +3057,9 @@
           document.querySelector('.lango-home__collections')?.focus();
         };
 
+        const unlockedDollSet = new Set(unlockedDolls);
+        const hasUnlockedDolls = unlockedDolls.length > 0;
+
         return e('section', {
           id: 'collection-overlay',
           className: visible ? 'visible' : '',
@@ -2978,8 +3067,8 @@
           'aria-modal': 'true',
           'aria-hidden': visible ? 'false' : 'true',
           'aria-labelledby': 'collection-title',
-          'data-state': unlocked ? 'unlocked' : 'locked',
-          'data-node-id': unlocked ? '768:1173' : '768:1141'
+          'data-state': hasUnlockedDolls ? 'unlocked' : 'locked',
+          'data-node-id': hasUnlockedDolls ? '768:1173' : '768:1141'
         },
           e('h2', { id: 'collection-title', className: 'collection-sr-title' }, 'Doll Collection'),
           e('img', { className: 'collection-background', src: collectionAsset('background'), alt: '', draggable: false }),
@@ -2990,28 +3079,32 @@
           e('ol', {
             ref: listRef,
             className: 'collection-list',
-            'aria-label': unlocked ? 'Unlocked dolls' : 'Locked dolls',
+            'aria-label': 'Langomon doll collection',
             onScroll: (event) => {
               const list = event.currentTarget;
               const available = list.scrollHeight - list.clientHeight;
               setScrollProgress(available > 0 ? list.scrollTop / available : 0);
             }
           },
-            ...COLLECTION_DOLLS.map((doll, index) => e('li', {
-              key: index,
-              className: `collection-row ${unlocked ? 'unlocked' : 'locked'}`,
-              style: {
-                '--row-height': `${doll.rowHeight / 9.54}cqh`,
-                '--doll-left': `${doll.left / 8.98}%`,
-                '--doll-size': `${doll.size / 8.98}%`,
-                '--lock-top': `${doll.lockTop / doll.rowHeight * 100}%`,
+            ...COLLECTION_DOLLS.map((doll, index) => {
+              const dollNumber = index + 1;
+              const isUnlocked = unlockedDollSet.has(`doll-${dollNumber}`);
+              return e('li', {
+                key: index,
+                className: `collection-row ${isUnlocked ? 'unlocked' : 'locked'}`,
+                style: {
+                  '--row-height': `${doll.rowHeight / 9.54}cqh`,
+                  '--doll-left': `${doll.left / 8.98}%`,
+                  '--doll-size': `${doll.size / 8.98}%`,
+                  '--lock-top': `${doll.lockTop / doll.rowHeight * 100}%`,
+                },
+                'aria-label': `Doll ${dollNumber}, ${isUnlocked ? 'unlocked' : 'locked'}`
               },
-              'aria-label': unlocked ? `Doll ${index + 1}, unlocked` : `Doll ${index + 1}, locked`
-            },
-              e('img', { className: 'collection-doll', src: collectionAsset(`${unlocked ? 'unlocked' : 'locked'}-${index + 1}`), alt: '', draggable: false }),
-              !unlocked && e('img', { className: 'collection-lock', src: collectionAsset('lock'), alt: '', draggable: false }),
-              e('img', { className: 'collection-divider', src: collectionAsset('divider'), alt: '', draggable: false })
-            ))
+                e('img', { className: 'collection-doll', src: collectionAsset(`${isUnlocked ? 'unlocked' : 'locked'}-${dollNumber}`), alt: '', draggable: false }),
+                !isUnlocked && e('img', { className: 'collection-lock', src: collectionAsset('lock'), alt: '', draggable: false }),
+                e('img', { className: 'collection-divider', src: collectionAsset('divider'), alt: '', draggable: false })
+              );
+            })
           ),
           e('div', { className: 'collection-scrollbar', 'aria-hidden': 'true', style: { '--scroll-thumb-top': `${scrollProgress * 87.34}%` } },
             e('span', { className: 'collection-scrollbar-thumb' })
@@ -3251,6 +3344,12 @@
     let dailyRewardsStatus = null;
     let dailyRewardsStudent = false;
     let previewClaimedMilestones = [];
+    let previewUnlockedDolls = [];
+    let dailyRewardRevealAnimation = null;
+    let dailyRewardRevealTimers = [];
+    const bubbleExplosionDataPromise = fetch("/assets/daily-rewards/bubble-explosion.json")
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("Bubble animation unavailable")))
+      .catch(() => null);
 
     const REWARD_SLOT_CARD_ASSETS = {
       1: "1day.png",
@@ -3294,8 +3393,9 @@
     function previewRewardStatus() {
       const milestones = [
         { day: 1, id: "word-whack", label: "New Game", title: "New Game In Garden", name: "Word-Whack Blitz", icon: "mole", cta: "Get", destination: "modal", stars: 5 },
-        { day: 3, id: "langomon-doll", label: "Langomon Doll", title: "New Langomon Doll", name: "Penguin Doll", icon: "penguin", cta: "Add to collection", destination: "modal", stars: 10 },
+        { day: 3, id: "langomon-doll", type: "random-doll", label: "Langomon Doll", title: "New Langomon Doll", name: "Mystery Langomon Doll", icon: "penguin", cta: "Add to collection", destination: "modal", stars: 10 },
         { day: 5, id: "new-spot", label: "New Spot", title: "New Spot", name: "Park", icon: "spot", cta: "Explore map", destination: "map", stars: 15 },
+        { day: 7, id: "seven-day-doll", type: "random-doll", label: "Langomon Doll", title: "New Langomon Doll", name: "Mystery Langomon Doll", icon: "penguin", cta: "Add to collection", destination: "modal", stars: 0 },
       ];
       const next = milestones.find((item) => !previewClaimedMilestones.includes(item.id));
       return {
@@ -3307,6 +3407,7 @@
           ...item,
           status: previewClaimedMilestones.includes(item.id) ? "claimed" : item.id === next?.id ? "active" : "locked",
         })),
+        collection: previewUnlockedDolls,
         unlockedLocations: previewClaimedMilestones.includes("new-spot") ? ["park"] : [],
       };
     }
@@ -3423,22 +3524,98 @@
       setTimeout(() => { dailyRewardsCelebrate.innerHTML = ""; }, 2400);
     }
 
+    function isDollReward(reward) {
+      return reward?.type === "random-doll"
+        || reward?.type === "doll"
+        || reward?.id === "langomon-doll"
+        || reward?.id === "seven-day-doll";
+    }
+
+    function clearDailyRewardReveal() {
+      dailyRewardRevealTimers.forEach(clearTimeout);
+      dailyRewardRevealTimers = [];
+      dailyRewardRevealAnimation?.destroy?.();
+      dailyRewardRevealAnimation = null;
+    }
+
+    async function revealMysteryDoll(reward, stage) {
+      if (!stage || stage.classList.contains("is-exploding")) return;
+      stage.classList.add("is-exploding");
+      stage.querySelector(".daily-reward-mystery-button")?.setAttribute("aria-busy", "true");
+      sfx?.play("powerUp", { interrupt: true });
+
+      const animationData = await bubbleExplosionDataPromise;
+      const animationContainer = stage.querySelector(".daily-reward-bubble-explosion");
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (animationData && animationContainer && window.lottie && !reduceMotion) {
+        dailyRewardRevealAnimation = window.lottie.loadAnimation({
+          container: animationContainer,
+          renderer: "svg",
+          loop: false,
+          autoplay: true,
+          animationData: structuredClone(animationData),
+          rendererSettings: { preserveAspectRatio: "xMidYMid meet" },
+        });
+      }
+
+      dailyRewardRevealTimers.push(setTimeout(() => {
+        stage.classList.add("is-revealed");
+        dailyRewardCongratsTitle.textContent = reward.title;
+        celebrateDailyReward();
+      }, reduceMotion ? 120 : 720));
+
+      dailyRewardRevealTimers.push(setTimeout(() => {
+        dailyRewardModalCta.hidden = false;
+        dailyRewardModalCta.focus({ preventScroll: true });
+      }, reduceMotion ? 220 : 1120));
+
+      dailyRewardRevealTimers.push(setTimeout(() => {
+        dailyRewardRevealAnimation?.destroy?.();
+        dailyRewardRevealAnimation = null;
+        if (animationContainer) animationContainer.innerHTML = "";
+      }, reduceMotion ? 300 : 1800));
+    }
+
     function showRewardCongratulations(reward) {
       const isWordWhack = reward.id === "word-whack";
-      dailyRewardCongrats.classList.toggle("word-whack-layout", isWordWhack);
-      dailyRewardCongratsTitle.textContent = reward.title;
+      const isDoll = isDollReward(reward);
+      const useFeaturedUnlockLayout = isWordWhack || isDoll;
+      clearDailyRewardReveal();
+      dailyRewardCongrats.classList.toggle("featured-unlock-layout", useFeaturedUnlockLayout);
+      dailyRewardCongratsTitle.textContent = isDoll && reward.collectionAsset
+        ? "Tap to Reveal!"
+        : reward.title;
       dailyRewardCongratsName.textContent = reward.name;
       dailyRewardModalCtaLabel.textContent = reward.cta;
       dailyRewardModalCta.setAttribute("aria-label", reward.cta);
-      dailyRewardCongratsIcon.innerHTML = isWordWhack
-        ? '<img src="/assets/daily-rewards/word-whack-modal-icon.png" alt="Word-Whack Blitz">'
-        : '<span class="penguin" role="img" aria-label="Penguin doll">🐧</span>';
+      dailyRewardModalCta.hidden = Boolean(isDoll && reward.collectionAsset);
+      if (isWordWhack) {
+        dailyRewardCongratsIcon.innerHTML = '<img src="/assets/daily-rewards/word-whack-modal-icon.png" alt="Word-Whack Blitz">';
+      } else if (isDoll && reward.collectionAsset) {
+        dailyRewardCongratsIcon.innerHTML = `
+          <div class="daily-reward-mystery-stage">
+            <button type="button" class="daily-reward-mystery-button" aria-label="Tap to reveal your Langomon Doll">
+              <img src="/assets/daily-rewards/gamepad.png" alt="Mystery gamepad">
+            </button>
+            <img class="daily-reward-revealed-doll" src="${reward.collectionAsset}" alt="${reward.name}">
+            <div class="daily-reward-bubble-explosion" aria-hidden="true"></div>
+          </div>`;
+        const stage = dailyRewardCongratsIcon.querySelector(".daily-reward-mystery-stage");
+        stage.querySelector(".daily-reward-mystery-button")?.addEventListener("click", () => revealMysteryDoll(reward, stage), { once: true });
+      } else {
+        dailyRewardCongratsIcon.innerHTML = '<span class="penguin" role="img" aria-label="Langomon doll">🐧</span>';
+      }
       dailyRewardCongrats.hidden = false;
-      dailyRewardModalCta.focus({ preventScroll: true });
+      if (dailyRewardModalCta.hidden) {
+        dailyRewardCongratsIcon.querySelector(".daily-reward-mystery-button")?.focus({ preventScroll: true });
+      } else {
+        dailyRewardModalCta.focus({ preventScroll: true });
+      }
       dailyRewardCongrats.closest(".daily-rewards-scene").scrollTop = 0;
     }
 
     function closeRewardCongratulations() {
+      clearDailyRewardReveal();
       dailyRewardCongrats.hidden = true;
       dailyRewardsClaimBtn.focus({ preventScroll: true });
       dailyRewardCongrats.closest(".daily-rewards-scene").scrollTop = 0;
@@ -3460,10 +3637,24 @@
     async function claimDailyReward() {
       if (!dailyRewardsStatus?.canClaimMilestone) return;
       if (PREVIEW_MODE) {
-        const reward = dailyRewardsStatus.nextMilestone;
+        let reward = dailyRewardsStatus.nextMilestone;
+        if (reward.type === "random-doll") {
+          const lockedDolls = [1, 2, 3, 4, 5, 6]
+            .map((number) => `doll-${number}`)
+            .filter((id) => !previewUnlockedDolls.includes(id));
+          const collectionItemId = lockedDolls[Math.floor(Math.random() * lockedDolls.length)] || null;
+          if (collectionItemId) previewUnlockedDolls = [...previewUnlockedDolls, collectionItemId];
+          const dollNumber = collectionItemId ? Number(collectionItemId.split("-")[1]) : null;
+          reward = {
+            ...reward,
+            collectionItemId,
+            collectionAsset: collectionItemId ? `/assets/collections/unlocked-${dollNumber}.png` : "",
+            name: collectionItemId ? `Langomon Doll ${dollNumber}` : "Langomon Collection Complete",
+          };
+        }
         previewClaimedMilestones = [...previewClaimedMilestones, reward.id];
         renderDailyRewards(previewRewardStatus());
-        celebrateDailyReward();
+        if (!isDollReward(reward)) celebrateDailyReward();
         if (reward.destination === "map") {
           localStorage.setItem("lango.systemUnlockedLocations", JSON.stringify(["park"]));
           window.location.href = "/map/?return=rewards";
@@ -3483,7 +3674,7 @@
         if (!res.ok) throw new Error("Could not claim reward");
         const data = await res.json();
         renderDailyRewards(data.status);
-        celebrateDailyReward();
+        if (!isDollReward(data.reward)) celebrateDailyReward();
         if (data.reward?.destination === "map") {
           localStorage.setItem("lango.systemUnlockedLocations", JSON.stringify(data.status.unlockedLocations || []));
           window.location.href = "/map/?return=rewards";
@@ -3614,6 +3805,13 @@
     let idleVideosReady = false;
     let idleVideoStarting = false;
     let playingTransitionVideo = false;
+    const FALLBACK_VIDEO_VOLUME = 0.6;
+    const BALANCED_TARGET_RMS = 0.1;
+    const VIDEO_DUCK_GAIN = 0.32;
+    const VIDEO_BALANCE_MIN_GAIN = 0.35;
+    const VIDEO_BALANCE_MAX_GAIN = 1.8;
+    const TTS_BALANCE_MIN_GAIN = 0.75;
+    const TTS_BALANCE_MAX_GAIN = 3;
     let avatar = null;
     let avatarLoading = null;
     let cameraEditMode = false;
@@ -3622,7 +3820,11 @@
     let tripleClickCount = 0;
     let tripleClickTimer = null;
     const TRIPLE_CLICK_MS = 500;
-    let ws, ctx, src, proc, source, stream;
+    let ws, ctx, src, proc, source, stream, speechGain, speechLimiter;
+    let speechBalanceGain = 1.5;
+    let videoAudioContext = null;
+    let videoBalanceFrame = 0;
+    const videoAudioRoutes = new Map();
     let active = false, inSession = false, playing = false, nextPlayTime = 0;
     const ENABLE_WAKE_WORD = false;
     let recognition = null, wakeWordEnabled = ENABLE_WAKE_WORD, listeningForWakeWord = false;
@@ -4056,20 +4258,125 @@
       window.dispatchEvent(new CustomEvent("lango:page-reveal"));
     }
 
+    function clampAudioGain(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function measureActiveRms(samples, silenceFloor = 0.008) {
+      let sumSquares = 0;
+      let peak = 0;
+      let activeSamples = 0;
+      for (let i = 0; i < samples.length; i++) {
+        const sample = Math.abs(samples[i]);
+        peak = Math.max(peak, sample);
+        if (sample < silenceFloor) continue;
+        sumSquares += sample * sample;
+        activeSamples++;
+      }
+      return {
+        rms: activeSamples ? Math.sqrt(sumSquares / activeSamples) : 0,
+        peak,
+        activeRatio: samples.length ? activeSamples / samples.length : 0,
+      };
+    }
+
+    function updateVideoBalance() {
+      videoBalanceFrame = requestAnimationFrame(updateVideoBalance);
+      for (const [videoEl, route] of videoAudioRoutes) {
+        if (videoEl.muted) {
+          route.gain.gain.setTargetAtTime(0, videoAudioContext.currentTime, 0.015);
+          continue;
+        }
+        if (videoEl.paused || videoEl.ended) continue;
+        route.analyser.getFloatTimeDomainData(route.samples);
+        const level = measureActiveRms(route.samples);
+        if (level.activeRatio < 0.04 || level.rms <= 0) {
+          const outputGain = route.smoothedGain * (playing ? VIDEO_DUCK_GAIN : 1);
+          route.gain.gain.setTargetAtTime(outputGain, videoAudioContext.currentTime, 0.05);
+          continue;
+        }
+
+        const peakSafeGain = level.peak > 0 ? 0.9 / level.peak : VIDEO_BALANCE_MAX_GAIN;
+        const desiredGain = clampAudioGain(
+          Math.min(BALANCED_TARGET_RMS / level.rms, peakSafeGain),
+          VIDEO_BALANCE_MIN_GAIN,
+          VIDEO_BALANCE_MAX_GAIN,
+        );
+        // A slow attack/release avoids audible pumping while still adapting
+        // when a different loop or transition video starts.
+        const smoothing = desiredGain < route.smoothedGain ? 0.18 : 0.025;
+        route.smoothedGain += (desiredGain - route.smoothedGain) * smoothing;
+        const outputGain = route.smoothedGain * (playing ? VIDEO_DUCK_GAIN : 1);
+        route.gain.gain.setTargetAtTime(outputGain, videoAudioContext.currentTime, 0.12);
+      }
+    }
+
+    function applyFallbackVideoDucking() {
+      if (videoAudioRoutes.has(idleVideoEl) && videoAudioRoutes.has(transitionVideoEl)) return;
+      const fallbackVolume = FALLBACK_VIDEO_VOLUME * (playing ? VIDEO_DUCK_GAIN : 1);
+      if (!videoAudioRoutes.has(idleVideoEl)) idleVideoEl.volume = fallbackVolume;
+      if (!videoAudioRoutes.has(transitionVideoEl)) transitionVideoEl.volume = fallbackVolume;
+    }
+
+    function ensureVideoAudioBalance() {
+      const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextCtor) return false;
+      try {
+        if (!videoAudioContext) videoAudioContext = new AudioContextCtor();
+        for (const videoEl of [idleVideoEl, transitionVideoEl]) {
+          if (videoAudioRoutes.has(videoEl)) continue;
+          const mediaSource = videoAudioContext.createMediaElementSource(videoEl);
+          const analyser = videoAudioContext.createAnalyser();
+          const gain = videoAudioContext.createGain();
+          const limiter = videoAudioContext.createDynamicsCompressor();
+          analyser.fftSize = 1024;
+          analyser.smoothingTimeConstant = 0.65;
+          gain.gain.value = 1;
+          limiter.threshold.value = -8;
+          limiter.knee.value = 8;
+          limiter.ratio.value = 10;
+          limiter.attack.value = 0.003;
+          limiter.release.value = 0.2;
+          mediaSource.connect(analyser);
+          analyser.connect(gain);
+          gain.connect(limiter);
+          limiter.connect(videoAudioContext.destination);
+          videoAudioRoutes.set(videoEl, {
+            analyser,
+            gain,
+            limiter,
+            samples: new Float32Array(analyser.fftSize),
+            smoothedGain: 1,
+          });
+        }
+        if (!videoBalanceFrame) updateVideoBalance();
+        videoAudioContext.resume().catch(() => {});
+        return true;
+      } catch (e) {
+        console.warn("Automatic video volume balancing unavailable; using fallback volume", e);
+        return false;
+      }
+    }
+
     function applyVideoAudioSettings(videoEl) {
-      videoEl.volume = 1;
+      videoEl.volume = videoAudioRoutes.has(videoEl) ? 1 : FALLBACK_VIDEO_VOLUME;
       videoEl.muted = !videoSoundUnlocked;
     }
 
     function unlockVideoSound() {
-      if (videoSoundUnlocked) return;
+      if (videoSoundUnlocked) {
+        ensureVideoAudioBalance();
+        return;
+      }
       videoSoundUnlocked = true;
+      ensureVideoAudioBalance();
       applyVideoAudioSettings(idleVideoEl);
       applyVideoAudioSettings(transitionVideoEl);
     }
 
     async function playVideoWithSound(videoEl) {
-      videoEl.volume = 1;
+      if (videoSoundUnlocked) ensureVideoAudioBalance();
+      videoEl.volume = videoAudioRoutes.has(videoEl) ? 1 : FALLBACK_VIDEO_VOLUME;
       videoEl.muted = false;
       try {
         await videoEl.play();
@@ -4093,7 +4400,7 @@
           !idleVideoEl.paused
         ) {
           idleVideoEl.muted = false;
-          idleVideoEl.volume = 1;
+          idleVideoEl.volume = videoAudioRoutes.has(idleVideoEl) ? 1 : FALLBACK_VIDEO_VOLUME;
         }
       };
       window.addEventListener("pointerdown", unlock, { passive: true });
@@ -4482,7 +4789,7 @@
         transitionVideoEl.currentTime = 0;
         unlockVideoSound();
         transitionVideoEl.muted = false;
-        transitionVideoEl.volume = 1;
+        transitionVideoEl.volume = videoAudioRoutes.has(transitionVideoEl) ? 1 : FALLBACK_VIDEO_VOLUME;
 
         let settled = false;
         const finish = () => {
@@ -4834,8 +5141,13 @@
     function releaseMicSync() {
       try { proc?.disconnect(); } catch (e) { console.warn("proc disconnect failed", e); }
       try { source?.disconnect(); } catch (e) { console.warn("source disconnect failed", e); }
+      try { speechGain?.disconnect(); } catch (e) { console.warn("speech gain disconnect failed", e); }
+      try { speechLimiter?.disconnect(); } catch (e) { console.warn("speech limiter disconnect failed", e); }
       proc = null;
       source = null;
+      speechGain = null;
+      speechLimiter = null;
+      speechBalanceGain = 1.5;
       try { stream?.getTracks().forEach((t) => t.stop()); } catch (e) { console.warn("stream stop failed", e); }
       stream = null;
       try { if (ctx?.state !== "closed") ctx?.close(); } catch (e) { console.warn("ctx close failed", e); }
@@ -5789,9 +6101,29 @@
       ws.close();
     }
 
+    function ensureSpeechOutputChain() {
+      if (speechGain && speechLimiter && speechGain.context === ctx) return speechGain;
+
+      speechGain = ctx.createGain();
+      speechGain.gain.value = speechBalanceGain;
+
+      // Raise quiet speech while catching peaks before they clip.
+      speechLimiter = ctx.createDynamicsCompressor();
+      speechLimiter.threshold.value = -10;
+      speechLimiter.knee.value = 8;
+      speechLimiter.ratio.value = 8;
+      speechLimiter.attack.value = 0.003;
+      speechLimiter.release.value = 0.18;
+
+      speechGain.connect(speechLimiter);
+      speechLimiter.connect(ctx.destination);
+      return speechGain;
+    }
+
     function playNext() {
       if (!queue.length) {
         playing = false;
+        applyFallbackVideoDucking();
         maybeEndAvatarSpeech();
         closeAfterToolEnd();
         if (audioDone) scheduleIdleNudge();
@@ -5799,6 +6131,7 @@
       }
 
       playing = true;
+      applyFallbackVideoDucking();
       beginAvatarSpeech();
 
       const pcm16 = new Int16Array(queue.shift());
@@ -5815,9 +6148,22 @@
       buf.getChannelData(0).set(f32);
       src = ctx.createBufferSource();
       src.buffer = buf;
-      src.connect(ctx.destination);
 
       const t = Math.max(ctx.currentTime, nextPlayTime);
+      const speechOutput = ensureSpeechOutputChain();
+      const level = measureActiveRms(f32);
+      if (level.activeRatio >= 0.04 && level.rms > 0) {
+        const peakSafeGain = level.peak > 0 ? 0.9 / level.peak : TTS_BALANCE_MAX_GAIN;
+        const desiredGain = clampAudioGain(
+          Math.min(BALANCED_TARGET_RMS / level.rms, peakSafeGain),
+          TTS_BALANCE_MIN_GAIN,
+          TTS_BALANCE_MAX_GAIN,
+        );
+        speechBalanceGain += (desiredGain - speechBalanceGain) * 0.35;
+        speechOutput.gain.setTargetAtTime(speechBalanceGain, t, 0.06);
+      }
+      src.connect(speechOutput);
+
       if (!speechPlaybackStart) speechPlaybackStart = t;
       nextPlayTime = t + buf.duration;
       src.onended = playNext;
@@ -5827,6 +6173,7 @@
     function stopAudio() {
       queue.length = 0;
       playing = false;
+      applyFallbackVideoDucking();
       nextPlayTime = 0;
       try { src?.stop(); } catch {}
       src = null;
@@ -6053,6 +6400,7 @@
 
       if (screen === "rewards") {
         previewClaimedMilestones = [];
+        previewUnlockedDolls = [];
         renderDailyRewards(previewRewardStatus());
         showDailyRewardsOverlay();
         return;

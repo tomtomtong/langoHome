@@ -317,12 +317,17 @@ function endGame() {
   clearInterval(timerId);
   updateHUD();
   updateProgressBar();
-  if (completeStarsEl) completeStarsEl.textContent = starRating();
-  if (completeScoreEl) completeScoreEl.textContent = score;
-  if (levelCompleteEl) levelCompleteEl.classList.remove('hidden');
+  const earnedStars = Math.max(1, starCount());
+  if (typeof GameResult !== 'undefined') {
+    GameResult.show({ stars: earnedStars, score, onNext: startGame });
+  } else {
+    if (completeStarsEl) completeStarsEl.textContent = starRating();
+    if (completeScoreEl) completeScoreEl.textContent = score;
+    if (levelCompleteEl) levelCompleteEl.classList.remove('hidden');
+  }
   if (typeof GameScoreReporter !== 'undefined') {
     GameScoreReporter.reportGameScore('cardgame', score, {
-      stars: starRating(),
+      stars: earnedStars,
       matchedCount,
       timeLeft,
     });
