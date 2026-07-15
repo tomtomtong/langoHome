@@ -288,7 +288,7 @@
 <body>
   <div class="page">
     <h1>Conversations &amp; Profile Summaries</h1>
-    <p class="lead">Review voice session transcripts, listen back to the full user microphone recording for each session, and inspect automatic profile-summary runs after student sessions.</p>
+    <p class="lead">Review voice session transcripts, listen back to the full session recording (user microphone + Uncle Tommy responses), and inspect automatic profile-summary runs after student sessions.</p>
 
     <div class="toolbar">
       <div class="field">
@@ -312,7 +312,7 @@
                   <th>Account</th>
                   <th>Duration</th>
                   <th>Turns</th>
-                  <th>User audio</th>
+                  <th>Session audio</th>
                 </tr>
               </thead>
               <tbody id="sessions-body">
@@ -362,9 +362,9 @@
           <button type="button" class="danger" id="delete-btn">Delete session</button>
         </div>
         <div class="user-audio-panel" id="user-audio-panel" hidden>
-          <h3>User session audio</h3>
+          <h3>Session audio</h3>
           <audio id="user-audio-player" controls preload="metadata"></audio>
-          <p class="hint">Full microphone input for this session (one continuous recording).</p>
+          <p class="hint">Full session recording: user microphone and Uncle Tommy responses mixed on one timeline.</p>
         </div>
         <div class="turns" id="turns"></div>
       </div>
@@ -511,7 +511,7 @@
           <td>${session.username}</td>
           <td>${formatDuration(session.startedAt, session.endedAt)}</td>
           <td>${session.turnCount || 0}</td>
-          <td>${session.hasUserAudio ? 'Yes' : '—'}</td>
+          <td>${session.hasSessionAudio || session.hasUserAudio ? 'Yes' : '—'}</td>
         </tr>
       `).join('');
 
@@ -642,9 +642,9 @@
         <div>Turns: ${data.turnCount || 0}</div>
       `;
 
-      if (data.hasUserAudio && data.userAudioUrl) {
+      if ((data.hasSessionAudio || data.hasUserAudio) && (data.sessionAudioUrl || data.userAudioUrl)) {
         userAudioPanel.hidden = false;
-        userAudioPlayer.src = data.userAudioUrl;
+        userAudioPlayer.src = data.sessionAudioUrl || data.userAudioUrl;
         userAudioPlayer.load();
       } else {
         userAudioPanel.hidden = true;

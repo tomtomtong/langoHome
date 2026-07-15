@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inworld Realtime — Simple</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #f5f5f5;
+      color: #1a1a1a;
+    }
+    body {
+      display: flex;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+    main {
+      width: min(100%, 420px);
+    }
+    h1 {
+      margin: 0 0 0.25rem;
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+    .sub {
+      margin: 0 0 1.5rem;
+      font-size: 0.85rem;
+      color: #666;
+    }
+    label {
+      display: block;
+      margin-bottom: 0.35rem;
+      font-size: 0.8rem;
+      color: #444;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 0.6rem 0.75rem;
+      margin-bottom: 0.9rem;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      background: #fff;
+      color: #1a1a1a;
+      font-size: 0.9rem;
+      font-family: inherit;
+    }
+    textarea { resize: vertical; min-height: 4rem; }
+    .row {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+    button {
+      padding: 0.55rem 1rem;
+      border: 1px solid #bbb;
+      border-radius: 6px;
+      background: #fff;
+      color: #1a1a1a;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+    button:hover:not(:disabled) { background: #eee; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button.primary {
+      background: #1a73e8;
+      border-color: #1a73e8;
+      color: #fff;
+    }
+    button.primary:hover:not(:disabled) { background: #1557b0; }
+    button.danger {
+      background: #d93025;
+      border-color: #d93025;
+      color: #fff;
+    }
+    button.danger:hover:not(:disabled) { background: #b3261e; }
+    #status {
+      padding: 0.6rem 0.75rem;
+      margin-bottom: 0.75rem;
+      border-radius: 6px;
+      background: #e8e8e8;
+      font-size: 0.85rem;
+    }
+    #status.ok { background: #e6f4ea; color: #137333; }
+    #status.err { background: #fce8e6; color: #c5221f; }
+    #status.live { background: #e8f0fe; color: #1967d2; }
+    #check-result {
+      margin-bottom: 1rem;
+      padding: 0.75rem;
+      border-radius: 6px;
+      background: #fff;
+      border: 1px solid #ddd;
+      font-size: 0.8rem;
+      white-space: pre-wrap;
+      display: none;
+    }
+    #check-result.show { display: block; }
+    .captions {
+      margin-top: 1.25rem;
+      padding-top: 1rem;
+      border-top: 1px solid #ddd;
+    }
+    .caption {
+      margin-bottom: 0.5rem;
+      font-size: 0.85rem;
+      line-height: 1.4;
+    }
+    .caption strong { color: #555; font-weight: 600; }
+    .hint {
+      margin-top: 1rem;
+      font-size: 0.75rem;
+      color: #888;
+    }
+    .hint a { color: #1a73e8; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Inworld Realtime</h1>
+    <p class="sub">Minimal session — no avatar, no background.</p>
+
+    <form id="form" onsubmit="return false;">
+      <label for="apiKey">API key</label>
+      <input id="apiKey" type="password" placeholder="From /config or enter here" autocomplete="off">
+
+      <label for="voice">Voice ID</label>
+      <input id="voice" type="text" placeholder="default-zylgts2tamenvybeti3z0w__uncle_tommy">
+
+      <label for="model">Model</label>
+      <input id="model" type="text" placeholder="openai/gpt-4o-mini">
+
+      <label for="instructions">Instructions</label>
+      <textarea id="instructions" placeholder="System prompt for the agent"></textarea>
+
+      <div class="row">
+        <button type="button" id="btn-check">Check</button>
+        <button type="button" id="btn-connect" class="primary">Connect</button>
+        <button type="button" id="btn-disconnect" class="danger" disabled>Disconnect</button>
+      </div>
+    </form>
+
+    <div id="status">Idle</div>
+    <div id="check-result"></div>
+
+    <div class="captions">
+      <div class="caption"><strong>You:</strong> <span id="user-text">—</span></div>
+      <div class="caption"><strong>Agent:</strong> <span id="agent-text">—</span></div>
+    </div>
+
+    <p class="hint">Requires login for WebSocket. <a href="/login">Log in</a> · <a href="/config">Config</a> · <a href="/">Main app</a></p>
+  </main>
+
+  <script type="module">
+    const DEFAULT_VOICE = "default-zylgts2tamenvybeti3z0w__uncle_tommy";
+    const DEFAULT_MODEL = "openai/gpt-4o-mini";
+    const DEFAULT_PROMPT = "You are a friendly voice assistant. Keep responses brief.";
+
+    const $ = (id) => document.getElementById(id);
+    const apiKeyEl = $("apiKey");
+    const voiceEl = $("voice");
+    const modelEl = $("model");
+    const instructionsEl = $("instructions");
+    const statusEl = $("status");
+    const checkResultEl = $("check-result");
+    const userTextEl = $("user-text");
+    const agentTextEl = $("agent-text");
+    const btnCheck = $("btn-check");
+    const btnConnect = $("btn-connect");
+    const btnDisconnect = $("btn-disconnect");
+
+    let ws = null;
+    let ctx = null;
+    let stream = null;
+    let source = null;
+    let proc = null;
+    let active = false;
+    let queue = [];
+    let playing = false;
+    let nextPlayTime = 0;
+    let src = null;
+    let responseText = "";
+
+    function getFormCfg() {
+      return {
+        apiKey: apiKeyEl.value.trim(),
+        voice: voiceEl.value.trim() || DEFAULT_VOICE,
+        model: modelEl.value.trim() || DEFAULT_MODEL,
+        instructions: instructionsEl.value.trim() || DEFAULT_PROMPT,
+      };
+    }
+
+    function setStatus(text, kind = "") {
+      statusEl.textContent = text;
+      statusEl.className = kind;
+    }
+
+    function showCheck(lines, ok) {
+      checkResultEl.textContent = lines.join("\n");
+      checkResultEl.className = "show" + (ok ? "" : "");
+      checkResultEl.style.borderColor = ok ? "#34a853" : "#ea4335";
+    }
+
+    function setUiConnected(on) {
+      active = on;
+      btnConnect.disabled = on;
+      btnCheck.disabled = on;
+      btnDisconnect.disabled = !on;
+      apiKeyEl.disabled = on;
+      voiceEl.disabled = on;
+      modelEl.disabled = on;
+      instructionsEl.disabled = on;
+    }
+
+    function b64(buf) {
+      const b = new Uint8Array(buf);
+      let s = "";
+      for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]);
+      return btoa(s);
+    }
+
+    async function loadServerConfig() {
+      try {
+        const res = await fetch("/api/config");
+        if (res.status === 401) {
+          setStatus("Not logged in — log in first", "err");
+          return null;
+        }
+        if (!res.ok) return null;
+        const cfg = await res.json();
+        if (cfg.apiKey) apiKeyEl.placeholder = "Loaded from server (••••••••)";
+        if (cfg.voice) voiceEl.value = cfg.voice;
+        if (cfg.model) modelEl.value = cfg.model;
+        if (cfg.instructions) instructionsEl.value = cfg.instructions;
+        return cfg;
+      } catch {
+        return null;
+      }
+    }
+
+    async function checkConnection() {
+      btnCheck.disabled = true;
+      setStatus("Checking…");
+      const lines = [];
+      let ok = true;
+
+      const serverCfg = await loadServerConfig();
+      const cfg = getFormCfg();
+      const apiKey = cfg.apiKey || serverCfg?.apiKey?.trim() || "";
+
+      lines.push(`API key: ${apiKey ? "present" : "MISSING"}`);
+      lines.push(`Voice: ${cfg.voice}`);
+      lines.push(`Model: ${cfg.model}`);
+      lines.push(`Instructions: ${cfg.instructions.slice(0, 60)}${cfg.instructions.length > 60 ? "…" : ""}`);
+
+      if (!apiKey) {
+        lines.push("\n✗ Set an API key in the form or at /config");
+        ok = false;
+        showCheck(lines, ok);
+        setStatus("Check failed — no API key", "err");
+        btnCheck.disabled = active;
+        return;
+      }
+
+      lines.push("\nTesting WebSocket…");
+      showCheck(lines, ok);
+
+      const wsProtocol = location.protocol === "https:" ? "wss:" : "ws:";
+      const socket = new WebSocket(`${wsProtocol}//${location.host}/ws`);
+
+      try {
+        await new Promise((resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error("Timeout (12s)")), 12000);
+
+          socket.onopen = () => {
+            socket.send(JSON.stringify({
+              type: "client.auth",
+              apiKey,
+              instructions: cfg.instructions,
+              voice: cfg.voice,
+              model: cfg.model,
+            }));
+          };
+
+          socket.onmessage = ({ data }) => {
+            const e = JSON.parse(data);
+            if (e.type === "client.error") {
+              clearTimeout(timer);
+              reject(new Error(e.message));
+              return;
+            }
+            if (e.type === "session.created" || e.type === "session.updated") {
+              clearTimeout(timer);
+              resolve(e.type);
+            }
+          };
+
+          socket.onerror = () => {
+            clearTimeout(timer);
+            reject(new Error("WebSocket error"));
+          };
+
+          socket.onclose = (ev) => {
+            if (ev.code === 4001) {
+              clearTimeout(timer);
+              reject(new Error("Login required — go to /login"));
+            }
+          };
+        });
+
+        lines.push("✓ WebSocket connected");
+        lines.push("✓ Inworld session ready");
+        setStatus("Check passed", "ok");
+      } catch (e) {
+        lines.push(`✗ ${e.message || e}`);
+        ok = false;
+        setStatus("Check failed", "err");
+      } finally {
+        try { socket.close(); } catch {}
+        showCheck(lines, ok);
+        btnCheck.disabled = active;
+      }
+    }
+
+    function openSessionWebSocket(cfg, apiKey) {
+      const wsProtocol = location.protocol === "https:" ? "wss:" : "ws:";
+      const socket = new WebSocket(`${wsProtocol}//${location.host}/ws`);
+      return new Promise((resolve, reject) => {
+        socket.onopen = () => {
+          socket.send(JSON.stringify({
+            type: "client.auth",
+            apiKey,
+            instructions: cfg.instructions,
+            voice: cfg.voice,
+            model: cfg.model,
+          }));
+          resolve(socket);
+        };
+        socket.onerror = () => reject(new Error("WebSocket failed"));
+        socket.onclose = (ev) => {
+          if (ev.code === 4001) reject(new Error("Login required"));
+          else if (!active) reject(new Error("WebSocket closed"));
+        };
+      });
+    }
+
+    function setupMicPipeline() {
+      if (ctx?.state === "suspended") ctx.resume().catch(() => {});
+      source = ctx.createMediaStreamSource(stream);
+      proc = ctx.createScriptProcessor(2048, 1, 1);
+      proc.onaudioprocess = ({ inputBuffer }) => {
+        if (ws?.readyState !== WebSocket.OPEN) return;
+        const f = inputBuffer.getChannelData(0);
+        const pcm = new Int16Array(f.length);
+        for (let i = 0; i < f.length; i++) pcm[i] = Math.max(-32768, Math.min(32767, f[i] * 32768));
+        ws.send(JSON.stringify({ type: "input_audio_buffer.append", audio: b64(pcm.buffer) }));
+      };
+      const silent = ctx.createGain();
+      silent.gain.value = 0;
+      source.connect(proc);
+      proc.connect(silent);
+      silent.connect(ctx.destination);
+    }
+
+    function stopAudio() {
+      queue.length = 0;
+      playing = false;
+      nextPlayTime = 0;
+      try { src?.stop(); } catch {}
+      src = null;
+    }
+
+    function playNext() {
+      if (!queue.length) {
+        playing = false;
+        return;
+      }
+      playing = true;
+      const pcm16 = new Int16Array(queue.shift());
+      const len = pcm16.length;
+      const f32 = new Float32Array(len);
+      for (let i = 0; i < len; i++) f32[i] = pcm16[i] / 32768;
+
+      const buf = ctx.createBuffer(1, len, 24000);
+      buf.getChannelData(0).set(f32);
+      src = ctx.createBufferSource();
+      src.buffer = buf;
+      const t = Math.max(ctx.currentTime, nextPlayTime);
+      src.connect(ctx.destination);
+      nextPlayTime = t + buf.duration;
+      src.onended = playNext;
+      src.start(t);
+    }
+
+    function handleWsMessage(data) {
+      const e = JSON.parse(data);
+
+      if (e.type === "client.error") {
+        setStatus(e.message, "err");
+        cleanup();
+        return;
+      }
+
+      if (e.type === "response.output_text.delta" || e.type === "response.output_audio_transcript.delta") {
+        responseText += e.delta || "";
+        agentTextEl.textContent = responseText || "—";
+      }
+
+      if (e.type === "response.output_text.done" || e.type === "response.output_audio_transcript.done") {
+        responseText = e.text || e.transcript || responseText;
+        agentTextEl.textContent = responseText || "—";
+      }
+
+      if (e.type === "response.output_audio.delta") {
+        setStatus("Live — speak anytime", "live");
+        const pcm16 = Uint8Array.from(atob(e.delta), (c) => c.charCodeAt(0));
+        queue.push(pcm16.buffer);
+        if (!playing) playNext();
+      }
+
+      if (e.type === "conversation.item.input_audio_transcription.completed" && e.transcript?.trim()) {
+        userTextEl.textContent = e.transcript.trim();
+      }
+
+      if (e.type === "input_audio_buffer.speech_started") {
+        responseText = "";
+        agentTextEl.textContent = "—";
+        stopAudio();
+      }
+
+      if (e.type === "session.updated" || e.type === "session.created") {
+        setStatus("Live — speak anytime", "live");
+      }
+    }
+
+    function releaseMic() {
+      try { proc?.disconnect(); } catch {}
+      try { source?.disconnect(); } catch {}
+      proc = null;
+      source = null;
+      try { stream?.getTracks().forEach((t) => t.stop()); } catch {}
+      stream = null;
+      try { if (ctx?.state !== "closed") ctx?.close(); } catch {}
+      ctx = null;
+    }
+
+    function cleanup() {
+      stopAudio();
+      try { ws?.close(); } catch {}
+      ws = null;
+      releaseMic();
+      setUiConnected(false);
+      if (!statusEl.classList.contains("err")) setStatus("Disconnected");
+      btnConnect.textContent = "Connect";
+    }
+
+    async function connect() {
+      if (active) return;
+
+      const serverCfg = await loadServerConfig().catch(() => null);
+      const cfg = getFormCfg();
+      const apiKey = cfg.apiKey || serverCfg?.apiKey?.trim() || "";
+      if (!apiKey) {
+        setStatus("No API key", "err");
+        return;
+      }
+
+      btnConnect.disabled = true;
+      btnConnect.textContent = "Connecting…";
+      setStatus("Connecting…");
+      userTextEl.textContent = "—";
+      agentTextEl.textContent = "—";
+      responseText = "";
+
+      try {
+        ctx = new AudioContext({ sampleRate: 24000 });
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: { sampleRate: 24000, channelCount: 1, echoCancellation: true, noiseSuppression: true },
+        });
+        ws = await openSessionWebSocket(cfg, apiKey);
+      } catch (e) {
+        const denied = e?.name === "NotAllowedError" || e?.name === "NotFoundError";
+        setStatus(denied ? "Microphone denied" : (e.message || "Connection failed"), "err");
+        cleanup();
+        return;
+      }
+
+      ws.onmessage = ({ data }) => {
+        try { handleWsMessage(data); } catch (err) { console.error(err); }
+      };
+      ws.onclose = () => cleanup();
+
+      setupMicPipeline();
+      setUiConnected(true);
+      btnConnect.textContent = "Connect";
+      setStatus("Live — speak anytime", "live");
+    }
+
+    btnCheck.addEventListener("click", checkConnection);
+    btnConnect.addEventListener("click", connect);
+    btnDisconnect.addEventListener("click", () => {
+      try { ws?.close(); } catch {}
+      cleanup();
+    });
+
+    voiceEl.value = DEFAULT_VOICE;
+    modelEl.value = DEFAULT_MODEL;
+    instructionsEl.value = DEFAULT_PROMPT;
+    loadServerConfig();
+  </script>
+</body>
+</html>

@@ -212,6 +212,8 @@ function rowToConversation(row) {
     turnCount: row.turn_count,
     hasUserAudio: Boolean(row.user_audio_path),
     userAudioUrl: row.user_audio_path ? `/api/conversations/${row.id}/user-audio` : null,
+    hasSessionAudio: Boolean(row.user_audio_path),
+    sessionAudioUrl: row.user_audio_path ? `/api/conversations/${row.id}/user-audio` : null,
   };
 }
 
@@ -219,16 +221,83 @@ function ensureSessionAudioDir() {
   if (!existsSync(SESSION_AUDIO_DIR)) mkdirSync(SESSION_AUDIO_DIR, { recursive: true });
 }
 
-function appendUserAudioFromMessage(userAudioChunks, msg) {
-  let parsed;
-  try {
-    parsed = JSON.parse(msg.toString());
-  } catch {
-    return;
-  }
-  if (parsed?.type !== 'input_audio_buffer.append' || !parsed.audio) return;
-  const buf = Buffer.from(parsed.audio, 'base64');
-  if (buf.length) userAudioChunks.push(buf);
+function createSessionAudioRecorder(sampleRate = USER_AUDIO_SAMPLE_RATE) {
+  const startedAt = Date.now();
+  const segments = [];
+  let userSampleCursor = 0;
+  let userBaseSample = null;
+  let currentAgentResponseId = null;
+  let agentResponseStartSample = 0;
+  let agentResponseSampleCursor = 0;
+
+  const wallClockSample = () => Math.round(((Date.now() - startedAt) / 1000) * sampleRate);
+
+  return {
+    appendUserPcm(buf) {
+      if (!buf?.length) return;
+      if (userBaseSample === null) userBaseSample = wallClockSample();
+      const start = userBaseSample + userSampleCursor;
+      segments.push({ start, pcm: buf });
+      userSampleCursor += buf.length / 2;
+    },
+
+    appendUserFromMessage(msg) {
+      let parsed;
+      try {
+        parsed = JSON.parse(msg.toString());
+      } catch {
+        return;
+      }
+      if (parsed?.type !== 'input_audio_buffer.append' || !parsed.audio) return;
+      this.appendUserPcm(Buffer.from(parsed.audio, 'base64'));
+    },
+
+    appendAgentDelta(parsed) {
+      if (!parsed?.delta) return;
+      const buf = Buffer.from(parsed.delta, 'base64');
+      if (!buf.length) return;
+
+      const responseId = parsed.response_id || parsed.item_id || '__default__';
+      if (responseId !== currentAgentResponseId) {
+        currentAgentResponseId = responseId;
+        agentResponseStartSample = wallClockSample();
+        agentResponseSampleCursor = 0;
+      }
+
+      const start = agentResponseStartSample + agentResponseSampleCursor;
+      segments.push({ start, pcm: buf });
+      agentResponseSampleCursor += buf.length / 2;
+    },
+
+    buildPcmBuffer() {
+      if (!segments.length) return null;
+
+      let maxEnd = 0;
+      for (const { start, pcm } of segments) {
+        maxEnd = Math.max(maxEnd, start + (pcm.length / 2));
+      }
+      if (maxEnd <= 0) return null;
+
+      const mix = new Float32Array(maxEnd);
+      for (const { start, pcm } of segments) {
+        const view = new Int16Array(pcm.buffer, pcm.byteOffset, pcm.length / 2);
+        for (let i = 0; i < view.length; i++) {
+          mix[start + i] += view[i] / 32768;
+        }
+      }
+
+      const out = Buffer.alloc(maxEnd * 2);
+      for (let i = 0; i < maxEnd; i++) {
+        const sample = Math.max(-1, Math.min(1, mix[i]));
+        out.writeInt16LE(Math.round(sample * 32767), i * 2);
+      }
+      return out;
+    },
+
+    hasAudio() {
+      return segments.length > 0;
+    },
+  };
 }
 
 function buildWavBuffer(pcmChunks, sampleRate = USER_AUDIO_SAMPLE_RATE) {
@@ -251,13 +320,15 @@ function buildWavBuffer(pcmChunks, sampleRate = USER_AUDIO_SAMPLE_RATE) {
   return Buffer.concat([header, pcm]);
 }
 
-function saveUserSessionAudio(conversationId, pcmChunks) {
-  if (!pcmChunks.length) return null;
+function saveSessionMixAudio(conversationId, recorder) {
+  if (!recorder?.hasAudio()) return null;
+  const pcm = recorder.buildPcmBuffer();
+  if (!pcm?.length) return null;
   ensureSessionAudioDir();
   const filename = `${conversationId}.wav`;
   const filePath = join(SESSION_AUDIO_DIR, filename);
   try {
-    writeFileSync(filePath, buildWavBuffer(pcmChunks));
+    writeFileSync(filePath, buildWavBuffer([pcm]));
     setConversationUserAudioPathStmt.run(filename, conversationId);
     return filename;
   } catch (e) {
@@ -2767,6 +2838,7 @@ const pages = {
   '/map/': 'map/index.html',
   '/vocab-game': 'vocab-game/index.html',
   '/vocab-game/': 'vocab-game/index.html',
+  '/session-simple': 'session-simple.html',
 };
 
 function resolvePage(url) {
@@ -3166,7 +3238,7 @@ const server = createServer((req, res) => {
     const conversationId = userAudioMatch[1];
     const row = getConversationStmt.get(conversationId);
     if (!row?.user_audio_path) {
-      sendJson(res, 404, { error: 'User audio not found for this session.' });
+      sendJson(res, 404, { error: 'Session audio not found for this conversation.' });
       return;
     }
     const filePath = join(SESSION_AUDIO_DIR, row.user_audio_path);
@@ -3679,7 +3751,7 @@ const GREET = JSON.stringify({
 function connectToInworld(apiKey, browser, session, userInfo = {}) {
   let setup = 0;
   let conversationFinished = false;
-  const userAudioChunks = [];
+  const sessionAudio = createSessionAudioRecorder();
   const conversationId = createConversationRecord(
     userInfo.username || 'unknown',
     userInfo.role || 'unknown',
@@ -3694,8 +3766,8 @@ function connectToInworld(apiKey, browser, session, userInfo = {}) {
   const finishConversation = () => {
     if (conversationFinished) return;
     conversationFinished = true;
-    const savedAudio = saveUserSessionAudio(conversationId, userAudioChunks);
-    if (savedAudio) console.log(`[session-audio] saved ${savedAudio}`);
+    const savedAudio = saveSessionMixAudio(conversationId, sessionAudio);
+    if (savedAudio) console.log(`[session-audio] saved mixed ${savedAudio}`);
     endConversationRecord(conversationId);
     queueProfileSyncFromConversation({
       username: userInfo.username,
@@ -3735,7 +3807,12 @@ function connectToInworld(apiKey, browser, session, userInfo = {}) {
   api.on('message', (raw) => {
     let parsed;
     try { parsed = JSON.parse(raw.toString()); } catch { parsed = null; }
-    if (parsed) recordInworldMessage(parsed);
+    if (parsed) {
+      recordInworldMessage(parsed);
+      if (parsed.type === 'response.output_audio.delta') {
+        sessionAudio.appendAgentDelta(parsed);
+      }
+    }
     const t = parsed?.type;
     if (setup < 2) {
       if (t === 'session.created') {
@@ -3760,7 +3837,7 @@ function connectToInworld(apiKey, browser, session, userInfo = {}) {
   });
 
   browser.on('message', (msg) => {
-    appendUserAudioFromMessage(userAudioChunks, msg);
+    sessionAudio.appendUserFromMessage(msg);
     if (api.readyState === WebSocket.OPEN) api.send(msg.toString());
   });
 
