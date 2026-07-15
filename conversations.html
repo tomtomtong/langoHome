@@ -246,30 +246,11 @@
       line-height: 1.5;
       font-size: 0.875rem;
     }
-    .session-recording {
-      margin-bottom: 1rem;
-      padding: 0.875rem 1rem;
-      background: #12151c;
-      border: 1px solid #2a2f3a;
-      border-radius: 10px;
-    }
-    .session-recording h3 {
-      margin: 0 0 0.65rem;
-      font-size: 0.875rem;
-      color: #c4c7c5;
-    }
-    .session-recording audio {
+    .turn-audio {
+      margin-top: 0.6rem;
       width: 100%;
-      height: 40px;
-    }
-    .session-recording .recording-missing {
-      margin: 0;
-      font-size: 0.8125rem;
-      color: #9aa0a6;
-    }
-    .badge.recording {
-      background: #1f3b2d;
-      color: #81c995;
+      max-width: 360px;
+      height: 32px;
     }
     .pager {
       display: flex;
@@ -293,7 +274,7 @@
 <body>
   <div class="page">
     <h1>Conversations &amp; Profile Summaries</h1>
-    <p class="lead">Review voice session transcripts, listen to full session recordings, and inspect automatic profile-summary runs after each student session.</p>
+    <p class="lead">Review voice session transcripts, play back each user speech turn, and inspect automatic profile-summary runs after student sessions.</p>
 
     <div class="toolbar">
       <div class="field">
@@ -317,11 +298,10 @@
                   <th>Account</th>
                   <th>Duration</th>
                   <th>Turns</th>
-                  <th>Audio</th>
                 </tr>
               </thead>
               <tbody id="sessions-body">
-                <tr><td colspan="5" class="empty">Loading…</td></tr>
+                <tr><td colspan="4" class="empty">Loading…</td></tr>
               </tbody>
             </table>
           </div>
@@ -366,11 +346,6 @@
           <div class="detail-meta" id="detail-meta"></div>
           <button type="button" class="danger" id="delete-btn">Delete session</button>
         </div>
-        <div class="session-recording" id="session-recording">
-          <h3>Session recording</h3>
-          <audio id="session-audio" controls preload="metadata" hidden></audio>
-          <p class="recording-missing" id="recording-missing" hidden>No audio was captured for this session.</p>
-        </div>
         <div class="turns" id="turns"></div>
       </div>
 
@@ -399,8 +374,6 @@
     const profileDetailMeta = document.getElementById('profile-detail-meta');
     const profileDetailBody = document.getElementById('profile-detail-body');
     const turnsEl = document.getElementById('turns');
-    const sessionAudio = document.getElementById('session-audio');
-    const recordingMissing = document.getElementById('recording-missing');
     const pager = document.getElementById('pager');
     const profilePager = document.getElementById('profile-pager');
     const pagerLabel = document.getElementById('pager-label');
@@ -506,7 +479,7 @@
 
     function renderSessions(sessions) {
       if (!sessions.length) {
-        sessionsBody.innerHTML = '<tr><td colspan="5" class="empty">No conversations recorded yet.</td></tr>';
+        sessionsBody.innerHTML = '<tr><td colspan="4" class="empty">No conversations recorded yet.</td></tr>';
         return;
       }
 
@@ -516,7 +489,6 @@
           <td>${session.username}</td>
           <td>${formatDuration(session.startedAt, session.endedAt)}</td>
           <td>${session.turnCount || 0}</td>
-          <td>${session.hasRecording ? '<span class="badge recording">Yes</span>' : '—'}</td>
         </tr>
       `).join('');
 
@@ -647,17 +619,6 @@
         <div>Turns: ${data.turnCount || 0}</div>
       `;
 
-      if (data.hasRecording) {
-        sessionAudio.hidden = false;
-        recordingMissing.hidden = true;
-        sessionAudio.src = `/api/conversations/${encodeURIComponent(id)}/recording`;
-        sessionAudio.load();
-      } else {
-        sessionAudio.hidden = true;
-        sessionAudio.removeAttribute('src');
-        recordingMissing.hidden = false;
-      }
-
       if (!data.turns?.length) {
         turnsEl.innerHTML = '<div class="empty">No transcript turns captured for this session.</div>';
       } else {
@@ -668,6 +629,7 @@
               <time>${formatDate(turn.createdAt)}</time>
             </div>
             <p class="turn-text"></p>
+            ${turn.role === 'user' && turn.audioUrl ? `<audio class="turn-audio" controls preload="none" src="${turn.audioUrl}"></audio>` : ''}
           </article>
         `).join('');
         turnsEl.querySelectorAll('.turn').forEach((node, index) => {
