@@ -19,7 +19,7 @@
       padding: 2rem 1rem;
     }
     main {
-      width: min(100%, 420px);
+      width: min(100%, 640px);
     }
     h1 {
       margin: 0 0 0.25rem;
@@ -138,6 +138,44 @@
       display: none;
     }
     #playback.show { display: block; }
+    #debug-log {
+      margin: 0;
+      padding: 0.75rem;
+      max-height: 280px;
+      overflow: auto;
+      background: #1e1e1e;
+      color: #d4d4d4;
+      border-radius: 6px;
+      border: 1px solid #333;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.72rem;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .log-line { margin-bottom: 0.35rem; }
+    .log-line .t { color: #888; }
+    .log-line.in .k { color: #4fc3f7; }
+    .log-line.out .k { color: #81c784; }
+    .log-line.sys .k { color: #ffb74d; }
+    .log-line.err .k { color: #ef5350; }
+    .log-line.warn .k { color: #ffca28; }
+    .debug-opts {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 0.6rem;
+      font-size: 0.8rem;
+      color: #555;
+    }
+    .debug-opts label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      margin: 0;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -174,6 +212,18 @@
     </div>
 
     <section class="section">
+      <h2>Debug log</h2>
+      <div class="debug-opts">
+        <label><input type="checkbox" id="debug-verbose" checked> Full JSON</label>
+        <label><input type="checkbox" id="debug-audio"> Log audio chunks</label>
+        <label><input type="checkbox" id="debug-autoscroll" checked> Auto-scroll</label>
+        <button type="button" id="btn-clear-log">Clear</button>
+        <button type="button" id="btn-copy-log">Copy</button>
+      </div>
+      <pre id="debug-log"></pre>
+    </section>
+
+    <section class="section">
       <h2>Audio recorder</h2>
       <p class="sub" style="margin-bottom: 0.75rem;">Record from mic, then play back.</p>
       <div class="row">
@@ -204,6 +254,79 @@
     const btnCheck = $("btn-check");
     const btnConnect = $("btn-connect");
     const btnDisconnect = $("btn-disconnect");
+    const debugLogEl = $("debug-log");
+    const debugVerboseEl = $("debug-verbose");
+    const debugAudioEl = $("debug-audio");
+    const debugAutoscrollEl = $("debug-autoscroll");
+    const btnClearLog = $("btn-clear-log");
+    const btnCopyLog = $("btn-copy-log");
+
+    const LOG_MAX = 400;
+    const logLines = [];
+    let micChunkCount = 0;
+    let audioDeltaCount = 0;
+
+    function ts() {
+      const d = new Date();
+      return d.toLocaleTimeString("en-GB", { hour12: false }) + "." + String(d.getMilliseconds()).padStart(3, "0");
+    }
+
+    function redactAuth(obj) {
+      if (!obj || typeof obj !== "object") return obj;
+      const copy = { ...obj };
+      if (copy.apiKey) copy.apiKey = `[redacted ${copy.apiKey.length} chars]`;
+      if (copy.audio) copy.audio = `[b64 ${copy.audio.length} chars]`;
+      if (copy.delta && copy.type?.includes("audio")) copy.delta = `[b64 ${copy.delta.length} chars]`;
+      if (copy.delta && copy.type?.includes("text")) copy.delta = copy.delta.length > 120 ? copy.delta.slice(0, 120) + "…" : copy.delta;
+      return copy;
+    }
+
+    function formatDetail(detail) {
+      if (detail == null) return "";
+      if (typeof detail === "string") return detail;
+      try {
+        return JSON.stringify(redactAuth(detail), null, debugVerboseEl.checked ? 2 : 0);
+      } catch {
+        return String(detail);
+      }
+    }
+
+    function uiLog(kind, message, detail = null) {
+      const line = { t: ts(), kind, message, detail };
+      logLines.push(line);
+      if (logLines.length > LOG_MAX) logLines.shift();
+
+      const el = document.createElement("div");
+      el.className = `log-line ${kind}`;
+      const detailText = detail != null ? "\n" + formatDetail(detail) : "";
+      el.textContent = `[${line.t}] [${kind.toUpperCase()}] ${message}${detailText}`;
+      debugLogEl.appendChild(el);
+      while (debugLogEl.childNodes.length > LOG_MAX) {
+        debugLogEl.removeChild(debugLogEl.firstChild);
+      }
+      if (debugAutoscrollEl.checked) {
+        debugLogEl.scrollTop = debugLogEl.scrollHeight;
+      }
+      console.log(`[session-simple] [${kind}]`, message, detail ?? "");
+    }
+
+    btnClearLog.addEventListener("click", () => {
+      logLines.length = 0;
+      debugLogEl.textContent = "";
+      micChunkCount = 0;
+      audioDeltaCount = 0;
+      uiLog("sys", "Log cleared");
+    });
+
+    btnCopyLog.addEventListener("click", async () => {
+      const text = [...debugLogEl.childNodes].map((n) => n.textContent).join("\n");
+      try {
+        await navigator.clipboard.writeText(text);
+        uiLog("sys", "Log copied to clipboard");
+      } catch {
+        uiLog("err", "Could not copy log");
+      }
+    });
 
     let ws = null;
     let ctx = null;
@@ -256,20 +379,33 @@
     }
 
     async function loadServerConfig() {
+      uiLog("sys", "GET /api/config");
       try {
         const res = await fetch("/api/config");
+        uiLog("sys", `/api/config → ${res.status}`);
         if (res.status === 401) {
           setStatus("Not logged in — log in first", "err");
+          uiLog("err", "Not logged in");
           return null;
         }
-        if (!res.ok) return null;
+        if (!res.ok) {
+          uiLog("err", "Config fetch failed", { status: res.status });
+          return null;
+        }
         const cfg = await res.json();
         if (cfg.apiKey) apiKeyEl.placeholder = "Loaded from server (••••••••)";
         if (cfg.voice) voiceEl.value = cfg.voice;
         if (cfg.model) modelEl.value = cfg.model;
         if (cfg.instructions) instructionsEl.value = cfg.instructions;
+        uiLog("sys", "Config loaded", {
+          hasApiKey: Boolean(cfg.apiKey),
+          voice: cfg.voice,
+          model: cfg.model,
+          instructionsLen: (cfg.instructions || "").length,
+        });
         return cfg;
-      } catch {
+      } catch (e) {
+        uiLog("err", "Config fetch error", { message: e?.message });
         return null;
       }
     }
@@ -277,6 +413,7 @@
     async function checkConnection() {
       btnCheck.disabled = true;
       setStatus("Checking…");
+      uiLog("sys", "Check started");
       const lines = [];
       let ok = true;
 
@@ -294,6 +431,7 @@
         ok = false;
         showCheck(lines, ok);
         setStatus("Check failed — no API key", "err");
+        uiLog("err", "Check failed — no API key");
         btnCheck.disabled = active;
         return;
       }
@@ -302,24 +440,30 @@
       showCheck(lines, ok);
 
       const wsProtocol = location.protocol === "https:" ? "wss:" : "ws:";
-      const socket = new WebSocket(`${wsProtocol}//${location.host}/ws`);
+      const wsUrl = `${wsProtocol}//${location.host}/ws`;
+      uiLog("sys", "Opening check WebSocket", { url: wsUrl });
+      const socket = new WebSocket(wsUrl);
 
       try {
         await new Promise((resolve, reject) => {
           const timer = setTimeout(() => reject(new Error("Timeout (12s)")), 12000);
 
           socket.onopen = () => {
-            socket.send(JSON.stringify({
+            uiLog("sys", "Check WS open");
+            const auth = {
               type: "client.auth",
               apiKey,
               instructions: cfg.instructions,
               voice: cfg.voice,
               model: cfg.model,
-            }));
+            };
+            uiLog("out", "client.auth", auth);
+            socket.send(JSON.stringify(auth));
           };
 
           socket.onmessage = ({ data }) => {
             const e = JSON.parse(data);
+            uiLog("in", e.type || "message", e);
             if (e.type === "client.error") {
               clearTimeout(timer);
               reject(new Error(e.message));
@@ -333,10 +477,12 @@
 
           socket.onerror = () => {
             clearTimeout(timer);
+            uiLog("err", "Check WS error");
             reject(new Error("WebSocket error"));
           };
 
           socket.onclose = (ev) => {
+            uiLog("sys", "Check WS closed", { code: ev.code, reason: ev.reason, wasClean: ev.wasClean });
             if (ev.code === 4001) {
               clearTimeout(timer);
               reject(new Error("Login required — go to /login"));
@@ -347,10 +493,12 @@
         lines.push("✓ WebSocket connected");
         lines.push("✓ Inworld session ready");
         setStatus("Check passed", "ok");
+        uiLog("sys", "Check passed");
       } catch (e) {
         lines.push(`✗ ${e.message || e}`);
         ok = false;
         setStatus("Check failed", "err");
+        uiLog("err", "Check failed", { message: e?.message || String(e) });
       } finally {
         try { socket.close(); } catch {}
         showCheck(lines, ok);
@@ -360,20 +508,29 @@
 
     function openSessionWebSocket(cfg, apiKey) {
       const wsProtocol = location.protocol === "https:" ? "wss:" : "ws:";
-      const socket = new WebSocket(`${wsProtocol}//${location.host}/ws`);
+      const wsUrl = `${wsProtocol}//${location.host}/ws`;
+      uiLog("sys", "Opening session WebSocket", { url: wsUrl });
+      const socket = new WebSocket(wsUrl);
       return new Promise((resolve, reject) => {
         socket.onopen = () => {
-          socket.send(JSON.stringify({
+          uiLog("sys", "Session WS open");
+          const auth = {
             type: "client.auth",
             apiKey,
             instructions: cfg.instructions,
             voice: cfg.voice,
             model: cfg.model,
-          }));
+          };
+          uiLog("out", "client.auth", auth);
+          socket.send(JSON.stringify(auth));
           resolve(socket);
         };
-        socket.onerror = () => reject(new Error("WebSocket failed"));
+        socket.onerror = () => {
+          uiLog("err", "Session WS error");
+          reject(new Error("WebSocket failed"));
+        };
         socket.onclose = (ev) => {
+          uiLog("sys", "Session WS closed (during connect)", { code: ev.code, reason: ev.reason });
           if (ev.code === 4001) reject(new Error("Login required"));
           else if (!active) reject(new Error("WebSocket closed"));
         };
@@ -382,6 +539,8 @@
 
     function setupMicPipeline() {
       if (ctx?.state === "suspended") ctx.resume().catch(() => {});
+      uiLog("sys", "Mic pipeline started", { sampleRate: ctx.sampleRate, state: ctx.state });
+      micChunkCount = 0;
       source = ctx.createMediaStreamSource(stream);
       proc = ctx.createScriptProcessor(2048, 1, 1);
       proc.onaudioprocess = ({ inputBuffer }) => {
@@ -390,6 +549,10 @@
         const pcm = new Int16Array(f.length);
         for (let i = 0; i < f.length; i++) pcm[i] = Math.max(-32768, Math.min(32767, f[i] * 32768));
         ws.send(JSON.stringify({ type: "input_audio_buffer.append", audio: b64(pcm.buffer) }));
+        micChunkCount++;
+        if (debugAudioEl.checked && (micChunkCount === 1 || micChunkCount % 25 === 0)) {
+          uiLog("out", `input_audio_buffer.append #${micChunkCount}`, { samples: pcm.length });
+        }
       };
       const silent = ctx.createGain();
       silent.gain.value = 0;
@@ -428,8 +591,32 @@
       src.start(t);
     }
 
+    function logWsEvent(e) {
+      if (e.type === "response.output_audio.delta") {
+        audioDeltaCount++;
+        if (!debugAudioEl.checked) {
+          if (audioDeltaCount === 1 || audioDeltaCount % 50 === 0) {
+            uiLog("in", `response.output_audio.delta ×${audioDeltaCount}`, {
+              response_id: e.response_id,
+              lastBytes: e.delta?.length,
+            });
+          }
+          return;
+        }
+      }
+      uiLog("in", e.type || "message", e);
+    }
+
     function handleWsMessage(data) {
-      const e = JSON.parse(data);
+      let e;
+      try {
+        e = JSON.parse(data);
+      } catch (err) {
+        uiLog("err", "Invalid WS JSON", { raw: String(data).slice(0, 200) });
+        return;
+      }
+
+      logWsEvent(e);
 
       if (e.type === "client.error") {
         setStatus(e.message, "err");
@@ -481,11 +668,16 @@
     }
 
     function cleanup() {
+      const wasLive = active || ws || stream;
+      if (!wasLive) return;
+      uiLog("sys", "Cleanup", { micChunksSent: micChunkCount, audioDeltasReceived: audioDeltaCount });
       stopAudio();
       try { ws?.close(); } catch {}
       ws = null;
       releaseMic();
       setUiConnected(false);
+      micChunkCount = 0;
+      audioDeltaCount = 0;
       if (!statusEl.classList.contains("err")) setStatus("Disconnected");
       btnConnect.textContent = "Connect";
     }
@@ -493,11 +685,13 @@
     async function connect() {
       if (active) return;
 
+      uiLog("sys", "Connect started");
       const serverCfg = await loadServerConfig().catch(() => null);
       const cfg = getFormCfg();
       const apiKey = cfg.apiKey || serverCfg?.apiKey?.trim() || "";
       if (!apiKey) {
         setStatus("No API key", "err");
+        uiLog("err", "Connect aborted — no API key");
         return;
       }
 
@@ -507,34 +701,50 @@
       userTextEl.textContent = "—";
       agentTextEl.textContent = "—";
       responseText = "";
+      audioDeltaCount = 0;
+      micChunkCount = 0;
 
       try {
+        uiLog("sys", "Requesting getUserMedia");
         ctx = new AudioContext({ sampleRate: 24000 });
         stream = await navigator.mediaDevices.getUserMedia({
           audio: { sampleRate: 24000, channelCount: 1, echoCancellation: true, noiseSuppression: true },
+        });
+        uiLog("sys", "getUserMedia OK", {
+          tracks: stream.getAudioTracks().map((t) => ({ label: t.label, readyState: t.readyState })),
         });
         ws = await openSessionWebSocket(cfg, apiKey);
       } catch (e) {
         const denied = e?.name === "NotAllowedError" || e?.name === "NotFoundError";
         setStatus(denied ? "Microphone denied" : (e.message || "Connection failed"), "err");
+        uiLog("err", "Connect failed", { name: e?.name, message: e?.message });
         cleanup();
         return;
       }
 
       ws.onmessage = ({ data }) => {
-        try { handleWsMessage(data); } catch (err) { console.error(err); }
+        try { handleWsMessage(data); } catch (err) {
+          uiLog("err", "handleWsMessage threw", { message: err?.message });
+          console.error(err);
+        }
       };
-      ws.onclose = () => cleanup();
+      ws.onclose = (ev) => {
+        uiLog("sys", "Session WS closed", { code: ev.code, reason: ev.reason, wasClean: ev.wasClean });
+        cleanup();
+      };
+      ws.onerror = () => uiLog("err", "Session WS error (live)");
 
       setupMicPipeline();
       setUiConnected(true);
       btnConnect.textContent = "Connect";
       setStatus("Live — speak anytime", "live");
+      uiLog("sys", "Session live");
     }
 
     btnCheck.addEventListener("click", checkConnection);
     btnConnect.addEventListener("click", connect);
     btnDisconnect.addEventListener("click", () => {
+      uiLog("sys", "Disconnect clicked");
       try { ws?.close(); } catch {}
       cleanup();
     });
@@ -634,6 +844,7 @@
     voiceEl.value = DEFAULT_VOICE;
     modelEl.value = DEFAULT_MODEL;
     instructionsEl.value = DEFAULT_PROMPT;
+    uiLog("sys", "Page ready", { host: location.host, protocol: location.protocol });
     loadServerConfig();
   </script>
 </body>
