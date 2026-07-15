@@ -25,11 +25,11 @@
       });
     };
     const locations = [
-      { id: "home", label: "Home", image: "location-top-left.png", unlocked: true },
-      { id: "school", label: "School", image: "location-top-right.png" },
-      { id: "mall", label: "Shopping Mall", image: "location-center.png" },
-      { id: "park", label: "Park", image: "location-bottom-left.png" },
-      { id: "beach", label: "Beach", image: "location-bottom-right.png" }
+      { id: "home", label: "Home", image: "location-home.png", unlocked: true },
+      { id: "school", label: "School", image: "location-school.png" },
+      { id: "mall", label: "Shopping Mall", image: "location-shopping-mall.png" },
+      { id: "park", label: "Park", image: "location-park.png" },
+      { id: "beach", label: "Beach", image: "location-beach.png" }
     ];
     const loadUnlocked = () => {
       try {
@@ -108,7 +108,7 @@
           "section",
           { className: "map-scene", "data-node-id": "799:32", "aria-label": "Lango location map" },
           e("img", { className: "map-background", src: "/assets/map/background.png", alt: "", draggable: false }),
-          e("img", { className: "map-frame", src: "/assets/map/map-overlay.png", alt: "", draggable: false }),
+          e("div", { className: "map-frame", "aria-hidden": true }),
           e("img", { className: "map-title", src: "/assets/map/side-panel.png", alt: "Map", draggable: false }),
           e(
             "button",

@@ -523,8 +523,9 @@ function recordGamePlay(username, { gameId, score, details } = {}) {
     detailsJson,
   );
   const play = rowToGamePlay(getGamePlayStmt.get(result.lastInsertRowid));
+  const checkIn = recordCheckIn(username);
   console.log(`[game-play] ${username} ${normalizedGameId} score=${safeScore} date=${playDate}`);
-  return { ok: true, play };
+  return { ok: true, play, checkIn };
 }
 
 function listGamePlays({
@@ -1053,7 +1054,17 @@ function queueProfileSyncFromConversation({ username, role, apiKey, conversation
 }
 
 const REWARD_CYCLE_DAYS = 7;
-const LANGOMON_DOLL_IDS = Array.from({ length: 6 }, (_, index) => `doll-${index + 1}`);
+const LANGOMON_DOLLS = ['bird', 'cat', 'dog', 'mouse', 'penguin', 'rabbit']
+  .flatMap((animal) => Array.from({ length: 5 }, (_, index) => {
+    const variant = index + 1;
+    return {
+      id: `${animal}-${variant}`,
+      name: `${animal[0].toUpperCase()}${animal.slice(1)} Doll ${variant}`,
+      asset: `/assets/collections/unlocked-${animal}-${variant}.png`,
+    };
+  }));
+const LANGOMON_DOLL_IDS = LANGOMON_DOLLS.map((doll) => doll.id);
+const LANGOMON_DOLL_ID_SET = new Set(LANGOMON_DOLL_IDS);
 const REWARD_CYCLE = [
   { day: 1, type: 'checkin', label: 'Check in', icon: 'calendar', stars: 5 },
   { day: 2, type: 'game', label: 'Game', icon: 'game', stars: 8 },
@@ -1095,11 +1106,11 @@ const DAILY_REWARD_MILESTONES = [
     type: 'spot',
     label: 'New Spot',
     title: 'New Spot',
-    name: 'Park',
+    name: 'School',
     icon: 'spot',
     cta: 'Explore map',
     destination: 'map',
-    unlockLocation: 'park',
+    unlockLocation: 'school',
     stars: 15,
   },
   {
@@ -1163,10 +1174,10 @@ function normalizeCheckInRecord(raw) {
       ? [...new Set(src.claimedMilestones.map(String))]
       : [],
     collection: Array.isArray(src.collection)
-      ? [...new Set(src.collection.map(String))]
+      ? [...new Set(src.collection.map(String))].filter((id) => LANGOMON_DOLL_ID_SET.has(id))
       : [],
     unlockedLocations: Array.isArray(src.unlockedLocations)
-      ? [...new Set(src.unlockedLocations.map(String))]
+      ? [...new Set(src.unlockedLocations.map(String).map((id) => id === 'park' ? 'school' : id))]
       : [],
   };
 }
@@ -1231,9 +1242,13 @@ function buildCheckInSlots(record, checkedInToday) {
 function getCheckInStatus(username) {
   const timezone = getVideoPairsTimezone();
   const today = getTodayDateString(timezone);
+  const yesterday = offsetDateString(today, -1, timezone);
   const record = getCheckInRecord(username);
   const checkedInToday = record.lastCheckInDate === today;
   const canCheckIn = !checkedInToday;
+  const currentStreak = checkedInToday || record.lastCheckInDate === yesterday
+    ? record.currentStreak
+    : 0;
   const nextRewardDay = checkedInToday
     ? (record.cyclePosition % REWARD_CYCLE_DAYS) + 1
     : (record.totalCheckIns % REWARD_CYCLE_DAYS) + 1;
@@ -1246,12 +1261,12 @@ function getCheckInStatus(username) {
     ...reward,
     status: claimedMilestones.includes(reward.id)
       ? 'claimed'
-      : reward.id === nextMilestone?.id ? 'active' : 'locked',
+      : checkedInToday && reward.id === nextMilestone?.id ? 'active' : 'locked',
   }));
   return {
     timezone,
     today,
-    currentStreak: record.currentStreak,
+    currentStreak,
     totalCheckIns: record.totalCheckIns,
     totalStars: record.totalStars,
     checkedInToday,
@@ -1260,12 +1275,12 @@ function getCheckInStatus(username) {
     cyclePosition: record.cyclePosition || nextRewardDay,
     slots: buildCheckInSlots(record, checkedInToday),
     rewards: REWARD_CYCLE,
-    taskProgress: { current: 1, target: 1, complete: true },
+    taskProgress: { current: checkedInToday ? 1 : 0, target: 1, complete: checkedInToday },
     taskText: 'Finish a game or daily exercise to check-in now!',
     milestones,
     claimedMilestones,
     nextMilestone: nextMilestone || null,
-    canClaimMilestone: Boolean(nextMilestone),
+    canClaimMilestone: checkedInToday && Boolean(nextMilestone),
     collection: record.collection,
     unlockedLocations: record.unlockedLocations,
   };
@@ -1274,8 +1289,15 @@ function getCheckInStatus(username) {
 function claimDailyMilestone(username) {
   const timezone = getVideoPairsTimezone();
   const today = getTodayDateString(timezone);
-  const yesterday = offsetDateString(today, -1, timezone);
   const record = getCheckInRecord(username);
+  if (record.lastCheckInDate !== today) {
+    return {
+      ok: false,
+      error: 'Finish one game to check in before claiming a reward.',
+      reward: null,
+      status: getCheckInStatus(username),
+    };
+  }
   const claimedMilestones = record.rewardFlowDate === today ? [...record.claimedMilestones] : [];
   const reward = DAILY_REWARD_MILESTONES.find((item) => !claimedMilestones.includes(item.id));
 
@@ -1291,12 +1313,12 @@ function claimDailyMilestone(username) {
       ? lockedDolls[Math.floor(Math.random() * lockedDolls.length)]
       : null;
     if (collectionItemId) collection = [...record.collection, collectionItemId];
-    const dollNumber = collectionItemId ? Number(collectionItemId.split('-')[1]) : null;
+    const doll = LANGOMON_DOLLS.find((item) => item.id === collectionItemId);
     claimedReward = {
       ...reward,
       collectionItemId,
-      collectionAsset: collectionItemId ? `/assets/collections/unlocked-${dollNumber}.png` : '',
-      name: collectionItemId ? `Langomon Doll ${dollNumber}` : 'Langomon Collection Complete',
+      collectionAsset: doll?.asset || '',
+      name: doll?.name || 'Langomon Collection Complete',
       collectionComplete: !collectionItemId,
     };
   }
@@ -1308,13 +1330,6 @@ function claimDailyMilestone(username) {
     totalStars: record.totalStars + reward.stars,
     collection,
   };
-
-  if (record.lastCheckInDate !== today) {
-    updated.currentStreak = record.lastCheckInDate === yesterday ? record.currentStreak + 1 : 1;
-    updated.totalCheckIns = record.totalCheckIns + 1;
-    updated.lastCheckInDate = today;
-    updated.cyclePosition = 1;
-  }
 
   if (reward.unlockLocation && !updated.unlockedLocations.includes(reward.unlockLocation)) {
     updated.unlockedLocations = [...updated.unlockedLocations, reward.unlockLocation];
@@ -1342,6 +1357,7 @@ function recordCheckIn(username) {
   const nextCycleDay = (record.totalCheckIns % REWARD_CYCLE_DAYS) + 1;
   const reward = getRewardForCycleDay(nextCycleDay);
   const updated = {
+    ...record,
     currentStreak: newStreak,
     totalCheckIns: record.totalCheckIns + 1,
     totalStars: record.totalStars + reward.stars,

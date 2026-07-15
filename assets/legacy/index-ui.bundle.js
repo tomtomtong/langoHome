@@ -465,7 +465,7 @@
           label: "Play Word Chop vocab game",
           onClick: () => go("game", "/vocab-game/index.html")
         }),
-        e("img", { className: "lango-home__frame", src: asset("character"), alt: "", draggable: false })
+        e("div", { className: "lango-home__frame", "aria-hidden": true })
       );
     }
     ReactDOM.createRoot(document.getElementById("lango-home-root")).render(e(LangoHome));

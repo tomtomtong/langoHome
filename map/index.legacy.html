@@ -44,8 +44,8 @@
 
     .map-scene {
       position: relative;
-      width: min(100vw, calc(100vh * 1366 / 954));
-      height: min(100vh, calc(100vw * 954 / 1366));
+      width: min(100vw, calc(100vh * 4 / 3));
+      height: min(100vh, calc(100vw * 3 / 4));
       overflow: hidden;
       isolation: isolate;
       background: #74bdf1;
@@ -69,12 +69,12 @@
 
     .map-frame {
       z-index: 30;
-      top: 50%;
-      left: 50%;
-      width: 79%;
-      height: 158%;
-      object-fit: fill;
-      transform: translate(-50%, -50%) rotate(90deg);
+      inset: 0;
+      background:
+        url('/assets/lango-home/upside.png') left top / 100% 8.28% no-repeat,
+        url('/assets/lango-home/downside.png') left bottom / 100% 8.28% no-repeat,
+        url('/assets/lango-home/leftside.png') left top / 4.83% 100% no-repeat,
+        url('/assets/lango-home/rightside.png') right top / 4.83% 100% no-repeat;
     }
 
     .map-title {

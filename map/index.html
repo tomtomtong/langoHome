@@ -42,8 +42,8 @@
 
     .map-scene {
       position: relative;
-      width: min(100vw, calc(100vh * 1366 / 954));
-      height: min(100vh, calc(100vw * 954 / 1366));
+      width: min(100vw, calc(100vh * 4 / 3));
+      height: min(100vh, calc(100vw * 3 / 4));
       overflow: hidden;
       isolation: isolate;
       background: #74bdf1;
@@ -67,12 +67,12 @@
 
     .map-frame {
       z-index: 30;
-      top: 50%;
-      left: 50%;
-      width: 79%;
-      height: 158%;
-      object-fit: fill;
-      transform: translate(-50%, -50%) rotate(90deg);
+      inset: 0;
+      background:
+        url('/assets/lango-home/upside.png') left top / 100% 8.28% no-repeat,
+        url('/assets/lango-home/downside.png') left bottom / 100% 8.28% no-repeat,
+        url('/assets/lango-home/leftside.png') left top / 4.83% 100% no-repeat,
+        url('/assets/lango-home/rightside.png') right top / 4.83% 100% no-repeat;
     }
 
     .map-title {
@@ -120,6 +120,7 @@
 
     .location-hotspot {
       z-index: 10;
+      isolation: isolate;
       border-radius: 18%;
       transition: transform 150ms ease, filter 150ms ease;
     }
@@ -159,6 +160,78 @@
       box-shadow: 0 .45cqw .7cqw rgba(67, 24, 3, .38), inset 0 0 0 .24cqw #e78d2b;
       font-size: clamp(17px, 2.25cqw, 31px);
       line-height: 1;
+    }
+
+    .location-hotspot[data-unlocking="true"] {
+      pointer-events: none;
+      z-index: 20;
+    }
+
+    .location-hotspot[data-unlocking="true"] > .location-image {
+      position: relative;
+      z-index: 1;
+      animation: location-locked-layer-out .7s ease-out .04s both;
+      will-change: opacity, transform;
+    }
+
+    .location-hotspot .location-unlock-colour-layer {
+      position: absolute;
+      z-index: 2;
+      inset: 0;
+      filter: none !important;
+      opacity: 0;
+      clip-path: circle(0 at 50% 50%);
+    }
+
+    .location-hotspot[data-unlocking="true"] > .location-unlock-colour-layer {
+      animation: location-colour-layer-in .76s cubic-bezier(.16,.82,.22,1) .38s both;
+      will-change: opacity, transform, clip-path;
+    }
+
+    .location-hotspot[data-unlocking="true"]::before {
+      content: "";
+      position: absolute;
+      z-index: 0;
+      inset: 10%;
+      border: max(4px, .5cqw) solid #fff5a4;
+      border-radius: 50%;
+      opacity: 0;
+      box-shadow: 0 0 1.4cqw #fff37a, 0 0 2.6cqw rgba(255, 174, 39, .75);
+      animation: location-unlock-glow .82s ease-out .28s both;
+      pointer-events: none;
+    }
+
+    .location-hotspot[data-unlocking="true"]::after {
+      z-index: 5;
+      animation: location-lock-release .42s cubic-bezier(.16,.82,.22,1.2) .18s both;
+    }
+
+    .location-unlock-sparks {
+      position: absolute;
+      inset: 0;
+      z-index: 4;
+      overflow: visible;
+      pointer-events: none;
+    }
+
+    .location-unlock-spark {
+      position: absolute;
+      top: 48%;
+      left: 50%;
+      width: clamp(7px, .85cqw, 13px);
+      aspect-ratio: 1;
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(.2) rotate(0);
+      background: #ffe96d;
+      clip-path: polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 94%,50% 72%,21% 94%,32% 57%,2% 35%,39% 35%);
+      filter: drop-shadow(0 0 .35cqw #ff9f1c);
+      animation: location-unlock-spark .58s ease-out calc(.34s + var(--spark-delay)) both;
+      will-change: opacity, transform;
+    }
+
+    .location-unlock-spark:nth-child(even) {
+      width: clamp(5px, .62cqw, 10px);
+      background: #fffbd0;
     }
 
     .unlock-backdrop {
@@ -246,6 +319,39 @@
     @keyframes fade-in { from { opacity: 0; } }
     @keyframes card-in { from { opacity: 0; transform: translateY(5%) scale(.94); } }
     @keyframes toast-in { from { opacity: 0; transform: translate(-50%, 30%); } }
+    @keyframes location-locked-layer-out {
+      0%, 16% { opacity: .86; transform: translateX(0) scale(.98); }
+      23% { transform: translateX(-1.8%) scale(.98); }
+      30% { transform: translateX(1.8%) scale(.98); }
+      37% { transform: translateX(-1%) scale(.98); }
+      45% { opacity: .86; transform: translateX(0) scale(.98); }
+      100% { opacity: 0; transform: scale(1.055); }
+    }
+    @keyframes location-colour-layer-in {
+      0% { opacity: 0; clip-path: circle(0 at 50% 50%); transform: scale(.94); }
+      28% { opacity: 1; }
+      72% { clip-path: circle(80% at 50% 50%); transform: scale(1.065); }
+      100% { opacity: 1; clip-path: circle(80% at 50% 50%); transform: scale(1); }
+    }
+    @keyframes location-unlock-glow {
+      0% { opacity: 0; transform: scale(.35); }
+      38% { opacity: 1; transform: scale(.82); }
+      62% { opacity: .9; transform: scale(1.02); }
+      100% { opacity: 0; transform: scale(1.62); }
+    }
+    @keyframes location-lock-release {
+      0% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(0); }
+      48% { opacity: 1; transform: translate(-50%, -64%) scale(1.24) rotate(-10deg); }
+      100% { opacity: 0; transform: translate(-50%, -125%) scale(.35) rotate(22deg); }
+    }
+    @keyframes location-unlock-spark {
+      0% { opacity: 0; transform: translate(-50%, -50%) scale(.2) rotate(0); }
+      25% { opacity: 1; }
+      100% {
+        opacity: 0;
+        transform: translate(calc(-50% + var(--spark-x)), calc(-50% + var(--spark-y))) scale(.72) rotate(170deg);
+      }
+    }
 
     @media (orientation: portrait) and (max-width: 900px) {
       .map-page::before {
@@ -302,17 +408,23 @@
       };
 
       const locations = [
-        { id: 'home', label: 'Home', image: 'location-top-left.png', unlocked: true },
-        { id: 'school', label: 'School', image: 'location-top-right.png' },
-        { id: 'mall', label: 'Shopping Mall', image: 'location-center.png' },
-        { id: 'park', label: 'Park', image: 'location-bottom-left.png' },
-        { id: 'beach', label: 'Beach', image: 'location-bottom-right.png' }
+        { id: 'home', position: 'home', label: 'Home', image: 'location-home.png', unlocked: true },
+        { id: 'school', position: 'school', label: 'School', image: 'location-school.png' },
+        { id: 'mall', position: 'mall', label: 'Shopping Mall', image: 'location-shopping-mall.png' },
+        { id: 'park', position: 'park', label: 'Park', image: 'location-park.png' },
+        { id: 'beach', position: 'beach', label: 'Beach', image: 'location-beach.png' }
       ];
 
       const loadUnlocked = () => {
         try {
           const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-          return new Set(['home', ...saved]);
+          // Day 5 previously wrote "park" even though the intended reward is
+          // the top-right School. Migrate and persist that stale browser state.
+          const migrated = saved.map((id) => id === 'park' ? 'school' : id);
+          if (migrated.some((id, index) => id !== saved[index])) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify([...new Set(migrated)]));
+          }
+          return new Set(['home', ...migrated]);
         } catch {
           return new Set(['home']);
         }
@@ -345,12 +457,40 @@
       }
 
       function MapPage() {
-        const [unlocked] = React.useState(loadUnlocked);
+        const mapParams = React.useMemo(() => new URLSearchParams(window.location.search), []);
+        const returnToRewards = mapParams.get('return') === 'rewards';
+        const previewMode = mapParams.get('preview') === '1';
+        const requestedUnlock = mapParams.get('unlock');
+        const [unlocked] = React.useState(() => {
+          const saved = loadUnlocked();
+          // A direct preview URL can exercise the one-time unlock animation
+          // without changing real student progress.
+          if (previewMode && requestedUnlock) saved.add(requestedUnlock);
+          return saved;
+        });
+        const [unlockingLocation, setUnlockingLocation] = React.useState(
+          requestedUnlock && unlocked.has(requestedUnlock) ? requestedUnlock : null
+        );
         const [lockedNotice, setLockedNotice] = React.useState(null);
         const [toast, setToast] = React.useState('');
         const toastTimer = React.useRef(null);
 
-        React.useEffect(() => () => clearTimeout(toastTimer.current), []);
+        React.useEffect(() => {
+          if (!unlockingLocation) return () => clearTimeout(toastTimer.current);
+          const location = locations.find((item) => item.id === unlockingLocation);
+          const cleanUrl = new URL(window.location.href);
+          cleanUrl.searchParams.delete('unlock');
+          window.history.replaceState({}, '', `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`);
+          const unlockTimer = setTimeout(() => {
+            setUnlockingLocation(null);
+            playSound('unlocked');
+            announce(`${location?.label || 'Location'} unlocked!`);
+          }, window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 60 : 1200);
+          return () => {
+            clearTimeout(unlockTimer);
+            clearTimeout(toastTimer.current);
+          };
+        }, []);
 
         const announce = (message) => {
           setToast(message);
@@ -375,16 +515,18 @@
 
         const leaveMap = () => {
           playSound('back');
-          const destination = returnToRewards ? '/?openRewards=1' : '/';
+          const destination = returnToRewards
+            ? (previewMode
+              ? '/?preview=1&screen=rewards&openRewards=1&resumeRewards=1'
+              : '/?openRewards=1')
+            : '/';
           setTimeout(() => { window.location.href = destination; }, 180);
         };
-
-        const returnToRewards = new URLSearchParams(window.location.search).get('return') === 'rewards';
 
         return e('main', { className: 'map-page' },
           e('section', { className: 'map-scene', 'data-node-id': '799:32', 'aria-label': 'Lango location map' },
             e('img', { className: 'map-background', src: '/assets/map/background.png', alt: '', draggable: false }),
-            e('img', { className: 'map-frame', src: '/assets/map/map-overlay.png', alt: '', draggable: false }),
+            e('div', { className: 'map-frame', 'aria-hidden': true }),
             e('img', { className: 'map-title', src: '/assets/map/side-panel.png', alt: 'Map', draggable: false }),
             e('button', { type: 'button', className: 'map-return', 'aria-label': returnToRewards ? 'Return to rewards' : 'Return home', onClick: leaveMap },
               e('img', { src: '/assets/map/home-button.png', alt: '', draggable: false })
@@ -392,11 +534,40 @@
             ...locations.map((location) => e('button', {
               key: location.id,
               type: 'button',
-              className: `location-hotspot location-hotspot--${location.id}`,
-              'data-locked': String(!unlocked.has(location.id)),
-              'aria-label': unlocked.has(location.id) ? `${location.label}, unlocked` : `${location.label}, locked`,
+              className: `location-hotspot location-hotspot--${location.position}`,
+              'data-locked': String(!unlocked.has(location.id) || unlockingLocation === location.id),
+              'data-unlocking': String(unlockingLocation === location.id),
+              'aria-label': unlockingLocation === location.id
+                ? `${location.label}, unlocking`
+                : unlocked.has(location.id) ? `${location.label}, unlocked` : `${location.label}, locked`,
+              disabled: unlockingLocation === location.id,
               onClick: () => chooseLocation(location)
-            }, e('img', { src: `/assets/map/${location.image}`, alt: '', draggable: false }))),
+            },
+              e('img', { className: 'location-image', src: `/assets/map/${location.image}`, alt: '', draggable: false }),
+              unlockingLocation === location.id && e('img', {
+                className: 'location-unlock-colour-layer',
+                src: `/assets/map/${location.image}`,
+                alt: '',
+                'aria-hidden': true,
+                draggable: false
+              }),
+              unlockingLocation === location.id && e('span', { className: 'location-unlock-sparks', 'aria-hidden': true },
+                ...[
+                  ['0cqw', '-8cqh', '0s'],
+                  ['6cqw', '-5.5cqh', '.02s'],
+                  ['8cqw', '0cqh', '.05s'],
+                  ['6cqw', '5.5cqh', '.03s'],
+                  ['0cqw', '8cqh', '.07s'],
+                  ['-6cqw', '5.5cqh', '.04s'],
+                  ['-8cqw', '0cqh', '.06s'],
+                  ['-6cqw', '-5.5cqh', '.01s'],
+                ].map(([x, y, delay], index) => e('span', {
+                  key: index,
+                  className: 'location-unlock-spark',
+                  style: { '--spark-x': x, '--spark-y': y, '--spark-delay': delay }
+                }))
+              )
+            )),
             toast && e('div', { className: 'map-toast', role: 'status' }, toast),
             lockedNotice && e(LockedDialog, { location: lockedNotice, onClose: closeLockedNotice })
           )

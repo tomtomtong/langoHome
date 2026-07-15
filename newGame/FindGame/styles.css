@@ -108,7 +108,8 @@ body {
 .timer-readout {
   position: absolute;
   left: 50%;
-  top: 59%;
+  top: 52%;
+  width: 68%;
   transform: translate(-50%, -50%);
   display: flex;
   align-items: baseline;
@@ -544,11 +545,20 @@ body {
 }
 
 .score-chip {
-  background: rgba(255, 255, 255, 0.94);
-  border-radius: 999px;
-  padding: 8px 16px;
-  font-weight: 600;
-  color: #1a5276;
+  width: clamp(190px, 15vw, 250px);
+  aspect-ratio: 2.85 / 1;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  padding: 10% 0 0;
+  overflow: hidden;
+  background: transparent url("../assets/images/live-score.png") center / 100% auto no-repeat;
+  color: #fff7df;
+  font-family: "Fredoka", "Baloo 2", system-ui, sans-serif;
+  font-size: clamp(24px, 2.5vw, 42px);
+  font-weight: 800;
+  line-height: 1;
+  text-shadow: 0 3px 0 #3d1608, 0 0 8px rgba(255, 206, 91, 0.35);
 }
 
 .overlay {

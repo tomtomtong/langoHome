@@ -74,13 +74,22 @@ h1 { margin: 6px; font-size: 18px; }
   color: #ffe066;
 }
 #score-display {
-  font-size: 18px;
-  font-weight: bold;
-  color: #fff;
-  text-shadow: 1px 1px 3px rgba(0,0,0,0.5);
+  width: clamp(180px, 14vw, 230px);
+  aspect-ratio: 2.85 / 1;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  padding: 10% 0 0;
+  overflow: hidden;
+  background: transparent url("../assets/images/live-score.png") center / 100% auto no-repeat;
+  color: #fff7df;
+  font-size: clamp(23px, 2.3vw, 38px);
+  font-weight: 800;
+  line-height: 1;
+  text-shadow: 0 3px 0 #3d1608, 0 0 8px rgba(255, 206, 91, 0.35);
 }
 #score-text {
-  color: #ffe066;
+  color: inherit;
 }
 .timer-icon {
   width: 30px;

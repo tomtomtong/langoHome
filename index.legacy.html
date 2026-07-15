@@ -2042,48 +2042,19 @@
       isolation: isolate;
     }
 
-    /* Continuous thin frame beneath the decorative PNG. It closes the
-       transparent corner gaps so the video always remains behind the wood. */
-    .lango-home::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      z-index: 9;
-      box-sizing: border-box;
-      border: 5.2vw solid #b65d18;
-      border-color: #c66c20 #a94f13 #b85c16 #a94f13;
-      box-shadow:
-        inset 0 0 0 3px #6f2a08,
-        inset 0 0 12px 6px rgba(92, 34, 5, .45),
-        0 0 0 3px #e79032;
-      pointer-events: none;
-    }
-
     @supports (width: 1cqw) {
       .lango-home { container-type: size; }
-      .lango-home::after { border-width: 5.2cqw; }
     }
 
     .lango-home__frame {
       position: absolute;
+      inset: 0;
       z-index: 10;
-      /* The source PNG includes transparent export padding. Overscan it so
-         the wooden outer edge meets all four sides like a real photo frame. */
-      inset: -5.5% -6.5%;
-      width: 113%;
-      height: 111%;
-      /* Reveal only the outer bands of the oversized artwork. This keeps the
-         photo-frame edge treatment while making the wood roughly half as thick. */
-      -webkit-mask:
-        linear-gradient(#000 0 0) top / 100% 10.5% no-repeat,
-        linear-gradient(#000 0 0) bottom / 100% 10.5% no-repeat,
-        linear-gradient(#000 0 0) left / 10.5% 100% no-repeat,
-        linear-gradient(#000 0 0) right / 10.5% 100% no-repeat;
-      mask:
-        linear-gradient(#000 0 0) top / 100% 10.5% no-repeat,
-        linear-gradient(#000 0 0) bottom / 100% 10.5% no-repeat,
-        linear-gradient(#000 0 0) left / 10.5% 100% no-repeat,
-        linear-gradient(#000 0 0) right / 10.5% 100% no-repeat;
+      background:
+        url('/assets/lango-home/upside.png') left top / 100% 8.28% no-repeat,
+        url('/assets/lango-home/downside.png') left bottom / 100% 8.28% no-repeat,
+        url('/assets/lango-home/leftside.png') left top / 4.83% 100% no-repeat,
+        url('/assets/lango-home/rightside.png') right top / 4.83% 100% no-repeat;
       pointer-events: none;
     }
 

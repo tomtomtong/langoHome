@@ -91,6 +91,7 @@
   const $ = (id) => document.getElementById(id);
   const grid = $("grid");
   const timerVal = $("timerVal");
+  const scoreVal = $("scoreVal");
   const questionVal = $("questionVal");
   const comboVal = $("comboVal");
   const comboChip = $("comboChip");
@@ -421,6 +422,7 @@
 
   function addScore(delta) {
     state.score = Math.max(0, state.score + delta);
+    scoreVal.textContent = String(state.score);
   }
 
   function renderCombo() {
@@ -541,6 +543,7 @@
     state.roundBusy = false;
 
     questionVal.textContent = 0;
+    scoreVal.textContent = "0";
     renderCombo();
     renderTimer();
     updateProgress();

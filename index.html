@@ -213,6 +213,27 @@
 
     #preview-exit:hover { background: #4a505b; }
 
+    #daily-rewards-dev-day-btn {
+      display: none;
+      position: absolute;
+      z-index: 55;
+      right: 2.2%;
+      bottom: 2.2%;
+      min-width: 190px;
+      padding: .55em 1em;
+      border: 2px solid rgba(255,255,255,.55);
+      border-radius: 12px;
+      background: rgba(17,27,49,.94);
+      color: #fff;
+      font: 800 clamp(12px, 1.15cqw, 17px)/1.1 system-ui, sans-serif;
+      box-shadow: 0 5px 18px rgba(0,0,0,.38);
+      cursor: pointer;
+    }
+
+    html.preview-mode #daily-rewards-overlay.visible #daily-rewards-dev-day-btn:not([hidden]) { display: block; }
+    #daily-rewards-dev-day-btn:hover:not(:disabled) { background: #26395e; }
+    #daily-rewards-dev-day-btn:disabled { opacity: .55; cursor: default; }
+
     html.preview-mode #app {
       top: calc(196px + (100vh - 196px) / 2);
       width: min(100vw, calc((100vh - 196px) * 4 / 3));
@@ -859,6 +880,8 @@
       line-height: 1;
       pointer-events: none;
       filter: drop-shadow(0 4px 2px rgba(75, 31, 4, 0.24));
+      transform-origin: 50% 50%;
+      animation: weather-card-float 5.4s ease-in-out infinite;
     }
 
     #hko-weather-bar[hidden] {
@@ -871,6 +894,7 @@
       width: 100%;
       height: 100%;
       object-fit: contain;
+      animation: weather-frame-glow 4.2s ease-in-out infinite;
     }
 
     .hko-weather-details {
@@ -882,62 +906,171 @@
       left: 15.8%;
       box-sizing: border-box;
       display: grid;
-      grid-template-rows: auto auto 1fr;
-      gap: 0;
-      align-content: center;
-      padding: 0 3.5%;
+      grid-template-columns: 1fr auto;
+      grid-template-rows: auto 1fr;
+      gap: 1% 3%;
+      align-content: stretch;
+      padding: 4% 6%;
       overflow: hidden;
       border-radius: 9% / 20%;
-      background: #183558;
+      background: transparent;
+      box-shadow: none;
+      isolation: isolate;
+    }
+
+    .hko-weather-details::before {
+      content: '';
+      position: absolute;
+      z-index: 0;
+      top: -24%;
+      bottom: -24%;
+      left: 0;
+      width: 34%;
+      background: linear-gradient(90deg, transparent, rgba(177, 224, 255, .2), transparent);
+      transform: translateX(-220%) skewX(-18deg);
+      animation: weather-panel-shine 5.8s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    .hko-weather-details > * {
+      position: relative;
+      z-index: 1;
     }
 
     #hko-weather-location,
     #hko-weather-datetime {
       overflow: hidden;
       color: #d6e5f7;
-      text-align: center;
+      align-self: start;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
 
     #hko-weather-location {
-      font: 800 var(--hko-weather-location-font-size, clamp(12px, 2.3cqh, 18px))/0.95 'Baloo 2', sans-serif;
+      grid-column: 1;
+      text-align: left;
+      font: 800 var(--hko-weather-location-font-size, clamp(10px, 2.1cqh, 16px))/0.95 'Baloo 2', sans-serif;
     }
 
     #hko-weather-datetime {
-      font: 800 var(--hko-weather-datetime-font-size, clamp(11px, 2.1cqh, 17px))/0.95 'Baloo 2', sans-serif;
+      grid-column: 2;
+      color: rgba(231, 243, 252, .82);
+      text-align: right;
+      font: 700 var(--hko-weather-datetime-font-size, clamp(8px, 1.5cqh, 12px))/1 'Baloo 2', sans-serif;
     }
 
     .hko-weather-row {
-      display: flex;
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      grid-template-rows: 1fr auto;
+      grid-template-areas:
+        "temp temp temp"
+        "icon condition humidity";
       min-width: 0;
-      align-items: center;
-      justify-content: center;
-      gap: 2.2%;
+      min-height: 0;
+      align-items: end;
+      gap: 0 3%;
     }
 
     #hko-weather-icon {
-      display: none;
+      grid-area: icon;
+      align-self: center;
+      width: clamp(12px, 2.6cqh, 22px);
+      height: clamp(12px, 2.6cqh, 22px);
+      object-fit: contain;
     }
 
+    #hko-weather-icon[hidden] { display: none; }
+
     #hko-weather-condition {
-      flex: 0 0 auto;
+      grid-area: condition;
+      align-self: center;
       min-width: 0;
       overflow: hidden;
-      font: 800 var(--hko-weather-row-font-size, clamp(12px, 2.3cqh, 18px))/0.95 'Baloo 2', sans-serif;
+      font: 700 var(--hko-weather-row-font-size, clamp(9px, 1.8cqh, 14px))/1 'Baloo 2', sans-serif;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
 
     .hko-weather-stat {
       color: #d6e5f7;
-      font: 800 var(--hko-weather-row-font-size, clamp(12px, 2.3cqh, 18px))/0.95 'Baloo 2', sans-serif;
       white-space: nowrap;
+    }
+
+    .hko-weather-temp {
+      grid-area: temp;
+      align-self: center;
+      justify-self: start;
+      font: 400 clamp(21px, 5.2cqh, 42px)/.78 'Baloo 2', sans-serif;
+      letter-spacing: -.035em;
+    }
+
+    .hko-weather-temp strong { font-weight: 500; }
+
+    .hko-weather-humidity {
+      grid-area: humidity;
+      align-self: center;
+      font: 700 var(--hko-weather-row-font-size, clamp(9px, 1.8cqh, 14px))/1 'Baloo 2', sans-serif;
     }
 
     .hko-weather-stat strong {
       color: #fff9e8;
       font-weight: 800;
+    }
+
+    .hko-weather-drop {
+      display: inline-block;
+      margin-right: .04em;
+      transform-origin: 50% 78%;
+      animation: weather-drop-breathe 2.5s ease-in-out infinite;
+    }
+
+    #hko-weather-bar.weather-refresh #hko-weather-location,
+    #hko-weather-bar.weather-refresh #hko-weather-datetime,
+    #hko-weather-bar.weather-refresh .hko-weather-row {
+      animation: weather-data-rise .46s cubic-bezier(.2, .8, .2, 1) both;
+    }
+
+    #hko-weather-bar.weather-refresh #hko-weather-datetime { animation-delay: 60ms; }
+    #hko-weather-bar.weather-refresh .hko-weather-row { animation-delay: 120ms; }
+
+    @keyframes weather-card-float {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      50% { transform: translateY(-2px) rotate(.2deg); }
+    }
+
+    @keyframes weather-frame-glow {
+      0%, 100% { filter: brightness(1) saturate(1); }
+      50% { filter: brightness(1.05) saturate(1.08); }
+    }
+
+    @keyframes weather-panel-shine {
+      0%, 58% { transform: translateX(-220%) skewX(-18deg); opacity: 0; }
+      64% { opacity: 1; }
+      84%, 100% { transform: translateX(420%) skewX(-18deg); opacity: 0; }
+    }
+
+    @keyframes weather-data-rise {
+      from { opacity: 0; transform: translateY(28%) scale(.94); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes weather-drop-breathe {
+      0%, 100% { transform: translateY(0) scale(1); filter: brightness(1); }
+      50% { transform: translateY(-8%) scale(1.12); filter: brightness(1.18) drop-shadow(0 0 3px rgba(90, 205, 255, .65)); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #hko-weather-bar,
+      .lango-home__weather-frame,
+      .hko-weather-details::before,
+      .hko-weather-drop,
+      #hko-weather-bar.weather-refresh #hko-weather-location,
+      #hko-weather-bar.weather-refresh #hko-weather-datetime,
+      #hko-weather-bar.weather-refresh .hko-weather-row {
+        animation: none;
+      }
     }
 
     @keyframes idle-hint-pulse {
@@ -1517,17 +1650,17 @@
 
     .daily-rewards-quest {
       position: absolute;
-      z-index: 5;
-      left: 44.1%;
-      top: 71%;
-      width: 40%;
-      aspect-ratio: 567 / 156;
+      z-index: 3;
+      left: 41.5%;
+      top: 67%;
+      width: 45%;
+      aspect-ratio: 622 / 124;
     }
 
     .daily-rewards-quest-art {
       width: 100%;
       height: 100%;
-      object-fit: fill;
+      object-fit: contain;
       filter: drop-shadow(0 4px 3px rgba(85, 34, 11, .18));
     }
 
@@ -1551,7 +1684,8 @@
       height: 35.2%;
       display: flex;
       align-items: flex-start;
-      gap: 3cqw;
+      /* Leave a visible peek of Day 7 so players know the row continues. */
+      gap: 1.25cqw;
       padding: 0;
       overflow-x: hidden;
       overflow-y: hidden;
@@ -1577,7 +1711,9 @@
       border-radius: 999px;
       background: #53210d;
       box-shadow: inset 0 1px 2px rgba(0, 0, 0, .35);
-      pointer-events: none;
+      pointer-events: auto;
+      touch-action: none;
+      cursor: pointer;
     }
 
     .daily-rewards-slots.show-scrollbar + .daily-rewards-scrollbar { display: block; }
@@ -1591,7 +1727,11 @@
       border-radius: 999px;
       background: #da997c;
       box-shadow: 0 1px 2px rgba(30, 10, 2, .4);
+      cursor: grab;
     }
+
+    .daily-rewards-scrollbar.is-dragging .daily-rewards-scrollbar-thumb { cursor: grabbing; }
+    .daily-rewards-slots.is-scrollbar-dragging { scroll-snap-type: none; }
 
     .daily-reward-slot,
     .daily-reward-slot:nth-child(2),
@@ -1677,16 +1817,24 @@
 
     .daily-rewards-task-progress {
       position: absolute;
-      z-index: 2;
-      left: 15.4%;
-      top: 52%;
-      width: 8.2%;
-      transform: translateY(-50%);
-      background: #fbe4b0;
-      color: #214b78;
-      font: 800 clamp(13px, 2.45cqw, 34px)/1 "Baloo 2", sans-serif;
+      z-index: 4;
+      left: 12.1%;
+      top: 53.4%;
+      width: 9.8%;
+      height: 10.8%;
+      display: grid;
+      place-items: center;
+      background: transparent;
+      color: #a63b21;
+      font: 900 clamp(32px, 5.2cqw, 72px)/1 "Baloo 2", sans-serif;
       text-align: center;
+      text-shadow:
+        0 .055em 0 #fff7d5,
+        0 .105em .055em rgba(77,32,7,.38);
+      pointer-events: none;
     }
+
+    .daily-rewards-task-progress.is-checked-in { color: #318b21; }
 
     .daily-reward-congrats {
       position: absolute;
@@ -1878,7 +2026,7 @@
       height: 100%;
     }
 
-    .daily-reward-mystery-button {
+    button.daily-reward-mystery-button {
       position: absolute;
       inset: 0;
       z-index: 2;
@@ -1890,6 +2038,13 @@
       cursor: pointer;
       filter: drop-shadow(0 0 1.2cqw rgba(99, 217, 255, .7));
       animation: reward-gamepad-nudge 1.05s ease-in-out infinite, reward-gamepad-flash 1.7s ease-in-out infinite;
+    }
+
+    button.daily-reward-mystery-button:hover:not(:disabled),
+    button.daily-reward-mystery-button:active {
+      border: 0;
+      background: transparent;
+      box-shadow: none;
     }
 
     .daily-reward-mystery-button:focus-visible {
@@ -2136,48 +2291,19 @@
       isolation: isolate;
     }
 
-    /* Continuous thin frame beneath the decorative PNG. It closes the
-       transparent corner gaps so the video always remains behind the wood. */
-    .lango-home::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      z-index: 9;
-      box-sizing: border-box;
-      border: 5.2vw solid #b65d18;
-      border-color: #c66c20 #a94f13 #b85c16 #a94f13;
-      box-shadow:
-        inset 0 0 0 3px #6f2a08,
-        inset 0 0 12px 6px rgba(92, 34, 5, .45),
-        0 0 0 3px #e79032;
-      pointer-events: none;
-    }
-
     @supports (width: 1cqw) {
       .lango-home { container-type: size; }
-      .lango-home::after { border-width: 5.2cqw; }
     }
 
     .lango-home__frame {
       position: absolute;
+      inset: 0;
       z-index: 10;
-      /* The source PNG includes transparent export padding. Overscan it so
-         the wooden outer edge meets all four sides like a real photo frame. */
-      inset: -5.5% -6.5%;
-      width: 113%;
-      height: 111%;
-      /* Reveal only the outer bands of the oversized artwork. This keeps the
-         photo-frame edge treatment while making the wood roughly half as thick. */
-      -webkit-mask:
-        linear-gradient(#000 0 0) top / 100% 10.5% no-repeat,
-        linear-gradient(#000 0 0) bottom / 100% 10.5% no-repeat,
-        linear-gradient(#000 0 0) left / 10.5% 100% no-repeat,
-        linear-gradient(#000 0 0) right / 10.5% 100% no-repeat;
-      mask:
-        linear-gradient(#000 0 0) top / 100% 10.5% no-repeat,
-        linear-gradient(#000 0 0) bottom / 100% 10.5% no-repeat,
-        linear-gradient(#000 0 0) left / 10.5% 100% no-repeat,
-        linear-gradient(#000 0 0) right / 10.5% 100% no-repeat;
+      background:
+        url('/assets/lango-home/upside.png') left top / 100% 8.28% no-repeat,
+        url('/assets/lango-home/downside.png') left bottom / 100% 8.28% no-repeat,
+        url('/assets/lango-home/leftside.png') left top / 4.83% 100% no-repeat,
+        url('/assets/lango-home/rightside.png') right top / 4.83% 100% no-repeat;
       pointer-events: none;
     }
 
@@ -2607,7 +2733,10 @@
       height: 67.1%;
       border-radius: 70px;
       background: #f5be86;
-      pointer-events: none;
+      pointer-events: auto;
+      touch-action: none;
+      cursor: pointer;
+      user-select: none;
     }
 
     .collection-scrollbar-thumb {
@@ -2618,13 +2747,33 @@
       height: 12.66%;
       border-radius: 70px;
       background: #b45919;
+      cursor: grab;
     }
+
+    .collection-scrollbar:active .collection-scrollbar-thumb { cursor: grabbing; }
+    .collection-scrollbar:focus-visible { outline: 4px solid #fff5b2; outline-offset: 3px; }
 
     .collection-row {
       position: relative;
-      flex: 0 0 var(--row-height);
+      flex: 0 0 21.8cqh;
       width: 100%;
-      min-height: var(--row-height);
+      min-height: 21.8cqh;
+    }
+
+    .collection-doll-line {
+      position: absolute;
+      inset: 0 0 4.507cqh;
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 1.5%;
+      margin: 0;
+      padding: 0 2%;
+      list-style: none;
+    }
+
+    .collection-doll-slot {
+      position: relative;
+      min-width: 0;
     }
 
     .collection-doll,
@@ -2639,18 +2788,19 @@
     }
 
     .collection-doll {
-      top: 0;
-      left: var(--doll-left);
-      width: var(--doll-size);
+      inset: 0;
+      width: 100%;
+      height: 100%;
     }
 
-    .collection-row.locked .collection-doll { opacity: .51; }
+    .collection-doll-slot.locked .collection-doll { opacity: .51; }
 
     .collection-lock {
-      top: var(--lock-top);
-      left: 7.795%; /* 70px within the 898px list */
+      top: 50%;
+      left: 50%;
       z-index: 2;
-      width: 5.345%; /* 48px within the 898px list */
+      width: 27%;
+      transform: translate(-50%, -50%);
     }
 
     .collection-divider {
@@ -2969,8 +3119,25 @@
             e('div', { className: 'daily-rewards-board' },
               e('img', { className: 'daily-rewards-board-art', src: rewardAsset('reward-board'), alt: '', draggable: false }),
               e('h2', { id: 'daily-rewards-title', className: 'daily-rewards-meta' }, 'Reward'),
+              e('span', {
+                className: 'daily-rewards-task-progress',
+                id: 'daily-rewards-day-count',
+                'aria-live': 'polite',
+                'aria-label': '0 day streak'
+              }, '0'),
             e('div', { className: 'daily-rewards-slots', id: 'daily-rewards-slots', 'aria-label': 'Upcoming rewards' }),
-            e('div', { className: 'daily-rewards-scrollbar', id: 'daily-rewards-scrollbar', 'aria-hidden': 'true' },
+            e('div', {
+              className: 'daily-rewards-scrollbar',
+              id: 'daily-rewards-scrollbar',
+              role: 'scrollbar',
+              tabIndex: 0,
+              'aria-label': 'Scroll daily rewards',
+              'aria-controls': 'daily-rewards-slots',
+              'aria-orientation': 'horizontal',
+              'aria-valuemin': '0',
+              'aria-valuemax': '100',
+              'aria-valuenow': '0'
+            },
               e('span', { className: 'daily-rewards-scrollbar-thumb', id: 'daily-rewards-scrollbar-thumb' })
             ),
             e('div', { className: 'daily-rewards-track', id: 'daily-rewards-track', 'aria-hidden': 'true' },
@@ -2980,9 +3147,14 @@
                 e('button', { type: 'button', id: 'daily-rewards-claim-btn' }, 'Get')
               )
             ),
-            e('div', { className: 'daily-rewards-quest', 'aria-hidden': 'true' },
-              e('img', { className: 'daily-rewards-quest-art', src: rewardAsset('reward-title'), alt: '', draggable: false }),
-              e('span', { className: 'daily-rewards-task-progress' }, '1/1')
+            e('div', { className: 'daily-rewards-quest' },
+              e('img', {
+                className: 'daily-rewards-quest-art',
+                id: 'daily-rewards-quest-art',
+                src: rewardAsset('reward-title-non-finish'),
+                alt: '0 of 1 games completed today',
+                draggable: false
+              })
             ),
             e('div', { className: 'daily-reward-congrats', id: 'daily-reward-congrats', hidden: true },
               e('section', { className: 'daily-reward-congrats-card', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'daily-reward-congrats-banner', 'data-node-id': '719:34' },
@@ -2996,6 +3168,7 @@
                 )
               )
             ),
+            e('button', { type: 'button', id: 'daily-rewards-dev-day-btn' }, 'DEV · Complete Day 1'),
             e('div', { className: 'daily-rewards-meta', 'aria-live': 'polite' },
               e('span', { id: 'daily-rewards-streak-text' }, 'Streak: 0 days'),
               e('span', { id: 'daily-rewards-stars-text' }, '0 stars')
@@ -3004,27 +3177,35 @@
         );
       }
 
-      const COLLECTION_DOLLS = [
-        { rowHeight: 188, size: 188, left: 0, lockTop: 70 },
-        { rowHeight: 164, size: 142, left: 23, lockTop: 47 },
-        { rowHeight: 164, size: 150, left: 19, lockTop: 51 },
-        { rowHeight: 177, size: 167, left: 11, lockTop: 64 },
-        { rowHeight: 187, size: 172, left: 8, lockTop: 74 },
-        { rowHeight: 177, size: 163, left: 13, lockTop: 57 },
-      ];
+      const COLLECTION_GROUPS = ['bird', 'cat', 'dog', 'mouse', 'penguin', 'rabbit']
+        .map((animal) => ({
+          animal,
+          name: `${animal[0].toUpperCase()}${animal.slice(1)}`,
+          dolls: Array.from({ length: 5 }, (_, index) => {
+            const variant = index + 1;
+            return {
+              id: `${animal}-${variant}`,
+              name: `${animal[0].toUpperCase()}${animal.slice(1)} Doll ${variant}`,
+              asset: `${animal}-${variant}`,
+            };
+          }),
+        }));
+      const COLLECTION_DOLLS = COLLECTION_GROUPS.flatMap((group) => group.dolls);
 
       function Collection() {
         const [visible, setVisible] = React.useState(false);
         const [unlockedDolls, setUnlockedDolls] = React.useState([]);
         const [scrollProgress, setScrollProgress] = React.useState(0);
         const listRef = React.useRef(null);
+        const scrollbarRef = React.useRef(null);
+        const scrollbarDragRef = React.useRef({ pointerId: null, offset: 0 });
         const collectionAsset = (name) => `/assets/collections/${name}.png`;
 
         React.useEffect(() => {
           const close = () => setVisible(false);
           const open = async (options = {}) => {
             let nextUnlockedDolls = options.unlocked === true
-              ? COLLECTION_DOLLS.map((_, index) => `doll-${index + 1}`)
+              ? COLLECTION_DOLLS.map((doll) => doll.id)
               : Array.isArray(options.unlockedDolls) ? options.unlockedDolls : [];
             if (typeof options.unlocked !== 'boolean') {
               try {
@@ -3058,7 +3239,59 @@
         };
 
         const unlockedDollSet = new Set(unlockedDolls);
-        const hasUnlockedDolls = unlockedDolls.length > 0;
+        const hasUnlockedDolls = COLLECTION_DOLLS.some((doll) => unlockedDollSet.has(doll.id));
+        const scrollListToPointer = (clientY) => {
+          const list = listRef.current;
+          const track = scrollbarRef.current;
+          if (!list || !track) return;
+          const trackRect = track.getBoundingClientRect();
+          const thumbHeight = trackRect.height * 0.1266;
+          const maxThumbTop = Math.max(0, trackRect.height - thumbHeight);
+          const rawThumbTop = clientY - trackRect.top - scrollbarDragRef.current.offset;
+          const thumbTop = Math.max(0, Math.min(maxThumbTop, rawThumbTop));
+          const progress = maxThumbTop > 0 ? thumbTop / maxThumbTop : 0;
+          const available = Math.max(0, list.scrollHeight - list.clientHeight);
+          list.scrollTop = progress * available;
+        };
+        const onScrollbarPointerDown = (event) => {
+          const track = event.currentTarget;
+          const thumb = track.querySelector('.collection-scrollbar-thumb');
+          const thumbRect = thumb?.getBoundingClientRect();
+          const grabbedThumb = event.target === thumb;
+          scrollbarDragRef.current = {
+            pointerId: event.pointerId,
+            offset: grabbedThumb && thumbRect
+              ? event.clientY - thumbRect.top
+              : (thumbRect?.height || 0) / 2,
+          };
+          track.setPointerCapture(event.pointerId);
+          scrollListToPointer(event.clientY);
+          event.preventDefault();
+        };
+        const onScrollbarPointerMove = (event) => {
+          if (scrollbarDragRef.current.pointerId !== event.pointerId) return;
+          scrollListToPointer(event.clientY);
+        };
+        const stopScrollbarDrag = (event) => {
+          if (scrollbarDragRef.current.pointerId !== event.pointerId) return;
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+          }
+          scrollbarDragRef.current = { pointerId: null, offset: 0 };
+        };
+        const onScrollbarKeyDown = (event) => {
+          const list = listRef.current;
+          if (!list) return;
+          const page = Math.max(40, list.clientHeight * 0.8);
+          if (event.key === 'ArrowUp') list.scrollTop -= 40;
+          else if (event.key === 'ArrowDown') list.scrollTop += 40;
+          else if (event.key === 'PageUp') list.scrollTop -= page;
+          else if (event.key === 'PageDown') list.scrollTop += page;
+          else if (event.key === 'Home') list.scrollTop = 0;
+          else if (event.key === 'End') list.scrollTop = list.scrollHeight;
+          else return;
+          event.preventDefault();
+        };
 
         return e('section', {
           id: 'collection-overlay',
@@ -3077,6 +3310,7 @@
             e('img', { src: collectionAsset('return'), alt: '', draggable: false })
           ),
           e('ol', {
+            id: 'collection-list',
             ref: listRef,
             className: 'collection-list',
             'aria-label': 'Langomon doll collection',
@@ -3086,27 +3320,47 @@
               setScrollProgress(available > 0 ? list.scrollTop / available : 0);
             }
           },
-            ...COLLECTION_DOLLS.map((doll, index) => {
-              const dollNumber = index + 1;
-              const isUnlocked = unlockedDollSet.has(`doll-${dollNumber}`);
+            ...COLLECTION_GROUPS.map((group) => {
               return e('li', {
-                key: index,
-                className: `collection-row ${isUnlocked ? 'unlocked' : 'locked'}`,
-                style: {
-                  '--row-height': `${doll.rowHeight / 9.54}cqh`,
-                  '--doll-left': `${doll.left / 8.98}%`,
-                  '--doll-size': `${doll.size / 8.98}%`,
-                  '--lock-top': `${doll.lockTop / doll.rowHeight * 100}%`,
-                },
-                'aria-label': `Doll ${dollNumber}, ${isUnlocked ? 'unlocked' : 'locked'}`
+                key: group.animal,
+                className: 'collection-row',
+                'aria-label': `${group.name} dolls 1 to 5`
               },
-                e('img', { className: 'collection-doll', src: collectionAsset(`${isUnlocked ? 'unlocked' : 'locked'}-${dollNumber}`), alt: '', draggable: false }),
-                !isUnlocked && e('img', { className: 'collection-lock', src: collectionAsset('lock'), alt: '', draggable: false }),
+                e('ol', { className: 'collection-doll-line' },
+                  ...group.dolls.map((doll) => {
+                    const isUnlocked = unlockedDollSet.has(doll.id);
+                    return e('li', {
+                      key: doll.id,
+                      className: `collection-doll-slot ${isUnlocked ? 'unlocked' : 'locked'}`,
+                      'aria-label': `${doll.name}, ${isUnlocked ? 'unlocked' : 'locked'}`
+                    },
+                      e('img', { className: 'collection-doll', src: collectionAsset(`${isUnlocked ? 'unlocked' : 'locked'}-${doll.asset}`), alt: '', draggable: false }),
+                      !isUnlocked && e('img', { className: 'collection-lock', src: collectionAsset('lock'), alt: '', draggable: false })
+                    );
+                  })
+                ),
                 e('img', { className: 'collection-divider', src: collectionAsset('divider'), alt: '', draggable: false })
               );
             })
           ),
-          e('div', { className: 'collection-scrollbar', 'aria-hidden': 'true', style: { '--scroll-thumb-top': `${scrollProgress * 87.34}%` } },
+          e('div', {
+            ref: scrollbarRef,
+            className: 'collection-scrollbar',
+            role: 'scrollbar',
+            tabIndex: 0,
+            'aria-label': 'Scroll doll collection',
+            'aria-controls': 'collection-list',
+            'aria-orientation': 'vertical',
+            'aria-valuemin': 0,
+            'aria-valuemax': 100,
+            'aria-valuenow': Math.round(scrollProgress * 100),
+            onPointerDown: onScrollbarPointerDown,
+            onPointerMove: onScrollbarPointerMove,
+            onPointerUp: stopScrollbarDrag,
+            onPointerCancel: stopScrollbarDrag,
+            onKeyDown: onScrollbarKeyDown,
+            style: { '--scroll-thumb-top': `${scrollProgress * 87.34}%` }
+          },
             e('span', { className: 'collection-scrollbar-thumb' })
           )
         );
@@ -3193,8 +3447,12 @@
               e('div', { className: 'hko-weather-row' },
                 e('img', { id: 'hko-weather-icon', alt: '', width: 32, height: 32, hidden: true }),
                 e('span', { id: 'hko-weather-condition' }, 'Weather'),
-                e('span', { className: 'hko-weather-stat' }, e('strong', { id: 'hko-weather-temp' }, '--')),
-                e('span', { className: 'hko-weather-stat', 'aria-label': 'Humidity' }, '💧', e('strong', { id: 'hko-weather-humidity' }, '--'))
+                e('span', { className: 'hko-weather-stat hko-weather-temp' }, e('strong', { id: 'hko-weather-temp' }, '--')),
+                e('span', { className: 'hko-weather-stat hko-weather-humidity', 'aria-label': 'Humidity' },
+                  e('span', { className: 'hko-weather-drop', 'aria-hidden': 'true' }, '💧'),
+                  e('span', { className: 'hko-weather-humidity-label' }, 'Humidity '),
+                  e('strong', { id: 'hko-weather-humidity' }, '--')
+                )
               )
             )
           ),
@@ -3217,7 +3475,7 @@
             label: 'Play Word Chop vocab game',
             onClick: () => go('game', '/vocab-game/index.html')
           }),
-          e('img', { className: 'lango-home__frame', src: asset('character'), alt: '', draggable: false })
+          e('div', { className: 'lango-home__frame', 'aria-hidden': true })
         );
       }
 
@@ -3324,10 +3582,14 @@
     const dailyRewardsOverlay = document.getElementById("daily-rewards-overlay");
     const dailyRewardsClose = document.getElementById("daily-rewards-close");
     const dailyRewardsSlots = document.getElementById("daily-rewards-slots");
+    const dailyRewardsScrollbar = document.getElementById("daily-rewards-scrollbar");
+    const dailyRewardsScrollbarThumb = document.getElementById("daily-rewards-scrollbar-thumb");
     const dailyRewardsClaimBtn = document.getElementById("daily-rewards-claim-btn");
     const dailyRewardsStreakText = document.getElementById("daily-rewards-streak-text");
     const dailyRewardsStarsText = document.getElementById("daily-rewards-stars-text");
     const dailyRewardsStreakBadge = document.getElementById("daily-rewards-streak-badge");
+    const dailyRewardsDayCount = document.getElementById("daily-rewards-day-count");
+    const dailyRewardsQuestArt = document.getElementById("daily-rewards-quest-art");
     const dailyRewardsCelebrate = document.getElementById("daily-rewards-celebrate");
     const dailyRewardCongrats = document.getElementById("daily-reward-congrats");
     const dailyRewardCongratsTitle = document.getElementById("daily-reward-congrats-title");
@@ -3335,21 +3597,84 @@
     const dailyRewardCongratsName = document.getElementById("daily-reward-congrats-name");
     const dailyRewardModalCta = document.getElementById("daily-reward-modal-cta");
     const dailyRewardModalCtaLabel = document.getElementById("daily-reward-modal-cta-label");
+    const dailyRewardsDevDayBtn = document.getElementById("daily-rewards-dev-day-btn");
     const previewScreenSelect = document.getElementById("preview-screen-select");
     const gamePreviewFrame = document.getElementById("game-preview-frame");
     const previewExit = document.getElementById("preview-exit");
     const previewToolbarHide = document.getElementById("preview-toolbar-hide");
     const previewToolbarShow = document.getElementById("preview-toolbar-show");
     const PREVIEW_TOOLBAR_COLLAPSED_KEY = "preview-toolbar-collapsed";
+    const PREVIEW_REWARD_STATE_KEY = "lango.previewRewardState";
     let dailyRewardsStatus = null;
     let dailyRewardsStudent = false;
     let previewClaimedMilestones = [];
     let previewUnlockedDolls = [];
+    let previewCompletedDay = 0;
     let dailyRewardRevealAnimation = null;
     let dailyRewardRevealTimers = [];
+    let dailyRewardCongratsReward = null;
+    let mapPreloadStarted = false;
+    const mapPreloadImages = [];
+    const MAP_PRELOAD_ASSETS = [
+      "background.png",
+      "side-panel.png",
+      "home-button.png",
+      "location-home.png",
+      "location-school.png",
+      "location-shopping-mall.png",
+      "location-park.png",
+      "location-beach.png",
+    ];
+    const PREVIEW_LANGOMON_DOLLS = ['bird', 'cat', 'dog', 'mouse', 'penguin', 'rabbit']
+      .flatMap((animal) => Array.from({ length: 5 }, (_, index) => {
+        const variant = index + 1;
+        return {
+          id: `${animal}-${variant}`,
+          name: `${animal[0].toUpperCase()}${animal.slice(1)} Doll ${variant}`,
+          asset: `${animal}-${variant}`,
+        };
+      }));
     const bubbleExplosionDataPromise = fetch("/assets/daily-rewards/bubble-explosion.json")
       .then((response) => response.ok ? response.json() : Promise.reject(new Error("Bubble animation unavailable")))
       .catch(() => null);
+
+    function preloadMapAssets() {
+      if (mapPreloadStarted) return;
+      mapPreloadStarted = true;
+      MAP_PRELOAD_ASSETS.forEach((asset) => {
+        const image = new Image();
+        image.decoding = "async";
+        image.src = `/assets/map/${asset}`;
+        mapPreloadImages.push(image);
+      });
+      const mapPagePrefetch = document.createElement("link");
+      mapPagePrefetch.rel = "prefetch";
+      mapPagePrefetch.href = "/map/";
+      document.head.appendChild(mapPagePrefetch);
+    }
+
+    function savePreviewRewardState() {
+      try {
+        sessionStorage.setItem(PREVIEW_REWARD_STATE_KEY, JSON.stringify({
+          claimedMilestones: previewClaimedMilestones,
+          unlockedDolls: previewUnlockedDolls,
+          completedDay: previewCompletedDay,
+        }));
+      } catch { /* Preview still works without persistence until navigation. */ }
+    }
+
+    function restorePreviewRewardState() {
+      try {
+        const saved = JSON.parse(sessionStorage.getItem(PREVIEW_REWARD_STATE_KEY) || "null");
+        previewClaimedMilestones = Array.isArray(saved?.claimedMilestones) ? saved.claimedMilestones : [];
+        previewUnlockedDolls = Array.isArray(saved?.unlockedDolls) ? saved.unlockedDolls : [];
+        previewCompletedDay = Math.max(0, Math.min(7, Number(saved?.completedDay) || 0));
+      } catch {
+        previewClaimedMilestones = [];
+        previewUnlockedDolls = [];
+        previewCompletedDay = 0;
+      }
+    }
 
     const REWARD_SLOT_CARD_ASSETS = {
       1: "1day.png",
@@ -3381,25 +3706,53 @@
     }
 
     function syncDailyRewardScrollbar() {
-      const thumb = document.getElementById("daily-rewards-scrollbar-thumb");
+      const thumb = dailyRewardsScrollbarThumb;
       if (!thumb) return;
       const { scrollWidth, clientWidth, scrollLeft } = dailyRewardsSlots;
       if (!scrollWidth) return;
       const widthPct = Math.min(100, (clientWidth / scrollWidth) * 100);
       thumb.style.width = `${widthPct}%`;
       thumb.style.left = `${Math.min(100 - widthPct, (scrollLeft / scrollWidth) * 100)}%`;
+      const maxScroll = Math.max(0, scrollWidth - clientWidth);
+      const scrollPct = maxScroll ? Math.round((scrollLeft / maxScroll) * 100) : 0;
+      dailyRewardsScrollbar?.setAttribute("aria-valuenow", String(scrollPct));
+    }
+
+    let dailyRewardScrollbarDrag = null;
+
+    function scrollDailyRewardsFromPointer(clientX, thumbOffset) {
+      if (!dailyRewardsScrollbar || !dailyRewardsScrollbarThumb) return;
+      const trackRect = dailyRewardsScrollbar.getBoundingClientRect();
+      const thumbRect = dailyRewardsScrollbarThumb.getBoundingClientRect();
+      const availableTrack = Math.max(1, trackRect.width - thumbRect.width);
+      const thumbLeft = Math.max(0, Math.min(availableTrack, clientX - trackRect.left - thumbOffset));
+      const maxScroll = Math.max(0, dailyRewardsSlots.scrollWidth - dailyRewardsSlots.clientWidth);
+      dailyRewardsSlots.scrollLeft = (thumbLeft / availableTrack) * maxScroll;
+    }
+
+    function endDailyRewardScrollbarDrag(event) {
+      if (!dailyRewardScrollbarDrag || event.pointerId !== dailyRewardScrollbarDrag.pointerId) return;
+      if (dailyRewardsScrollbar?.hasPointerCapture?.(event.pointerId)) {
+        dailyRewardsScrollbar.releasePointerCapture(event.pointerId);
+      }
+      dailyRewardsScrollbar?.classList.remove("is-dragging");
+      dailyRewardsSlots.classList.remove("is-scrollbar-dragging");
+      dailyRewardScrollbarDrag = null;
     }
 
     function previewRewardStatus() {
       const milestones = [
         { day: 1, id: "word-whack", label: "New Game", title: "New Game In Garden", name: "Word-Whack Blitz", icon: "mole", cta: "Get", destination: "modal", stars: 5 },
         { day: 3, id: "langomon-doll", type: "random-doll", label: "Langomon Doll", title: "New Langomon Doll", name: "Mystery Langomon Doll", icon: "penguin", cta: "Add to collection", destination: "modal", stars: 10 },
-        { day: 5, id: "new-spot", label: "New Spot", title: "New Spot", name: "Park", icon: "spot", cta: "Explore map", destination: "map", stars: 15 },
+        { day: 5, id: "new-spot", label: "New Spot", title: "New Spot", name: "School", icon: "spot", cta: "Explore map", destination: "map", unlockLocation: "school", stars: 15 },
         { day: 7, id: "seven-day-doll", type: "random-doll", label: "Langomon Doll", title: "New Langomon Doll", name: "Mystery Langomon Doll", icon: "penguin", cta: "Add to collection", destination: "modal", stars: 0 },
       ];
-      const next = milestones.find((item) => !previewClaimedMilestones.includes(item.id));
+      const next = milestones.find((item) => (
+        item.day <= previewCompletedDay && !previewClaimedMilestones.includes(item.id)
+      ));
       return {
-        currentStreak: previewClaimedMilestones.length ? 1 : 0,
+        currentStreak: previewCompletedDay,
+        checkedInToday: previewCompletedDay > 0,
         totalStars: previewClaimedMilestones.reduce((sum, id) => sum + (milestones.find((item) => item.id === id)?.stars || 0), 0),
         canClaimMilestone: Boolean(next),
         nextMilestone: next || null,
@@ -3408,7 +3761,7 @@
           status: previewClaimedMilestones.includes(item.id) ? "claimed" : item.id === next?.id ? "active" : "locked",
         })),
         collection: previewUnlockedDolls,
-        unlockedLocations: previewClaimedMilestones.includes("new-spot") ? ["park"] : [],
+        unlockedLocations: previewClaimedMilestones.includes("new-spot") ? ["school"] : [],
       };
     }
 
@@ -3418,6 +3771,29 @@
 
       dailyRewardsStreakText.textContent = `Streak: ${status.currentStreak} day${status.currentStreak === 1 ? "" : "s"}`;
       dailyRewardsStarsText.textContent = `⭐ ${status.totalStars} stars`;
+      const displayedDay = Math.max(0, Number(status.currentStreak) || 0);
+      if (displayedDay >= 4 && !status.milestones?.some((item) => item.id === "new-spot" && item.status === "claimed")) {
+        preloadMapAssets();
+      }
+      dailyRewardsDayCount.textContent = String(displayedDay);
+      dailyRewardsDayCount.classList.toggle("is-checked-in", Boolean(status.checkedInToday));
+      dailyRewardsDayCount.setAttribute(
+        "aria-label",
+        `${displayedDay} consecutive day${displayedDay === 1 ? "" : "s"} completed`,
+      );
+      const finishedToday = Boolean(status.checkedInToday);
+      dailyRewardsQuestArt.src = finishedToday
+        ? "/assets/daily-rewards/reward-title-finish.png?v=20260715a"
+        : "/assets/daily-rewards/reward-title-non-finish.png?v=20260715a";
+      dailyRewardsQuestArt.alt = finishedToday
+        ? "1 of 1 games completed today"
+        : "0 of 1 games completed today";
+      if (PREVIEW_MODE && dailyRewardsDevDayBtn) {
+        dailyRewardsDevDayBtn.disabled = false;
+        dailyRewardsDevDayBtn.textContent = previewCompletedDay >= 7
+          ? "DEV · Reset Rewards"
+          : `DEV · Complete Day ${previewCompletedDay + 1}`;
+      }
 
       if (status.currentStreak > 0) {
         dailyRewardsStreakBadge.hidden = false;
@@ -3448,11 +3824,10 @@
           status: apiSlot?.status || fallbackStatus,
         };
       });
-      const needsRewardScrollbar = milestones.some(
-        (slot) => slot.day === 7 && slot.status !== "locked",
-      );
-      dailyRewardsSlots.classList.toggle("show-scrollbar", needsRewardScrollbar);
-      if (!needsRewardScrollbar) dailyRewardsSlots.scrollLeft = 0;
+      // Day 7 must remain reachable even while locked. Previously scrolling
+      // only activated after Day 7 unlocked, which made its card look missing.
+      const hasDaySevenCard = milestones.some((slot) => slot.day === 7);
+      dailyRewardsSlots.classList.toggle("show-scrollbar", hasDaySevenCard);
       // Park the claim button outside the slots before wiping them, since it
       // normally lives inside the active card.
       const rewardsActions = document.querySelector(".daily-rewards-actions");
@@ -3472,6 +3847,14 @@
           </article>
         `;
       }).join("");
+
+      const activeDaySeven = dailyRewardsSlots.querySelector('.daily-reward-slot.active[data-day="7"]');
+      if (activeDaySeven) {
+        requestAnimationFrame(() => {
+          dailyRewardsSlots.scrollLeft = dailyRewardsSlots.scrollWidth - dailyRewardsSlots.clientWidth;
+          syncDailyRewardScrollbar();
+        });
+      }
 
       const trackFill = document.getElementById("daily-rewards-track-fill");
       if (trackFill) {
@@ -3553,7 +3936,9 @@
           renderer: "svg",
           loop: false,
           autoplay: true,
-          animationData: structuredClone(animationData),
+          animationData: typeof structuredClone === "function"
+            ? structuredClone(animationData)
+            : JSON.parse(JSON.stringify(animationData)),
           rendererSettings: { preserveAspectRatio: "xMidYMid meet" },
         });
       }
@@ -3581,6 +3966,7 @@
       const isDoll = isDollReward(reward);
       const useFeaturedUnlockLayout = isWordWhack || isDoll;
       clearDailyRewardReveal();
+      dailyRewardCongratsReward = reward;
       dailyRewardCongrats.classList.toggle("featured-unlock-layout", useFeaturedUnlockLayout);
       dailyRewardCongratsTitle.textContent = isDoll && reward.collectionAsset
         ? "Tap to Reveal!"
@@ -3602,10 +3988,14 @@
           </div>`;
         const stage = dailyRewardCongratsIcon.querySelector(".daily-reward-mystery-stage");
         stage.querySelector(".daily-reward-mystery-button")?.addEventListener("click", () => revealMysteryDoll(reward, stage), { once: true });
+      } else if (reward.id === "new-spot") {
+        preloadMapAssets();
+        dailyRewardCongratsIcon.innerHTML = '<img src="/assets/daily-rewards/map-pin.png" alt="School map location">';
       } else {
         dailyRewardCongratsIcon.innerHTML = '<span class="penguin" role="img" aria-label="Langomon doll">🐧</span>';
       }
       dailyRewardCongrats.hidden = false;
+      if (PREVIEW_MODE && dailyRewardsDevDayBtn) dailyRewardsDevDayBtn.hidden = true;
       if (dailyRewardModalCta.hidden) {
         dailyRewardCongratsIcon.querySelector(".daily-reward-mystery-button")?.focus({ preventScroll: true });
       } else {
@@ -3617,6 +4007,8 @@
     function closeRewardCongratulations() {
       clearDailyRewardReveal();
       dailyRewardCongrats.hidden = true;
+      dailyRewardCongratsReward = null;
+      if (PREVIEW_MODE && dailyRewardsDevDayBtn) dailyRewardsDevDayBtn.hidden = false;
       dailyRewardsClaimBtn.focus({ preventScroll: true });
       dailyRewardCongrats.closest(".daily-rewards-scene").scrollTop = 0;
     }
@@ -3639,28 +4031,22 @@
       if (PREVIEW_MODE) {
         let reward = dailyRewardsStatus.nextMilestone;
         if (reward.type === "random-doll") {
-          const lockedDolls = [1, 2, 3, 4, 5, 6]
-            .map((number) => `doll-${number}`)
-            .filter((id) => !previewUnlockedDolls.includes(id));
-          const collectionItemId = lockedDolls[Math.floor(Math.random() * lockedDolls.length)] || null;
+          const lockedDolls = PREVIEW_LANGOMON_DOLLS.filter((doll) => !previewUnlockedDolls.includes(doll.id));
+          const doll = lockedDolls[Math.floor(Math.random() * lockedDolls.length)] || null;
+          const collectionItemId = doll?.id || null;
           if (collectionItemId) previewUnlockedDolls = [...previewUnlockedDolls, collectionItemId];
-          const dollNumber = collectionItemId ? Number(collectionItemId.split("-")[1]) : null;
           reward = {
             ...reward,
             collectionItemId,
-            collectionAsset: collectionItemId ? `/assets/collections/unlocked-${dollNumber}.png` : "",
-            name: collectionItemId ? `Langomon Doll ${dollNumber}` : "Langomon Collection Complete",
+            collectionAsset: doll ? `/assets/collections/unlocked-${doll.asset}.png` : "",
+            name: doll?.name || "Langomon Collection Complete",
           };
         }
         previewClaimedMilestones = [...previewClaimedMilestones, reward.id];
+        savePreviewRewardState();
         renderDailyRewards(previewRewardStatus());
         if (!isDollReward(reward)) celebrateDailyReward();
-        if (reward.destination === "map") {
-          localStorage.setItem("lango.systemUnlockedLocations", JSON.stringify(["park"]));
-          window.location.href = "/map/?return=rewards";
-        } else {
-          showRewardCongratulations(reward);
-        }
+        showRewardCongratulations(reward);
         return;
       }
       dailyRewardsClaimBtn.disabled = true;
@@ -3677,8 +4063,6 @@
         if (!isDollReward(data.reward)) celebrateDailyReward();
         if (data.reward?.destination === "map") {
           localStorage.setItem("lango.systemUnlockedLocations", JSON.stringify(data.status.unlockedLocations || []));
-          window.location.href = "/map/?return=rewards";
-          return;
         }
         if (data.reward) {
           showRewardCongratulations(data.reward);
@@ -3723,9 +4107,69 @@
     });
     dailyRewardModalCta.addEventListener("click", () => {
       sfx?.play("next");
+      const claimedReward = dailyRewardCongratsReward;
       closeRewardCongratulations();
+      if (claimedReward?.destination === "map") {
+        const unlockLocation = encodeURIComponent(claimedReward.unlockLocation || "school");
+        window.location.href = PREVIEW_MODE
+          ? `/map/?return=rewards&unlock=${unlockLocation}&preview=1`
+          : `/map/?return=rewards&unlock=${unlockLocation}`;
+      }
+    });
+    dailyRewardsDevDayBtn?.addEventListener("click", () => {
+      if (!PREVIEW_MODE) return;
+      if (previewCompletedDay >= 7) {
+        clearDailyRewardReveal();
+        dailyRewardCongrats.hidden = true;
+        dailyRewardCongratsReward = null;
+        previewCompletedDay = 0;
+        previewClaimedMilestones = [];
+        previewUnlockedDolls = [];
+        try { sessionStorage.removeItem(PREVIEW_REWARD_STATE_KEY); } catch {}
+        dailyRewardsSlots.scrollLeft = 0;
+        dailyRewardsDevDayBtn.hidden = false;
+        renderDailyRewards(previewRewardStatus());
+        requestAnimationFrame(syncDailyRewardScrollbar);
+        sfx?.play("back", { interrupt: true });
+        return;
+      }
+      previewCompletedDay += 1;
+      savePreviewRewardState();
+      renderDailyRewards(previewRewardStatus());
+      sfx?.play("powerUp", { interrupt: true });
     });
     dailyRewardsSlots.addEventListener("scroll", () => requestAnimationFrame(syncDailyRewardScrollbar), { passive: true });
+    dailyRewardsScrollbar?.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      const thumbRect = dailyRewardsScrollbarThumb.getBoundingClientRect();
+      const pressedThumb = event.target === dailyRewardsScrollbarThumb;
+      const thumbOffset = pressedThumb
+        ? event.clientX - thumbRect.left
+        : thumbRect.width / 2;
+      dailyRewardScrollbarDrag = { pointerId: event.pointerId, thumbOffset };
+      dailyRewardsScrollbar.setPointerCapture(event.pointerId);
+      dailyRewardsScrollbar.classList.add("is-dragging");
+      dailyRewardsSlots.classList.add("is-scrollbar-dragging");
+      scrollDailyRewardsFromPointer(event.clientX, thumbOffset);
+      event.preventDefault();
+    });
+    dailyRewardsScrollbar?.addEventListener("pointermove", (event) => {
+      if (!dailyRewardScrollbarDrag || event.pointerId !== dailyRewardScrollbarDrag.pointerId) return;
+      scrollDailyRewardsFromPointer(event.clientX, dailyRewardScrollbarDrag.thumbOffset);
+      event.preventDefault();
+    });
+    dailyRewardsScrollbar?.addEventListener("pointerup", endDailyRewardScrollbarDrag);
+    dailyRewardsScrollbar?.addEventListener("pointercancel", endDailyRewardScrollbarDrag);
+    dailyRewardsScrollbar?.addEventListener("keydown", (event) => {
+      const maxScroll = Math.max(0, dailyRewardsSlots.scrollWidth - dailyRewardsSlots.clientWidth);
+      const step = Math.max(40, dailyRewardsSlots.clientWidth * .18);
+      if (event.key === "ArrowLeft") dailyRewardsSlots.scrollLeft -= step;
+      else if (event.key === "ArrowRight") dailyRewardsSlots.scrollLeft += step;
+      else if (event.key === "Home") dailyRewardsSlots.scrollLeft = 0;
+      else if (event.key === "End") dailyRewardsSlots.scrollLeft = maxScroll;
+      else return;
+      event.preventDefault();
+    });
 
     const captionUserEl = document.getElementById("caption-user");
     const captionUserTextEl = document.getElementById("caption-user-text");
@@ -4462,7 +4906,8 @@
       if (!row || !row.clientWidth) return;
 
       row.style.removeProperty("--hko-weather-row-font-size");
-      const items = [hkoWeatherCondition, ...row.querySelectorAll(".hko-weather-stat")];
+      const items = [hkoWeatherCondition, row.querySelector(".hko-weather-humidity")];
+      if (!hkoWeatherIcon.hidden) items.unshift(hkoWeatherIcon);
       let fontSize = parseFloat(getComputedStyle(hkoWeatherCondition).fontSize) || 14;
 
       for (let attempt = 0; attempt < 4; attempt += 1) {
@@ -4489,7 +4934,9 @@
         hkoWeatherIcon.hidden = true;
       }
       showHkoWeatherBar();
+      hkoWeatherBar.classList.remove("weather-refresh");
       requestAnimationFrame(() => {
+        hkoWeatherBar.classList.add("weather-refresh");
         fitHkoWeatherLocation();
         fitHkoWeatherDateTime();
         fitHkoWeatherRow();
@@ -4625,8 +5072,12 @@
       return now >= start || now <= end;
     }
 
-    function pickVideoPair(videoPairs, date = new Date()) {
-      const eligible = (videoPairs || []).filter((p) => p.loopVideo?.url && isPairActiveNow(p, date));
+    function pickVideoPair(videoPairs, date = new Date(), { scene = null, excludeId = null } = {}) {
+      const eligible = (videoPairs || []).filter((p) => {
+        if (!p.loopVideo?.url || !isPairActiveNow(p, date)) return false;
+        if (excludeId !== null && p.id === excludeId) return false;
+        return scene === null || getVideoPairScene(p) === scene;
+      });
       if (!eligible.length) return null;
       return eligible[Math.floor(Math.random() * eligible.length)];
     }
@@ -4656,18 +5107,22 @@
       return sceneMatchers.find(([, matcher]) => matcher.test(prompt))?.[0] || "livingroom";
     }
 
-    function applyActivePairScene(pair) {
+    function getVideoPairScene(pair) {
       const configuredScene = String(pair?.scene ?? "").trim().toLowerCase();
-      const scene = ROOM_SCENE_IDS.has(configuredScene)
+      return ROOM_SCENE_IDS.has(configuredScene)
         ? configuredScene
         : inferRoomSceneFromPrompt(pair?.text);
+    }
+
+    function applyActivePairScene(pair) {
+      const scene = getVideoPairScene(pair);
       window.LangoRoomScene = scene;
       window.dispatchEvent(new CustomEvent("lango:room-scene", { detail: { scene } }));
       return scene;
     }
 
-    function setupIdleVideosFromConfig(cfg, { autoplay = false } = {}) {
-      activeVideoPair = pickVideoPair(cfg.videoPairs);
+    function setupIdleVideosFromConfig(cfg, { autoplay = false, pair } = {}) {
+      activeVideoPair = pair === undefined ? pickVideoPair(cfg.videoPairs) : pair;
       let result;
       if (activeVideoPair) {
         result = setupIdleVideos(activeVideoPair.loopVideo, activeVideoPair.transitionVideo, {
@@ -4910,12 +5365,18 @@
       startConversationFromIdleTap();
     });
 
-    async function refreshIdleVideosForCurrentPeriod() {
+    async function refreshIdleVideosForCurrentPeriod({ rotateWithinScene = false } = {}) {
       if (inSession || active || playingTransitionVideo || idleVideoStarting) return;
       const cfg = cachedConfig || await getConfig();
-      const nextPair = pickVideoPair(cfg.videoPairs);
-      const nextId = nextPair?.id ?? null;
       const currentId = activeVideoPair?.id ?? null;
+      const currentScene = activeVideoPair ? getVideoPairScene(activeVideoPair) : null;
+      let nextPair = pickVideoPair(cfg.videoPairs, new Date(), rotateWithinScene && currentScene
+        ? { scene: currentScene, excludeId: currentId }
+        : {});
+      // At the end of a conversation, rotate to another pair in the same room.
+      // If none is available, keep the current pair so the scene never changes.
+      if (rotateWithinScene && activeVideoPair && !nextPair) nextPair = activeVideoPair;
+      const nextId = nextPair?.id ?? null;
       if (nextId === currentId) {
         if (nextPair) {
           activeVideoPair = nextPair;
@@ -4926,7 +5387,7 @@
         return;
       }
       const wasPlaying = Boolean(idleVideoUrl) && !document.body.classList.contains("idle-video-dismissed");
-      await setupIdleVideosFromConfig(cfg, { autoplay: wasPlaying });
+      await setupIdleVideosFromConfig(cfg, { autoplay: wasPlaying, pair: nextPair });
       if (wasPlaying && idleVideoUrl) {
         restoreIdleVideoScreen();
         resetIdleVideoElement();
@@ -4934,9 +5395,9 @@
       }
     }
 
-    function resumeIdleVideo() {
+    function resumeIdleVideo({ rotateWithinScene = false } = {}) {
       if (inSession || active) return;
-      refreshIdleVideosForCurrentPeriod().then(() => {
+      refreshIdleVideosForCurrentPeriod({ rotateWithinScene }).then(() => {
         if (!idleVideoUrl) return;
         restoreIdleVideoScreen();
         resetIdleVideoElement();
@@ -5227,7 +5688,7 @@
     function returnToHelloCycle() {
       uiLog("hello", "returnToHelloCycle", "hello");
       showErr("");
-      resumeIdleVideo();
+      resumeIdleVideo({ rotateWithinScene: true });
       if (dailyRewardsStudent) fetchDailyRewardsStatus();
       wakeWordEnabled = ENABLE_WAKE_WORD;
       wakeWordRestartAttempts = 0;
@@ -6414,8 +6875,15 @@
       }
 
       if (screen === "rewards") {
-        previewClaimedMilestones = [];
-        previewUnlockedDolls = [];
+        const resumeRewards = new URLSearchParams(location.search).get("resumeRewards") === "1";
+        if (resumeRewards) {
+          restorePreviewRewardState();
+        } else {
+          previewClaimedMilestones = [];
+          previewUnlockedDolls = [];
+          previewCompletedDay = 0;
+          savePreviewRewardState();
+        }
         renderDailyRewards(previewRewardStatus());
         showDailyRewardsOverlay();
         return;
