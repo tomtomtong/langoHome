@@ -3416,7 +3416,6 @@ const server = createServer((req, res) => {
         const report = {
           id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           submittedAt: new Date().toISOString(),
-          source: String(parsed.source || 'voice-app').slice(0, 64),
           userAgent: String(parsed.userAgent || req.headers['user-agent'] || ''),
           note: String(parsed.note || '').slice(0, 500),
           state: parsed.state && typeof parsed.state === 'object' ? parsed.state : {},

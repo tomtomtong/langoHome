@@ -19,7 +19,7 @@
       padding: 2rem 1rem;
     }
     main {
-      width: min(100%, 640px);
+      width: min(100%, 420px);
     }
     h1 {
       margin: 0 0 0.25rem;
@@ -138,46 +138,6 @@
       display: none;
     }
     #playback.show { display: block; }
-    #log-upload-status.err { color: #c5221f; }
-    #log-upload-status.ok { color: #137333; }
-    #debug-log {
-      margin: 0;
-      padding: 0.75rem;
-      max-height: 280px;
-      overflow: auto;
-      background: #1e1e1e;
-      color: #d4d4d4;
-      border-radius: 6px;
-      border: 1px solid #333;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 0.72rem;
-      line-height: 1.45;
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-    .log-line { margin-bottom: 0.35rem; }
-    .log-line .t { color: #888; }
-    .log-line.in .k { color: #4fc3f7; }
-    .log-line.out .k { color: #81c784; }
-    .log-line.sys .k { color: #ffb74d; }
-    .log-line.err .k { color: #ef5350; }
-    .log-line.warn .k { color: #ffca28; }
-    .debug-opts {
-      display: flex;
-      gap: 0.75rem;
-      flex-wrap: wrap;
-      align-items: center;
-      margin-bottom: 0.6rem;
-      font-size: 0.8rem;
-      color: #555;
-    }
-    .debug-opts label {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-      margin: 0;
-      cursor: pointer;
-    }
   </style>
 </head>
 <body>
@@ -214,21 +174,6 @@
     </div>
 
     <section class="section">
-      <h2>Debug log</h2>
-      <div class="debug-opts">
-        <label><input type="checkbox" id="debug-verbose" checked> Full JSON</label>
-        <label><input type="checkbox" id="debug-audio"> Log audio chunks</label>
-        <label><input type="checkbox" id="debug-autoscroll" checked> Auto-scroll</label>
-        <button type="button" id="btn-clear-log">Clear</button>
-        <button type="button" id="btn-copy-log">Copy</button>
-        <button type="button" id="btn-download-log">Download</button>
-        <button type="button" id="btn-send-log">Send to server</button>
-      </div>
-      <div id="log-upload-status" class="sub" style="margin: 0 0 0.5rem;"></div>
-      <pre id="debug-log"></pre>
-    </section>
-
-    <section class="section">
       <h2>Audio recorder</h2>
       <p class="sub" style="margin-bottom: 0.75rem;">Record from mic, then play back.</p>
       <div class="row">
@@ -259,173 +204,68 @@
     const btnCheck = $("btn-check");
     const btnConnect = $("btn-connect");
     const btnDisconnect = $("btn-disconnect");
-    const debugLogEl = $("debug-log");
-    const debugVerboseEl = $("debug-verbose");
-    const debugAudioEl = $("debug-audio");
-    const debugAutoscrollEl = $("debug-autoscroll");
-    const btnClearLog = $("btn-clear-log");
-    const btnCopyLog = $("btn-copy-log");
-    const btnDownloadLog = $("btn-download-log");
-    const btnSendLog = $("btn-send-log");
-    const logUploadStatusEl = $("log-upload-status");
-
-    const LOG_MAX = 400;
-    const logLines = [];
-    let micChunkCount = 0;
-    let audioDeltaCount = 0;
-
-    function ts() {
-      const d = new Date();
-      return d.toLocaleTimeString("en-GB", { hour12: false }) + "." + String(d.getMilliseconds()).padStart(3, "0");
-    }
-
-    function redactAuth(obj) {
-      if (!obj || typeof obj !== "object") return obj;
-      const copy = { ...obj };
-      if (copy.apiKey) copy.apiKey = `[redacted ${copy.apiKey.length} chars]`;
-      if (copy.audio) copy.audio = `[b64 ${copy.audio.length} chars]`;
-      if (copy.delta && copy.type?.includes("audio")) copy.delta = `[b64 ${copy.delta.length} chars]`;
-      if (copy.delta && copy.type?.includes("text")) copy.delta = copy.delta.length > 120 ? copy.delta.slice(0, 120) + "…" : copy.delta;
-      return copy;
-    }
-
-    function formatDetail(detail) {
-      if (detail == null) return "";
-      if (typeof detail === "string") return detail;
-      try {
-        return JSON.stringify(redactAuth(detail), null, debugVerboseEl.checked ? 2 : 0);
-      } catch {
-        return String(detail);
-      }
-    }
-
-    function uiLog(kind, message, detail = null) {
-      const line = { t: ts(), kind, message, detail };
-      logLines.push(line);
-      if (logLines.length > LOG_MAX) logLines.shift();
-
-      const el = document.createElement("div");
-      el.className = `log-line ${kind}`;
-      const detailText = detail != null ? "\n" + formatDetail(detail) : "";
-      el.textContent = `[${line.t}] [${kind.toUpperCase()}] ${message}${detailText}`;
-      debugLogEl.appendChild(el);
-      while (debugLogEl.childNodes.length > LOG_MAX) {
-        debugLogEl.removeChild(debugLogEl.firstChild);
-      }
-      if (debugAutoscrollEl.checked) {
-        debugLogEl.scrollTop = debugLogEl.scrollHeight;
-      }
-      console.log(`[session-simple] [${kind}]`, message, detail ?? "");
-    }
-
-    function collectLogLines() {
-      return logLines.map((line) => {
-        const detailText = line.detail != null ? "\n" + formatDetail(line.detail) : "";
-        return `[${line.t}] [${line.kind.toUpperCase()}] ${line.message}${detailText}`;
-      });
-    }
-
-    function snapshotSessionState() {
-      return {
-        active,
-        wsState: ws?.readyState ?? null,
-        micChunksSent: micChunkCount,
-        audioDeltasReceived: audioDeltaCount,
-        voice: voiceEl.value,
-        model: modelEl.value,
-        page: "session-simple",
-      };
-    }
-
-    function setLogUploadStatus(msg, kind = "") {
-      logUploadStatusEl.textContent = msg;
-      logUploadStatusEl.className = kind;
-    }
-
-    function downloadLogFile() {
-      const lines = collectLogLines();
-      if (!lines.length) {
-        setLogUploadStatus("No log lines yet", "err");
-        return;
-      }
-      const text = lines.join("\n");
-      const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = `session-simple-log-${Date.now()}.txt`;
-      a.click();
-      URL.revokeObjectURL(a.href);
-      setLogUploadStatus("Downloaded locally", "ok");
-      uiLog("sys", "Log downloaded locally");
-    }
-
-    async function sendLogToServer() {
-      const lines = collectLogLines();
-      if (!lines.length) {
-        setLogUploadStatus("No log lines yet", "err");
-        return;
-      }
-      btnSendLog.disabled = true;
-      setLogUploadStatus("Sending…");
-      try {
-        const res = await fetch("/api/debug-log", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            source: "session-simple",
-            lines,
-            state: snapshotSessionState(),
-            userAgent: navigator.userAgent,
-          }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          setLogUploadStatus(data.error || "Upload failed", "err");
-          uiLog("err", "Log upload failed", { status: res.status, error: data.error });
-          return;
-        }
-        setLogUploadStatus(`Sent — download in Config CMS (id: ${data.id})`, "ok");
-        uiLog("sys", "Log sent to server", { id: data.id });
-      } catch (e) {
-        setLogUploadStatus("Could not reach server", "err");
-        uiLog("err", "Log upload error", { message: e?.message });
-      } finally {
-        btnSendLog.disabled = false;
-      }
-    }
-
-    btnClearLog.addEventListener("click", () => {
-      logLines.length = 0;
-      debugLogEl.textContent = "";
-      micChunkCount = 0;
-      audioDeltaCount = 0;
-      uiLog("sys", "Log cleared");
-    });
-
-    btnCopyLog.addEventListener("click", async () => {
-      const text = collectLogLines().join("\n");
-      try {
-        await navigator.clipboard.writeText(text);
-        uiLog("sys", "Log copied to clipboard");
-      } catch {
-        uiLog("err", "Could not copy log");
-      }
-    });
-
-    btnDownloadLog.addEventListener("click", downloadLogFile);
-    btnSendLog.addEventListener("click", sendLogToServer);
 
     let ws = null;
     let ctx = null;
     let stream = null;
     let source = null;
-    let proc = null;
+    let micNode = null; // AudioWorkletNode, or ScriptProcessor fallback
     let active = false;
-    let queue = [];
-    let playing = false;
     let nextPlayTime = 0;
-    let src = null;
+    const activeSources = new Set();
     let responseText = "";
+
+    // Mic capture runs in an AudioWorklet (audio thread) so low-end devices
+    // don't drop microphone chunks when the main thread is busy. It
+    // downsamples from the device's native rate to 24 kHz PCM16.
+    const MIC_WORKLET_CODE = `
+      class Pcm24Capture extends AudioWorkletProcessor {
+        constructor() {
+          super();
+          this.ratio = sampleRate / 24000;
+          this.inBuf = new Float32Array(0);
+          this.CHUNK = 1200; // 50ms at 24kHz
+        }
+        process(inputs) {
+          const ch = inputs[0] && inputs[0][0];
+          if (ch && ch.length) {
+            const merged = new Float32Array(this.inBuf.length + ch.length);
+            merged.set(this.inBuf);
+            merged.set(ch, this.inBuf.length);
+            this.inBuf = merged;
+          }
+          const needed = Math.ceil(this.CHUNK * this.ratio) + 1;
+          while (this.inBuf.length >= needed) {
+            const out = new Int16Array(this.CHUNK);
+            for (let i = 0; i < this.CHUNK; i++) {
+              const pos = i * this.ratio;
+              const i0 = pos | 0;
+              const frac = pos - i0;
+              let s = this.inBuf[i0] + (this.inBuf[i0 + 1] - this.inBuf[i0]) * frac;
+              if (s > 1) s = 1; else if (s < -1) s = -1;
+              out[i] = s < 0 ? s * 32768 : s * 32767;
+            }
+            this.inBuf = this.inBuf.slice(Math.round(this.CHUNK * this.ratio));
+            this.port.postMessage(out.buffer, [out.buffer]);
+          }
+          return true;
+        }
+      }
+      registerProcessor("pcm24-capture", Pcm24Capture);
+    `;
+
+    async function loadWorklet(context) {
+      if (!context.audioWorklet) return false;
+      try {
+        const blob = new Blob([MIC_WORKLET_CODE], { type: "application/javascript" });
+        const url = URL.createObjectURL(blob);
+        await context.audioWorklet.addModule(url);
+        URL.revokeObjectURL(url);
+        return true;
+      } catch {
+        return false;
+      }
+    }
 
     function getFormCfg() {
       return {
@@ -437,6 +277,8 @@
     }
 
     function setStatus(text, kind = "") {
+      // Skip redundant DOM writes — this is called per audio chunk.
+      if (statusEl.textContent === text && statusEl.className === kind) return;
       statusEl.textContent = text;
       statusEl.className = kind;
     }
@@ -461,38 +303,36 @@
     function b64(buf) {
       const b = new Uint8Array(buf);
       let s = "";
-      for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]);
+      const STEP = 0x8000;
+      for (let i = 0; i < b.length; i += STEP) {
+        s += String.fromCharCode.apply(null, b.subarray(i, i + STEP));
+      }
       return btoa(s);
     }
 
+    function b64ToBuf(str) {
+      const bin = atob(str);
+      const len = bin.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i);
+      return bytes.buffer;
+    }
+
     async function loadServerConfig() {
-      uiLog("sys", "GET /api/config");
       try {
         const res = await fetch("/api/config");
-        uiLog("sys", `/api/config → ${res.status}`);
         if (res.status === 401) {
           setStatus("Not logged in — log in first", "err");
-          uiLog("err", "Not logged in");
           return null;
         }
-        if (!res.ok) {
-          uiLog("err", "Config fetch failed", { status: res.status });
-          return null;
-        }
+        if (!res.ok) return null;
         const cfg = await res.json();
         if (cfg.apiKey) apiKeyEl.placeholder = "Loaded from server (••••••••)";
         if (cfg.voice) voiceEl.value = cfg.voice;
         if (cfg.model) modelEl.value = cfg.model;
         if (cfg.instructions) instructionsEl.value = cfg.instructions;
-        uiLog("sys", "Config loaded", {
-          hasApiKey: Boolean(cfg.apiKey),
-          voice: cfg.voice,
-          model: cfg.model,
-          instructionsLen: (cfg.instructions || "").length,
-        });
         return cfg;
-      } catch (e) {
-        uiLog("err", "Config fetch error", { message: e?.message });
+      } catch {
         return null;
       }
     }
@@ -500,7 +340,6 @@
     async function checkConnection() {
       btnCheck.disabled = true;
       setStatus("Checking…");
-      uiLog("sys", "Check started");
       const lines = [];
       let ok = true;
 
@@ -518,7 +357,6 @@
         ok = false;
         showCheck(lines, ok);
         setStatus("Check failed — no API key", "err");
-        uiLog("err", "Check failed — no API key");
         btnCheck.disabled = active;
         return;
       }
@@ -527,30 +365,24 @@
       showCheck(lines, ok);
 
       const wsProtocol = location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${wsProtocol}//${location.host}/ws`;
-      uiLog("sys", "Opening check WebSocket", { url: wsUrl });
-      const socket = new WebSocket(wsUrl);
+      const socket = new WebSocket(`${wsProtocol}//${location.host}/ws`);
 
       try {
         await new Promise((resolve, reject) => {
           const timer = setTimeout(() => reject(new Error("Timeout (12s)")), 12000);
 
           socket.onopen = () => {
-            uiLog("sys", "Check WS open");
-            const auth = {
+            socket.send(JSON.stringify({
               type: "client.auth",
               apiKey,
               instructions: cfg.instructions,
               voice: cfg.voice,
               model: cfg.model,
-            };
-            uiLog("out", "client.auth", auth);
-            socket.send(JSON.stringify(auth));
+            }));
           };
 
           socket.onmessage = ({ data }) => {
             const e = JSON.parse(data);
-            uiLog("in", e.type || "message", e);
             if (e.type === "client.error") {
               clearTimeout(timer);
               reject(new Error(e.message));
@@ -564,12 +396,10 @@
 
           socket.onerror = () => {
             clearTimeout(timer);
-            uiLog("err", "Check WS error");
             reject(new Error("WebSocket error"));
           };
 
           socket.onclose = (ev) => {
-            uiLog("sys", "Check WS closed", { code: ev.code, reason: ev.reason, wasClean: ev.wasClean });
             if (ev.code === 4001) {
               clearTimeout(timer);
               reject(new Error("Login required — go to /login"));
@@ -580,12 +410,10 @@
         lines.push("✓ WebSocket connected");
         lines.push("✓ Inworld session ready");
         setStatus("Check passed", "ok");
-        uiLog("sys", "Check passed");
       } catch (e) {
         lines.push(`✗ ${e.message || e}`);
         ok = false;
         setStatus("Check failed", "err");
-        uiLog("err", "Check failed", { message: e?.message || String(e) });
       } finally {
         try { socket.close(); } catch {}
         showCheck(lines, ok);
@@ -595,115 +423,110 @@
 
     function openSessionWebSocket(cfg, apiKey) {
       const wsProtocol = location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${wsProtocol}//${location.host}/ws`;
-      uiLog("sys", "Opening session WebSocket", { url: wsUrl });
-      const socket = new WebSocket(wsUrl);
+      const socket = new WebSocket(`${wsProtocol}//${location.host}/ws`);
       return new Promise((resolve, reject) => {
         socket.onopen = () => {
-          uiLog("sys", "Session WS open");
-          const auth = {
+          socket.send(JSON.stringify({
             type: "client.auth",
             apiKey,
             instructions: cfg.instructions,
             voice: cfg.voice,
             model: cfg.model,
-          };
-          uiLog("out", "client.auth", auth);
-          socket.send(JSON.stringify(auth));
+          }));
           resolve(socket);
         };
-        socket.onerror = () => {
-          uiLog("err", "Session WS error");
-          reject(new Error("WebSocket failed"));
-        };
+        socket.onerror = () => reject(new Error("WebSocket failed"));
         socket.onclose = (ev) => {
-          uiLog("sys", "Session WS closed (during connect)", { code: ev.code, reason: ev.reason });
           if (ev.code === 4001) reject(new Error("Login required"));
           else if (!active) reject(new Error("WebSocket closed"));
         };
       });
     }
 
-    function setupMicPipeline() {
+    function sendMicChunk(pcmBuffer) {
+      if (ws?.readyState !== WebSocket.OPEN) return;
+      ws.send(JSON.stringify({ type: "input_audio_buffer.append", audio: b64(pcmBuffer) }));
+    }
+
+    function downsampleTo24k(f32, inRate) {
+      if (inRate === 24000) return f32;
+      const ratio = inRate / 24000;
+      const outLen = Math.floor(f32.length / ratio);
+      const out = new Float32Array(outLen);
+      for (let i = 0; i < outLen; i++) {
+        const pos = i * ratio;
+        const i0 = pos | 0;
+        const frac = pos - i0;
+        const i1 = Math.min(i0 + 1, f32.length - 1);
+        out[i] = f32[i0] + (f32[i1] - f32[i0]) * frac;
+      }
+      return out;
+    }
+
+    function setupMicPipeline(hasWorklet) {
       if (ctx?.state === "suspended") ctx.resume().catch(() => {});
-      uiLog("sys", "Mic pipeline started", { sampleRate: ctx.sampleRate, state: ctx.state });
-      micChunkCount = 0;
       source = ctx.createMediaStreamSource(stream);
-      proc = ctx.createScriptProcessor(2048, 1, 1);
-      proc.onaudioprocess = ({ inputBuffer }) => {
-        if (ws?.readyState !== WebSocket.OPEN) return;
-        const f = inputBuffer.getChannelData(0);
-        const pcm = new Int16Array(f.length);
-        for (let i = 0; i < f.length; i++) pcm[i] = Math.max(-32768, Math.min(32767, f[i] * 32768));
-        ws.send(JSON.stringify({ type: "input_audio_buffer.append", audio: b64(pcm.buffer) }));
-        micChunkCount++;
-        if (debugAudioEl.checked && (micChunkCount === 1 || micChunkCount % 25 === 0)) {
-          uiLog("out", `input_audio_buffer.append #${micChunkCount}`, { samples: pcm.length });
-        }
-      };
       const silent = ctx.createGain();
       silent.gain.value = 0;
-      source.connect(proc);
-      proc.connect(silent);
+
+      if (hasWorklet) {
+        micNode = new AudioWorkletNode(ctx, "pcm24-capture", {
+          numberOfInputs: 1,
+          numberOfOutputs: 1,
+          channelCount: 1,
+        });
+        micNode.port.onmessage = ({ data }) => sendMicChunk(data);
+        source.connect(micNode);
+        micNode.connect(silent);
+      } else {
+        const inRate = ctx.sampleRate;
+        micNode = ctx.createScriptProcessor(4096, 1, 1);
+        micNode.onaudioprocess = ({ inputBuffer }) => {
+          const f = downsampleTo24k(inputBuffer.getChannelData(0), inRate);
+          const pcm = new Int16Array(f.length);
+          for (let i = 0; i < f.length; i++) {
+            pcm[i] = Math.max(-32768, Math.min(32767, f[i] * 32768));
+          }
+          sendMicChunk(pcm.buffer);
+        };
+        source.connect(micNode);
+        micNode.connect(silent);
+      }
       silent.connect(ctx.destination);
     }
 
     function stopAudio() {
-      queue.length = 0;
-      playing = false;
+      for (const node of activeSources) {
+        try { node.stop(); } catch {}
+      }
+      activeSources.clear();
       nextPlayTime = 0;
-      try { src?.stop(); } catch {}
-      src = null;
     }
 
-    function playNext() {
-      if (!queue.length) {
-        playing = false;
-        return;
-      }
-      playing = true;
-      const pcm16 = new Int16Array(queue.shift());
+    // Schedule each chunk immediately at a chained start time instead of
+    // waiting for onended callbacks — those run on the main thread and cause
+    // gaps on slow devices.
+    function schedulePcmChunk(arrayBuffer) {
+      const pcm16 = new Int16Array(arrayBuffer);
       const len = pcm16.length;
+      if (!len) return;
       const f32 = new Float32Array(len);
       for (let i = 0; i < len; i++) f32[i] = pcm16[i] / 32768;
 
       const buf = ctx.createBuffer(1, len, 24000);
       buf.getChannelData(0).set(f32);
-      src = ctx.createBufferSource();
-      src.buffer = buf;
-      const t = Math.max(ctx.currentTime, nextPlayTime);
-      src.connect(ctx.destination);
+      const node = ctx.createBufferSource();
+      node.buffer = buf;
+      node.connect(ctx.destination);
+      const t = Math.max(ctx.currentTime + 0.05, nextPlayTime);
+      node.start(t);
       nextPlayTime = t + buf.duration;
-      src.onended = playNext;
-      src.start(t);
-    }
-
-    function logWsEvent(e) {
-      if (e.type === "response.output_audio.delta") {
-        audioDeltaCount++;
-        if (!debugAudioEl.checked) {
-          if (audioDeltaCount === 1 || audioDeltaCount % 50 === 0) {
-            uiLog("in", `response.output_audio.delta ×${audioDeltaCount}`, {
-              response_id: e.response_id,
-              lastBytes: e.delta?.length,
-            });
-          }
-          return;
-        }
-      }
-      uiLog("in", e.type || "message", e);
+      activeSources.add(node);
+      node.onended = () => activeSources.delete(node);
     }
 
     function handleWsMessage(data) {
-      let e;
-      try {
-        e = JSON.parse(data);
-      } catch (err) {
-        uiLog("err", "Invalid WS JSON", { raw: String(data).slice(0, 200) });
-        return;
-      }
-
-      logWsEvent(e);
+      const e = JSON.parse(data);
 
       if (e.type === "client.error") {
         setStatus(e.message, "err");
@@ -723,9 +546,7 @@
 
       if (e.type === "response.output_audio.delta") {
         setStatus("Live — speak anytime", "live");
-        const pcm16 = Uint8Array.from(atob(e.delta), (c) => c.charCodeAt(0));
-        queue.push(pcm16.buffer);
-        if (!playing) playNext();
+        schedulePcmChunk(b64ToBuf(e.delta));
       }
 
       if (e.type === "conversation.item.input_audio_transcription.completed" && e.transcript?.trim()) {
@@ -744,9 +565,13 @@
     }
 
     function releaseMic() {
-      try { proc?.disconnect(); } catch {}
+      if (micNode) {
+        try { micNode.port?.close?.(); } catch {}
+        micNode.onaudioprocess = null;
+        try { micNode.disconnect(); } catch {}
+      }
       try { source?.disconnect(); } catch {}
-      proc = null;
+      micNode = null;
       source = null;
       try { stream?.getTracks().forEach((t) => t.stop()); } catch {}
       stream = null;
@@ -755,16 +580,11 @@
     }
 
     function cleanup() {
-      const wasLive = active || ws || stream;
-      if (!wasLive) return;
-      uiLog("sys", "Cleanup", { micChunksSent: micChunkCount, audioDeltasReceived: audioDeltaCount });
       stopAudio();
       try { ws?.close(); } catch {}
       ws = null;
       releaseMic();
       setUiConnected(false);
-      micChunkCount = 0;
-      audioDeltaCount = 0;
       if (!statusEl.classList.contains("err")) setStatus("Disconnected");
       btnConnect.textContent = "Connect";
     }
@@ -772,13 +592,11 @@
     async function connect() {
       if (active) return;
 
-      uiLog("sys", "Connect started");
       const serverCfg = await loadServerConfig().catch(() => null);
       const cfg = getFormCfg();
       const apiKey = cfg.apiKey || serverCfg?.apiKey?.trim() || "";
       if (!apiKey) {
         setStatus("No API key", "err");
-        uiLog("err", "Connect aborted — no API key");
         return;
       }
 
@@ -788,50 +606,45 @@
       userTextEl.textContent = "—";
       agentTextEl.textContent = "—";
       responseText = "";
-      audioDeltaCount = 0;
-      micChunkCount = 0;
 
+      let hasWorklet = false;
       try {
-        uiLog("sys", "Requesting getUserMedia");
-        ctx = new AudioContext({ sampleRate: 24000 });
+        // Run the context at the device's native rate — forcing 24 kHz makes
+        // some Android devices resample every audio callback. The worklet
+        // downsamples mic input; playback buffers resample automatically.
+        ctx = new AudioContext({ latencyHint: "interactive" });
+        const workletPromise = loadWorklet(ctx);
         stream = await navigator.mediaDevices.getUserMedia({
-          audio: { sampleRate: 24000, channelCount: 1, echoCancellation: true, noiseSuppression: true },
-        });
-        uiLog("sys", "getUserMedia OK", {
-          tracks: stream.getAudioTracks().map((t) => ({ label: t.label, readyState: t.readyState })),
+          audio: {
+            channelCount: 1,
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
         });
         ws = await openSessionWebSocket(cfg, apiKey);
+        hasWorklet = await workletPromise;
       } catch (e) {
         const denied = e?.name === "NotAllowedError" || e?.name === "NotFoundError";
         setStatus(denied ? "Microphone denied" : (e.message || "Connection failed"), "err");
-        uiLog("err", "Connect failed", { name: e?.name, message: e?.message });
         cleanup();
         return;
       }
 
       ws.onmessage = ({ data }) => {
-        try { handleWsMessage(data); } catch (err) {
-          uiLog("err", "handleWsMessage threw", { message: err?.message });
-          console.error(err);
-        }
+        try { handleWsMessage(data); } catch (err) { console.error(err); }
       };
-      ws.onclose = (ev) => {
-        uiLog("sys", "Session WS closed", { code: ev.code, reason: ev.reason, wasClean: ev.wasClean });
-        cleanup();
-      };
-      ws.onerror = () => uiLog("err", "Session WS error (live)");
+      ws.onclose = () => cleanup();
 
-      setupMicPipeline();
+      setupMicPipeline(hasWorklet);
       setUiConnected(true);
       btnConnect.textContent = "Connect";
       setStatus("Live — speak anytime", "live");
-      uiLog("sys", "Session live");
     }
 
     btnCheck.addEventListener("click", checkConnection);
     btnConnect.addEventListener("click", connect);
     btnDisconnect.addEventListener("click", () => {
-      uiLog("sys", "Disconnect clicked");
       try { ws?.close(); } catch {}
       cleanup();
     });
@@ -931,7 +744,6 @@
     voiceEl.value = DEFAULT_VOICE;
     modelEl.value = DEFAULT_MODEL;
     instructionsEl.value = DEFAULT_PROMPT;
-    uiLog("sys", "Page ready", { host: location.host, protocol: location.protocol });
     loadServerConfig();
   </script>
 </body>
