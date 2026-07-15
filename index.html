@@ -4756,10 +4756,23 @@
 
     function dismissIdleVideoScreen() {
       document.body.classList.add("idle-video-dismissed");
-      idleVideoEl.pause();
-      transitionVideoEl.pause();
+      silenceBackgroundVideosForSession();
+    }
+
+    function silenceBackgroundVideosForSession() {
       playingTransitionVideo = false;
       setTransitionVideoMode(false);
+      transitionVideoEl.onended = null;
+      transitionVideoEl.onerror = null;
+      for (const videoEl of [idleVideoEl, transitionVideoEl]) {
+        if (!videoEl) continue;
+        try { videoEl.pause(); } catch {}
+        videoEl.muted = true;
+        const route = videoAudioRoutes.get(videoEl);
+        if (route && videoAudioContext) {
+          route.gain.gain.setValueAtTime(0, videoAudioContext.currentTime);
+        }
+      }
     }
 
     function restoreIdleVideoScreen() {
@@ -5112,6 +5125,7 @@
         avatar?.refreshAfterVisible();
         return;
       }
+      silenceBackgroundVideosForSession();
       inSession = true;
       document.body.classList.add("in-session");
       if (!avatar?.loaded) setStatus("Loading avatar…");
@@ -5987,6 +6001,7 @@
       }
 
       uiLog("session", "connectConversation begin", "hello");
+      silenceBackgroundVideosForSession();
       const cfg = cachedConfig || await getConfig();
       const apiKey = cfg.apiKey?.trim();
       if (!apiKey) {
