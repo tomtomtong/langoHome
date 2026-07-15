@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync, readdirSync, statSync, copyFileSync, rmSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync, readdirSync, statSync, copyFileSync } from 'fs';
 import { randomBytes, timingSafeEqual } from 'crypto';
 import { createServer } from 'http';
 import { createRequire } from 'module';
@@ -28,10 +28,8 @@ const SESSIONS_PATH = join(CONFIG_DIR, 'sessions.json');
 const DEBUG_LOG_PATH = join(CONFIG_DIR, 'hello-debug-log.json');
 const DEBUG_LOG_MAX_REPORTS = 20;
 const CONVERSATIONS_DB_PATH = join(CONFIG_DIR, 'conversations.db');
-const USER_AUDIO_DIR = join(CONFIG_DIR, 'user-audio');
+const SESSION_AUDIO_DIR = join(CONFIG_DIR, 'session-audio');
 const USER_AUDIO_SAMPLE_RATE = 24000;
-const USER_AUDIO_PREROLL_CHUNKS = 8;
-const USER_AUDIO_MAX_IDLE_CHUNKS = 16;
 const IDLE_VIDEO_DIR = join(CONFIG_DIR, 'idle-video');
 const TRANSITION_VIDEO_DIR = join(CONFIG_DIR, 'transition-video');
 const VIDEO_PAIRS_DIR = join(CONFIG_DIR, 'video-pairs');
@@ -60,7 +58,6 @@ function ensureConfigDir() {
 }
 
 ensureConfigDir();
-if (!existsSync(USER_AUDIO_DIR)) mkdirSync(USER_AUDIO_DIR, { recursive: true });
 const conversationsDb = new Database(CONVERSATIONS_DB_PATH);
 conversationsDb.exec(`
   CREATE TABLE IF NOT EXISTS conversations (
@@ -110,8 +107,10 @@ conversationsDb.exec(`
   CREATE INDEX IF NOT EXISTS idx_game_plays_date_game ON game_plays(play_date, game_id);
 `);
 try {
-  conversationsDb.exec(`ALTER TABLE conversation_turns ADD COLUMN audio_path TEXT`);
-} catch { /* column already exists */ }
+  conversationsDb.exec(`ALTER TABLE conversations ADD COLUMN user_audio_path TEXT`);
+} catch (e) {
+  if (!String(e.message).includes('duplicate column')) throw e;
+}
 
 const insertConversationStmt = conversationsDb.prepare(`
   INSERT INTO conversations (id, username, role, started_at, turn_count)
@@ -121,22 +120,14 @@ const endConversationStmt = conversationsDb.prepare(`
   UPDATE conversations SET ended_at = ? WHERE id = ? AND ended_at IS NULL
 `);
 const insertTurnStmt = conversationsDb.prepare(`
-  INSERT INTO conversation_turns (conversation_id, role, text, event_type, created_at, audio_path)
-  VALUES (?, ?, ?, ?, ?, ?)
-`);
-const updateTurnAudioPathStmt = conversationsDb.prepare(`
-  UPDATE conversation_turns SET audio_path = ? WHERE id = ?
-`);
-const getConversationTurnStmt = conversationsDb.prepare(`
-  SELECT id, conversation_id, role, audio_path
-  FROM conversation_turns
-  WHERE id = ?
+  INSERT INTO conversation_turns (conversation_id, role, text, event_type, created_at)
+  VALUES (?, ?, ?, ?, ?)
 `);
 const incrementTurnCountStmt = conversationsDb.prepare(`
   UPDATE conversations SET turn_count = turn_count + 1 WHERE id = ?
 `);
 const listConversationsStmt = conversationsDb.prepare(`
-  SELECT id, username, role, started_at, ended_at, turn_count
+  SELECT id, username, role, started_at, ended_at, turn_count, user_audio_path
   FROM conversations
   WHERE (? IS NULL OR username = ?)
   ORDER BY started_at DESC
@@ -146,11 +137,14 @@ const countConversationsStmt = conversationsDb.prepare(`
   SELECT COUNT(*) AS total FROM conversations WHERE (? IS NULL OR username = ?)
 `);
 const getConversationStmt = conversationsDb.prepare(`
-  SELECT id, username, role, started_at, ended_at, turn_count
+  SELECT id, username, role, started_at, ended_at, turn_count, user_audio_path
   FROM conversations WHERE id = ?
 `);
+const setConversationUserAudioPathStmt = conversationsDb.prepare(`
+  UPDATE conversations SET user_audio_path = ? WHERE id = ?
+`);
 const getConversationTurnsStmt = conversationsDb.prepare(`
-  SELECT id, role, text, event_type, created_at, audio_path
+  SELECT role, text, event_type, created_at
   FROM conversation_turns
   WHERE conversation_id = ?
   ORDER BY created_at ASC, id ASC
@@ -191,8 +185,55 @@ const getProfileSyncLogForConversationStmt = conversationsDb.prepare(`
   LIMIT 1
 `);
 
-function writeWavFile(filePath, pcmBuffer, sampleRate = USER_AUDIO_SAMPLE_RATE) {
-  const dataSize = pcmBuffer.length;
+function createConversationRecord(username, role) {
+  const id = `${Date.now()}-${randomBytes(4).toString('hex')}`;
+  insertConversationStmt.run(id, username, role, Date.now());
+  return id;
+}
+
+function endConversationRecord(id) {
+  endConversationStmt.run(Date.now(), id);
+}
+
+function addConversationTurn(conversationId, role, text, eventType) {
+  const trimmed = String(text || '').trim();
+  if (!trimmed) return;
+  insertTurnStmt.run(conversationId, role, trimmed, eventType || null, Date.now());
+  incrementTurnCountStmt.run(conversationId);
+}
+
+function rowToConversation(row) {
+  return {
+    id: row.id,
+    username: row.username,
+    role: row.role,
+    startedAt: row.started_at,
+    endedAt: row.ended_at,
+    turnCount: row.turn_count,
+    hasUserAudio: Boolean(row.user_audio_path),
+    userAudioUrl: row.user_audio_path ? `/api/conversations/${row.id}/user-audio` : null,
+  };
+}
+
+function ensureSessionAudioDir() {
+  if (!existsSync(SESSION_AUDIO_DIR)) mkdirSync(SESSION_AUDIO_DIR, { recursive: true });
+}
+
+function appendUserAudioFromMessage(userAudioChunks, msg) {
+  let parsed;
+  try {
+    parsed = JSON.parse(msg.toString());
+  } catch {
+    return;
+  }
+  if (parsed?.type !== 'input_audio_buffer.append' || !parsed.audio) return;
+  const buf = Buffer.from(parsed.audio, 'base64');
+  if (buf.length) userAudioChunks.push(buf);
+}
+
+function buildWavBuffer(pcmChunks, sampleRate = USER_AUDIO_SAMPLE_RATE) {
+  const pcm = Buffer.concat(pcmChunks);
+  const dataSize = pcm.length;
   const header = Buffer.alloc(44);
   header.write('RIFF', 0);
   header.writeUInt32LE(36 + dataSize, 4);
@@ -207,72 +248,32 @@ function writeWavFile(filePath, pcmBuffer, sampleRate = USER_AUDIO_SAMPLE_RATE) 
   header.writeUInt16LE(16, 34);
   header.write('data', 36);
   header.writeUInt32LE(dataSize, 40);
-  writeFileSync(filePath, Buffer.concat([header, pcmBuffer]));
+  return Buffer.concat([header, pcm]);
 }
 
-function saveUserTurnAudio(conversationId, turnId, chunks) {
-  if (!chunks?.length) return null;
-  const pcm = Buffer.concat(chunks);
-  if (!pcm.length) return null;
-  const dir = join(USER_AUDIO_DIR, conversationId);
-  mkdirSync(dir, { recursive: true });
-  const relativePath = `${conversationId}/${turnId}.wav`;
-  writeWavFile(join(USER_AUDIO_DIR, relativePath), pcm);
-  return relativePath;
-}
-
-function deleteConversationAudioFiles(conversationId) {
-  const dir = join(USER_AUDIO_DIR, conversationId);
-  if (!existsSync(dir)) return;
-  rmSync(dir, { recursive: true, force: true });
-}
-
-function getConversationTurnAudioPath(turnId) {
-  const row = getConversationTurnStmt.get(turnId);
-  if (!row?.audio_path) return null;
-  const filePath = join(USER_AUDIO_DIR, row.audio_path);
-  return existsSync(filePath) ? filePath : null;
-}
-
-function createConversationRecord(username, role) {
-  const id = `${Date.now()}-${randomBytes(4).toString('hex')}`;
-  insertConversationStmt.run(id, username, role, Date.now());
-  return id;
-}
-
-function endConversationRecord(id) {
-  endConversationStmt.run(Date.now(), id);
-}
-
-function addConversationTurn(conversationId, role, text, eventType, audioChunks = null) {
-  const trimmed = String(text || '').trim();
-  if (!trimmed) return null;
-  const result = insertTurnStmt.run(
-    conversationId,
-    role,
-    trimmed,
-    eventType || null,
-    Date.now(),
-    null,
-  );
-  incrementTurnCountStmt.run(conversationId);
-  const turnId = result.lastInsertRowid;
-  if (role === 'user' && audioChunks?.length) {
-    const audioPath = saveUserTurnAudio(conversationId, turnId, audioChunks);
-    if (audioPath) updateTurnAudioPathStmt.run(audioPath, turnId);
+function saveUserSessionAudio(conversationId, pcmChunks) {
+  if (!pcmChunks.length) return null;
+  ensureSessionAudioDir();
+  const filename = `${conversationId}.wav`;
+  const filePath = join(SESSION_AUDIO_DIR, filename);
+  try {
+    writeFileSync(filePath, buildWavBuffer(pcmChunks));
+    setConversationUserAudioPathStmt.run(filename, conversationId);
+    return filename;
+  } catch (e) {
+    console.error('[session-audio] save failed:', e.message);
+    return null;
   }
-  return turnId;
 }
 
-function rowToConversation(row) {
-  return {
-    id: row.id,
-    username: row.username,
-    role: row.role,
-    startedAt: row.started_at,
-    endedAt: row.ended_at,
-    turnCount: row.turn_count,
-  };
+function deleteUserSessionAudio(filename) {
+  if (!filename) return;
+  const filePath = join(SESSION_AUDIO_DIR, filename);
+  try {
+    if (existsSync(filePath)) unlinkSync(filePath);
+  } catch (e) {
+    console.error('[session-audio] delete failed:', e.message);
+  }
 }
 
 function listConversationRecords({ username = null, limit = 50, offset = 0 } = {}) {
@@ -293,21 +294,20 @@ function getConversationRecord(id) {
   const row = getConversationStmt.get(id);
   if (!row) return null;
   const turns = getConversationTurnsStmt.all(id).map((turn) => ({
-    id: turn.id,
     role: turn.role,
     text: turn.text,
     eventType: turn.event_type,
     createdAt: turn.created_at,
-    audioUrl: turn.audio_path ? `/api/conversations/turns/${turn.id}/audio` : null,
   }));
   return { ...rowToConversation(row), turns };
 }
 
 function deleteConversationRecord(id) {
+  const row = getConversationStmt.get(id);
+  if (row?.user_audio_path) deleteUserSessionAudio(row.user_audio_path);
   deleteConversationTurnsStmt.run(id);
   deleteProfileSyncLogsForConversationStmt.run(id);
   const result = deleteConversationStmt.run(id);
-  if (result.changes > 0) deleteConversationAudioFiles(id);
   return result.changes > 0;
 }
 
@@ -3160,18 +3160,20 @@ const server = createServer((req, res) => {
     return;
   }
 
-  const turnAudioMatch = url.match(/^\/api\/conversations\/turns\/(\d+)\/audio$/);
-  if (turnAudioMatch && req.method === 'GET') {
-    const filePath = getConversationTurnAudioPath(Number(turnAudioMatch[1]));
-    if (!filePath) {
-      sendJson(res, 404, { error: 'User audio not found for this turn.' });
+  const conversationMatch = url.match(/^\/api\/conversations\/([^/]+)$/);
+  const userAudioMatch = url.match(/^\/api\/conversations\/([^/]+)\/user-audio$/);
+  if (userAudioMatch && req.method === 'GET') {
+    const conversationId = userAudioMatch[1];
+    const row = getConversationStmt.get(conversationId);
+    if (!row?.user_audio_path) {
+      sendJson(res, 404, { error: 'User audio not found for this session.' });
       return;
     }
+    const filePath = join(SESSION_AUDIO_DIR, row.user_audio_path);
     serveFile(res, filePath);
     return;
   }
 
-  const conversationMatch = url.match(/^\/api\/conversations\/([^/]+)$/);
   if (conversationMatch) {
     const conversationId = conversationMatch[1];
     if (req.method === 'GET') {
@@ -3677,14 +3679,12 @@ const GREET = JSON.stringify({
 function connectToInworld(apiKey, browser, session, userInfo = {}) {
   let setup = 0;
   let conversationFinished = false;
+  const userAudioChunks = [];
   const conversationId = createConversationRecord(
     userInfo.username || 'unknown',
     userInfo.role || 'unknown',
   );
   const recordedAgentResponses = new Set();
-  const userSpeechChunks = [];
-  let turnStartIndex = 0;
-  let capturingUserSpeech = false;
   const sessionCfg = buildSessionCfg(session);
   const api = new WebSocket(
     `wss://api.inworld.ai/api/v1/realtime/session?key=voice-${Date.now()}&protocol=realtime`,
@@ -3694,6 +3694,8 @@ function connectToInworld(apiKey, browser, session, userInfo = {}) {
   const finishConversation = () => {
     if (conversationFinished) return;
     conversationFinished = true;
+    const savedAudio = saveUserSessionAudio(conversationId, userAudioChunks);
+    if (savedAudio) console.log(`[session-audio] saved ${savedAudio}`);
     endConversationRecord(conversationId);
     queueProfileSyncFromConversation({
       username: userInfo.username,
@@ -3707,19 +3709,9 @@ function connectToInworld(apiKey, browser, session, userInfo = {}) {
     if (!parsed?.type) return;
     const t = parsed.type;
 
-    if (t === 'input_audio_buffer.speech_started') {
-      capturingUserSpeech = true;
-      turnStartIndex = Math.max(0, userSpeechChunks.length - USER_AUDIO_PREROLL_CHUNKS);
-      return;
-    }
-
     if (t === 'conversation.item.input_audio_transcription.completed') {
       const transcript = parsed.transcript?.trim();
-      const turnChunks = userSpeechChunks.slice(turnStartIndex);
-      userSpeechChunks.length = 0;
-      turnStartIndex = 0;
-      capturingUserSpeech = false;
-      if (transcript) addConversationTurn(conversationId, 'user', transcript, t, turnChunks);
+      if (transcript) addConversationTurn(conversationId, 'user', transcript, t);
       return;
     }
 
@@ -3768,19 +3760,8 @@ function connectToInworld(apiKey, browser, session, userInfo = {}) {
   });
 
   browser.on('message', (msg) => {
-    const str = msg.toString();
-    try {
-      const parsed = JSON.parse(str);
-      if (parsed?.type === 'input_audio_buffer.append' && parsed.audio) {
-        userSpeechChunks.push(Buffer.from(parsed.audio, 'base64'));
-        if (!capturingUserSpeech) {
-          while (userSpeechChunks.length > USER_AUDIO_MAX_IDLE_CHUNKS) {
-            userSpeechChunks.shift();
-          }
-        }
-      }
-    } catch { /* ignore non-JSON */ }
-    if (api.readyState === WebSocket.OPEN) api.send(str);
+    appendUserAudioFromMessage(userAudioChunks, msg);
+    if (api.readyState === WebSocket.OPEN) api.send(msg.toString());
   });
 
   browser.on('close', () => {
@@ -3872,6 +3853,7 @@ server.listen(port, '0.0.0.0', () => {
   console.log(`Games hub:  http://0.0.0.0:${port}/games/`);
   console.log(`Game database: ${GAME_DB_PATH}`);
   console.log(`Conversation logs: ${CONVERSATIONS_DB_PATH}`);
+  console.log(`Session audio: ${SESSION_AUDIO_DIR}`);
   console.log(`Inworld API: ${INWORLD_API_ENABLED ? 'enabled' : 'disabled'}`);
   if (CONFIG_DIR !== ROOT) console.log(`Config stored at ${CONFIG_PATH}`);
 });

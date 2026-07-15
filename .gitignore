@@ -6,7 +6,6 @@ config.json
 sessions.json
 hello-debug-log.json
 conversations.db
-user-audio/
 idle-video/
 video-pairs/
 avatar-background/

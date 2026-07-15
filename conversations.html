@@ -211,6 +211,26 @@
       line-height: 1.5;
     }
     .detail-meta strong { color: #e8eaed; }
+    .user-audio-panel {
+      margin-bottom: 1rem;
+      padding: 0.875rem 1rem;
+      border: 1px solid #2f4a6b;
+      border-radius: 10px;
+      background: #152033;
+    }
+    .user-audio-panel h3 {
+      margin: 0 0 0.65rem;
+      font-size: 0.875rem;
+      color: #c4c7c5;
+    }
+    .user-audio-panel audio {
+      width: 100%;
+    }
+    .user-audio-panel .hint {
+      margin: 0.5rem 0 0;
+      font-size: 0.75rem;
+      color: #9aa0a6;
+    }
     .turns {
       display: flex;
       flex-direction: column;
@@ -246,12 +266,6 @@
       line-height: 1.5;
       font-size: 0.875rem;
     }
-    .turn-audio {
-      margin-top: 0.6rem;
-      width: 100%;
-      max-width: 360px;
-      height: 32px;
-    }
     .pager {
       display: flex;
       justify-content: space-between;
@@ -274,7 +288,7 @@
 <body>
   <div class="page">
     <h1>Conversations &amp; Profile Summaries</h1>
-    <p class="lead">Review voice session transcripts, play back each user speech turn, and inspect automatic profile-summary runs after student sessions.</p>
+    <p class="lead">Review voice session transcripts, listen back to the full user microphone recording for each session, and inspect automatic profile-summary runs after student sessions.</p>
 
     <div class="toolbar">
       <div class="field">
@@ -298,10 +312,11 @@
                   <th>Account</th>
                   <th>Duration</th>
                   <th>Turns</th>
+                  <th>User audio</th>
                 </tr>
               </thead>
               <tbody id="sessions-body">
-                <tr><td colspan="4" class="empty">Loading…</td></tr>
+                <tr><td colspan="5" class="empty">Loading…</td></tr>
               </tbody>
             </table>
           </div>
@@ -346,6 +361,11 @@
           <div class="detail-meta" id="detail-meta"></div>
           <button type="button" class="danger" id="delete-btn">Delete session</button>
         </div>
+        <div class="user-audio-panel" id="user-audio-panel" hidden>
+          <h3>User session audio</h3>
+          <audio id="user-audio-player" controls preload="metadata"></audio>
+          <p class="hint">Full microphone input for this session (one continuous recording).</p>
+        </div>
         <div class="turns" id="turns"></div>
       </div>
 
@@ -373,6 +393,8 @@
     const detailMeta = document.getElementById('detail-meta');
     const profileDetailMeta = document.getElementById('profile-detail-meta');
     const profileDetailBody = document.getElementById('profile-detail-body');
+    const userAudioPanel = document.getElementById('user-audio-panel');
+    const userAudioPlayer = document.getElementById('user-audio-player');
     const turnsEl = document.getElementById('turns');
     const pager = document.getElementById('pager');
     const profilePager = document.getElementById('profile-pager');
@@ -479,7 +501,7 @@
 
     function renderSessions(sessions) {
       if (!sessions.length) {
-        sessionsBody.innerHTML = '<tr><td colspan="4" class="empty">No conversations recorded yet.</td></tr>';
+        sessionsBody.innerHTML = '<tr><td colspan="5" class="empty">No conversations recorded yet.</td></tr>';
         return;
       }
 
@@ -489,6 +511,7 @@
           <td>${session.username}</td>
           <td>${formatDuration(session.startedAt, session.endedAt)}</td>
           <td>${session.turnCount || 0}</td>
+          <td>${session.hasUserAudio ? 'Yes' : '—'}</td>
         </tr>
       `).join('');
 
@@ -619,6 +642,17 @@
         <div>Turns: ${data.turnCount || 0}</div>
       `;
 
+      if (data.hasUserAudio && data.userAudioUrl) {
+        userAudioPanel.hidden = false;
+        userAudioPlayer.src = data.userAudioUrl;
+        userAudioPlayer.load();
+      } else {
+        userAudioPanel.hidden = true;
+        userAudioPlayer.pause();
+        userAudioPlayer.removeAttribute('src');
+        userAudioPlayer.load();
+      }
+
       if (!data.turns?.length) {
         turnsEl.innerHTML = '<div class="empty">No transcript turns captured for this session.</div>';
       } else {
@@ -629,7 +663,6 @@
               <time>${formatDate(turn.createdAt)}</time>
             </div>
             <p class="turn-text"></p>
-            ${turn.role === 'user' && turn.audioUrl ? `<audio class="turn-audio" controls preload="none" src="${turn.audioUrl}"></audio>` : ''}
           </article>
         `).join('');
         turnsEl.querySelectorAll('.turn').forEach((node, index) => {
