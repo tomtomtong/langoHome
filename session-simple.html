@@ -138,6 +138,8 @@
       display: none;
     }
     #playback.show { display: block; }
+    #log-upload-status.err { color: #c5221f; }
+    #log-upload-status.ok { color: #137333; }
     #debug-log {
       margin: 0;
       padding: 0.75rem;
@@ -219,7 +221,10 @@
         <label><input type="checkbox" id="debug-autoscroll" checked> Auto-scroll</label>
         <button type="button" id="btn-clear-log">Clear</button>
         <button type="button" id="btn-copy-log">Copy</button>
+        <button type="button" id="btn-download-log">Download</button>
+        <button type="button" id="btn-send-log">Send to server</button>
       </div>
+      <div id="log-upload-status" class="sub" style="margin: 0 0 0.5rem;"></div>
       <pre id="debug-log"></pre>
     </section>
 
@@ -260,6 +265,9 @@
     const debugAutoscrollEl = $("debug-autoscroll");
     const btnClearLog = $("btn-clear-log");
     const btnCopyLog = $("btn-copy-log");
+    const btnDownloadLog = $("btn-download-log");
+    const btnSendLog = $("btn-send-log");
+    const logUploadStatusEl = $("log-upload-status");
 
     const LOG_MAX = 400;
     const logLines = [];
@@ -310,6 +318,82 @@
       console.log(`[session-simple] [${kind}]`, message, detail ?? "");
     }
 
+    function collectLogLines() {
+      return logLines.map((line) => {
+        const detailText = line.detail != null ? "\n" + formatDetail(line.detail) : "";
+        return `[${line.t}] [${line.kind.toUpperCase()}] ${line.message}${detailText}`;
+      });
+    }
+
+    function snapshotSessionState() {
+      return {
+        active,
+        wsState: ws?.readyState ?? null,
+        micChunksSent: micChunkCount,
+        audioDeltasReceived: audioDeltaCount,
+        voice: voiceEl.value,
+        model: modelEl.value,
+        page: "session-simple",
+      };
+    }
+
+    function setLogUploadStatus(msg, kind = "") {
+      logUploadStatusEl.textContent = msg;
+      logUploadStatusEl.className = kind;
+    }
+
+    function downloadLogFile() {
+      const lines = collectLogLines();
+      if (!lines.length) {
+        setLogUploadStatus("No log lines yet", "err");
+        return;
+      }
+      const text = lines.join("\n");
+      const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `session-simple-log-${Date.now()}.txt`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      setLogUploadStatus("Downloaded locally", "ok");
+      uiLog("sys", "Log downloaded locally");
+    }
+
+    async function sendLogToServer() {
+      const lines = collectLogLines();
+      if (!lines.length) {
+        setLogUploadStatus("No log lines yet", "err");
+        return;
+      }
+      btnSendLog.disabled = true;
+      setLogUploadStatus("Sending…");
+      try {
+        const res = await fetch("/api/debug-log", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            source: "session-simple",
+            lines,
+            state: snapshotSessionState(),
+            userAgent: navigator.userAgent,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setLogUploadStatus(data.error || "Upload failed", "err");
+          uiLog("err", "Log upload failed", { status: res.status, error: data.error });
+          return;
+        }
+        setLogUploadStatus(`Sent — download in Config CMS (id: ${data.id})`, "ok");
+        uiLog("sys", "Log sent to server", { id: data.id });
+      } catch (e) {
+        setLogUploadStatus("Could not reach server", "err");
+        uiLog("err", "Log upload error", { message: e?.message });
+      } finally {
+        btnSendLog.disabled = false;
+      }
+    }
+
     btnClearLog.addEventListener("click", () => {
       logLines.length = 0;
       debugLogEl.textContent = "";
@@ -319,7 +403,7 @@
     });
 
     btnCopyLog.addEventListener("click", async () => {
-      const text = [...debugLogEl.childNodes].map((n) => n.textContent).join("\n");
+      const text = collectLogLines().join("\n");
       try {
         await navigator.clipboard.writeText(text);
         uiLog("sys", "Log copied to clipboard");
@@ -327,6 +411,9 @@
         uiLog("err", "Could not copy log");
       }
     });
+
+    btnDownloadLog.addEventListener("click", downloadLogFile);
+    btnSendLog.addEventListener("click", sendLogToServer);
 
     let ws = null;
     let ctx = null;

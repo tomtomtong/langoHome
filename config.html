@@ -130,6 +130,31 @@
       color: #c4c7c5;
     }
     .debug-toolbar button:hover { border-color: #5f6368; color: #e8eaed; }
+    .debug-source {
+      display: inline-block;
+      margin-left: 0.5rem;
+      padding: 0.1rem 0.45rem;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      background: #2a3142;
+      color: #8ab4f8;
+    }
+    .debug-report-actions {
+      margin: 0.5rem 0 0.75rem;
+    }
+    .debug-report-actions button {
+      padding: 0.35rem 0.65rem;
+      border-radius: 6px;
+      border: 1px solid #3c4048;
+      background: #252836;
+      color: #bdc1c6;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+    .debug-report-actions button:hover {
+      border-color: #5f6368;
+      color: #e8eaed;
+    }
     #debug-reports {
       display: flex;
       flex-direction: column;
@@ -322,10 +347,11 @@
     <hr class="section-divider">
 
     <section class="debug-section">
-      <h2>Hello cycle debug logs</h2>
-      <p>Logs uploaded from the voice app via <strong>Send log to server</strong>. Newest first.</p>
+      <h2>Session debug logs</h2>
+      <p>Logs uploaded from the voice app or <a href="/session-simple">session-simple</a> page. Newest first. Download as <code>.txt</code> for debugging.</p>
       <div class="debug-toolbar">
         <button type="button" id="btn-refresh-logs">Refresh</button>
+        <button type="button" id="btn-download-all-logs">Download all</button>
       </div>
       <div id="debug-reports">
         <div class="debug-empty">Loading…</div>
@@ -351,6 +377,7 @@
     const status = document.getElementById('status');
     const debugReportsEl = document.getElementById('debug-reports');
     const btnRefreshLogs = document.getElementById('btn-refresh-logs');
+    const btnDownloadAllLogs = document.getElementById('btn-download-all-logs');
     const gameIconsGrid = document.getElementById('game-icons-grid');
 
     let serverConfig = null;
@@ -617,9 +644,61 @@
       }
     }
 
+    let debugReportsCache = [];
+
+    function formatReportSource(source) {
+      if (source === 'session-simple') return 'session-simple';
+      if (source === 'voice-app') return 'voice app';
+      return source || 'voice app';
+    }
+
+    function buildReportText(report) {
+      const stateText = report.state && Object.keys(report.state).length
+        ? Object.entries(report.state).map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`).join('\n')
+        : '(no state snapshot)';
+      const linesText = (report.lines || []).join('\n');
+      return [
+        `ID: ${report.id || '—'}`,
+        `Submitted: ${report.submittedAt || '—'}`,
+        `Source: ${formatReportSource(report.source)}`,
+        `Device: ${report.userAgent || 'Unknown device'}`,
+        report.note ? `Note: ${report.note}` : '',
+        '',
+        '--- state ---',
+        stateText,
+        '',
+        '--- log ---',
+        linesText,
+      ].filter(Boolean).join('\n');
+    }
+
+    function downloadTextFile(filename, text) {
+      const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    function downloadReportFile(report) {
+      if (!report) return;
+      downloadTextFile(`debug-log-${report.source || 'voice-app'}-${report.id || Date.now()}.txt`, buildReportText(report));
+    }
+
+    function downloadAllReports(reports) {
+      if (!reports.length) return;
+      const text = reports.map((report, index) => {
+        const header = `========== Report ${index + 1} of ${reports.length} ==========`;
+        return `${header}\n\n${buildReportText(report)}`;
+      }).join('\n\n\n');
+      downloadTextFile(`debug-logs-all-${Date.now()}.txt`, text);
+    }
+
     function renderDebugReports(reports) {
+      debugReportsCache = reports;
       if (!reports.length) {
-        debugReportsEl.innerHTML = '<div class="debug-empty">No logs yet. Reproduce the issue on the voice app, then tap <strong>Send log to server</strong>.</div>';
+        debugReportsEl.innerHTML = '<div class="debug-empty">No logs yet. Use <strong>Send log to server</strong> on the voice app or <a href="/session-simple">session-simple</a> page.</div>';
         return;
       }
 
@@ -629,13 +708,18 @@
           : '(no state snapshot)';
         const linesText = (report.lines || []).join('\n');
         const ua = report.userAgent || 'Unknown device';
+        const source = formatReportSource(report.source);
         const title = `${formatReportTime(report.submittedAt)}${index === 0 ? ' (latest)' : ''}`;
         return `
           <details class="debug-report"${index === 0 ? ' open' : ''}>
-            <summary>${title}</summary>
+            <summary>${title}<span class="debug-source">${source.replace(/</g, '&lt;')}</span></summary>
             <div class="debug-report-meta">
               ID: ${report.id || '—'}<br>
+              Source: ${source.replace(/</g, '&lt;')}<br>
               Device: ${ua.replace(/</g, '&lt;')}
+            </div>
+            <div class="debug-report-actions">
+              <button type="button" class="btn-download-report" data-report-id="${report.id || ''}">Download .txt</button>
             </div>
             <pre>${stateText.replace(/</g, '&lt;')}
 
@@ -660,6 +744,13 @@ ${linesText.replace(/</g, '&lt;')}</pre>
     }
 
     btnRefreshLogs.addEventListener('click', loadDebugReports);
+    btnDownloadAllLogs.addEventListener('click', () => downloadAllReports(debugReportsCache));
+    debugReportsEl.addEventListener('click', (e) => {
+      const btn = e.target.closest('.btn-download-report');
+      if (!btn) return;
+      const report = debugReportsCache.find((r) => r.id === btn.dataset.reportId);
+      downloadReportFile(report);
+    });
     loadDebugReports();
 
     function resolveProfileSyncModelValue() {
