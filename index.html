@@ -370,6 +370,10 @@
       height: 100%;
     }
 
+    #splash-flappy-game audio {
+      display: none;
+    }
+
     .splash-game-score {
       position: absolute;
       z-index: 2;
@@ -3067,6 +3071,9 @@
         <canvas id="splash-flappy-canvas" width="720" height="300" aria-hidden="true"></canvas>
         <span class="splash-game-score" id="splash-flappy-score" aria-hidden="true">0</span>
         <p class="splash-game-message" id="splash-flappy-message">Tap or press Space to fly!</p>
+        <audio id="splash-sfx-flap" preload="auto" src="/assets/sfx/flappy-flap.mp3" playsinline></audio>
+        <audio id="splash-sfx-score" preload="auto" src="/assets/sfx/flappy-score.mp3" playsinline></audio>
+        <audio id="splash-sfx-crash" preload="auto" src="/assets/sfx/flappy-crash.mp3" playsinline></audio>
       </div>
       <div class="splash-loading-row">
         <p class="splash-loading-label">Loading…</p>
@@ -3098,57 +3105,53 @@
       let animationFrame = 0;
       let disposed = false;
       let locked = false;
-      let audioCtx = null;
-      let audioMaster = null;
+      const SFX = Object.freeze({
+        flap: { el: document.getElementById('splash-sfx-flap'), volume: 0.85 },
+        score: { el: document.getElementById('splash-sfx-score'), volume: 0.82 },
+        crash: { el: document.getElementById('splash-sfx-crash'), volume: 0.9 },
+      });
+      let sfxUnlocked = false;
 
-      function ensureAudio() {
-        if (disposed) return null;
-        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-        if (!AudioContextClass) return null;
-        if (!audioCtx) {
-          audioCtx = new AudioContextClass();
-          audioMaster = audioCtx.createGain();
-          audioMaster.gain.value = 0.22;
-          audioMaster.connect(audioCtx.destination);
-        }
-        if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
-        return audioCtx;
+      function warmSfxElement(el, volume) {
+        if (!el) return;
+        el.volume = volume;
+        const wasMuted = el.muted;
+        el.muted = true;
+        const playPromise = el.play();
+        const finish = () => {
+          el.pause();
+          try { el.currentTime = 0; } catch {}
+          el.muted = wasMuted;
+        };
+        if (playPromise?.then) playPromise.then(finish).catch(finish);
+        else finish();
       }
 
-      function tone(frequency, duration, options = {}) {
-        const ctxAudio = ensureAudio();
-        if (!ctxAudio || !audioMaster) return;
-        const start = ctxAudio.currentTime + (options.delay || 0);
-        const oscillator = ctxAudio.createOscillator();
-        const gain = ctxAudio.createGain();
-        oscillator.type = options.type || 'sine';
-        oscillator.frequency.setValueAtTime(frequency, start);
-        if (options.endFrequency) {
-          oscillator.frequency.exponentialRampToValueAtTime(
-            Math.max(20, options.endFrequency),
-            start + duration
-          );
-        }
-        gain.gain.setValueAtTime(0.0001, start);
-        gain.gain.exponentialRampToValueAtTime(options.volume || 0.28, start + 0.01);
-        gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-        oscillator.connect(gain);
-        gain.connect(audioMaster);
-        oscillator.start(start);
-        oscillator.stop(start + duration + 0.02);
+      function unlockSfx() {
+        if (sfxUnlocked) return;
+        sfxUnlocked = true;
+        // Warm the non-flap cues inside the first gesture. Flap itself is played
+        // unmuted below, so we must not pause/mute that element here.
+        warmSfxElement(SFX.score.el, SFX.score.volume);
+        warmSfxElement(SFX.crash.el, SFX.crash.volume);
       }
 
       function playSfx(name) {
         if (disposed) return;
-        if (name === 'flap') {
-          tone(420, 0.08, { endFrequency: 760, type: 'triangle', volume: 0.2 });
-          tone(640, 0.06, { delay: 0.02, endFrequency: 980, type: 'sine', volume: 0.1 });
-        } else if (name === 'score') {
-          tone(660, 0.1, { type: 'sine', volume: 0.24 });
-          tone(880, 0.14, { delay: 0.07, type: 'sine', volume: 0.22 });
-        } else if (name === 'crash') {
-          tone(240, 0.16, { endFrequency: 90, type: 'triangle', volume: 0.26 });
-          tone(140, 0.22, { delay: 0.05, endFrequency: 70, type: 'square', volume: 0.1 });
+        const sound = SFX[name];
+        const el = sound?.el;
+        if (!el) return;
+        try {
+          el.pause();
+          el.currentTime = 0;
+        } catch {}
+        el.muted = false;
+        el.volume = sound.volume;
+        const playPromise = el.play();
+        if (playPromise?.catch) {
+          playPromise.catch((error) => {
+            console.warn(`[splash-sfx] Could not play "${name}"`, error);
+          });
         }
       }
 
@@ -3195,6 +3198,7 @@
         if (locked || disposed) return;
         if (document.body.classList.contains('splash-dismissed')) return;
         shell.focus({ preventScroll: true });
+        unlockSfx();
         if (mode === 'crashed') reset();
         if (mode === 'ready') {
           mode = 'playing';
@@ -3409,11 +3413,6 @@
         cancelAnimationFrame(animationFrame);
         shell.removeEventListener('pointerdown', flap);
         window.removeEventListener('keydown', onKeyDown);
-        if (audioCtx) {
-          audioCtx.close().catch(() => {});
-          audioCtx = null;
-          audioMaster = null;
-        }
       }
 
       shell.addEventListener('pointerdown', flap);
@@ -4942,17 +4941,45 @@
       byebyeVoiceAudio = null;
     }
 
-    function playRandomByebyeVoice() {
-      stopByebyeVoice();
+    function pickRandomByebyeVoiceUrl() {
       const voiceUrl = pickRandomBgm(BYEBYE_VOICES, lastByebyeVoiceUrl);
-      if (!voiceUrl) return;
-      lastByebyeVoiceUrl = voiceUrl;
-      const audio = new Audio(voiceUrl);
+      if (voiceUrl) lastByebyeVoiceUrl = voiceUrl;
+      return voiceUrl;
+    }
+
+    function loadAudioDuration(url) {
+      return new Promise((resolve) => {
+        const audio = new Audio();
+        audio.preload = "metadata";
+        const finish = () => {
+          const duration = Number.isFinite(audio.duration) ? audio.duration : 0;
+          resolve(duration > 0 ? duration : 0);
+        };
+        audio.addEventListener("loadedmetadata", finish, { once: true });
+        audio.addEventListener("error", () => resolve(0), { once: true });
+        audio.src = url;
+      });
+    }
+
+    function playByebyeVoice(url) {
+      stopByebyeVoice();
+      const audio = new Audio(url);
       audio.preload = "auto";
       audio.volume = 0.85;
       byebyeVoiceAudio = audio;
-      audio.play().catch((e) => console.warn("Byebye voice could not play:", e));
-      uiLog("end", `playing byebye voice ${voiceUrl.split("/").pop()}`, "hello");
+      uiLog("end", `playing byebye voice ${url.split("/").pop()}`, "hello");
+      return new Promise((resolve) => {
+        const finish = () => {
+          if (byebyeVoiceAudio === audio) byebyeVoiceAudio = null;
+          resolve();
+        };
+        audio.addEventListener("ended", finish, { once: true });
+        audio.addEventListener("error", finish, { once: true });
+        audio.play().catch((e) => {
+          console.warn("Byebye voice could not play:", e);
+          finish();
+        });
+      });
     }
 
     async function playAnimationWithBgm(animationUrl, bgmPool, kind) {
@@ -6355,11 +6382,29 @@
       stopByebyeVoice();
       uiLog("end", "starting byebye animation alongside farewell", "hello");
       byebyeAnimationPromise = (async () => {
+        const voiceUrl = pickRandomByebyeVoiceUrl();
+        const [audioDuration, clipDuration] = await Promise.all([
+          voiceUrl ? loadAudioDuration(voiceUrl) : Promise.resolve(0),
+          avatar?.getMixamoClipDuration?.(BYEBYE_URL) ?? Promise.resolve(0),
+        ]);
+        const loopCount = clipDuration > 0 && audioDuration > 0
+          ? Math.max(1, Math.ceil(audioDuration / clipDuration))
+          : 1;
+        uiLog(
+          "end",
+          `byebye loops=${loopCount} (audio ${audioDuration.toFixed(2)}s / clip ${clipDuration.toFixed(2)}s)`,
+          "hello",
+        );
+
+        let voiceDone = Promise.resolve();
         const played = await avatar?.playMixamoAnimation(BYEBYE_URL, {
           resumeIdle: false,
-          playOnce: true,
-          onStart: () => playRandomByebyeVoice(),
+          loopCount,
+          onStart: () => {
+            if (voiceUrl) voiceDone = playByebyeVoice(voiceUrl);
+          },
         });
+        await voiceDone;
         if (!played) {
           stopByebyeVoice();
           uiLog("end", "byebye animation failed to play", "warn");

@@ -1667,7 +1667,8 @@ function isPreviewStaticAsset(url) {
     || url === '/assets/vendor/lottie_light.min.js'
     || /^\/games\/.+\.(?:css|js|svg|png|jpe?g|webp|gif|mp3|wav)$/i.test(url)
     || url === '/vocab-game-app.css'
-    || url === '/vocab-game-app.js';
+    || url === '/vocab-game-app.js'
+    || url === '/wordchop-voca.js';
 }
 
 function isPreviewSafeRequest(req, url, rawUrl) {

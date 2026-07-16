@@ -1038,6 +1038,21 @@ body.tommy-mole-set .hole.reveal .mole.reveal-hint .mole-body {
 .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 0 var(--wood-3); }
 .btn:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--wood-3); }
 
+.overlay-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+.overlay-actions .btn { margin-top: 10px; }
+.btn-secondary {
+  background: linear-gradient(180deg, #8a5a2f, #5c3a18);
+  box-shadow: 0 6px 0 #2c1608;
+}
+.btn-secondary:hover { box-shadow: 0 8px 0 #2c1608; }
+.btn-secondary:active { box-shadow: 0 2px 0 #2c1608; }
+
 /* ---------- FX ---------- */
 .fx-layer {
   position: absolute;

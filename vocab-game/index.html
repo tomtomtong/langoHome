@@ -6,7 +6,11 @@
     <title>英文生字拆字 Game</title>
     <link rel="stylesheet" href="/assets/page-motion.css" />
     <script src="/assets/page-motion.js"></script>
-    <script type="module" crossorigin src="/vocab-game-app.js"></script>
+    <script src="/wordchop-voca.js"></script>
+    <script type="module">
+      await (window.prepareWordChopWords?.() ?? Promise.resolve());
+      await import("/vocab-game-app.js");
+    </script>
     <script src="/games/js/gameScoreReporter.js"></script>
     <script src="/games/assets/game-result.js"></script>
     <link rel="stylesheet" crossorigin href="/vocab-game-app.css">
@@ -151,22 +155,44 @@
         text-shadow: 0 2px 0 rgba(83, 27, 4, .55);
       }
 
-      #vocab-completion-done {
-        min-width: min(260px, 76%);
-        padding: .62em 1.5em;
+      #vocab-completion-done,
+      #vocab-completion-again {
+        min-width: min(200px, 46%);
+        padding: .62em 1.2em;
         border: 5px solid #6f2708;
         border-radius: 999px;
         color: #fffbe4;
-        font: 950 clamp(24px, 5vw, 36px)/1.05 inherit;
+        font: 950 clamp(20px, 4.2vw, 30px)/1.05 inherit;
         cursor: pointer;
-        background: linear-gradient(180deg, #65d95f, #239b36);
-        box-shadow: inset 0 0 0 3px rgba(255, 255, 255, .28), 0 7px 0 #176225;
         transition: transform .12s ease, filter .12s ease;
       }
 
-      #vocab-completion-done:hover { filter: brightness(1.08); transform: scale(1.035); }
-      #vocab-completion-done:active { transform: translateY(5px); box-shadow: inset 0 0 0 3px rgba(255, 255, 255, .25), 0 2px 0 #176225; }
-      #vocab-completion-done:focus-visible { outline: 5px solid #fff8a8; outline-offset: 5px; }
+      #vocab-completion-again {
+        color: #3d1608;
+        background: linear-gradient(180deg, #ffe27a 0%, #f0b429 55%, #d88912 100%);
+        box-shadow: inset 0 0 0 3px rgba(255, 255, 255, .35), 0 7px 0 #8a4a08;
+      }
+
+      #vocab-completion-done {
+        background: linear-gradient(180deg, #8a5a2f, #5c3a18);
+        box-shadow: inset 0 0 0 3px rgba(255, 255, 255, .18), 0 7px 0 #2c1608;
+      }
+
+      .vocab-completion__actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: .75rem;
+        margin-top: .35rem;
+        width: 100%;
+      }
+
+      #vocab-completion-done:hover,
+      #vocab-completion-again:hover { filter: brightness(1.08); transform: scale(1.035); }
+      #vocab-completion-done:active,
+      #vocab-completion-again:active { transform: translateY(5px); }
+      #vocab-completion-done:focus-visible,
+      #vocab-completion-again:focus-visible { outline: 5px solid #fff8a8; outline-offset: 5px; }
 
       .vocab-completion__confetti span {
         position: absolute;
@@ -231,8 +257,11 @@
       <div class="vocab-completion__card">
         <span class="vocab-completion__trophy" aria-hidden="true">🏆</span>
         <h1 id="vocab-completion-title">Amazing!</h1>
-        <p>You finished all 10 words!</p>
-        <button id="vocab-completion-done" type="button">完成</button>
+        <p>You finished all the words!</p>
+        <div class="vocab-completion__actions">
+          <button id="vocab-completion-again" type="button">Play again</button>
+          <button id="vocab-completion-done" type="button">Return</button>
+        </div>
       </div>
     </section>
     <script>
@@ -246,9 +275,24 @@
 
       const completionModal = document.getElementById('vocab-completion');
       const completionDone = document.getElementById('vocab-completion-done');
+      const completionAgain = document.getElementById('vocab-completion-again');
       let completionScheduled = false;
       let vocabPenalties = 0;
       let messageWasBad = false;
+
+      const goHome = () => {
+        markVocabGamePlayed();
+        if (window.LangoPageTransition?.navigate) {
+          window.LangoPageTransition.navigate('/?connect=1');
+        } else {
+          window.location.href = '/?connect=1';
+        }
+      };
+
+      const playAgain = () => {
+        markVocabGamePlayed();
+        window.location.reload();
+      };
 
       const detectCompletedGame = () => {
         const messageEl = document.querySelector('.lango-home__message');
@@ -259,7 +303,10 @@
         if (completionScheduled) return;
         const progress = document.querySelector('.lango-home__progress-count')?.textContent.trim();
         const message = messageEl?.textContent || '';
-        if (progress !== '10/10' || !message.includes('Correct!')) return;
+        const total = Array.isArray(window.__WORD_CHOP_WORDS__) && window.__WORD_CHOP_WORDS__.length
+          ? window.__WORD_CHOP_WORDS__.length
+          : 10;
+        if (progress !== `${total}/${total}` || !message.includes('Correct!')) return;
 
         completionScheduled = true;
         window.setTimeout(() => {
@@ -272,18 +319,12 @@
             GameResult.show({
               stars,
               score,
-              onNext: () => {
-                markVocabGamePlayed();
-                if (window.LangoPageTransition?.navigate) {
-                  window.LangoPageTransition.navigate('/');
-                } else {
-                  window.location.href = '/';
-                }
-              },
+              onPlayAgain: playAgain,
+              onReturn: goHome,
             });
           } else {
             completionModal.hidden = false;
-            completionDone.focus();
+            completionAgain?.focus();
           }
         }, 720);
       };
@@ -296,16 +337,11 @@
         attributeFilter: ['class'],
       });
 
+      completionAgain?.addEventListener('click', playAgain);
+
       completionDone.addEventListener('click', () => {
-        markVocabGamePlayed();
         completionModal.classList.add('is-leaving');
-        window.setTimeout(() => {
-          if (window.LangoPageTransition?.navigate) {
-            window.LangoPageTransition.navigate('/');
-          } else {
-            window.location.href = '/';
-          }
-        }, 380);
+        window.setTimeout(goHome, 380);
       });
 
       // The supplied game used the Return artwork to skip a round. When the
@@ -316,11 +352,7 @@
         if (!event.target.closest('.lango-home__return')) return;
         event.preventDefault();
         event.stopImmediatePropagation();
-        if (window.LangoPageTransition?.navigate) {
-          window.LangoPageTransition.navigate('/');
-        } else {
-          window.location.href = '/';
-        }
+        goHome();
       }, true);
     </script>
   </body>

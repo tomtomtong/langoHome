@@ -585,6 +585,36 @@ h1 { margin: 6px; font-size: 18px; }
   margin: 0;
   font-size: 18px;
 }
+.level-complete-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 18px;
+}
+.level-complete-btn {
+  font: inherit;
+  font-weight: 700;
+  font-size: 16px;
+  padding: 10px 22px;
+  border: none;
+  border-radius: 999px;
+  color: #fff;
+  background: linear-gradient(180deg, #66bb6a, #43a047);
+  box-shadow: 0 4px 0 #2e7d32;
+  cursor: pointer;
+}
+.level-complete-btn--secondary {
+  background: linear-gradient(180deg, #8a5a2f, #5c3a18);
+  box-shadow: 0 4px 0 #2c1608;
+}
+.level-complete-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #2e7d32;
+}
+.level-complete-btn--secondary:active {
+  box-shadow: 0 2px 0 #2c1608;
+}
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }

@@ -634,6 +634,22 @@ body {
   box-shadow: 0 2px 0 #2e7d32;
 }
 
+.overlay-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.btn-secondary {
+  background: linear-gradient(180deg, #8a5a2f, #5c3a18);
+  box-shadow: 0 4px 0 #2c1608;
+}
+
+.btn-secondary:active {
+  box-shadow: 0 2px 0 #2c1608;
+}
+
 .game-picker--findgame .game-picker-btn {
   background: linear-gradient(180deg, #8a4fd0, #5a2da0);
 }

@@ -713,7 +713,7 @@ function endGame() {
   Sfx.play('gameover');
   announce(`Time is up. Final score ${score}.`);
   if (typeof GameResult !== 'undefined') {
-    GameResult.show({ stars: earnedStars, score, onNext: startGame });
+    GameResult.show({ stars: earnedStars, score, onPlayAgain: startGame });
   } else {
     if (completeStarsEl) completeStarsEl.textContent = starRating();
     if (completeScoreEl) completeScoreEl.textContent = score;
@@ -843,6 +843,17 @@ async function initGame() {
     soundToggleEl.addEventListener('click', () => {
       Sfx.toggle();
       syncSoundButton();
+    });
+  }
+  const levelCompletePlayAgain = document.getElementById('level-complete-play-again');
+  const levelCompleteReturn = document.getElementById('level-complete-return');
+  if (levelCompletePlayAgain) {
+    levelCompletePlayAgain.addEventListener('click', startGame);
+  }
+  if (levelCompleteReturn) {
+    levelCompleteReturn.addEventListener('click', () => {
+      if (typeof window.returnToConversation === 'function') window.returnToConversation();
+      else window.location.assign('/?connect=1');
     });
   }
   syncSoundButton();

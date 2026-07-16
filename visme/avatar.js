@@ -711,6 +711,11 @@ export class TommyAvatar {
     return clip;
   }
 
+  async getMixamoClipDuration(url) {
+    const clip = await this._getMixamoClip(url);
+    return clip?.duration > 0 ? clip.duration : 0;
+  }
+
   _stopDanceAnimation() {
     if (this._danceFinishedHandler) {
       this.mixer.removeEventListener("finished", this._danceFinishedHandler);
@@ -732,6 +737,7 @@ export class TommyAvatar {
   async playMixamoAnimation(url, {
     resumeIdle = true,
     playOnce = false,
+    loopCount = null,
     onStart = null,
   } = {}) {
     if (!this.vrm || !this.mixer) return false;
@@ -742,10 +748,14 @@ export class TommyAvatar {
 
       this._stopDanceAnimation();
 
+      const repeats = Number.isFinite(loopCount) && loopCount > 0
+        ? Math.max(1, Math.floor(loopCount))
+        : (playOnce ? 1 : ANIMATION_LOOP_COUNT);
+
       const action = this.mixer.clipAction(clip);
       action.setLoop(
-        playOnce ? THREE.LoopOnce : THREE.LoopRepeat,
-        playOnce ? 1 : ANIMATION_LOOP_COUNT,
+        repeats === 1 ? THREE.LoopOnce : THREE.LoopRepeat,
+        repeats,
       );
       action.clampWhenFinished = true;
 

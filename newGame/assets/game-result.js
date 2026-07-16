@@ -11,7 +11,8 @@
   };
 
   let overlay = null;
-  let nextHandler = null;
+  let playAgainHandler = null;
+  let returnHandler = null;
   let scoreFrame = 0;
   let scoreDelay = 0;
 
@@ -25,6 +26,19 @@
     link.rel = "stylesheet";
     link.href = stylesheetUrl;
     document.head.appendChild(link);
+  }
+
+  function defaultReturn() {
+    if (typeof window.returnToConversation === "function") {
+      window.returnToConversation();
+      return;
+    }
+    const url = "/?connect=1";
+    if (window.LangoPageTransition?.navigate) {
+      window.LangoPageTransition.navigate(url);
+    } else {
+      window.location.assign(url);
+    }
   }
 
   function ensureOverlay() {
@@ -49,14 +63,20 @@
           <img class="lango-result__score-plate" alt="" src="${asset("score-label.png")}">
           <span class="lango-result__score-text"></span>
         </div>
-        <button class="lango-result__next" type="button" aria-label="Next">
-          <img class="lango-result__next-image" alt="Next" src="${asset("score-board.png")}">
-        </button>
+        <div class="lango-result__actions">
+          <button class="lango-result__play-again" type="button">Play again</button>
+          <button class="lango-result__return" type="button">Return</button>
+        </div>
       </div>`;
     const gameFrame = document.getElementById("game");
     (gameFrame || document.body).appendChild(overlay);
-    overlay.querySelector(".lango-result__next").addEventListener("click", () => {
-      const handler = nextHandler;
+    overlay.querySelector(".lango-result__play-again").addEventListener("click", () => {
+      const handler = playAgainHandler;
+      hide();
+      if (typeof handler === "function") handler();
+    });
+    overlay.querySelector(".lango-result__return").addEventListener("click", () => {
+      const handler = returnHandler || defaultReturn;
       hide();
       if (typeof handler === "function") handler();
     });
@@ -131,7 +151,13 @@
     }, 560);
   }
 
-  function show({ stars = 1, score = 0, onNext } = {}) {
+  function show({
+    stars = 1,
+    score = 0,
+    onPlayAgain,
+    onReturn,
+    onNext,
+  } = {}) {
     ensureOverlay();
     const count = clampStars(stars);
     const tier = TIERS[count];
@@ -142,12 +168,17 @@
     renderStars(count);
     renderCelebration(count);
     animateScore(score);
-    nextHandler = onNext;
+    playAgainHandler = typeof onPlayAgain === "function"
+      ? onPlayAgain
+      : typeof onNext === "function"
+        ? onNext
+        : null;
+    returnHandler = typeof onReturn === "function" ? onReturn : defaultReturn;
     overlay.hidden = false;
     overlay.classList.remove("is-active");
     requestAnimationFrame(() => {
       overlay.classList.add("is-active");
-      overlay.querySelector(".lango-result__next").focus({ preventScroll: true });
+      overlay.querySelector(".lango-result__play-again").focus({ preventScroll: true });
     });
   }
 
@@ -157,7 +188,8 @@
     clearTimeout(scoreDelay);
     overlay.classList.remove("is-active");
     overlay.hidden = true;
-    nextHandler = null;
+    playAgainHandler = null;
+    returnHandler = null;
   }
 
   window.GameResult = Object.freeze({ show, hide, clampStars });

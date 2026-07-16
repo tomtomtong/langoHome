@@ -40,6 +40,7 @@
   const overlayTitle = document.getElementById("overlayTitle");
   const overlayMsg = document.getElementById("overlayMsg");
   const overlayBtn = document.getElementById("overlayBtn");
+  const overlayReturnBtn = document.getElementById("overlayReturnBtn");
   const replayBtn = document.getElementById("replayBtn");
   const Sfx = window.GameSfx || { play() {} };
   const Bgm = window.GameBgm || { play() {}, pause() {} };
@@ -611,7 +612,7 @@
     Sfx.play("finish");
     const stars = score >= 500 ? 3 : score >= 300 ? 2 : 1;
     if (typeof GameResult !== "undefined") {
-      GameResult.show({ stars, score, onNext: startGame });
+      GameResult.show({ stars, score, onPlayAgain: startGame });
     } else {
       overlayTitle.textContent = "Time's up!";
       overlayMsg.textContent = `Score: ${score}`;
@@ -656,6 +657,12 @@
       audioUnlocked = true;
       startGame();
     });
+    if (overlayReturnBtn) {
+      overlayReturnBtn.addEventListener("click", () => {
+        if (typeof window.returnToConversation === "function") window.returnToConversation();
+        else window.location.assign("/?connect=1");
+      });
+    }
 
     const firstLevel = levels[pickRandomLevelIndex()];
     const firstSceneUrl = levelSceneUrl(firstLevel);

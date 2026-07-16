@@ -692,7 +692,7 @@
       GameResult.show({
         stars: Math.max(1, stars),
         score: state.score,
-        onNext: startGame,
+        onPlayAgain: startGame,
       });
       return;
     }
@@ -705,11 +705,10 @@
         { l: "Stars earned", v: "★".repeat(stars) + "☆".repeat(3 - stars) },
         { l: "Best combo", v: state.maxCombo },
       ],
-      button: "Play again",
     });
   }
 
-  async function showOverlay({ title, subtitle, stats, button }) {
+  async function showOverlay({ title, subtitle, stats }) {
     let statsHtml = "";
     if (stats && stats.length) {
       statsHtml = `<div class="stats">` +
@@ -720,12 +719,19 @@
       <h1 class="title">${title}</h1>
       <p class="subtitle">${subtitle}</p>
       ${statsHtml}
-      <button id="startBtn" class="btn">${button}</button>
+      <div class="overlay-actions">
+        <button id="startBtn" class="btn">Play again</button>
+        <button id="returnOverlayBtn" class="btn btn-secondary" type="button">Return</button>
+      </div>
       <div class="legend">
         <div class="legend-row"><span class="dot good"></span> Correct → +10 base points, +2 per combo streak</div>
         <div class="legend-row"><span class="dot bad"></span> Wrong → no penalty, but combo resets</div>
       </div>`;
     document.getElementById("startBtn").addEventListener("click", startGame);
+    document.getElementById("returnOverlayBtn").addEventListener("click", () => {
+      if (typeof window.returnToConversation === "function") window.returnToConversation();
+      else window.location.assign("/?connect=1");
+    });
     overlay.classList.remove("hidden");
     if (typeof ImageConfig !== "undefined") await ImageConfig.applyAll();
   }
