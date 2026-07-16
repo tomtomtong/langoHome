@@ -374,7 +374,11 @@
       celebrateDailyReward();
       if (reward.destination === "map") {
         localStorage.setItem("lango.systemUnlockedLocations", JSON.stringify(["park"]));
-        window.location.href = "/map/?return=rewards";
+        if (window.LangoPageTransition && window.LangoPageTransition.navigate) {
+          window.LangoPageTransition.navigate("/map/?return=rewards");
+        } else {
+          window.location.href = "/map/?return=rewards";
+        }
       } else {
         showRewardCongratulations(reward);
       }
@@ -394,7 +398,11 @@
       celebrateDailyReward();
       if (((_a = data.reward) == null ? void 0 : _a.destination) === "map") {
         localStorage.setItem("lango.systemUnlockedLocations", JSON.stringify(data.status.unlockedLocations || []));
-        window.location.href = "/map/?return=rewards";
+        if (window.LangoPageTransition && window.LangoPageTransition.navigate) {
+          window.LangoPageTransition.navigate("/map/?return=rewards");
+        } else {
+          window.location.href = "/map/?return=rewards";
+        }
         return;
       }
       if (data.reward) {
@@ -675,19 +683,20 @@
   function navigateToGame(game) {
     if (!(game == null ? void 0 : game.url)) return;
     uiLog("game", "navigate \u2192 ".concat(game.url), "hello", { game: game.id });
+    if (window.LangoPageTransition && window.LangoPageTransition.navigate) {
+      window.LangoPageTransition.navigate(game.url);
+      return;
+    }
     window.location.assign(game.url);
   }
   async function launchGame(reason = "user asked to play", chosenGame = null) {
     if (launchingGame) return null;
     const surprise = !chosenGame;
     const game = chosenGame || pickRandomGame();
+    launchingGame = true;
     uiLog("game", "launch ".concat(game.id, " (").concat(reason, ")"), "hello", { surprise });
     setStatus("Launching ".concat(game.name, "\u2026"), true);
-    try {
-      await playGameLaunchTransition(game, { surprise });
-    } catch (e) {
-      uiLog("game", "transition error: ".concat(e.message), "warn");
-    }
+    sfx == null ? void 0 : sfx.play("start", { interrupt: true });
     try {
       ws == null ? void 0 : ws.close();
     } catch (e) {
@@ -2886,7 +2895,12 @@
     const url = new URL(location.href);
     url.searchParams.delete("preview");
     url.searchParams.delete("screen");
-    location.assign("".concat(url.pathname).concat(url.search).concat(url.hash) || "/");
+    const destination = "".concat(url.pathname).concat(url.search).concat(url.hash) || "/";
+    if (window.LangoPageTransition && window.LangoPageTransition.navigate) {
+      window.LangoPageTransition.navigate(destination);
+    } else {
+      location.assign(destination);
+    }
   });
   function setPreviewToolbarCollapsed(collapsed) {
     document.documentElement.classList.toggle("preview-toolbar-collapsed", collapsed);

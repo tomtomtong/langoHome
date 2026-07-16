@@ -31,7 +31,11 @@
   const CONVERSATION_URL = "/?connect=1";
 
   function returnToConversation() {
-    window.location.assign(CONVERSATION_URL);
+    if (window.LangoPageTransition?.navigate) {
+      window.LangoPageTransition.navigate(CONVERSATION_URL);
+    } else {
+      window.location.assign(CONVERSATION_URL);
+    }
   }
 
   function wireReturnButtons() {

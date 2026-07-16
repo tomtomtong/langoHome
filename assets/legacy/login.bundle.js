@@ -31,7 +31,12 @@
         showError(data.error || "Login failed. Please try again.");
         return;
       }
-      location.href = nextUrl.startsWith("/") ? nextUrl : "/";
+      const destination = nextUrl.startsWith("/") ? nextUrl : "/";
+      if (window.LangoPageTransition && window.LangoPageTransition.navigate) {
+        window.LangoPageTransition.navigate(destination);
+      } else {
+        location.href = destination;
+      }
     } catch (err) {
       showError("Could not reach the server. Please try again.");
     } finally {

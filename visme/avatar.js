@@ -729,7 +729,11 @@ export class TommyAvatar {
     }
   }
 
-  async playMixamoAnimation(url, { resumeIdle = true } = {}) {
+  async playMixamoAnimation(url, {
+    resumeIdle = true,
+    playOnce = false,
+    onStart = null,
+  } = {}) {
     if (!this.vrm || !this.mixer) return false;
 
     try {
@@ -739,7 +743,10 @@ export class TommyAvatar {
       this._stopDanceAnimation();
 
       const action = this.mixer.clipAction(clip);
-      action.setLoop(THREE.LoopRepeat, ANIMATION_LOOP_COUNT);
+      action.setLoop(
+        playOnce ? THREE.LoopOnce : THREE.LoopRepeat,
+        playOnce ? 1 : ANIMATION_LOOP_COUNT,
+      );
       action.clampWhenFinished = true;
 
       if (this.idleAction) this.idleAction.fadeOut(0.3);
@@ -754,6 +761,11 @@ export class TommyAvatar {
 
         action.reset().fadeIn(0.3).play();
         this.danceAction = action;
+        try {
+          onStart?.();
+        } catch (e) {
+          console.warn("Animation onStart callback failed:", e);
+        }
 
         this._danceFinishedHandler = (e) => {
           if (e.action !== action) return;

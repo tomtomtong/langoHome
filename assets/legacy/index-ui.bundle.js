@@ -350,8 +350,6 @@
       );
     }
     function LangoHome() {
-      const [transitionKind, setTransitionKind] = React.useState(null);
-      const [transitionLeaving, setTransitionLeaving] = React.useState(false);
       const [comingSoonFeature, setComingSoonFeature] = React.useState(null);
       const [roomScene, setRoomScene] = React.useState(() => ROOM_SCENE_LABELS[window.LangoRoomScene] ? window.LangoRoomScene : "livingroom");
       React.useEffect(() => {
@@ -385,36 +383,27 @@
         var _a;
         return (_a = document.getElementById("daily-rewards-btn")) == null ? void 0 : _a.click();
       };
-      const playTransition = (kind, action, { immediate = false, duration = 1100 } = {}) => {
+      const go = (_kind, path) => {
         if (transitionBusy.current) return;
         transitionBusy.current = true;
-        setTransitionLeaving(false);
-        setTransitionKind(kind);
-        if (immediate) action == null ? void 0 : action();
-        window.setTimeout(() => {
-          if (!immediate) action == null ? void 0 : action();
-          if (immediate) {
-            setTransitionLeaving(true);
-            window.setTimeout(() => {
-              setTransitionKind(null);
-              setTransitionLeaving(false);
-              transitionBusy.current = false;
-            }, 400);
-          }
-        }, duration);
-      };
-      const go = (kind, path) => playTransition(kind, () => {
+        if (window.LangoPageTransition && window.LangoPageTransition.navigate) {
+          window.LangoPageTransition.navigate(path);
+          return;
+        }
         window.location.href = path;
-      });
-      const reveal = (kind, action) => playTransition(kind, () => {
-        action == null ? void 0 : action();
-        setTransitionLeaving(true);
-        window.setTimeout(() => {
-          setTransitionKind(null);
-          setTransitionLeaving(false);
+      };
+      const reveal = (_kind, action) => {
+        if (transitionBusy.current) return;
+        transitionBusy.current = true;
+        if (!(window.LangoPageTransition && window.LangoPageTransition.play)) {
+          action == null ? void 0 : action();
           transitionBusy.current = false;
-        }, 400);
-      }, { duration: 1050 });
+          return;
+        }
+        window.LangoPageTransition.play({ onCovered: action }).finally(() => {
+          transitionBusy.current = false;
+        });
+      };
       const closeComingSoon = () => {
         var _a;
         (_a = window.LangoSfx) == null ? void 0 : _a.play("back");
@@ -424,7 +413,6 @@
       return e(
         "main",
         { className: "lango-home", "data-node-id": "49:62", "aria-label": roomLabel },
-        transitionKind && e(FunTransition, { kind: transitionKind, leaving: transitionLeaving }),
         comingSoonFeature && e(ComingSoonDialog, { feature: comingSoonFeature, onClose: closeComingSoon }),
         e("img", { className: "lango-home__title", src: asset("".concat(roomScene, "_header")), alt: "".concat(roomLabel, " header") }),
         e(

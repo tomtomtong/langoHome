@@ -305,44 +305,151 @@
 
     /* ── Splash screen (logo while assets preload) ── */
     #splash-screen {
+      --splash-purple: #9e287f;
+      --splash-deep-purple: #65318c;
+      --splash-yellow: #f5d45f;
+      --splash-teal: #58c7c4;
       position: fixed;
       inset: 0;
       z-index: 50;
       display: flex;
       align-items: center;
       justify-content: center;
-      background: #ffffff;
+      padding: clamp(14px, 2.5vw, 34px);
+      font-family: "Baloo 2", system-ui, sans-serif;
+      background: linear-gradient(180deg, #fff 0%, #fbf8ff 100%);
+      user-select: none;
     }
 
     .splash-content {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 1.5rem;
-      width: min(70vw, 420px);
+      gap: clamp(8px, 1.4vh, 16px);
+      width: min(92vw, 760px);
     }
 
-    #splash-screen img {
+    .splash-brand {
+      width: min(40vw, 270px);
+    }
+
+    .splash-brand img {
+      display: block;
       width: 100%;
       height: auto;
-      max-height: 60vh;
       object-fit: contain;
+      pointer-events: none;
+    }
+
+    .splash-game-shell {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 12 / 5;
+      max-height: 52vh;
+      overflow: hidden;
+      border: clamp(4px, .65vw, 7px) solid var(--splash-deep-purple);
+      border-radius: clamp(20px, 3vw, 32px);
+      background: #bcecf2;
+      box-shadow:
+        0 clamp(8px, 1.5vw, 15px) 0 rgba(101, 49, 140, .17),
+        0 18px 44px rgba(78, 38, 105, .16),
+        inset 0 0 0 3px rgba(255,255,255,.72);
+      cursor: pointer;
+      touch-action: manipulation;
+      outline: none;
+    }
+
+    .splash-game-shell:focus-visible {
+      outline: 5px solid var(--splash-yellow);
+      outline-offset: 4px;
+    }
+
+    #splash-flappy-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .splash-game-score {
+      position: absolute;
+      z-index: 2;
+      top: clamp(9px, 2vw, 18px);
+      left: clamp(12px, 2.2vw, 22px);
+      min-width: 2.2em;
+      padding: .08em .5em;
+      border: 3px solid rgba(255,255,255,.9);
+      border-radius: 999px;
+      color: #fff;
+      font-size: clamp(20px, 3.8vw, 36px);
+      font-weight: 800;
+      line-height: 1.1;
+      text-align: center;
+      text-shadow: 0 3px 0 rgba(81, 35, 112, .55);
+      background: rgba(101,49,140,.82);
+      box-shadow: 0 4px 0 rgba(64,29,88,.28);
+      pointer-events: none;
+    }
+
+    .splash-game-message {
+      position: absolute;
+      z-index: 2;
+      left: 50%;
+      top: 50%;
+      margin: 0;
+      padding: .35em .9em;
+      border: 3px solid rgba(255,255,255,.9);
+      border-radius: 999px;
+      color: #fff;
+      font-size: clamp(17px, 3vw, 28px);
+      font-weight: 800;
+      line-height: 1.1;
+      white-space: nowrap;
+      text-shadow: 0 2px 0 rgba(68, 26, 91, .55);
+      background: rgba(101,49,140,.86);
+      box-shadow: 0 5px 0 rgba(64,29,88,.3);
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+
+    .splash-game-message[hidden] { display: none; }
+
+    .splash-loading-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: min(86%, 620px);
+    }
+
+    .splash-loading-label {
+      flex: none;
+      margin: 0;
+      color: var(--splash-deep-purple);
+      font-size: clamp(14px, 1.8vw, 18px);
+      font-weight: 800;
     }
 
     .splash-loading-bar {
-      width: 100%;
-      height: 5px;
+      flex: 1;
+      height: clamp(7px, 1.2vw, 11px);
       border-radius: 999px;
       overflow: hidden;
-      background: rgba(0, 0, 0, 0.08);
+      background: rgba(101, 49, 140, .12);
     }
 
     .splash-loading-bar-fill {
       width: 0%;
       height: 100%;
       border-radius: inherit;
-      background: linear-gradient(90deg, #6c8cff, #5a7aef);
+      background: linear-gradient(90deg, var(--splash-purple), var(--splash-deep-purple), var(--splash-teal));
       transition: width 0.3s ease-out;
+    }
+
+    @media (max-height: 520px) {
+      #splash-screen { padding: 8px 18px; }
+      .splash-content { gap: 6px; width: min(86vw, 680px); }
+      .splash-brand { width: 150px; }
+      .splash-game-shell { max-height: 58vh; }
+      .splash-loading-row { width: 82%; }
     }
 
     body.splash-dismissed #splash-screen {
@@ -2629,12 +2736,13 @@
       border-radius: clamp(22px, 3cqw, 40px);
       color: #fff7cf;
       text-align: center;
+      font-family: "Baloo 2", system-ui, sans-serif;
       background: linear-gradient(180deg, #f39122 0%, #bd5b16 100%);
       box-shadow: inset 0 0 0 clamp(3px, .35cqw, 5px) #7e310a, 0 18px 45px rgba(53, 19, 2, .45);
       animation: coming-soon-card-in 220ms cubic-bezier(.2, .8, .2, 1) both;
     }
 
-    .coming-soon-card h2 {
+    .coming-soon-card h1 {
       margin: 0;
       color: #fff7c6;
       font-size: clamp(30px, 4cqw, 55px);
@@ -2648,6 +2756,12 @@
       font-size: clamp(16px, 1.7cqw, 24px);
       font-weight: 700;
       line-height: 1.25;
+    }
+
+    .coming-soon-actions {
+      display: flex;
+      justify-content: center;
+      gap: clamp(10px, 1.4cqw, 20px);
     }
 
     .coming-soon-card button {
@@ -2929,12 +3043,292 @@
 
   <div id="splash-screen" role="status" aria-live="polite" aria-busy="true" aria-label="Loading">
     <div class="splash-content">
-      <img src="/langoLogo.jpeg" alt="Lango" width="420" height="420" decoding="async">
-      <div class="splash-loading-bar" aria-hidden="true">
-        <div class="splash-loading-bar-fill" id="splash-progress-fill"></div>
+      <div class="splash-brand">
+        <img src="/langoLogo.jpeg" alt="Lango" width="420" height="274" decoding="async">
+      </div>
+      <div
+        class="splash-game-shell"
+        id="splash-flappy-game"
+        role="application"
+        tabindex="0"
+        aria-label="Flappy Lango. Tap, click, or press Space to fly through the gates while loading."
+      >
+        <canvas id="splash-flappy-canvas" width="720" height="300" aria-hidden="true"></canvas>
+        <span class="splash-game-score" id="splash-flappy-score" aria-hidden="true">0</span>
+        <p class="splash-game-message" id="splash-flappy-message">Tap or press Space to fly!</p>
+      </div>
+      <div class="splash-loading-row">
+        <p class="splash-loading-label">Loading…</p>
+        <div class="splash-loading-bar" aria-hidden="true">
+          <div class="splash-loading-bar-fill" id="splash-progress-fill"></div>
+        </div>
       </div>
     </div>
   </div>
+
+  <script>
+    (() => {
+      const shell = document.getElementById('splash-flappy-game');
+      const canvas = document.getElementById('splash-flappy-canvas');
+      const scoreEl = document.getElementById('splash-flappy-score');
+      const messageEl = document.getElementById('splash-flappy-message');
+      if (!shell || !canvas || !scoreEl || !messageEl) return;
+
+      const ctx = canvas.getContext('2d');
+      const WORLD = { width: 720, height: 300, floor: 276 };
+      const BIRD = { x: 150, radius: 17 };
+      const PIPE = { width: 62, gap: 112, speed: 158, spacing: 260 };
+      let mode = 'ready';
+      let birdY = 142;
+      let birdVelocity = 0;
+      let pipes = [];
+      let score = 0;
+      let lastTime = performance.now();
+      let animationFrame = 0;
+      let disposed = false;
+
+      function newGapY(index = 0) {
+        const wave = Math.sin((score + index * 1.7) * 1.35) * 42;
+        return Math.max(82, Math.min(208, 145 + wave));
+      }
+
+      function reset() {
+        mode = 'ready';
+        birdY = 142;
+        birdVelocity = 0;
+        score = 0;
+        pipes = [0, 1, 2].map((index) => ({
+          x: 510 + index * PIPE.spacing,
+          gapY: newGapY(index),
+          passed: false,
+        }));
+        scoreEl.textContent = '0';
+        messageEl.textContent = 'Tap or press Space to fly!';
+        messageEl.hidden = false;
+      }
+
+      function flap() {
+        if (document.body.classList.contains('splash-dismissed')) return;
+        shell.focus({ preventScroll: true });
+        if (mode === 'crashed') reset();
+        if (mode === 'ready') {
+          mode = 'playing';
+          messageEl.hidden = true;
+        }
+        birdVelocity = -255;
+      }
+
+      function crash() {
+        if (mode !== 'playing') return;
+        mode = 'crashed';
+        messageEl.textContent = `Score ${score} · Tap to try again`;
+        messageEl.hidden = false;
+      }
+
+      function update(dt, now) {
+        if (mode === 'ready') {
+          birdY = 142 + Math.sin(now / 270) * 7;
+          return;
+        }
+        if (mode === 'crashed') return;
+
+        birdVelocity += 690 * dt;
+        birdY += birdVelocity * dt;
+        for (const pipe of pipes) {
+          pipe.x -= PIPE.speed * dt;
+          if (!pipe.passed && pipe.x + PIPE.width < BIRD.x) {
+            pipe.passed = true;
+            score += 1;
+            scoreEl.textContent = String(score);
+          }
+        }
+
+        const first = pipes[0];
+        if (first.x + PIPE.width < -10) {
+          pipes.shift();
+          const last = pipes[pipes.length - 1];
+          pipes.push({ x: last.x + PIPE.spacing, gapY: newGapY(pipes.length), passed: false });
+        }
+
+        if (birdY - BIRD.radius <= 0 || birdY + BIRD.radius >= WORLD.floor) crash();
+        for (const pipe of pipes) {
+          const overlapsX = BIRD.x + BIRD.radius > pipe.x && BIRD.x - BIRD.radius < pipe.x + PIPE.width;
+          const outsideGap = birdY - BIRD.radius < pipe.gapY - PIPE.gap / 2 || birdY + BIRD.radius > pipe.gapY + PIPE.gap / 2;
+          if (overlapsX && outsideGap) crash();
+        }
+      }
+
+      function roundedRect(x, y, width, height, radius) {
+        const r = Math.min(radius, Math.abs(width) / 2, Math.abs(height) / 2);
+        ctx.beginPath();
+        ctx.roundRect(x, y, width, height, r);
+      }
+
+      function drawCloud(x, y, scale = 1) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(scale, scale);
+        ctx.fillStyle = 'rgba(255,255,255,.76)';
+        ctx.beginPath();
+        ctx.arc(0, 7, 19, 0, Math.PI * 2);
+        ctx.arc(22, 0, 25, 0, Math.PI * 2);
+        ctx.arc(49, 9, 18, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function drawPipe(pipe) {
+        const gapTop = pipe.gapY - PIPE.gap / 2;
+        const gapBottom = pipe.gapY + PIPE.gap / 2;
+        const gradient = ctx.createLinearGradient(pipe.x, 0, pipe.x + PIPE.width, 0);
+        gradient.addColorStop(0, '#7e1f69');
+        gradient.addColorStop(.55, '#a72b87');
+        gradient.addColorStop(1, '#682f8c');
+        ctx.fillStyle = gradient;
+        ctx.strokeStyle = '#55216f';
+        ctx.lineWidth = 4;
+
+        roundedRect(pipe.x, -12, PIPE.width, gapTop + 3, 11);
+        ctx.fill();
+        ctx.stroke();
+        roundedRect(pipe.x - 8, gapTop - 18, PIPE.width + 16, 22, 8);
+        ctx.fill();
+        ctx.stroke();
+
+        roundedRect(pipe.x, gapBottom, PIPE.width, WORLD.floor - gapBottom + 12, 11);
+        ctx.fill();
+        ctx.stroke();
+        roundedRect(pipe.x - 8, gapBottom - 4, PIPE.width + 16, 22, 8);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = 'rgba(245,212,95,.72)';
+        ctx.fillRect(pipe.x + 9, 0, 7, Math.max(0, gapTop - 18));
+        ctx.fillRect(pipe.x + 9, gapBottom + 18, 7, Math.max(0, WORLD.floor - gapBottom - 18));
+      }
+
+      function drawBird() {
+        const tilt = mode === 'crashed' ? .6 : Math.max(-.42, Math.min(.55, birdVelocity / 520));
+        ctx.save();
+        ctx.translate(BIRD.x, birdY);
+        ctx.rotate(tilt);
+
+        ctx.fillStyle = 'rgba(67,29,83,.17)';
+        ctx.beginPath();
+        ctx.ellipse(0, 20, 24, 7, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#a32983';
+        ctx.strokeStyle = '#65216f';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 23, 20, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        const wingLift = mode === 'playing' ? Math.sin(performance.now() / 55) * 5 : Math.sin(performance.now() / 180) * 3;
+        ctx.fillStyle = '#65318c';
+        ctx.beginPath();
+        ctx.ellipse(-8, 5 + wingLift, 14, 9, -.25, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(9, -7, 9, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#421b55';
+        ctx.beginPath();
+        ctx.arc(12, -7, 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#f5d45f';
+        ctx.strokeStyle = '#b47c22';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(20, -3);
+        ctx.lineTo(38, 3);
+        ctx.lineTo(20, 10);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#58c7c4';
+        ctx.beginPath();
+        ctx.moveTo(-19, 7);
+        ctx.lineTo(-32, 14);
+        ctx.lineTo(-20, -2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function draw(now) {
+        ctx.clearRect(0, 0, WORLD.width, WORLD.height);
+        const sky = ctx.createLinearGradient(0, 0, 0, WORLD.height);
+        sky.addColorStop(0, '#bcecf2');
+        sky.addColorStop(1, '#eef9df');
+        ctx.fillStyle = sky;
+        ctx.fillRect(0, 0, WORLD.width, WORLD.height);
+
+        const drift = (now * .018) % 820;
+        drawCloud(90 - drift, 57, .82);
+        drawCloud(420 - drift, 92, .58);
+        drawCloud(750 - drift, 45, .7);
+        drawCloud(910 - drift, 70, .78);
+
+        ctx.fillStyle = '#dff0a0';
+        ctx.beginPath();
+        ctx.moveTo(0, WORLD.floor);
+        for (let x = 0; x <= WORLD.width; x += 60) {
+          ctx.quadraticCurveTo(x + 30, 235 + Math.sin(x * .03) * 10, x + 60, WORLD.floor);
+        }
+        ctx.fill();
+
+        pipes.forEach(drawPipe);
+        drawBird();
+
+        ctx.fillStyle = '#f5d45f';
+        ctx.fillRect(0, WORLD.floor, WORLD.width, WORLD.height - WORLD.floor);
+        ctx.fillStyle = '#65318c';
+        ctx.fillRect(0, WORLD.floor, WORLD.width, 5);
+        ctx.fillStyle = 'rgba(255,255,255,.42)';
+        for (let x = -((now * .09) % 36); x < WORLD.width; x += 36) {
+          ctx.fillRect(x, WORLD.floor + 10, 18, 4);
+        }
+      }
+
+      function frame(now) {
+        if (disposed) return;
+        const dt = Math.min(.034, Math.max(0, (now - lastTime) / 1000));
+        lastTime = now;
+        update(dt, now);
+        draw(now);
+        animationFrame = requestAnimationFrame(frame);
+      }
+
+      function onKeyDown(event) {
+        if (event.code !== 'Space' && event.code !== 'ArrowUp') return;
+        if (document.body.classList.contains('splash-dismissed')) return;
+        event.preventDefault();
+        flap();
+      }
+
+      function dispose() {
+        if (disposed) return;
+        disposed = true;
+        cancelAnimationFrame(animationFrame);
+        shell.removeEventListener('pointerdown', flap);
+        window.removeEventListener('keydown', onKeyDown);
+      }
+
+      shell.addEventListener('pointerdown', flap);
+      window.addEventListener('keydown', onKeyDown);
+      window.addEventListener('lango:page-reveal', dispose, { once: true });
+      reset();
+      animationFrame = requestAnimationFrame(frame);
+      window.LangoSplashGame = { flap, reset, getState: () => ({ mode, score, birdY }) };
+    })();
+  </script>
 
   <div id="portrait-prompt">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -3154,9 +3548,11 @@
             'aria-modal': 'true',
             'aria-labelledby': 'coming-soon-title'
           },
-            e('h2', { id: 'coming-soon-title' }, `${feature} is coming soon`),
+            e('h1', { id: 'coming-soon-title' }, `${feature} is coming soon`),
             e('p', null, 'We are working on it. Please check back soon!'),
-            e('button', { type: 'button', autoFocus: true, onClick: onClose }, 'Got it')
+            e('div', { className: 'coming-soon-actions' },
+              e('button', { type: 'button', autoFocus: true, onClick: onClose }, 'Got it')
+            )
           )
         );
       }
@@ -3439,8 +3835,6 @@
       }
 
       function LangoHome() {
-        const [transitionKind, setTransitionKind] = React.useState(null);
-        const [transitionLeaving, setTransitionLeaving] = React.useState(false);
         const [comingSoonFeature, setComingSoonFeature] = React.useState(null);
         const [roomScene, setRoomScene] = React.useState(() => (
           ROOM_SCENE_LABELS[window.LangoRoomScene] ? window.LangoRoomScene : 'livingroom'
@@ -3473,34 +3867,26 @@
         }, []);
         const transitionBusy = React.useRef(false);
         const openRewards = () => document.getElementById('daily-rewards-btn')?.click();
-        const playTransition = (kind, action, { immediate = false, duration = 1100 } = {}) => {
+        const go = (_kind, path) => {
           if (transitionBusy.current) return;
           transitionBusy.current = true;
-          setTransitionLeaving(false);
-          setTransitionKind(kind);
-          if (immediate) action?.();
-          window.setTimeout(() => {
-            if (!immediate) action?.();
-            if (immediate) {
-              setTransitionLeaving(true);
-              window.setTimeout(() => {
-                setTransitionKind(null);
-                setTransitionLeaving(false);
-                transitionBusy.current = false;
-              }, 400);
-            }
-          }, duration);
+          if (window.LangoPageTransition?.navigate) {
+            window.LangoPageTransition.navigate(path);
+            return;
+          }
+          window.location.href = path;
         };
-        const go = (kind, path) => playTransition(kind, () => { window.location.href = path; });
-        const reveal = (kind, action) => playTransition(kind, () => {
-          action?.();
-          setTransitionLeaving(true);
-          window.setTimeout(() => {
-            setTransitionKind(null);
-            setTransitionLeaving(false);
+        const reveal = (_kind, action) => {
+          if (transitionBusy.current) return;
+          transitionBusy.current = true;
+          if (!window.LangoPageTransition?.play) {
+            action?.();
             transitionBusy.current = false;
-          }, 400);
-        }, { duration: 1050 });
+            return;
+          }
+          window.LangoPageTransition.play({ onCovered: action })
+            .finally(() => { transitionBusy.current = false; });
+        };
         const closeComingSoon = () => {
           window.LangoSfx?.play('back');
           setComingSoonFeature(null);
@@ -3508,7 +3894,6 @@
 
         const roomLabel = ROOM_SCENE_LABELS[roomScene];
         return e('main', { className: 'lango-home', 'data-node-id': '49:62', 'aria-label': roomLabel },
-          transitionKind && e(FunTransition, { kind: transitionKind, leaving: transitionLeaving }),
           comingSoonFeature && e(ComingSoonDialog, { feature: comingSoonFeature, onClose: closeComingSoon }),
           e('img', { className: 'lango-home__title', src: asset(`${roomScene}_header`), alt: `${roomLabel} header` }),
           e('section', { id: 'hko-weather-bar', className: 'lango-home__clock', 'aria-label': 'Hong Kong weather', 'aria-live': 'polite' },
@@ -3611,7 +3996,9 @@
     const DEFAULT_PROMPT = "You are Uncle Tommy, a friendly voice assistant. Keep responses brief.";
     const DEFAULT_VOICE = "default-zylgts2tamenvybeti3z0w__uncle_tommy";
     const DEFAULT_MODEL = "openai/gpt-4o-mini";
-    const PREVIEW_MODE = new URLSearchParams(location.search).get("preview") === "1";
+    const pageParams = new URLSearchParams(location.search);
+    const PREVIEW_MODE = pageParams.get("preview") === "1";
+    const SPLASH_GAME_PREVIEW = pageParams.get("splashGame") === "1";
     const sfx = window.LangoSfx;
 
     const btnStart = document.getElementById("btn-start");
@@ -4186,9 +4573,14 @@
       closeRewardCongratulations();
       if (claimedReward?.destination === "map") {
         const unlockLocation = encodeURIComponent(claimedReward.unlockLocation || "school");
-        window.location.href = PREVIEW_MODE
+        const destination = PREVIEW_MODE
           ? `/map/?return=rewards&unlock=${unlockLocation}&preview=1`
           : `/map/?return=rewards&unlock=${unlockLocation}`;
+        if (window.LangoPageTransition?.navigate) {
+          window.LangoPageTransition.navigate(destination);
+        } else {
+          window.location.href = destination;
+        }
       }
     });
     dailyRewardsDevDayBtn?.addEventListener("click", () => {
@@ -4267,6 +4659,17 @@
     const KUNGFU_ANIMATIONS = [
       "/Animation/KungFu/Standing%20Idle%20To%20Fight%20Idle.fbx",
       "/Animation/KungFu/Punch%20Combo.fbx",
+    ];
+    const DANCE_BGM = [
+      "/assets/bgm/dance/playful-upbeat-times.mp3",
+      "/assets/bgm/dance/funky-dance-floor.mp3",
+      "/assets/bgm/dance/happy-kids-loop.mp3",
+      "/assets/bgm/dance/playful-kids-dance.mp3",
+    ];
+    const KUNGFU_BGM = [
+      "/assets/bgm/kungfu/martial-arts-action.mp3",
+      "/assets/bgm/kungfu/taiko-dojo.mp3",
+      "/assets/bgm/kungfu/action-stomp.mp3",
     ];
     const BYEBYE_URL = "/Animation/byebye.fbx";
     const DEBUG_LOG_MAX = 80;
@@ -4386,6 +4789,10 @@
     let directSessionEntry = false;
     let lastChickenDanceAt = 0;
     let lastKungfuAt = 0;
+    let lastDanceBgmUrl = null;
+    let lastKungfuBgmUrl = null;
+    let animationBgmAudio = null;
+    let animationBgmRunId = 0;
     let cachedConfig = null;
     let connectPrep = null;
     let replayingPrepMessages = false;
@@ -4403,6 +4810,50 @@
 
     function pickRandomKungfuUrl() {
       return KUNGFU_ANIMATIONS[Math.floor(Math.random() * KUNGFU_ANIMATIONS.length)];
+    }
+
+    function pickRandomBgm(pool, previousUrl) {
+      if (pool.length < 2) return pool[0] || null;
+      const choices = pool.filter((url) => url !== previousUrl);
+      return choices[Math.floor(Math.random() * choices.length)];
+    }
+
+    function stopAnimationBgm() {
+      animationBgmRunId += 1;
+      if (!animationBgmAudio) return;
+      animationBgmAudio.pause();
+      animationBgmAudio.currentTime = 0;
+      animationBgmAudio = null;
+    }
+
+    async function playAnimationWithBgm(animationUrl, bgmPool, kind) {
+      if (!avatar) return false;
+
+      stopAnimationBgm();
+      const runId = animationBgmRunId;
+      const previousUrl = kind === "dance" ? lastDanceBgmUrl : lastKungfuBgmUrl;
+      const bgmUrl = pickRandomBgm(bgmPool, previousUrl);
+      if (kind === "dance") lastDanceBgmUrl = bgmUrl;
+      else lastKungfuBgmUrl = bgmUrl;
+
+      const bgm = bgmUrl ? new Audio(bgmUrl) : null;
+      if (bgm) {
+        bgm.loop = true;
+        bgm.preload = "auto";
+        bgm.volume = kind === "dance" ? 0.24 : 0.28;
+      }
+
+      try {
+        return await avatar.playMixamoAnimation(animationUrl, {
+          onStart: () => {
+            if (!bgm || runId !== animationBgmRunId) return;
+            animationBgmAudio = bgm;
+            bgm.play().catch((e) => console.warn("Animation BGM could not play:", e));
+          },
+        });
+      } finally {
+        if (runId === animationBgmRunId) stopAnimationBgm();
+      }
     }
 
     function animationNameFromUrl(url) {
@@ -4506,6 +4957,10 @@
     function navigateToGame(game) {
       if (!game?.url) return;
       uiLog("game", `navigate → ${game.url}`, "hello", { game: game.id });
+      if (window.LangoPageTransition?.navigate) {
+        window.LangoPageTransition.navigate(game.url);
+        return;
+      }
       window.location.assign(game.url);
     }
 
@@ -4513,13 +4968,10 @@
       if (launchingGame) return null;
       const surprise = !chosenGame;
       const game = chosenGame || pickRandomGame();
+      launchingGame = true;
       uiLog("game", `launch ${game.id} (${reason})`, "hello", { surprise });
       setStatus(`Launching ${game.name}…`, true);
-      try {
-        await playGameLaunchTransition(game, { surprise });
-      } catch (e) {
-        uiLog("game", `transition error: ${e.message}`, "warn");
-      }
+      sfx?.play("start", { interrupt: true });
       try { ws?.close(); } catch {}
       navigateToGame(game);
       return game;
@@ -4773,6 +5225,11 @@
     function dismissSplash() {
       setSplashProgress(100);
       if (splashScreenEl) splashScreenEl.setAttribute("aria-busy", "false");
+      if (SPLASH_GAME_PREVIEW) {
+        const label = splashScreenEl?.querySelector(".splash-loading-label");
+        if (label) label.textContent = "Ready!";
+        return;
+      }
       document.body.classList.add("splash-dismissed");
       window.dispatchEvent(new CustomEvent("lango:page-reveal"));
     }
@@ -5720,6 +6177,7 @@
         endConversationCloseTimer = null;
       }
       byebyeAnimationPromise = null;
+      stopAnimationBgm();
       try { stopAudio(); } catch (e) { console.warn("stopAudio failed", e); }
       try { stopAvatarSpeech(); } catch (e) { console.warn("stopAvatarSpeech failed", e); }
       resetResponseState(null);
@@ -5733,9 +6191,13 @@
 
     function startByebyeAnimation() {
       if (byebyeAnimationPromise) return byebyeAnimationPromise;
+      stopAnimationBgm();
       uiLog("end", "starting byebye animation alongside farewell", "hello");
       byebyeAnimationPromise = (async () => {
-        const played = await avatar?.playMixamoAnimation(BYEBYE_URL, { resumeIdle: false });
+        const played = await avatar?.playMixamoAnimation(BYEBYE_URL, {
+          resumeIdle: false,
+          playOnce: true,
+        });
         if (!played) uiLog("end", "byebye animation failed to play", "warn");
         return played;
       })();
@@ -5905,7 +6367,7 @@
       lastChickenDanceAt = now;
       const danceUrl = pickRandomDanceUrl();
       uiLog("dance", `${animationNameFromUrl(danceUrl)} (${reason})`, "hello");
-      avatar?.playMixamoAnimation(danceUrl);
+      playAnimationWithBgm(danceUrl, DANCE_BGM, "dance");
     }
 
     function triggerKungfu(reason = "user asked to fight") {
@@ -5914,7 +6376,7 @@
       lastKungfuAt = now;
       const kungfuUrl = pickRandomKungfuUrl();
       uiLog("kungfu", `${animationNameFromUrl(kungfuUrl)} (${reason})`, "hello");
-      avatar?.playMixamoAnimation(kungfuUrl);
+      playAnimationWithBgm(kungfuUrl, KUNGFU_BGM, "kungfu");
     }
 
     function resetResponseState(id) {
@@ -6048,7 +6510,7 @@
           if (args.reason) reason = args.reason;
         } catch {}
         const danceUrl = pickRandomDanceUrl();
-        avatar?.playMixamoAnimation(danceUrl);
+        playAnimationWithBgm(danceUrl, DANCE_BGM, "dance");
         lastChickenDanceAt = Date.now();
         sendFunctionOutput(callId, { success: true, reason, animation: animationNameFromUrl(danceUrl) });
         ws.send(JSON.stringify({ type: "response.create" }));
@@ -6062,7 +6524,7 @@
           if (args.reason) reason = args.reason;
         } catch {}
         const kungfuUrl = pickRandomKungfuUrl();
-        avatar?.playMixamoAnimation(kungfuUrl);
+        playAnimationWithBgm(kungfuUrl, KUNGFU_BGM, "kungfu");
         lastKungfuAt = Date.now();
         sendFunctionOutput(callId, { success: true, reason, animation: animationNameFromUrl(kungfuUrl) });
         ws.send(JSON.stringify({ type: "response.create" }));
@@ -7035,7 +7497,12 @@
       const url = new URL(location.href);
       url.searchParams.delete("preview");
       url.searchParams.delete("screen");
-      location.assign(`${url.pathname}${url.search}${url.hash}` || "/");
+      const destination = `${url.pathname}${url.search}${url.hash}` || "/";
+      if (window.LangoPageTransition?.navigate) {
+        window.LangoPageTransition.navigate(destination);
+      } else {
+        location.assign(destination);
+      }
     });
 
     function setPreviewToolbarCollapsed(collapsed) {

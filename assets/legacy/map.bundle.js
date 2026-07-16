@@ -97,7 +97,11 @@
         playSound("back");
         const destination = returnToRewards ? "/?openRewards=1" : "/";
         setTimeout(() => {
-          window.location.href = destination;
+          if (window.LangoPageTransition && window.LangoPageTransition.navigate) {
+            window.LangoPageTransition.navigate(destination);
+          } else {
+            window.location.href = destination;
+          }
         }, 180);
       };
       const returnToRewards = new URLSearchParams(window.location.search).get("return") === "rewards";

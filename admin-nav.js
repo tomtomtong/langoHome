@@ -51,6 +51,10 @@
     try {
       await fetch('/api/logout', { method: 'POST' });
     } catch (_) { /* ignore */ }
-    location.href = '/admin/login';
+    if (window.LangoPageTransition?.navigate) {
+      window.LangoPageTransition.navigate('/admin/login');
+    } else {
+      location.href = '/admin/login';
+    }
   });
 })();

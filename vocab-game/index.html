@@ -54,6 +54,24 @@
         aspect-ratio: 4 / 3;
       }
 
+      /* Preserve the chop hit areas while hiding the bars between letters. */
+      .lango-home__cut,
+      .lango-home__cut.is-active {
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+      }
+
+      .lango-home__cut.is-active {
+        z-index: 1;
+        font-size: clamp(5rem, calc(160cqw / var(--letter-count)), 9.5rem);
+        font-weight: 950;
+        line-height: .65;
+        text-shadow: 0 3px 0 rgba(17, 37, 79, .14);
+        transform: scaleY(1.12);
+      }
+
       #vocab-completion[hidden] { display: none; }
 
       #vocab-completion {
@@ -255,7 +273,11 @@
               score,
               onNext: () => {
                 markVocabGamePlayed();
-                window.location.href = '/';
+                if (window.LangoPageTransition?.navigate) {
+                  window.LangoPageTransition.navigate('/');
+                } else {
+                  window.location.href = '/';
+                }
               },
             });
           } else {
@@ -276,7 +298,13 @@
       completionDone.addEventListener('click', () => {
         markVocabGamePlayed();
         completionModal.classList.add('is-leaving');
-        window.setTimeout(() => { window.location.href = '/'; }, 380);
+        window.setTimeout(() => {
+          if (window.LangoPageTransition?.navigate) {
+            window.LangoPageTransition.navigate('/');
+          } else {
+            window.location.href = '/';
+          }
+        }, 380);
       });
 
       // The supplied game used the Return artwork to skip a round. When the
@@ -287,7 +315,11 @@
         if (!event.target.closest('.lango-home__return')) return;
         event.preventDefault();
         event.stopImmediatePropagation();
-        window.location.href = '/';
+        if (window.LangoPageTransition?.navigate) {
+          window.LangoPageTransition.navigate('/');
+        } else {
+          window.location.href = '/';
+        }
       }, true);
     </script>
   </body>

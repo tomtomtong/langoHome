@@ -1651,15 +1651,19 @@ function isPublicPath(url) {
     || url === '/admin/login'
     || url === '/api/login'
     || url === '/api/admin/login'
+    || url === '/assets/page-motion.css'
+    || url === '/assets/page-motion.js'
+    || /^\/assets\/uncle-tommy-transition\/(?:uncle-tommy-transition\.(?:css|js)|user_uncletommy_[1-4]\.png)$/i.test(url)
     || url === '/langoLogo.jpeg';
 }
 
 function isPreviewStaticAsset(url) {
   return /^\/visme\/.+\.(?:js|mjs|vrm|fbx|wasm|json)$/i.test(url)
     || /^\/Animation\/.+\.fbx$/i.test(url)
-    || /^\/assets\/(?:lango-home|daily-rewards|collections|map|sfx)\/.+\.(?:png|jpe?g|webp|svg|json|mp3|wav)$/i.test(url)
+    || /^\/assets\/(?:lango-home|daily-rewards|collections|map|sfx|bgm)\/.+\.(?:png|jpe?g|webp|svg|json|mp3|wav)$/i.test(url)
     || url === '/assets/page-motion.css'
     || url === '/assets/page-motion.js'
+    || /^\/assets\/uncle-tommy-transition\/(?:uncle-tommy-transition\.(?:css|js)|user_uncletommy_[1-4]\.png)$/i.test(url)
     || url === '/assets/vendor/lottie_light.min.js'
     || /^\/games\/.+\.(?:css|js|svg|png|jpe?g|webp|gif|mp3|wav)$/i.test(url)
     || url === '/vocab-game-app.css'
@@ -1722,8 +1726,10 @@ function isPreviewSafeRequest(req, url, rawUrl) {
     || url.startsWith('/assets/collections/')
     || url.startsWith('/assets/map/')
     || url.startsWith('/assets/sfx/')
+    || url.startsWith('/assets/bgm/')
     || url === '/assets/page-motion.css'
     || url === '/assets/page-motion.js'
+    || url.startsWith('/assets/uncle-tommy-transition/')
     || url.startsWith('/games/assets/')
     || /^\/games\/.+\.(?:css|js|svg|png|jpe?g|webp|gif|mp3|wav)$/i.test(url)
     || /^\/api\/(idle-video|transition-video|avatar-background)$/.test(url)
@@ -3514,9 +3520,28 @@ const server = createServer((req, res) => {
     return;
   }
 
+  const backgroundMusicAsset = url.match(
+    /^\/assets\/bgm\/(dance|kungfu)\/([a-z0-9-]+\.mp3)$/i,
+  );
+  if (backgroundMusicAsset) {
+    serveFile(
+      res,
+      join(ROOT, 'assets', 'bgm', backgroundMusicAsset[1], backgroundMusicAsset[2]),
+    );
+    return;
+  }
+
   const sharedMotionAsset = url.match(/^\/assets\/(page-motion\.(?:css|js))$/i);
   if (sharedMotionAsset) {
     serveFile(res, join(ROOT, 'assets', sharedMotionAsset[1]));
+    return;
+  }
+
+  const uncleTommyTransitionAsset = url.match(
+    /^\/assets\/uncle-tommy-transition\/(uncle-tommy-transition\.(?:css|js)|user_uncletommy_[1-4]\.png)$/i,
+  );
+  if (uncleTommyTransitionAsset) {
+    serveFile(res, join(ROOT, 'assets', 'uncle-tommy-transition', uncleTommyTransitionAsset[1]));
     return;
   }
 

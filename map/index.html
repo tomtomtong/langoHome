@@ -520,7 +520,13 @@
               ? '/?preview=1&screen=rewards&openRewards=1&resumeRewards=1'
               : '/?openRewards=1')
             : '/';
-          setTimeout(() => { window.location.href = destination; }, 180);
+          setTimeout(() => {
+            if (window.LangoPageTransition?.navigate) {
+              window.LangoPageTransition.navigate(destination);
+            } else {
+              window.location.href = destination;
+            }
+          }, 180);
         };
 
         return e('main', { className: 'map-page' },
