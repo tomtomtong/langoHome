@@ -3739,14 +3739,15 @@ function buildSessionCfg({
   voice,
   model,
   asrModel,
+  asrLanguage,
   vadEagerness,
   vadThreshold,
   ttsModel,
+  ttsLanguage,
   ttsSpeed,
   ttsDeliveryMode,
   temperature,
   maxOutputTokens,
-  language,
 } = {}) {
   const session = {
     type: 'realtime',
@@ -3774,6 +3775,9 @@ function buildSessionCfg({
     },
   };
 
+  const asrLang = String(asrLanguage || '').trim();
+  if (asrLang) session.audio.input.transcription.language = asrLang;
+
   const temp = Number(temperature);
   if (Number.isFinite(temp)) session.temperature = temp;
 
@@ -3787,26 +3791,19 @@ function buildSessionCfg({
   const speed = Number(ttsSpeed);
   if (Number.isFinite(speed) && speed > 0) session.audio.output.speed = speed;
 
-  const locale = String(language || '').trim();
-  if (locale) {
-    session.audio.input.transcription.language = locale.split('-')[0].toLowerCase();
-  }
-
   const providerData = {};
-  const sttPd = {};
   const vad = Number(vadThreshold);
   if (Number.isFinite(vad) && vad >= 0 && vad <= 1) {
-    sttPd.vad_threshold = vad;
+    providerData.stt = { vad_threshold: vad };
   }
-  if (locale) sttPd.language_hints = [locale];
-  if (Object.keys(sttPd).length) providerData.stt = sttPd;
 
   const ttsPd = {};
   const deliveryMode = String(ttsDeliveryMode || '').trim().toUpperCase();
   if (deliveryMode === 'STABLE' || deliveryMode === 'BALANCED' || deliveryMode === 'CREATIVE') {
     ttsPd.delivery_mode = deliveryMode;
   }
-  if (locale) ttsPd.language = locale;
+  const ttsLang = String(ttsLanguage || '').trim();
+  if (ttsLang) ttsPd.language = ttsLang;
   if (Object.keys(ttsPd).length) providerData.tts = ttsPd;
 
   if (Object.keys(providerData).length) session.providerData = providerData;
@@ -4006,16 +4003,17 @@ wss.on('connection', (browser, req) => {
       voice: parsed.voice?.trim() || saved.voice?.trim(),
       model: parsed.model?.trim() || saved.model?.trim(),
       asrModel: parsed.asrModel?.trim() || saved.asrModel?.trim(),
+      asrLanguage: parsed.asrLanguage?.trim() || saved.asrLanguage?.trim(),
       vadEagerness: parsed.vadEagerness?.trim() || saved.vadEagerness?.trim(),
       vadThreshold: Number.isFinite(vadThreshold) ? vadThreshold : undefined,
       ttsModel: parsed.ttsModel?.trim() || saved.ttsModel?.trim(),
+      ttsLanguage: parsed.ttsLanguage?.trim() || saved.ttsLanguage?.trim(),
       ttsSpeed: Number.isFinite(ttsSpeed) ? ttsSpeed : undefined,
       ttsDeliveryMode: parsed.ttsDeliveryMode?.trim() || saved.ttsDeliveryMode?.trim(),
       temperature: Number.isFinite(temperature) ? temperature : undefined,
       maxOutputTokens: maxOutputTokens === 'inf' || Number.isFinite(maxOutputTokens)
         ? maxOutputTokens
         : undefined,
-      language: parsed.language?.trim() || saved.language?.trim(),
     }, {
       username: sessionUser?.username || 'unknown',
       role: sessionUser?.role || 'unknown',

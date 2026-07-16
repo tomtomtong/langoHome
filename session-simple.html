@@ -171,7 +171,6 @@
       font-size: 0.8rem;
     }
     #modelCustom { display: none; }
-    #languageCustom { display: none; }
   </style>
 </head>
 <body>
@@ -185,27 +184,6 @@
 
       <label for="instructions">Instructions</label>
       <textarea id="instructions" placeholder="System prompt for the agent"></textarea>
-
-      <h2 class="config-section">Language</h2>
-
-      <label for="language">Language</label>
-      <select id="language">
-        <option value="">Auto detect</option>
-        <option value="en-US">English (US)</option>
-        <option value="en-GB">English (UK)</option>
-        <option value="zh-CN">Chinese (Simplified)</option>
-        <option value="zh-HK">Chinese (Hong Kong)</option>
-        <option value="es-ES">Spanish</option>
-        <option value="fr-FR">French</option>
-        <option value="de-DE">German</option>
-        <option value="it-IT">Italian</option>
-        <option value="pt-BR">Portuguese (Brazil)</option>
-        <option value="ja-JP">Japanese</option>
-        <option value="ko-KR">Korean</option>
-        <option value="__custom__">Custom locale…</option>
-      </select>
-      <input id="languageCustom" type="text" placeholder="BCP-47 locale, e.g. en-US or zh-HK">
-      <p class="field-hint">Sets STT transcription language and TTS output language. Leave on auto to let the server detect speech.</p>
 
       <h2 class="config-section">LLM</h2>
 
@@ -236,6 +214,10 @@
         <option value="inworld-tts-1.5-mini">inworld-tts-1.5-mini (lower latency)</option>
       </select>
 
+      <label for="ttsLanguage">TTS language</label>
+      <input id="ttsLanguage" type="text" placeholder="en-US (optional)">
+      <p class="field-hint">BCP-47 code for synthesis (e.g. <code>en-US</code>, <code>zh-HK</code>). Leave empty to let TTS infer.</p>
+
       <label for="ttsSpeed">TTS speed</label>
       <input id="ttsSpeed" type="number" min="0.5" max="2" step="0.05" placeholder="1.0">
       <p class="field-hint">Playback speed multiplier. Leave empty for default (1.0).</p>
@@ -258,6 +240,10 @@
         <option value="assemblyai/universal-streaming-multilingual">assemblyai/universal-streaming-multilingual</option>
         <option value="soniox/stt-rt-v4">soniox/stt-rt-v4</option>
       </select>
+
+      <label for="asrLanguage">ASR language</label>
+      <input id="asrLanguage" type="text" placeholder="en (optional)">
+      <p class="field-hint">BCP-47 code for speech recognition (e.g. <code>en</code>, <code>es</code>, <code>zh</code>). Leave empty for auto-detect.</p>
 
       <label for="vadEagerness">VAD eagerness</label>
       <select id="vadEagerness">
@@ -320,12 +306,12 @@
     const temperatureEl = $("temperature");
     const maxOutputTokensEl = $("maxOutputTokens");
     const ttsModelEl = $("ttsModel");
+    const ttsLanguageEl = $("ttsLanguage");
     const ttsSpeedEl = $("ttsSpeed");
     const ttsDeliveryModeEl = $("ttsDeliveryMode");
-    const languageEl = $("language");
-    const languageCustomEl = $("languageCustom");
     const instructionsEl = $("instructions");
     const asrModelEl = $("asrModel");
+    const asrLanguageEl = $("asrLanguage");
     const vadEagernessEl = $("vadEagerness");
     const vadThresholdEl = $("vadThreshold");
     const statusEl = $("status");
@@ -416,41 +402,6 @@
     });
     btnRefreshModels.addEventListener("click", () => loadInworldModels({ forceRefresh: true }));
 
-    function resolveLanguageValue() {
-      if (languageEl.value === "__custom__") return languageCustomEl.value.trim();
-      return languageEl.value.trim();
-    }
-
-    function applyLanguageValue(value) {
-      const trimmed = String(value || "").trim();
-      const known = new Set([...languageEl.options].map((opt) => opt.value).filter((v) => v && v !== "__custom__"));
-      if (!trimmed) {
-        languageEl.value = "";
-        languageCustomEl.style.display = "none";
-        languageCustomEl.value = "";
-        return;
-      }
-      if (known.has(trimmed)) {
-        languageEl.value = trimmed;
-        languageCustomEl.style.display = "none";
-        languageCustomEl.value = "";
-        return;
-      }
-      languageEl.value = "__custom__";
-      languageCustomEl.style.display = "block";
-      languageCustomEl.value = trimmed;
-    }
-
-    languageEl.addEventListener("change", () => {
-      if (languageEl.value === "__custom__") {
-        languageCustomEl.style.display = "block";
-        languageCustomEl.focus();
-      } else {
-        languageCustomEl.style.display = "none";
-        languageCustomEl.value = "";
-      }
-    });
-
     // Mic capture runs in an AudioWorklet (audio thread) so low-end devices
     // don't drop microphone chunks when the main thread is busy. It
     // downsamples from the device's native rate to 24 kHz PCM16.
@@ -522,10 +473,11 @@
         temperature: Number.isFinite(tempParsed) ? tempParsed : undefined,
         maxOutputTokens: maxParsed === "inf" || Number.isFinite(maxParsed) ? maxParsed : undefined,
         ttsModel: ttsModelEl.value.trim() || DEFAULT_TTS_MODEL,
+        ttsLanguage: ttsLanguageEl.value.trim() || undefined,
         ttsSpeed: Number.isFinite(speedParsed) ? speedParsed : undefined,
         ttsDeliveryMode: ttsDeliveryModeEl.value.trim() || undefined,
-        language: resolveLanguageValue() || undefined,
         asrModel: asrModelEl.value.trim() || DEFAULT_ASR_MODEL,
+        asrLanguage: asrLanguageEl.value.trim() || undefined,
         vadEagerness: vadEagernessEl.value.trim() || DEFAULT_VAD_EAGERNESS,
         vadThreshold: Number.isFinite(vadParsed) ? vadParsed : undefined,
       };
@@ -541,10 +493,11 @@
         temperature: cfg.temperature,
         maxOutputTokens: cfg.maxOutputTokens,
         ttsModel: cfg.ttsModel,
+        ttsLanguage: cfg.ttsLanguage,
         ttsSpeed: cfg.ttsSpeed,
         ttsDeliveryMode: cfg.ttsDeliveryMode,
-        language: cfg.language,
         asrModel: cfg.asrModel,
+        asrLanguage: cfg.asrLanguage,
         vadEagerness: cfg.vadEagerness,
         vadThreshold: cfg.vadThreshold,
       };
@@ -578,12 +531,12 @@
       temperatureEl.disabled = on;
       maxOutputTokensEl.disabled = on;
       ttsModelEl.disabled = on;
+      ttsLanguageEl.disabled = on;
       ttsSpeedEl.disabled = on;
       ttsDeliveryModeEl.disabled = on;
-      languageEl.disabled = on;
-      languageCustomEl.disabled = on;
       instructionsEl.disabled = on;
       asrModelEl.disabled = on;
+      asrLanguageEl.disabled = on;
       vadEagernessEl.disabled = on;
       vadThresholdEl.disabled = on;
     }
@@ -646,10 +599,11 @@
           maxOutputTokensEl.value = cfg.maxOutputTokens;
         }
         if (cfg.ttsModel) ttsModelEl.value = cfg.ttsModel;
+        if (cfg.ttsLanguage) ttsLanguageEl.value = cfg.ttsLanguage;
         if (cfg.ttsSpeed != null && cfg.ttsSpeed !== "") ttsSpeedEl.value = cfg.ttsSpeed;
         if (cfg.ttsDeliveryMode) ttsDeliveryModeEl.value = cfg.ttsDeliveryMode;
-        if (cfg.language) applyLanguageValue(cfg.language);
         if (cfg.asrModel) asrModelEl.value = cfg.asrModel;
+        if (cfg.asrLanguage) asrLanguageEl.value = cfg.asrLanguage;
         if (cfg.vadEagerness) vadEagernessEl.value = cfg.vadEagerness;
         if (cfg.vadThreshold != null && cfg.vadThreshold !== "") vadThresholdEl.value = cfg.vadThreshold;
         return cfg;
@@ -674,10 +628,11 @@
       lines.push(`Temperature: ${cfg.temperature ?? "(default)"}`);
       lines.push(`Max tokens: ${cfg.maxOutputTokens ?? "(default)"}`);
       lines.push(`TTS: ${cfg.ttsModel}`);
+      lines.push(`TTS language: ${cfg.ttsLanguage ?? "(auto)"}`);
       lines.push(`TTS speed: ${cfg.ttsSpeed ?? "(default)"}`);
       lines.push(`TTS delivery: ${cfg.ttsDeliveryMode ?? "(default)"}`);
-      lines.push(`Language: ${cfg.language ?? "auto"}`);
       lines.push(`ASR: ${cfg.asrModel}`);
+      lines.push(`ASR language: ${cfg.asrLanguage ?? "(auto)"}`);
       lines.push(`VAD eagerness: ${cfg.vadEagerness}`);
       lines.push(`VAD threshold: ${cfg.vadThreshold ?? "(eagerness preset)"}`);
       lines.push(`Instructions: ${cfg.instructions.slice(0, 60)}${cfg.instructions.length > 60 ? "…" : ""}`);
