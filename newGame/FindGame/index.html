@@ -25,11 +25,14 @@
   </div>
   <div id="bga-custom-background" aria-hidden="true"></div>
 
-  <button type="button" class="return-btn" id="returnBtn" title="Return to conversation" aria-label="Return to conversation">
-    <img src="assets/images/return-button.png" alt="" class="return-icon" />
-  </button>
-
   <div id="game" class="scene">
+    <button type="button" class="return-btn" id="returnBtn" title="Return to conversation" aria-label="Return to conversation">
+      <img src="assets/images/return-button.png" alt="" class="return-icon" />
+    </button>
+    <div class="game-audio-control" data-game-audio-menu>
+      <button type="button" class="sound-toggle--viewport" data-game-audio-menu-button aria-label="Sound settings" title="Sound settings">🔊</button>
+    </div>
+
     <header class="hud">
       <div class="sign-wrap">
         <div class="sign">
@@ -77,6 +80,9 @@
   </div>
 
   <script src="../js/loadingScreen.js"></script>
+  <script src="../js/gameBgm.js"></script>
+  <script src="../js/gameSfx.js"></script>
+  <script src="../js/gameAudioMenu.js"></script>
   <script src="js/imageConfig.js"></script>
   <script src="../js/gamePicker.js"></script>
   <script src="../js/gameScoreReporter.js"></script>

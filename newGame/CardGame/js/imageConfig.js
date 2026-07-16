@@ -22,20 +22,6 @@ const CardImageConfig = (() => {
   }
 
   const SLOTS = {
-    card_progressBar: {
-      label: "Progress bar",
-      description: "Footer progress bar frame",
-      default: "assets/images/progress-bar.svg",
-      sizeMode: "stretch",
-      apply: (url, scale = DEFAULT_SCALE) => {
-        const size = bgSize("stretch", scale);
-        document.querySelectorAll(".progress-frame").forEach((el) => {
-          el.style.background = `url("${url}") center / ${size} no-repeat`;
-          el.style.border = "none";
-          el.style.boxShadow = "none";
-        });
-      },
-    },
     card_levelPanel: {
       label: "Level complete panel",
       description: "Game-over / time-up dialog panel",

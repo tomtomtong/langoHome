@@ -65,6 +65,29 @@
   const NEXT_ROUND_DELAY = 700;
   const MISSES_BEFORE_REVEAL = 2;
   const REVEAL_ROUND_DELAY = 7000;
+  const HIT_REACTION_DELAY = 430;
+
+  const MOLE_ACTIONS = [
+    "hello",
+    "hat-tip",
+    "curious-left",
+    "curious-right",
+    "magic",
+    "confident",
+    "startled",
+    "bounce",
+  ];
+
+  const TOMMY_POSE_BY_ACTION = {
+    "hello": "assets/images/tommy/tommy-base.png",
+    "hat-tip": "assets/images/tommy/tommy-base.png",
+    "curious-left": "assets/images/tommy/tommy-base.png",
+    "curious-right": "assets/images/tommy/tommy-base.png",
+    "magic": "assets/images/tommy/tommy-base.png",
+    "confident": "assets/images/tommy/tommy-base.png",
+    "startled": "assets/images/tommy/tommy-base.png",
+    "bounce": "assets/images/tommy/tommy-base.png",
+  };
 
   const GENERIC_DISTRACTORS = ["LOUD", "COLD", "FAST", "BLUE", "METAL", "SILENT", "SQUARE", "HOT"];
 
@@ -85,6 +108,7 @@
     holes: [],
     tickTimer: null,
     nextRoundTimer: null,
+    lastProgressPct: 0,
   };
 
   // ---------- DOM ----------
@@ -97,9 +121,34 @@
   const comboChip = $("comboChip");
   const sentenceEl = $("sentence");
   const progressFill = $("progressFill");
+  const progressFrame = document.querySelector(".progress-frame");
   const overlay = $("overlay");
   const fxLayer = $("fx");
-  const timerWrap = document.querySelector(".timer-wrap");
+  const timerWrap = document.querySelector(".timer-chip");
+  const Sfx = window.GameSfx || { play() {} };
+  const Bgm = window.GameBgm || { play() {}, pause() {} };
+
+  const DESIGN_W = 960;
+  const DESIGN_H = 720;
+
+  function fitGameToScreen() {
+    const gameEl = $("game");
+    if (!gameEl) return;
+    const viewport = window.visualViewport;
+    const winW = viewport ? viewport.width : window.innerWidth;
+    const winH = viewport ? viewport.height : window.innerHeight;
+    const scale = Math.min(winW / DESIGN_W, winH / DESIGN_H, 4);
+    gameEl.style.transform = `scale(${scale})`;
+    gameEl.style.transformOrigin = "center center";
+  }
+
+  fitGameToScreen();
+  window.addEventListener("resize", fitGameToScreen);
+  window.addEventListener("orientationchange", fitGameToScreen);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", fitGameToScreen);
+    window.visualViewport.addEventListener("scroll", fitGameToScreen);
+  }
 
   // ---------- Build grid ----------
   function buildGrid() {
@@ -114,12 +163,17 @@
           <div class="hole-ellip"></div>
           <div class="mole-clip">
             <div class="mole">
-              <div class="mole-body">
-                <img class="mole-img" src="" alt="" />
+              <div class="mole-actor">
+                <div class="mole-body">
+                  <img class="mole-img mole-img-normal" src="assets/images/tommy/tommy-base.png" alt="Tommy" />
+                  <img class="mole-img mole-img-hit" src="assets/images/tommy/tommy-base.png" alt="" aria-hidden="true" />
+                </div>
+                <div class="hit-expression" aria-hidden="true"><span></span><span></span></div>
+                <div class="mole-face"><div class="eye"></div><div class="eye"></div></div>
+                <div class="mole-nose"></div>
+                <div class="mole-teeth"></div>
               </div>
-              <div class="mole-face"><div class="eye"></div><div class="eye"></div></div>
-              <div class="mole-nose"></div>
-              <div class="mole-teeth"></div>
+              <div class="hit-burst" aria-hidden="true"><span>★</span><span>✦</span><span>★</span></div>
               <div class="word-sign"></div>
             </div>
           </div>
@@ -135,6 +189,9 @@
         word: null,
         correct: false,
         whacked: false,
+        action: null,
+        hitTimer: null,
+        normalImg: hole.querySelector(".mole-img-normal"),
       };
       mole.addEventListener("click", () => whack(obj));
       mole.addEventListener("touchstart", (e) => { e.preventDefault(); whack(obj); }, { passive: false });
@@ -286,18 +343,34 @@
 
   function resetHoles() {
     state.holes.forEach((hole) => {
+      clearTimeout(hole.hitTimer);
+      hole.hitTimer = null;
       hole.up = false;
       hole.whacked = false;
       hole.word = null;
       hole.correct = false;
-      hole.el.classList.remove("up", "whacked", "waiting", "hit-good", "hit-bad", "reveal");
+      hole.el.classList.remove("up", "whacked", "waiting", "hit-reacting", "hit-good", "hit-bad", "reveal");
       hole.mole.classList.remove("hit-good", "hit-bad", "reveal-hint");
+      MOLE_ACTIONS.forEach((action) => hole.mole.classList.remove(`action-${action}`));
       hole.wordSign.textContent = "";
     });
   }
 
+  function setHoleAction(hole, action) {
+    MOLE_ACTIONS.forEach((name) => hole.mole.classList.remove(`action-${name}`));
+    hole.action = action;
+    hole.mole.classList.add(`action-${action}`);
+
+    if (hole.normalImg) {
+      const poseUrl = TOMMY_POSE_BY_ACTION[action] || TOMMY_POSE_BY_ACTION.bounce;
+      hole.normalImg.dataset.defaultSrc = poseUrl;
+      hole.normalImg.src = poseUrl;
+    }
+  }
+
   function spawnRoundMoles() {
     const words = buildRoundWords(state.puzzle);
+    const actions = shuffle([...MOLE_ACTIONS]);
     resetHoles();
     state.roundMisses = 0;
     state.roundCorrectWords = words.filter((w) => w.correct).map((w) => w.word);
@@ -307,6 +380,7 @@
       hole.word = word;
       hole.correct = correct;
       hole.wordSign.textContent = word;
+      setHoleAction(hole, actions[i]);
       void hole.mole.offsetWidth;
       hole.el.classList.add("up", "waiting");
       hole.up = true;
@@ -324,12 +398,25 @@
     spawnRoundMoles();
   }
 
-  function retractMole(hole) {
+  function retractMole(hole, delay = 0) {
     if (!hole.up) return;
-    hole.el.classList.remove("up", "waiting");
-    hole.el.classList.add("whacked");
     hole.up = false;
     hole.whacked = true;
+
+    const retract = () => {
+      hole.el.classList.remove("up", "waiting", "hit-reacting");
+      hole.el.classList.add("whacked");
+    };
+
+    if (delay > 0) {
+      hole.el.classList.remove("waiting");
+      hole.el.classList.add("hit-reacting");
+      clearTimeout(hole.hitTimer);
+      hole.hitTimer = setTimeout(retract, delay);
+      return;
+    }
+
+    retract();
   }
 
   function remainingCorrectMoles() {
@@ -377,12 +464,13 @@
     if (hole.correct) {
       state.roundBusy = true;
       hole.mole.classList.add("hit-good");
+      Sfx.play("correct", { rate: Math.min(1.28, 1 + state.combo * 0.035) });
       const gain = BASE_POINTS + state.combo * COMBO_BONUS;
       addScore(gain);
       state.combo++;
       state.maxCombo = Math.max(state.maxCombo, state.combo);
       state.questionsAnswered++;
-      questionVal.textContent = state.questionsAnswered;
+      if (questionVal) questionVal.textContent = state.questionsAnswered;
       floatText(hole.el, `+${gain}`, true);
       renderCombo();
       pulseCombo();
@@ -392,7 +480,7 @@
       state.holes.forEach((h) => {
         if (h !== hole && h.up) retractMole(h);
       });
-      retractMole(hole);
+      retractMole(hole, HIT_REACTION_DELAY);
 
       clearTimeout(state.nextRoundTimer);
       state.nextRoundTimer = setTimeout(() => {
@@ -402,13 +490,14 @@
     }
 
     hole.mole.classList.add("hit-bad");
+    Sfx.play("wrong");
     state.combo = 0;
     state.roundMisses++;
     floatText(hole.el, "Miss!", false);
     pulseCombo(true);
     shakeScreen();
     renderCombo();
-    retractMole(hole);
+    retractMole(hole, HIT_REACTION_DELAY);
 
     if (state.roundMisses >= MISSES_BEFORE_REVEAL) {
       revealCorrectAnswer();
@@ -426,10 +515,11 @@
   }
 
   function renderCombo() {
-    comboVal.textContent = state.combo;
+    if (comboVal) comboVal.textContent = state.combo;
   }
 
   function pulseCombo(reset) {
+    if (!comboChip) return;
     comboChip.classList.remove("hot");
     void comboChip.offsetWidth;
     if (!reset && state.combo > 0) comboChip.classList.add("hot");
@@ -448,16 +538,39 @@
     return earned;
   }
 
+  function celebrateProgressStar(star) {
+    star.classList.remove("just-earned");
+    void star.offsetWidth;
+    star.classList.add("just-earned");
+    if (progressFrame) {
+      progressFrame.classList.remove("milestone-celebrate");
+      void progressFrame.offsetWidth;
+      progressFrame.classList.add("milestone-celebrate");
+    }
+    Sfx.play("star");
+  }
+
   function updateProgress() {
     const pct = Math.min(100, (state.score / MAX_SCORE_GOAL) * 100);
-    progressFill.style.width = pct + "%";
+    const advanced = pct > state.lastProgressPct;
+    state.lastProgressPct = pct;
+    progressFill.style.width = `${pct}%`;
+
+    if (advanced && progressFrame) {
+      progressFrame.classList.remove("progress-bump");
+      void progressFrame.offsetWidth;
+      progressFrame.classList.add("progress-bump");
+    }
+
     document.querySelectorAll(".star-milestone").forEach((s) => {
       const m = parseInt(s.dataset.milestone, 10);
       const threshold = STAR_THRESHOLDS.find((t) => t.stars === m);
       if (threshold && state.questionsAnswered >= threshold.questions && state.score >= threshold.score) {
+        const justEarned = !s.classList.contains("earned");
         s.classList.add("earned");
+        if (justEarned) celebrateProgressStar(s);
       } else {
-        s.classList.remove("earned");
+        s.classList.remove("earned", "just-earned");
       }
     });
   }
@@ -517,6 +630,7 @@
       }
       renderTimer();
       updateProgress();
+      if (state.time <= 10) Sfx.play("warning");
     }, 1000);
   }
 
@@ -532,6 +646,8 @@
 
   // ---------- Game flow ----------
   function startGame() {
+    Sfx.play("ready");
+    Bgm.play("wordwhack");
     state.running = true;
     state.score = 0;
     state.combo = 0;
@@ -541,8 +657,9 @@
     state.lastPuzzleIdx = -1;
     state.lastTargetWord = null;
     state.roundBusy = false;
+    state.lastProgressPct = 0;
 
-    questionVal.textContent = 0;
+    if (questionVal) questionVal.textContent = 0;
     scoreVal.textContent = "0";
     renderCombo();
     renderTimer();
@@ -560,6 +677,8 @@
     stopTimer();
     clearTimeout(state.nextRoundTimer);
     resetHoles();
+    Bgm.pause();
+    Sfx.play("finish");
 
     const stars = getStarsEarned();
     if (typeof GameScoreReporter !== 'undefined') {

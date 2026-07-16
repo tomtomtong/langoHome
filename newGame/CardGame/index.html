@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="../css/gamePicker.css">
 <link rel="stylesheet" href="../css/loadingScreen.css">
 </head>
-<body>
+<body data-hide-game-picker="true">
 <div id="game-loading" class="game-loading--cardgame" role="status" aria-live="polite" aria-busy="true">
   <div class="game-loading-backdrop" aria-hidden="true"></div>
   <div class="game-loading-card">
@@ -22,35 +22,38 @@
 </div>
 <div id="bga-custom-background" aria-hidden="true"></div>
 
-<button id="return-btn" class="return-btn" type="button" title="Return to conversation" aria-label="Return to conversation">
-  <img src="../FindGame/assets/images/return-button.png" alt="Return" class="return-icon">
-</button>
-
 <div id="game">
+  <button id="return-btn" class="return-btn" type="button" title="Return to conversation" aria-label="Return to conversation">
+    <img src="../FindGame/assets/images/return-button.png" alt="Return" class="return-icon">
+  </button>
+  <div id="timer-display" class="timer-chip" aria-label="Time remaining">
+    <span class="timer-readout">
+      <span id="timer-text" class="timer-num">90</span>
+      <span class="timer-unit">sec</span>
+    </span>
+  </div>
+  <div class="game-audio-control sound-toggle--cardgame" data-game-audio-menu>
+    <button type="button" class="sound-toggle--viewport" data-game-audio-menu-button aria-label="Sound settings" title="Sound settings">🔊</button>
+  </div>
   <header class="game-top-hud">
-    <h1 class="title-text">Picture-Word Memory Match</h1>
-    <div id="status-row">
-      <div id="timer-display" class="timer-chip" aria-label="Time remaining">
-        <span class="timer-readout">
-          <span id="timer-text" class="timer-num">90</span>
-          <span class="timer-unit">sec</span>
-        </span>
-      </div>
-      <div id="pairs-display"><span id="pairs-found">0/6</span> Pairs Found</div>
-      <div id="score-display" class="live-score" aria-label="Score"><span id="score-text">0</span></div>
-    </div>
+    <h1 class="title-text">
+      <img src="assets/images/card-game-title.svg" alt="Memory Matching" class="title-image">
+    </h1>
   </header>
-  <button id="sound-toggle" class="sound-toggle" type="button" aria-label="Mute sound" aria-pressed="false" title="Mute sound">🔊</button>
   <div id="hud">
     <span id="timer" style="display:none;">90</span>
   </div>
   <div id="board"></div>
   <footer class="footer">
     <div class="progress-frame">
-      <div id="progressFill" class="progress-fill"></div>
-      <div class="star-milestone s1" data-milestone="1"><img src="assets/images/star.png" alt="" class="star-img"></div>
-      <div class="star-milestone s2" data-milestone="2"><img src="assets/images/star.png" alt="" class="star-img"></div>
-      <div class="star-milestone s3" data-milestone="3"><img src="assets/images/star.png" alt="" class="star-img"></div>
+      <div class="progress-track">
+        <div id="progressFill" class="progress-fill">
+          <img src="assets/images/progress-bar-fill.svg" alt="" class="progress-fill-art">
+        </div>
+      </div>
+      <div class="star-milestone s1" data-milestone="1"><img src="../assets/images/progress-star.png" alt="" class="star-img"></div>
+      <div class="star-milestone s2" data-milestone="2"><img src="../assets/images/progress-star.png" alt="" class="star-img"></div>
+      <div class="star-milestone s3" data-milestone="3"><img src="../assets/images/progress-star.png" alt="" class="star-img"></div>
     </div>
   </footer>
   <div id="level-complete" class="hidden" aria-live="polite">
@@ -62,11 +65,24 @@
   </div>
   <div id="game-announcer" class="visually-hidden" aria-live="polite"></div>
 </div>
+
+<div id="race-cue" class="race-cue hidden" aria-hidden="true" aria-live="assertive">
+  <div class="race-cue-backdrop" aria-hidden="true"></div>
+  <div class="race-cue-speed-lines" aria-hidden="true"></div>
+  <div class="race-cue-content">
+    <span id="race-cue-kicker" class="race-cue-kicker">GET READY</span>
+    <strong id="race-cue-word" class="race-cue-word">READY</strong>
+    <button id="race-cue-start" class="race-cue-start" type="button">Tap to start</button>
+  </div>
+</div>
+
 <script src="../js/loadingScreen.js"></script>
+<script src="../js/gameBgm.js"></script>
 <script src="../js/vocaConfig.js"></script>
 <script src="../js/gamePicker.js"></script>
 <script src="../js/gameScoreReporter.js"></script>
 <script src="../assets/game-result.js"></script>
 <script src="game.js"></script>
+<script src="../js/gameAudioMenu.js"></script>
 </body>
 </html>

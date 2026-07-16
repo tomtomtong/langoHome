@@ -65,9 +65,9 @@ const ImageConfig = (() => {
       label: "Mole hole",
       description: "Hole ellipse and front lip",
       default: "assets/images/hole.svg",
-      sizeMode: "contain",
+      sizeMode: "stretch",
       apply: (url, scale = DEFAULT_SCALE) => {
-        const size = bgSize("contain", scale);
+        const size = bgSize("stretch", scale);
         document.querySelectorAll(".hole-ellip, .hole-lip").forEach((el) => {
           el.style.background = `url("${url}") center / ${size} no-repeat`;
           el.style.border = "none";
@@ -76,13 +76,18 @@ const ImageConfig = (() => {
       },
     },
     mole: {
-      label: "Mole",
-      description: "Mole character body",
-      default: "assets/images/mole.svg",
+      label: "Tommy character",
+      description: "Tommy character used by Word-Whack Blitz",
+      default: "assets/images/tommy/tommy-base.png",
       sizeMode: "img",
-      apply: (url, scale = DEFAULT_SCALE) => {
-        document.querySelectorAll(".mole-img").forEach((img) => {
-          img.src = url;
+      scalable: false,
+      apply: (_url, scale = DEFAULT_SCALE) => {
+        // Word-Whack now has a fixed character identity. An older persisted
+        // `mole` upload may still exist in the image database, but it must not
+        // replace Tommy when the game loads.
+        const usesTommySet = true;
+        document.querySelectorAll(".mole-img-normal").forEach((img) => {
+          img.src = img.dataset.defaultSrc || SLOTS.mole.default;
           img.style.display = "block";
           img.style.transform = "";
           img.style.transformOrigin = "";
@@ -91,6 +96,7 @@ const ImageConfig = (() => {
           applyTransformScale(body, scale, "translateX(-50%)", "center bottom");
         });
         document.body.classList.add("image-based-mole");
+        document.body.classList.toggle("tommy-mole-set", usesTommySet);
       },
     },
     wordSign: {
@@ -128,43 +134,22 @@ const ImageConfig = (() => {
     returnBtn: {
       label: "Return button",
       description: "Top-left return / back button",
-      default: "assets/images/return-btn.svg",
-      sizeMode: "contain",
+      default: "FindGame/assets/images/return-button.png",
+      sizeMode: "img",
       apply: (url, scale = DEFAULT_SCALE) => {
-        const size = bgSize("contain", scale);
-        const applyToButtons = (w, h) => {
-          document.querySelectorAll(".return-btn").forEach((el) => {
-            if (w > 0 && h > 0) el.style.aspectRatio = `${w} / ${h}`;
-            el.style.backgroundImage = `url("${url}")`;
-            el.style.backgroundSize = size;
-            el.style.backgroundRepeat = "no-repeat";
-            el.style.backgroundPosition = "center";
-            el.style.backgroundColor = "transparent";
-            el.style.border = "none";
-            el.style.boxShadow = "none";
-          });
-        };
-        const probe = new Image();
-        probe.onload = () => applyToButtons(probe.naturalWidth, probe.naturalHeight);
-        probe.onerror = () => applyToButtons(0, 0);
-        probe.src = url;
+        document.querySelectorAll(".return-icon").forEach((img) => {
+          img.src = url;
+          applyTransformScale(img, scale, "", "left top");
+        });
       },
     },
     stopwatch: {
-      label: "Stopwatch",
+      label: "Timer",
       description: "Timer widget background",
-      default: "assets/images/stopwatch.svg",
+      default: "FindGame/assets/images/countdown-clock.png",
       sizeMode: "contain",
       apply: (url, scale = DEFAULT_SCALE) => {
-        applyBg(".stopwatch", url, bgSize("contain", scale));
-        document.querySelectorAll(".sw-top, .sw-button").forEach((el) => {
-          el.style.display = "none";
-        });
-        const face = document.querySelector(".sw-face");
-        if (face) {
-          face.style.background = "transparent";
-          face.style.border = "none";
-        }
+        applyBg(".timer-chip", url, bgSize("contain", scale));
       },
     },
     progressFrame: {
@@ -303,6 +288,7 @@ const ImageConfig = (() => {
 
   function applyDefaults() {
     document.body.classList.remove("image-based-mole");
+    document.body.classList.remove("tommy-mole-set");
     document.querySelectorAll(".mole-body").forEach((body) => {
       body.style.transform = "";
       body.style.transformOrigin = "";
@@ -311,15 +297,6 @@ const ImageConfig = (() => {
       el.style.transform = "";
       el.style.transformOrigin = "";
     });
-    document.querySelectorAll(".sw-top, .sw-button").forEach((el) => {
-      el.style.display = "";
-    });
-    const face = document.querySelector(".sw-face");
-    if (face) {
-      face.style.background = "";
-      face.style.border = "";
-    }
-
     for (const key of Object.keys(SLOTS)) {
       SLOTS[key].apply(SLOTS[key].default, DEFAULT_SCALE);
     }

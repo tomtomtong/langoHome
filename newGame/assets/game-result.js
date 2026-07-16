@@ -53,7 +53,8 @@
           <img class="lango-result__next-image" alt="Next" src="${asset("score-board.png")}">
         </button>
       </div>`;
-    document.body.appendChild(overlay);
+    const gameFrame = document.getElementById("game");
+    (gameFrame || document.body).appendChild(overlay);
     overlay.querySelector(".lango-result__next").addEventListener("click", () => {
       const handler = nextHandler;
       hide();

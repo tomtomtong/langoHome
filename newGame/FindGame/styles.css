@@ -82,14 +82,15 @@ body {
 }
 
 .hud-meta {
-  grid-column: 3;
+  position: absolute;
+  top: 18px;
+  right: 28px;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 8px;
-  justify-self: end;
   pointer-events: auto;
-  margin-top: 20px;
+  margin: 0;
 }
 
 .timer-chip {
@@ -143,7 +144,7 @@ body {
 
 .return-icon {
   display: block;
-  width: clamp(150px, 18vw, 185px);
+  width: 185px;
   height: auto;
   filter: drop-shadow(0 5px 6px rgba(0, 0, 0, 0.28));
 }

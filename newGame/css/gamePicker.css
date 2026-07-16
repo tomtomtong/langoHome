@@ -2,12 +2,12 @@
    Game picker — shared overlay for all games
    =========================================================== */
 
-/* Return buttons — viewport top-left (outside scaled game canvases) */
+/* Shared controls use the same in-frame coordinates in every 4:3 game. */
 .return-btn,
 #return-btn {
-  position: fixed;
-  top: max(18px, env(safe-area-inset-top));
-  left: max(28px, env(safe-area-inset-left));
+  position: absolute;
+  top: 18px;
+  left: 28px;
   z-index: 110;
   border: none;
   background: transparent;
@@ -15,6 +15,146 @@
   padding: 0;
   line-height: 0;
   transition: transform 0.2s ease;
+}
+
+.return-icon {
+  display: block;
+  width: 185px;
+  height: auto;
+  max-width: none;
+  object-fit: contain;
+  filter: drop-shadow(0 5px 6px rgba(0, 0, 0, 0.28));
+}
+
+.game-audio-control {
+  position: absolute;
+  top: 138px;
+  right: 62px;
+  z-index: 260;
+  width: 44px;
+  height: 44px;
+}
+
+.sound-toggle--viewport {
+  position: relative;
+  inset: auto;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 3px solid #70431f;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #fff3a5 0%, #ffc83d 100%);
+  box-shadow: 0 5px 0 rgba(91, 52, 20, 0.3), 0 8px 18px rgba(0, 0, 0, 0.2);
+  color: #3c260f;
+  font-size: 21px;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease;
+}
+
+.game-audio-menu {
+  position: absolute;
+  top: 56px;
+  right: 0;
+  width: 250px;
+  padding: 12px;
+  border: 3px solid #70431f;
+  border-radius: 16px;
+  background: rgba(255, 246, 223, 0.97);
+  box-shadow: 0 9px 0 rgba(91, 52, 20, 0.24), 0 16px 30px rgba(0, 0, 0, 0.28);
+  color: #3a2410;
+  font-family: "Fredoka", system-ui, sans-serif;
+  line-height: 1.2;
+}
+
+.game-audio-menu__title {
+  margin: 0 4px 8px;
+  font-family: "Baloo 2", "Fredoka", system-ui, sans-serif;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.game-audio-option {
+  width: 100%;
+  min-height: 52px;
+  display: grid;
+  grid-template-columns: 28px 1fr 38px;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.game-audio-option:hover,
+.game-audio-option:focus-visible {
+  background: rgba(255, 211, 77, 0.28);
+  outline: none;
+}
+
+.game-audio-option__copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.game-audio-option__copy strong {
+  font-size: 0.88rem;
+}
+
+.game-audio-option__copy small {
+  font-size: 0.7rem;
+  opacity: 0.68;
+}
+
+.game-audio-option__state {
+  position: relative;
+  width: 36px;
+  height: 21px;
+  border-radius: 999px;
+  background: #a69683;
+  transition: background 0.16s ease;
+}
+
+.game-audio-option__state i {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.16s ease;
+}
+
+.game-audio-option[data-enabled="true"] .game-audio-option__state {
+  background: #57ad38;
+}
+
+.game-audio-option[data-enabled="true"] .game-audio-option__state i {
+  transform: translateX(15px);
+}
+
+.sound-toggle--viewport:hover {
+  transform: translateY(-1px) rotate(-4deg) scale(1.05);
+  filter: saturate(1.12);
+}
+
+.sound-toggle--viewport:active {
+  transform: translateY(3px) scale(0.96);
+  box-shadow: 0 2px 0 rgba(91, 52, 20, 0.3), 0 4px 10px rgba(0, 0, 0, 0.18);
+}
+
+.sound-toggle--viewport:focus-visible {
+  outline: 4px solid #fff;
+  outline-offset: 3px;
 }
 
 .game-picker {
@@ -208,4 +348,5 @@ a.game-picker-item:hover {
     font-size: 0.75rem;
     padding: 5px 11px;
   }
+
 }

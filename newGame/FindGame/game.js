@@ -41,6 +41,8 @@
   const overlayMsg = document.getElementById("overlayMsg");
   const overlayBtn = document.getElementById("overlayBtn");
   const replayBtn = document.getElementById("replayBtn");
+  const Sfx = window.GameSfx || { play() {} };
+  const Bgm = window.GameBgm || { play() {}, pause() {} };
 
   const DESIGN_W = 960;
   const DESIGN_H = 720;
@@ -49,9 +51,8 @@
     const gameEl = document.getElementById("game");
     if (!gameEl) return;
     const vv = window.visualViewport;
-    const pad = 8;
-    const winW = (vv ? vv.width : window.innerWidth) - pad;
-    const winH = (vv ? vv.height : window.innerHeight) - pad;
+    const winW = vv ? vv.width : window.innerWidth;
+    const winH = vv ? vv.height : window.innerHeight;
     const scale = Math.min(winW / DESIGN_W, winH / DESIGN_H, 4);
     gameEl.style.transform = `scale(${scale})`;
     gameEl.style.transformOrigin = "center center";
@@ -142,6 +143,7 @@
     if (gameOver) return;
     timeLeft -= 1;
     updateTimerDisplay();
+    if (timeLeft > 0 && timeLeft <= 10) Sfx.play("warning");
     if (timeLeft <= 0) {
       showGameOver();
     }
@@ -335,6 +337,7 @@
     const lv = currentLevel();
     if (!lv?.sentence) return;
 
+    Sfx.play("tap");
     audioUnlocked = true;
 
     if (questionAudio) {
@@ -569,12 +572,14 @@
 
     if (correct) {
       locked = true;
+      Sfx.play("correct");
       renderPositionMarkers([]);
       score += POINTS_PER_LEVEL;
       foundCount += 1;
       scoreValEl.textContent = String(score);
       setTimeout(advanceLevel, 500);
     } else {
+      Sfx.play("wrong");
       wrongAttempts += 1;
       sceneWrap.classList.add("shake");
       setTimeout(() => sceneWrap.classList.remove("shake"), 400);
@@ -602,6 +607,8 @@
     stopTimer();
     stopQuestionSpeech();
     renderPositionMarkers([]);
+    Bgm.pause();
+    Sfx.play("finish");
     const stars = score >= 500 ? 3 : score >= 300 ? 2 : 1;
     if (typeof GameResult !== "undefined") {
       GameResult.show({ stars, score, onNext: startGame });
@@ -616,6 +623,8 @@
   }
 
   function startGame() {
+    Sfx.play("ready");
+    Bgm.play("findgame");
     gameOver = false;
     currentIndex = pickRandomLevelIndex();
     score = 0;

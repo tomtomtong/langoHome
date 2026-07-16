@@ -48,6 +48,8 @@
   function init() {
     wireReturnButtons();
 
+    if (document.body.dataset.hideGamePicker === "true") return;
+
     const current = getCurrentGameId();
     if (current === "findgame") return;
 
@@ -111,9 +113,22 @@
       btn.setAttribute("aria-expanded", open ? "true" : "false");
     }
 
-    btn.addEventListener("click", () => setOpen(panel.hidden));
-    backdrop.addEventListener("click", () => setOpen(false));
-    closeBtn.addEventListener("click", () => setOpen(false));
+    function playMenuTap() {
+      if (window.GameSfx) window.GameSfx.play("flip");
+    }
+
+    btn.addEventListener("click", () => {
+      playMenuTap();
+      setOpen(panel.hidden);
+    });
+    backdrop.addEventListener("click", () => {
+      playMenuTap();
+      setOpen(false);
+    });
+    closeBtn.addEventListener("click", () => {
+      playMenuTap();
+      setOpen(false);
+    });
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && !panel.hidden) setOpen(false);
     });

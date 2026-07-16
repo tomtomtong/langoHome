@@ -37,12 +37,21 @@ html, body {
   -webkit-user-select: none;
 }
 
+body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #315f20;
+}
+
 /* ---------- Scene ---------- */
 .scene {
   position: relative;
-  width: 100vw;
-  height: 100vh;
-  min-height: 640px;
+  width: 960px;
+  height: 720px;
+  min-height: 0;
+  flex-shrink: 0;
+  transform-origin: center center;
   background:
     linear-gradient(180deg, var(--sky-1) 0%, var(--sky-2) 55%, var(--grass-1) 55%, var(--grass-2) 100%);
   overflow: hidden;
@@ -122,23 +131,17 @@ html, body {
 .config-link:hover { transform: translateY(-1px); }
 
 .return-btn {
-  width: 48px;
-  height: auto;
-  aspect-ratio: 1;
-  padding: 0;
-  border: 3px solid var(--wood-3);
-  border-radius: 50%;
-  background: var(--cream) url("../assets/images/return-btn.svg") center / contain no-repeat;
-  box-shadow: var(--shadow);
-  cursor: pointer;
-  transition: transform 0.1s ease;
-}
-.return-btn:hover { transform: translateY(-1px); }
-.return-btn:active { transform: translateY(2px); box-shadow: 0 4px 0 rgba(0, 0, 0, 0.18); }
-.return-btn[style*="background-image"] {
+  background: transparent;
   border: none;
   box-shadow: none;
-  border-radius: 0;
+}
+.return-btn:hover { transform: scale(1.1); }
+.return-icon {
+  display: block;
+  width: 185px;
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 5px 6px rgba(0, 0, 0, 0.28));
 }
 
 /* ---------- Sign ---------- */
@@ -244,63 +247,57 @@ html, body {
   100% { transform: scale(1); opacity: 1; }
 }
 
-/* ---------- Stopwatch ---------- */
+/* ---------- Timer ---------- */
 .timer-wrap {
   grid-column: 3;
   justify-self: end;
 }
-.stopwatch {
+.timer-chip {
   position: relative;
-  width: 96px;
-  background: linear-gradient(180deg, var(--purple), var(--purple-deep));
-  border: 4px solid var(--gold-deep);
-  border-radius: 18px;
-  padding: 22px 10px 12px;
-  box-shadow: var(--shadow);
+  width: 112px;
+  height: 112px;
+  background: url("../FindGame/assets/images/countdown-clock.png") center / contain no-repeat;
+  border-radius: 0;
+  padding: 0;
+  font-weight: 800;
+  color: #4b235f;
+  white-space: nowrap;
+  filter: drop-shadow(0 5px 6px rgba(0, 0, 0, 0.28));
 }
-.sw-top {
+.timer-readout {
   position: absolute;
-  top: -10px;
   left: 50%;
-  transform: translateX(-50%);
-  width: 30px;
-  height: 14px;
-  background: var(--gold-deep);
-  border-radius: 6px 6px 4px 4px;
-}
-.sw-button {
-  position: absolute;
-  top: -16px;
-  right: 14px;
-  width: 10px;
-  height: 10px;
-  background: var(--gold);
-  border: 2px solid var(--gold-deep);
-  border-radius: 50%;
-}
-.sw-face {
-  background: #fff6df;
-  border: 3px solid #2a1a08;
-  border-radius: 10px;
-  padding: 6px 4px;
-  text-align: center;
+  top: 52%;
+  width: 68%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 3px;
+  line-height: 1;
 }
 .timer-num {
   font-family: "Baloo 2", sans-serif;
   font-weight: 800;
-  font-size: 1.7rem;
-  color: var(--purple-deep);
-  display: block;
+  font-size: 1.55rem;
+  font-variant-numeric: tabular-nums;
+  color: inherit;
   line-height: 1;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.75);
 }
 .timer-unit {
-  font-size: 0.6rem;
-  letter-spacing: 0.16em;
-  color: #6b4626;
-  text-transform: uppercase;
+  font-size: 0.78rem;
+  font-weight: 800;
+  opacity: 0.9;
 }
-.timer-low .timer-num { color: var(--bad); animation: tick 0.9s ease-in-out infinite; }
-@keyframes tick { 50% { transform: scale(1.12); } }
+.timer-chip.timer-low {
+  color: #c62828;
+  animation: timer-flash 0.8s ease-in-out infinite;
+}
+@keyframes timer-flash {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
 
 /* ---------- Play area ---------- */
 .play-area {
@@ -310,7 +307,7 @@ html, body {
   align-items: center;
   justify-content: center;
   padding: 8px 24px 0;
-  height: calc(100vh - 220px);
+  height: 500px;
 }
 
 .grid {
@@ -318,7 +315,7 @@ html, body {
   grid-template-columns: repeat(4, 1fr);
   grid-template-rows: repeat(2, 1fr);
   gap: 26px 40px;
-  width: min(960px, 92vw);
+  width: 884px;
   max-height: 100%;
 }
 
@@ -337,7 +334,7 @@ html, body {
 .hole-mound {
   position: relative;
   width: 100%;
-  height: 70px;
+  height: 85px;
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -346,8 +343,8 @@ html, body {
 .hole-ellip {
   position: absolute;
   bottom: 0;
-  width: 78%;
-  height: 56px;
+  width: 97%;
+  height: 73px;
   border-radius: 50%;
   background:
     radial-gradient(ellipse at 50% 30%, #2a1450 0%, var(--hole-2) 55%, var(--hole-1) 100%);
@@ -360,7 +357,7 @@ html, body {
    everything below the hole's midline is hidden. */
 .mole-clip {
   position: absolute;
-  bottom: 24px;
+  bottom: 32px;
   left: 0;
   width: 100%;
   height: 210px;
@@ -375,8 +372,8 @@ html, body {
   bottom: 0;
   left: 50%;
   transform: translateX(-50%);
-  width: 78%;
-  height: 56px;
+  width: 97%;
+  height: 73px;
   border-radius: 50%;
   background:
     radial-gradient(ellipse at 50% 30%, #2a1450 0%, var(--hole-2) 55%, var(--hole-1) 100%);
@@ -391,20 +388,135 @@ html, body {
   position: absolute;
   bottom: 0;
   left: 50%;
-  margin-left: -55px;
-  width: 110px;
-  height: 130px;
+  margin-left: -68px;
+  width: 136px;
+  height: 166px;
   transform: translateY(150%);
   transition: transform 0.28s cubic-bezier(0.2, 1.4, 0.4, 1);
   pointer-events: none;
 }
 .hole.up .mole { transform: translateY(0); pointer-events: auto; }
-.hole.up.waiting .mole { animation: moleWait 1.8s ease-in-out infinite; }
 .hole.whacked .mole { transform: translateY(150%); animation: none; }
 
-@keyframes moleWait {
+.mole-actor {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 150px;
+  transform-origin: 50% 92%;
+  will-change: transform;
+}
+.mole-actor::after {
+  position: absolute;
+  z-index: 5;
+  opacity: 0;
+  pointer-events: none;
+  font-family: "Baloo 2", sans-serif;
+  font-weight: 800;
+  text-shadow: 0 2px 0 rgba(60, 28, 96, .35);
+}
+.mole.action-hello .mole-actor::after {
+  content: "⌁";
+  left: -2px;
+  top: 76px;
+  color: #fff;
+  font-size: 1.5rem;
+  opacity: .9;
+  animation: tommyWaveMark 1.15s ease-in-out infinite;
+}
+.mole.action-magic .mole-actor::after {
+  content: "✦";
+  right: 3px;
+  top: 64px;
+  color: #ca7cff;
+  font-size: 1.75rem;
+  opacity: 1;
+  animation: tommyMagicSpark 1.2s ease-in-out infinite;
+}
+.mole.action-startled .mole-actor::after {
+  content: "!";
+  right: 5px;
+  top: 42px;
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+  background: #fff4a3;
+  color: #6b318f;
+  font-size: 1.2rem;
+  line-height: 25px;
+  text-align: center;
+  opacity: 1;
+  animation: tommySurpriseMark 1.25s ease-in-out infinite;
+}
+
+.hole.up.waiting .mole.action-hello .mole-actor { animation: tommyHello 1.15s ease-in-out infinite; }
+.hole.up.waiting .mole.action-hat-tip .mole-actor { animation: tommyHatTip 1.35s ease-in-out infinite; }
+.hole.up.waiting .mole.action-curious-left .mole-actor { animation: tommyCuriousLeft 1.5s ease-in-out infinite; }
+.hole.up.waiting .mole.action-curious-right .mole-actor { animation: tommyCuriousRight 1.45s ease-in-out infinite; }
+.hole.up.waiting .mole.action-magic .mole-actor { animation: tommyMagic 1.2s ease-in-out infinite; }
+.hole.up.waiting .mole.action-confident .mole-actor { animation: tommyConfident 1.55s ease-in-out infinite; }
+.hole.up.waiting .mole.action-startled .mole-actor { animation: tommyStartled 1.25s ease-in-out infinite; }
+.hole.up.waiting .mole.action-bounce .mole-actor { animation: tommyBounce 1s ease-in-out infinite; }
+
+@keyframes tommyHello {
+  0%, 100% { transform: translateY(0) rotate(-1deg); }
+  45% { transform: translateY(-7px) rotate(2deg); }
+  70% { transform: translateY(-3px) rotate(-2deg); }
+}
+@keyframes tommyHatTip {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  38% { transform: translate(-2px, 3px) rotate(-7deg); }
+  62% { transform: translateY(-3px) rotate(2deg); }
+}
+@keyframes tommyCuriousLeft {
+  0%, 100% { transform: translateX(0) rotate(0); }
+  50% { transform: translate(-9px, -3px) rotate(-7deg); }
+}
+@keyframes tommyCuriousRight {
+  0%, 100% { transform: translateX(0) rotate(0); }
+  50% { transform: translate(9px, -4px) rotate(7deg); }
+}
+@keyframes tommyMagic {
+  0%, 100% { transform: translateY(1px) scale(1); filter: drop-shadow(0 0 0 rgba(181, 102, 255, 0)); }
+  50% { transform: translateY(-9px) scale(1.045); filter: drop-shadow(0 0 8px rgba(181, 102, 255, .9)); }
+}
+@keyframes tommyConfident {
+  0%, 100% { transform: translateY(0) scaleY(1); }
+  42% { transform: translateY(2px) scaleY(.97); }
+  58% { transform: translateY(-4px) scaleY(1.025); }
+}
+@keyframes tommyStartled {
+  0%, 62%, 100% { transform: translateY(0) scale(1); }
+  72% { transform: translateY(7px) scale(.96, .92); }
+  82% { transform: translateY(-11px) scale(1.04, 1.08); }
+}
+@keyframes tommyBounce {
   0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-6px); }
+  50% { transform: translateY(-10px); }
+}
+@keyframes tommyWaveMark {
+  0%, 100% { transform: translateY(3px) rotate(-15deg); opacity: .25; }
+  45% { transform: translate(-4px, -7px) rotate(16deg); opacity: 1; }
+}
+@keyframes tommyMagicSpark {
+  0%, 100% { transform: scale(.55) rotate(0); filter: brightness(1); }
+  50% { transform: scale(1.25) rotate(90deg); filter: brightness(1.35); }
+}
+@keyframes tommySurpriseMark {
+  0%, 62%, 100% { transform: scale(.7); opacity: 0; }
+  72%, 88% { transform: scale(1.1); opacity: 1; }
+}
+
+.hole.up.hit-reacting .mole .mole-actor {
+  animation: tommyHit .43s cubic-bezier(.2, .85, .3, 1) both !important;
+}
+@keyframes tommyHit {
+  0% { transform: translateY(0) rotate(0) scale(1); }
+  22% { transform: translateY(7px) rotate(-6deg) scale(1.13, .76); }
+  48% { transform: translateY(-7px) rotate(7deg) scale(.94, 1.08); }
+  72% { transform: translateY(3px) rotate(-3deg) scale(1.03, .94); }
+  100% { transform: translateY(0) rotate(0) scale(1); }
 }
 
 .mole-body {
@@ -412,8 +524,8 @@ html, body {
   bottom: 0;
   left: 50%;
   transform: translateX(-50%);
-  width: 96px;
-  height: 96px;
+  width: 132px;
+  height: 150px;
   background: radial-gradient(circle at 38% 32%, var(--mole-1), var(--mole-2) 80%);
   border: 4px solid #3a2410;
   border-radius: 50% 50% 48% 48% / 58% 58% 42% 42%;
@@ -424,8 +536,60 @@ html, body {
   width: 100%;
   height: 100%;
   object-fit: contain;
+  object-position: center bottom;
   pointer-events: none;
 }
+.mole-img-hit { display: none; }
+body.tommy-mole-set .mole.hit-good .mole-img-normal,
+body.tommy-mole-set .mole.hit-bad .mole-img-normal { display: none !important; }
+body.tommy-mole-set .mole.hit-good .mole-img-hit,
+body.tommy-mole-set .mole.hit-bad .mole-img-hit { display: block; }
+.hit-expression {
+  position: absolute;
+  top: 39%;
+  left: 50%;
+  width: 62%;
+  height: 37%;
+  transform: translateX(-50%);
+  display: none;
+  z-index: 3;
+  pointer-events: none;
+}
+.hit-expression span {
+  position: absolute;
+  top: 1px;
+  width: 20px;
+  height: 20px;
+}
+.hit-expression span:first-child { left: 3px; }
+.hit-expression span:nth-child(2) { right: 3px; }
+.hit-expression span::before,
+.hit-expression span::after {
+  content: "";
+  position: absolute;
+  left: 9px;
+  top: -1px;
+  width: 4px;
+  height: 23px;
+  border-radius: 999px;
+  background: #38214f;
+  box-shadow: 0 1px 0 #fff;
+}
+.hit-expression span::before { transform: rotate(45deg); }
+.hit-expression span::after { transform: rotate(-45deg); }
+.hit-expression::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 1px;
+  width: 22px;
+  height: 10px;
+  transform: translateX(-50%);
+  border-top: 4px solid #8d4864;
+  border-radius: 50%;
+}
+body.tommy-mole-set .mole.hit-good .hit-expression,
+body.tommy-mole-set .mole.hit-bad .hit-expression { display: block; }
 body.image-based-mole .mole-body {
   background: none;
   border: none;
@@ -485,7 +649,7 @@ body.image-based-mole .mole-teeth {
 /* Word sign the mole holds */
 .word-sign {
   position: absolute;
-  bottom: 108px;
+  bottom: 132px;
   left: 50%;
   transform: translateX(-50%);
   background: linear-gradient(180deg, #f3c98a, #d99a4f);
@@ -554,6 +718,46 @@ body.image-based-mole .mole-teeth {
   75% { transform: translateX(-56%); }
 }
 
+.hit-burst {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  width: 118px;
+  height: 72px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  opacity: 0;
+  z-index: 4;
+}
+.hit-burst span {
+  position: absolute;
+  color: #ffe14f;
+  font-size: 1.35rem;
+  text-shadow: 0 2px 0 #8d5a00, 0 0 8px rgba(255, 232, 92, .9);
+}
+.hit-burst span:nth-child(1) { left: 4px; top: 26px; }
+.hit-burst span:nth-child(2) { left: 50px; top: 0; font-size: 1.65rem; }
+.hit-burst span:nth-child(3) { right: 1px; top: 21px; }
+.hole.hit-reacting .hit-burst { animation: tommyHitStars .43s ease-out both; }
+@keyframes tommyHitStars {
+  0% { opacity: 0; transform: translateX(-50%) scale(.3) rotate(-12deg); }
+  30%, 72% { opacity: 1; transform: translateX(-50%) scale(1.08) rotate(5deg); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-18px) scale(.82) rotate(18deg); }
+}
+
+body.tommy-mole-set .hole.up .mole.hit-good .mole-body {
+  box-shadow: none;
+  filter: drop-shadow(0 0 7px rgba(70, 223, 91, .95));
+}
+body.tommy-mole-set .hole.up .mole.hit-bad .mole-body {
+  box-shadow: none;
+  filter: drop-shadow(0 0 7px rgba(255, 87, 87, .95));
+}
+body.tommy-mole-set .hole.reveal .mole.reveal-hint .mole-body {
+  box-shadow: none;
+  filter: drop-shadow(0 0 10px rgba(255, 211, 77, .95));
+}
+
 /* ---------- Footer ---------- */
 .footer {
   position: absolute;
@@ -570,53 +774,151 @@ body.image-based-mole .mole-teeth {
 
 .progress-frame {
   position: relative;
-  width: min(620px, 80vw);
-  height: 26px;
-  background: linear-gradient(180deg, var(--wood-1), var(--wood-2));
-  border: 4px solid var(--wood-3);
+  width: 680px;
+  aspect-ratio: 1530 / 225;
+  background: url("../assets/images/progress-frame.svg") center / 100% 100% no-repeat;
+  border: none;
+  filter: drop-shadow(0 7px 8px rgba(52, 29, 10, .32));
+  isolation: isolate;
+}
+.progress-track {
+  position: absolute;
+  inset: 21% 3.1%;
+  z-index: 1;
+  overflow: hidden;
   border-radius: 999px;
-  padding: 3px;
-  box-shadow: var(--shadow);
 }
 .progress-fill {
+  position: relative;
+  width: 0;
   height: 100%;
-  width: 0%;
-  background: linear-gradient(90deg, #8be54a, #5bbf23);
+  overflow: hidden;
+  background: url("../assets/images/progress-fill.svg") left center / 100% 100% no-repeat;
   border-radius: 999px;
-  transition: width 0.4s ease;
+  transition: width .55s cubic-bezier(.2, .85, .25, 1);
+}
+.progress-fill::after {
+  content: "";
+  position: absolute;
+  top: -25%;
+  bottom: -25%;
+  left: -28%;
+  width: 18%;
+  transform: skewX(-18deg);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .58), transparent);
+  animation: progressShine 2.5s ease-in-out infinite;
+}
+.progress-frame.progress-bump {
+  animation: progressBump .48s cubic-bezier(.22, .9, .32, 1.25);
+}
+@keyframes progressShine {
+  0%, 20% { left: -28%; opacity: 0; }
+  35% { opacity: .9; }
+  70%, 100% { left: 112%; opacity: 0; }
+}
+@keyframes progressBump {
+  0% { transform: scale(1); }
+  42% { transform: translateY(-3px) scale(1.035, 1.1); }
+  72% { transform: translateY(1px) scale(.99, .97); }
+  100% { transform: scale(1); }
 }
 .star-milestone {
   position: absolute;
+  z-index: 3;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: 26px;
-  height: 26px;
+  width: clamp(64px, 8vw, 106px);
+  height: clamp(64px, 8vw, 106px);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  font-size: 16px;
-  background: var(--wood-3);
-  border: 3px solid var(--gold-deep);
+  background: transparent;
+  transition: transform 0.25s ease, filter 0.25s ease;
+}
+.star-milestone::before {
+  content: "";
+  position: absolute;
+  inset: 4%;
+  z-index: -1;
+  border: 4px solid rgba(255, 247, 151, .92);
   border-radius: 50%;
-  transition: transform 0.25s ease, background 0.25s ease;
+  opacity: 0;
+  transform: scale(.45);
+  pointer-events: none;
+}
+.star-milestone::after {
+  content: "✦";
+  position: absolute;
+  top: -12%;
+  left: 50%;
+  color: #fffbd0;
+  font-size: clamp(13px, 1.5vw, 20px);
+  line-height: 1;
+  opacity: 0;
+  text-shadow:
+    -38px 24px 0 #fff4a3,
+    38px 22px 0 #fff,
+    -26px 58px 0 #ffd84d,
+    30px 58px 0 #fff4a3;
+  transform: translateX(-50%) scale(.4) rotate(-25deg);
+  pointer-events: none;
 }
 .star-milestone.earned {
-  background: var(--gold);
-  color: var(--wood-3);
   transform: translate(-50%, -50%) scale(1.15);
-  box-shadow: 0 0 14px 2px rgba(255, 211, 77, 0.8);
+  filter: drop-shadow(0 0 11px rgba(255, 226, 77, .95));
+}
+.star-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: .5;
+  filter: saturate(.55);
+  transition: opacity .25s ease, filter .25s ease;
+}
+.star-milestone.earned .star-img {
+  opacity: 1;
+  filter: saturate(1);
+}
+.star-milestone.just-earned {
+  animation: starCelebrate .9s cubic-bezier(.18, .9, .25, 1.35);
+}
+.star-milestone.just-earned::before {
+  animation: starFlashRing .72s ease-out;
+}
+.star-milestone.just-earned::after {
+  animation: starSparkleBurst .82s ease-out;
+}
+.progress-frame.milestone-celebrate {
+  animation: milestoneFrameStretch .72s cubic-bezier(.2, .86, .28, 1.2);
+}
+@keyframes starCelebrate {
+  0% { transform: translate(-50%, -50%) scale(.72) rotate(-18deg); filter: brightness(1); }
+  28% { transform: translate(-50%, -50%) scale(1.64) rotate(10deg); filter: brightness(1.55) drop-shadow(0 0 18px #fff38a); }
+  50% { transform: translate(-50%, -50%) scale(.98) rotate(-5deg); }
+  72% { transform: translate(-50%, -50%) scale(1.3) rotate(3deg); }
+  100% { transform: translate(-50%, -50%) scale(1.15) rotate(0); filter: drop-shadow(0 0 11px rgba(255, 226, 77, .95)); }
+}
+@keyframes starFlashRing {
+  0% { opacity: 0; transform: scale(.45); }
+  24% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.55); }
+}
+@keyframes starSparkleBurst {
+  0% { opacity: 0; transform: translateX(-50%) scale(.35) rotate(-25deg); }
+  28% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(-50%) scale(1.25) rotate(20deg); }
+}
+@keyframes milestoneFrameStretch {
+  0%, 100% { transform: scale(1); }
+  32% { transform: scale(1.035, 1.13); }
+  58% { transform: scale(.992, .96); }
+  78% { transform: scale(1.012, 1.045); }
 }
 .s1 { left: 33.33%; }
 .s2 { left: 66.66%; }
 .s3 { left: 95%; }
 
-.footer-meta {
-  display: flex;
-  gap: 14px;
-  font-family: "Baloo 2", sans-serif;
-  font-weight: 800;
-}
 .live-score {
   position: absolute;
   right: 28px;
@@ -652,18 +954,6 @@ body.image-based-mole .mole-teeth {
   position: relative;
   z-index: 1;
 }
-.level-chip, .combo-chip {
-  background: var(--cream);
-  border: 3px solid var(--wood-3);
-  border-radius: 999px;
-  padding: 4px 14px;
-  color: var(--purple-deep);
-  box-shadow: var(--shadow);
-  font-size: 0.95rem;
-}
-.combo-chip.hot { background: #ffe9a8; animation: pop 0.3s ease; }
-@keyframes pop { 50% { transform: scale(1.12); } }
-
 /* ---------- Overlay ---------- */
 .overlay {
   position: absolute;
@@ -784,12 +1074,32 @@ body.image-based-mole .mole-teeth {
   .sign { min-width: 240px; padding: 10px 18px; }
   .grid { gap: 14px 18px; }
   .hole { height: 150px; }
-  .mole { width: 86px; height: 100px; margin-left: -43px; }
-  .mole-clip { height: 160px; }
-  .mole-body { width: 76px; height: 76px; }
-  .word-sign { font-size: 0.85rem; bottom: 84px; padding: 2px 8px; }
-  .return-btn { width: 42px; }
-  .stopwatch { width: 80px; padding: 18px 8px 10px; }
-  .timer-num { font-size: 1.3rem; }
+  .hole-mound { height: 67px; }
+  .hole-ellip,
+  .hole-lip {
+    width: 95%;
+    height: 59px;
+  }
+  .mole { width: 104px; height: 128px; margin-left: -52px; }
+  .mole-clip { bottom: 26px; height: 160px; }
+  .mole-actor { height: 116px; }
+  .mole-body { width: 102px; height: 116px; }
+  .word-sign { font-size: 0.85rem; bottom: 102px; padding: 2px 8px; }
   .hud { padding: 12px 14px 6px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hole.up.waiting .mole .mole-actor,
+  .mole-actor::after,
+  .hit-burst,
+  .timer-chip.timer-low,
+  .progress-fill::after,
+  .progress-frame.progress-bump,
+  .progress-frame.milestone-celebrate,
+  .star-milestone.just-earned,
+  .star-milestone.just-earned::before,
+  .star-milestone.just-earned::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }

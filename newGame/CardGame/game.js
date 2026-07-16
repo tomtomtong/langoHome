@@ -32,6 +32,9 @@ let lockBoard = false;
 let gameOver = false;
 let previewMode = false;
 let previewTimeoutId = null;
+let previewSequenceId = 0;
+let previewDelayResolve = null;
+let raceTapResolve = null;
 let resolveTimeoutId = null;
 
 const board = document.getElementById('board');
@@ -46,6 +49,11 @@ const timerDisplayEl = document.getElementById('timer-display');
 const timerUnitEl = document.querySelector('.timer-unit');
 const soundToggleEl = document.getElementById('sound-toggle');
 const announcerEl = document.getElementById('game-announcer');
+const raceCueEl = document.getElementById('race-cue');
+const raceCueKickerEl = document.getElementById('race-cue-kicker');
+const raceCueWordEl = document.getElementById('race-cue-word');
+const raceCueStartEl = document.getElementById('race-cue-start');
+const Bgm = window.GameBgm || { play() {}, pause() {}, unlock() {}, setMuted() {} };
 
 const Sfx = (() => {
   const files = {
@@ -74,7 +82,10 @@ const Sfx = (() => {
   let activated = false;
   let muted = false;
   try {
-    muted = localStorage.getItem('cardgame-muted') === '1';
+    const sharedPreference = localStorage.getItem('lango-game-sfx-muted');
+    muted = sharedPreference == null
+      ? localStorage.getItem('cardgame-muted') === '1'
+      : sharedPreference === '1';
   } catch {
     muted = false;
   }
@@ -114,6 +125,35 @@ const Sfx = (() => {
     oscillator.stop(start + duration + 0.02);
   }
 
+  function whistle(startFrequency, endFrequency, duration, options = {}) {
+    if (muted) return;
+    const ctx = ensureContext();
+    if (!ctx || !master) return;
+    const start = ctx.currentTime + (options.delay || 0);
+    const oscillator = ctx.createOscillator();
+    const vibrato = ctx.createOscillator();
+    const vibratoDepth = ctx.createGain();
+    const gain = ctx.createGain();
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(startFrequency, start);
+    oscillator.frequency.exponentialRampToValueAtTime(endFrequency, start + duration);
+    vibrato.type = 'sine';
+    vibrato.frequency.value = options.vibratoRate || 17;
+    vibratoDepth.gain.value = options.vibratoDepth || 20;
+    vibrato.connect(vibratoDepth);
+    vibratoDepth.connect(oscillator.frequency);
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(options.volume || 0.28, start + 0.018);
+    gain.gain.setValueAtTime(options.volume || 0.28, start + Math.max(0.025, duration - 0.09));
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+    oscillator.connect(gain);
+    gain.connect(master);
+    oscillator.start(start);
+    vibrato.start(start);
+    oscillator.stop(start + duration + 0.025);
+    vibrato.stop(start + duration + 0.025);
+  }
+
   function playSynth(name) {
     if (name === 'flip') {
       tone(360, 0.07, { endFrequency: 620, type: 'triangle', volume: 0.22 });
@@ -125,8 +165,9 @@ const Sfx = (() => {
       tone(210, 0.15, { endFrequency: 150, type: 'square', volume: 0.14 });
       tone(145, 0.18, { delay: 0.09, endFrequency: 110, type: 'triangle', volume: 0.18 });
     } else if (name === 'star') {
-      [880, 1108.73, 1318.51].forEach((freq, index) => {
-        tone(freq, 0.3, { delay: index * 0.07, type: 'sine', volume: 0.2 });
+      tone(330, 0.12, { endFrequency: 660, type: 'triangle', volume: 0.11 });
+      [783.99, 1046.5, 1318.51, 1567.98].forEach((freq, index) => {
+        tone(freq, 0.3, { delay: 0.025 + index * 0.055, type: 'sine', volume: 0.14 });
       });
     } else if (name === 'clear') {
       [392, 523.25, 659.25, 783.99].forEach((freq, index) => {
@@ -140,6 +181,15 @@ const Sfx = (() => {
     } else if (name === 'ready') {
       tone(440, 0.12, { type: 'sine', volume: 0.18 });
       tone(659.25, 0.2, { delay: 0.1, type: 'sine', volume: 0.2 });
+    } else if (name === 'countdown') {
+      whistle(690, 870, 0.2, { volume: 0.2, vibratoDepth: 13 });
+    } else if (name === 'look') {
+      whistle(850, 1420, 0.42, { volume: 0.3, vibratoDepth: 24 });
+      tone(710, 0.16, { delay: 0.08, endFrequency: 1040, type: 'triangle', volume: 0.12 });
+    } else if (name === 'go') {
+      whistle(920, 1840, 0.54, { volume: 0.34, vibratoDepth: 29, vibratoRate: 19 });
+      tone(523.25, 0.28, { type: 'triangle', volume: 0.15 });
+      tone(783.99, 0.32, { delay: 0.06, type: 'triangle', volume: 0.14 });
     }
   }
 
@@ -154,16 +204,20 @@ const Sfx = (() => {
 
   function play(name) {
     if (muted || !activated) return;
+    const hasLayeredCelebration = name === 'star';
+    if (hasLayeredCelebration) playSynth(name);
     const template = recorded.get(name);
     if (!template) {
-      playSynth(name);
+      if (!hasLayeredCelebration) playSynth(name);
       return;
     }
     const audio = template.cloneNode();
     audio.volume = volumes[name] ?? 0.4;
     const playback = audio.play();
     if (playback?.catch) {
-      playback.catch(() => playSynth(name));
+      playback.catch(() => {
+        if (!hasLayeredCelebration) playSynth(name);
+      });
     }
   }
 
@@ -176,6 +230,7 @@ const Sfx = (() => {
     muted = Boolean(value);
     try {
       localStorage.setItem('cardgame-muted', muted ? '1' : '0');
+      localStorage.setItem('lango-game-sfx-muted', muted ? '1' : '0');
     } catch {
       /* Storage may be unavailable in embedded browsers. */
     }
@@ -190,10 +245,13 @@ const Sfx = (() => {
     play,
     preload,
     unlock,
+    isActivated: () => activated,
     isMuted: () => muted,
     toggle: () => setMuted(!muted),
   };
 })();
+
+window.GameSfx = Sfx;
 
 function announce(message) {
   if (!announcerEl) return;
@@ -215,18 +273,19 @@ function syncSoundButton() {
   const muted = Sfx.isMuted();
   soundToggleEl.textContent = muted ? '🔇' : '🔊';
   soundToggleEl.setAttribute('aria-pressed', muted ? 'true' : 'false');
-  soundToggleEl.setAttribute('aria-label', muted ? 'Turn sound on' : 'Mute sound');
-  soundToggleEl.title = muted ? 'Turn sound on' : 'Mute sound';
+  soundToggleEl.setAttribute('aria-label', muted ? 'Turn music and effects on' : 'Mute music and effects');
+  soundToggleEl.title = muted ? 'Turn music and effects on' : 'Mute music and effects';
 }
 
-/* --- Responsive scaling to fit screen (max scale 4.0 for bigger display) --- */
+/* --- Keep the complete 4:3 game frame inside the available viewport. --- */
 function fitGameToScreen() {
   const gameEl = document.getElementById('game');
   if (!gameEl) return;
-  const baseW = 800;
-  const baseH = 600;
-  const winW = window.innerWidth;
-  const winH = window.innerHeight;
+  const baseW = 960;
+  const baseH = 720;
+  const viewport = window.visualViewport;
+  const winW = viewport ? viewport.width : window.innerWidth;
+  const winH = viewport ? viewport.height : window.innerHeight;
   const scaleX = winW / baseW;
   const scaleY = winH / baseH;
   const scale = Math.min(scaleX, scaleY, 4.0);
@@ -234,6 +293,11 @@ function fitGameToScreen() {
   gameEl.style.transformOrigin = 'center center';
 }
 window.addEventListener('resize', fitGameToScreen);
+window.addEventListener('orientationchange', fitGameToScreen);
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', fitGameToScreen);
+  window.visualViewport.addEventListener('scroll', fitGameToScreen);
+}
 window.addEventListener('load', fitGameToScreen);
 setTimeout(fitGameToScreen, 50);
 
@@ -349,7 +413,12 @@ function updateProgressBar() {
   const maxScore = STAR_THRESHOLDS[2];
   const pct = Math.min(100, (score / maxScore) * 100);
   const fill = document.getElementById('progressFill');
-  if (fill) fill.style.width = pct + '%';
+  if (fill) {
+    const previousPct = Number(fill.dataset.progress || 0);
+    fill.style.width = pct + '%';
+    fill.dataset.progress = String(pct);
+    if (pct > previousPct) replayAnimation(fill, 'is-advancing');
+  }
 
   document.querySelectorAll('.star-milestone').forEach((s) => {
     const m = parseInt(s.dataset.milestone, 10);
@@ -432,11 +501,15 @@ function starRating() {
 function celebrateNewStars(previousCount) {
   const currentCount = starCount();
   if (currentCount <= previousCount) return;
+  const progressFrame = document.querySelector('.progress-frame');
   for (let index = previousCount; index < currentCount; index++) {
     const star = document.querySelector(`.star-milestone[data-milestone="${index + 1}"]`);
-    setTimeout(() => replayAnimation(star, 'just-earned'), (index - previousCount) * 140);
+    setTimeout(() => {
+      replayAnimation(star, 'just-earned');
+      replayAnimation(progressFrame, 'milestone-celebrate');
+      Sfx.play('star');
+    }, (index - previousCount) * 160);
   }
-  Sfx.play('star');
 }
 
 function onCardClick(i) {
@@ -487,7 +560,7 @@ function onCardClick(i) {
           resolveTimeoutId = null;
           flippedCards = [];
           lockBoard = false;
-          render({ previewEnding: true });
+          render();
           if (typeof window.__bgaMarkDirty === 'function') window.__bgaMarkDirty();
         }, 680);
       }
@@ -499,22 +572,104 @@ function hideLevelComplete() {
   if (levelCompleteEl) levelCompleteEl.classList.add('hidden');
 }
 
-function beginPreview(onComplete) {
+function finishRaceCueHide() {
+  if (!raceCueEl) return;
+  raceCueEl.classList.add('hidden');
+  raceCueEl.classList.remove('is-exiting', 'needs-tap');
+  raceCueEl.setAttribute('aria-hidden', 'true');
+}
+
+function showRaceCue(word, phase, kicker) {
+  if (!raceCueEl || !raceCueWordEl) return;
+  raceCueEl.classList.remove('hidden', 'is-exiting', 'phase-ready', 'phase-look', 'phase-go');
+  raceCueEl.classList.add(`phase-${phase}`);
+  raceCueEl.setAttribute('aria-hidden', 'false');
+  raceCueWordEl.textContent = word;
+  if (raceCueKickerEl) raceCueKickerEl.textContent = kicker;
+  raceCueWordEl.style.animation = 'none';
+  void raceCueWordEl.offsetWidth;
+  raceCueWordEl.style.animation = '';
+}
+
+function beginRaceCueHide() {
+  if (raceCueEl) raceCueEl.classList.add('is-exiting');
+}
+
+function waitForPreview(ms, sequenceId) {
+  return new Promise((resolve) => {
+    previewDelayResolve = resolve;
+    previewTimeoutId = setTimeout(() => {
+      previewTimeoutId = null;
+      previewDelayResolve = null;
+      resolve(sequenceId === previewSequenceId);
+    }, ms);
+  });
+}
+
+function cancelPreviewSequence() {
+  previewSequenceId++;
   if (previewTimeoutId) clearTimeout(previewTimeoutId);
-  previewMode = true;
+  previewTimeoutId = null;
+  if (previewDelayResolve) previewDelayResolve(false);
+  previewDelayResolve = null;
+  if (raceTapResolve) raceTapResolve(false);
+  raceTapResolve = null;
+  finishRaceCueHide();
+}
+
+function waitForRaceStart(sequenceId) {
+  if (Sfx.isActivated() || Sfx.isMuted()) return Promise.resolve(sequenceId === previewSequenceId);
+  if (raceCueEl) raceCueEl.classList.add('needs-tap');
+  return new Promise((resolve) => {
+    raceTapResolve = resolve;
+  });
+}
+
+async function beginPreview(onComplete) {
+  cancelPreviewSequence();
+  const sequenceId = previewSequenceId;
+  previewMode = false;
   lockBoard = true;
+  flippedCards = [];
   render({ deal: true });
-  Sfx.play('ready');
-  announce('Memorize the cards.');
-  previewTimeoutId = setTimeout(() => {
-    previewMode = false;
-    lockBoard = false;
-    previewTimeoutId = null;
-    render({ previewEnding: true });
-    announce('Go! Find the matching pairs.');
-    if (onComplete) onComplete();
-    if (typeof window.__bgaMarkDirty === 'function') window.__bgaMarkDirty();
-  }, PREVIEW_TIME * 1000);
+
+  showRaceCue('READY', 'ready', 'GET READY');
+  announce('Ready. Tap to start if prompted.');
+  if (!await waitForRaceStart(sequenceId)) return;
+  if (raceCueEl) raceCueEl.classList.remove('needs-tap');
+  Sfx.play('countdown');
+
+  if (!await waitForPreview(680, sequenceId)) return;
+  showRaceCue('LOOK!', 'look', 'MEMORIZE');
+  Sfx.play('look');
+  announce('Look! Memorize the cards.');
+  if (!await waitForPreview(650, sequenceId)) return;
+
+  previewMode = true;
+  render({ deal: true });
+  beginRaceCueHide();
+  if (!await waitForPreview(380, sequenceId)) return;
+  finishRaceCueHide();
+  if (!await waitForPreview(PREVIEW_TIME * 1000, sequenceId)) return;
+
+  showRaceCue('READY', 'ready', 'GET READY');
+  Sfx.play('countdown');
+  announce('Ready.');
+  if (!await waitForPreview(680, sequenceId)) return;
+
+  previewMode = false;
+  render();
+  showRaceCue('GO!', 'go', 'FIND THE PAIRS');
+  Sfx.play('go');
+  announce('Go! Find the matching pairs.');
+  if (!await waitForPreview(620, sequenceId)) return;
+
+  beginRaceCueHide();
+  if (!await waitForPreview(380, sequenceId)) return;
+  finishRaceCueHide();
+  lockBoard = false;
+  if (onComplete) onComplete();
+  if (typeof window.__bgaMarkDirty === 'function') window.__bgaMarkDirty();
 }
 
 function refreshBoard() {
@@ -553,6 +708,7 @@ function endGame() {
   resolveTimeoutId = null;
   updateHUD();
   updateProgressBar();
+  Bgm.pause();
   const earnedStars = Math.max(1, starCount());
   Sfx.play('gameover');
   announce(`Time is up. Final score ${score}.`);
@@ -588,8 +744,9 @@ function tick() {
 }
 
 function startGame() {
+  Bgm.play('cardgame');
   clearInterval(timerId);
-  if (previewTimeoutId) clearTimeout(previewTimeoutId);
+  cancelPreviewSequence();
   if (resolveTimeoutId) clearTimeout(resolveTimeoutId);
   resolveTimeoutId = null;
   flippedCards = [];
@@ -621,11 +778,10 @@ window.getGameState = function() {
 window.setGameState = function(state) {
   if (!state || !state.deck) { startGame(); return; }
   clearInterval(timerId);
-  if (previewTimeoutId) clearTimeout(previewTimeoutId);
+  cancelPreviewSequence();
   if (resolveTimeoutId) clearTimeout(resolveTimeoutId);
   resolveTimeoutId = null;
   previewMode = false;
-  previewTimeoutId = null;
   deck = state.deck.map(c => ({ pairId: c.pairId, type: c.type, content: c.content, matched: c.matched }));
   cardBackAssignments = state.cardBackAssignments || CARD_BACK_IMAGES_UPDATED.slice(0, deck.length);
   flippedCards = state.flippedCards || [];
@@ -672,6 +828,17 @@ async function initGame() {
   }
   document.addEventListener('keydown', onKeyDown);
   document.addEventListener('pointerdown', Sfx.unlock, { once: true });
+  if (raceCueStartEl) {
+    raceCueStartEl.addEventListener('click', () => {
+      Sfx.unlock();
+      Bgm.unlock();
+      Bgm.play('cardgame');
+      if (!raceTapResolve) return;
+      const resolve = raceTapResolve;
+      raceTapResolve = null;
+      resolve(true);
+    });
+  }
   if (soundToggleEl) {
     soundToggleEl.addEventListener('click', () => {
       Sfx.toggle();

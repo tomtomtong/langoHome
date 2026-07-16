@@ -3,7 +3,7 @@
 }
 
 .lango-result {
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: 10000;
   display: grid;
@@ -22,7 +22,7 @@
 .lango-result__dialog {
   position: relative;
   z-index: 2;
-  width: min(92vw, 760px);
+  width: min(100%, 760px);
   aspect-ratio: 4 / 3;
   filter: drop-shadow(0 24px 30px rgba(0, 0, 0, 0.42));
 }
