@@ -2940,7 +2940,7 @@
     setInterval(() => {
       refreshIdleVideosForCurrentPeriod().catch(() => {
       });
-    }, 6e4);
+    }, 18e4);
     uiLog("hello", "app init", "hello", { IS_IOS, WAKE_WORD_RESTART_DELAY, POST_SESSION_WAKE_DELAY });
     initVideoSoundUnlock();
     updateHkoDateTime();

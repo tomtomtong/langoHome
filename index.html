@@ -4672,6 +4672,13 @@
       "/assets/bgm/kungfu/action-stomp.mp3",
     ];
     const BYEBYE_URL = "/Animation/byebye.fbx";
+    const BYEBYE_VOICES = [
+      "/assets/sfx/byebye-1.mp3",
+      "/assets/sfx/byebye-2.mp3",
+      "/assets/sfx/byebye-3.mp3",
+      "/assets/sfx/byebye-4.mp3",
+      "/assets/sfx/byebye-5.mp3",
+    ];
     const DEBUG_LOG_MAX = 80;
     const debugLogLines = [];
 
@@ -4791,7 +4798,9 @@
     let lastKungfuAt = 0;
     let lastDanceBgmUrl = null;
     let lastKungfuBgmUrl = null;
+    let lastByebyeVoiceUrl = null;
     let animationBgmAudio = null;
+    let byebyeVoiceAudio = null;
     let animationBgmRunId = 0;
     let cachedConfig = null;
     let connectPrep = null;
@@ -4824,6 +4833,26 @@
       animationBgmAudio.pause();
       animationBgmAudio.currentTime = 0;
       animationBgmAudio = null;
+    }
+
+    function stopByebyeVoice() {
+      if (!byebyeVoiceAudio) return;
+      byebyeVoiceAudio.pause();
+      byebyeVoiceAudio.currentTime = 0;
+      byebyeVoiceAudio = null;
+    }
+
+    function playRandomByebyeVoice() {
+      stopByebyeVoice();
+      const voiceUrl = pickRandomBgm(BYEBYE_VOICES, lastByebyeVoiceUrl);
+      if (!voiceUrl) return;
+      lastByebyeVoiceUrl = voiceUrl;
+      const audio = new Audio(voiceUrl);
+      audio.preload = "auto";
+      audio.volume = 0.85;
+      byebyeVoiceAudio = audio;
+      audio.play().catch((e) => console.warn("Byebye voice could not play:", e));
+      uiLog("end", `playing byebye voice ${voiceUrl.split("/").pop()}`, "hello");
     }
 
     async function playAnimationWithBgm(animationUrl, bgmPool, kind) {
@@ -5502,6 +5531,7 @@
         ...KUNGFU_ANIMATIONS.map(prefetchAsset),
         prefetchAsset(BYEBYE_URL),
         prefetchAsset("/Animation/Idle.fbx"),
+        ...BYEBYE_VOICES.map(prefetchAsset),
       ];
 
       applyGameIconsFromConfig(cfg.gameIcons);
@@ -6176,7 +6206,11 @@
         clearTimeout(endConversationCloseTimer);
         endConversationCloseTimer = null;
       }
-      byebyeAnimationPromise = null;
+      // Keep the in-flight bye-bye promise/voice when farewell gesture is still playing.
+      if (!keepSessionView) {
+        byebyeAnimationPromise = null;
+        stopByebyeVoice();
+      }
       stopAnimationBgm();
       try { stopAudio(); } catch (e) { console.warn("stopAudio failed", e); }
       try { stopAvatarSpeech(); } catch (e) { console.warn("stopAvatarSpeech failed", e); }
@@ -6192,13 +6226,18 @@
     function startByebyeAnimation() {
       if (byebyeAnimationPromise) return byebyeAnimationPromise;
       stopAnimationBgm();
+      stopByebyeVoice();
       uiLog("end", "starting byebye animation alongside farewell", "hello");
       byebyeAnimationPromise = (async () => {
         const played = await avatar?.playMixamoAnimation(BYEBYE_URL, {
           resumeIdle: false,
           playOnce: true,
+          onStart: () => playRandomByebyeVoice(),
         });
-        if (!played) uiLog("end", "byebye animation failed to play", "warn");
+        if (!played) {
+          stopByebyeVoice();
+          uiLog("end", "byebye animation failed to play", "warn");
+        }
         return played;
       })();
       return byebyeAnimationPromise;
@@ -7548,7 +7587,7 @@
     } else {
       setInterval(() => {
         refreshIdleVideosForCurrentPeriod().catch(() => {});
-      }, 60_000);
+      }, 180_000);
 
       uiLog("hello", "app init", "hello", { IS_IOS, WAKE_WORD_RESTART_DELAY, POST_SESSION_WAKE_DELAY });
       initVideoSoundUnlock();
