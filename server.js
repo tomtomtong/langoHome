@@ -3742,9 +3742,10 @@ function buildSessionCfg({ instructions, voice, model } = {}) {
     audio: {
       input: {
         turn_detection: {
-          type: 'server_vad',
-          idle_timeout_ms: 15000,
+          type: 'semantic_vad',
+          eagerness: 'low',
           create_response: true,
+          interrupt_response: true,
         },
         transcription: {
           model: 'assemblyai/universal-streaming-english',

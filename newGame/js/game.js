@@ -167,6 +167,10 @@
                 <div class="mole-body">
                   <img class="mole-img mole-img-normal" src="assets/images/tommy/tommy-base.png" alt="Tommy" />
                   <img class="mole-img mole-img-hit" src="assets/images/tommy/tommy-base.png" alt="" aria-hidden="true" />
+                  <div class="action-expression" aria-hidden="true">
+                    <span class="expression-eye expression-eye-left"></span>
+                    <span class="expression-eye expression-eye-right"></span>
+                  </div>
                 </div>
                 <div class="hit-expression" aria-hidden="true"><span></span><span></span></div>
                 <div class="mole-face"><div class="eye"></div><div class="eye"></div></div>
