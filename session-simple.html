@@ -183,7 +183,7 @@
       <input id="apiKey" type="password" placeholder="From /config or enter here" autocomplete="off">
 
       <label for="instructions">Instructions</label>
-      <textarea id="instructions" placeholder="System prompt for the agent"></textarea>
+      <textarea id="instructions" placeholder="Optional — leave empty for no system prompt"></textarea>
 
       <h2 class="config-section">LLM</h2>
 
@@ -291,7 +291,6 @@
   <script type="module">
     const DEFAULT_VOICE = "default-zylgts2tamenvybeti3z0w__uncle_tommy";
     const DEFAULT_MODEL = "openai/gpt-4o-mini";
-    const DEFAULT_PROMPT = "You are a friendly voice assistant. Keep responses brief.";
     const DEFAULT_ASR_MODEL = "assemblyai/universal-streaming-english";
     const DEFAULT_VAD_EAGERNESS = "low";
     const DEFAULT_TTS_MODEL = "inworld-tts-2";
@@ -469,7 +468,7 @@
         apiKey: apiKeyEl.value.trim(),
         voice: voiceEl.value.trim() || DEFAULT_VOICE,
         model: resolveModelValue(),
-        instructions: instructionsEl.value.trim() || DEFAULT_PROMPT,
+        instructions: instructionsEl.value.trim(),
         temperature: Number.isFinite(tempParsed) ? tempParsed : undefined,
         maxOutputTokens: maxParsed === "inf" || Number.isFinite(maxParsed) ? maxParsed : undefined,
         ttsModel: ttsModelEl.value.trim() || DEFAULT_TTS_MODEL,
@@ -486,6 +485,7 @@
     function authPayload(cfg, apiKey) {
       return {
         type: "client.auth",
+        simpleSession: true,
         apiKey,
         instructions: cfg.instructions,
         voice: cfg.voice,
@@ -593,7 +593,6 @@
         if (cfg.voice) voiceEl.value = cfg.voice;
         if (cfg.model) pendingModelValue = cfg.model;
         applyModelValue(pendingModelValue);
-        if (cfg.instructions) instructionsEl.value = cfg.instructions;
         if (cfg.temperature != null && cfg.temperature !== "") temperatureEl.value = cfg.temperature;
         if (cfg.maxOutputTokens != null && cfg.maxOutputTokens !== "") {
           maxOutputTokensEl.value = cfg.maxOutputTokens;
@@ -635,7 +634,7 @@
       lines.push(`ASR language: ${cfg.asrLanguage ?? "(auto)"}`);
       lines.push(`VAD eagerness: ${cfg.vadEagerness}`);
       lines.push(`VAD threshold: ${cfg.vadThreshold ?? "(eagerness preset)"}`);
-      lines.push(`Instructions: ${cfg.instructions.slice(0, 60)}${cfg.instructions.length > 60 ? "…" : ""}`);
+      lines.push(`Instructions: ${cfg.instructions ? `${cfg.instructions.slice(0, 60)}${cfg.instructions.length > 60 ? "…" : ""}` : "(none)"}`);
 
       if (!apiKey) {
         lines.push("\n✗ Set an API key in the form or at /config");
@@ -1021,7 +1020,6 @@
 
     voiceEl.value = DEFAULT_VOICE;
     pendingModelValue = DEFAULT_MODEL;
-    instructionsEl.value = DEFAULT_PROMPT;
     ttsModelEl.value = DEFAULT_TTS_MODEL;
     asrModelEl.value = DEFAULT_ASR_MODEL;
     vadEagernessEl.value = DEFAULT_VAD_EAGERNESS;

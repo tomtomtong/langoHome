@@ -3748,14 +3748,15 @@ function buildSessionCfg({
   ttsDeliveryMode,
   temperature,
   maxOutputTokens,
+  simpleSession = false,
 } = {}) {
   const session = {
     type: 'realtime',
     model: model || DEFAULT_MODEL,
-    instructions: (instructions || DEFAULT_INSTRUCTIONS) + HAPPY_TOOL_INSTRUCTION + KUNGFU_TOOL_INSTRUCTION + GAME_TOOLS_INSTRUCTION + LEAVE_TOOL_INSTRUCTION,
+    instructions: simpleSession
+      ? (instructions ?? '')
+      : (instructions || DEFAULT_INSTRUCTIONS) + HAPPY_TOOL_INSTRUCTION + KUNGFU_TOOL_INSTRUCTION + GAME_TOOLS_INSTRUCTION + LEAVE_TOOL_INSTRUCTION,
     output_modalities: ['audio', 'text'],
-    tools: [HAPPY_TOOL, KUNGFU_TOOL, PLAY_WORDWHACK_TOOL, PLAY_CARDGAME_TOOL, PLAY_FINDGAME_TOOL, END_CONVERSATION_TOOL],
-    tool_choice: 'auto',
     audio: {
       input: {
         turn_detection: {
@@ -3774,6 +3775,11 @@ function buildSessionCfg({
       },
     },
   };
+
+  if (!simpleSession) {
+    session.tools = [HAPPY_TOOL, KUNGFU_TOOL, PLAY_WORDWHACK_TOOL, PLAY_CARDGAME_TOOL, PLAY_FINDGAME_TOOL, END_CONVERSATION_TOOL];
+    session.tool_choice = 'auto';
+  }
 
   const asrLang = String(asrLanguage || '').trim();
   if (asrLang) session.audio.input.transcription.language = asrLang;
@@ -3974,7 +3980,10 @@ wss.on('connection', (browser, req) => {
     const profile = sessionUser?.role === 'student'
       ? getUserProfile(sessionUser.username)
       : {};
-    const baseInstructions = parsed.instructions?.trim() || saved.instructions?.trim();
+    const simpleSession = parsed.simpleSession === true;
+    const baseInstructions = simpleSession
+      ? (typeof parsed.instructions === 'string' ? parsed.instructions.trim() : '')
+      : (parsed.instructions?.trim() || saved.instructions?.trim());
     const vadThresholdRaw = parsed.vadThreshold;
     const vadThreshold = vadThresholdRaw === '' || vadThresholdRaw == null
       ? undefined
@@ -3995,11 +4004,14 @@ wss.on('connection', (browser, req) => {
       : Number(ttsSpeedRaw);
 
     connectToInworld(apiKey, browser, {
-      instructions: mergeInstructionsWithProfile(
-        baseInstructions,
-        profile,
-        sessionUser?.role === 'student' ? sessionUser.username : null,
-      ),
+      instructions: simpleSession
+        ? baseInstructions
+        : mergeInstructionsWithProfile(
+          baseInstructions,
+          profile,
+          sessionUser?.role === 'student' ? sessionUser.username : null,
+        ),
+      simpleSession,
       voice: parsed.voice?.trim() || saved.voice?.trim(),
       model: parsed.model?.trim() || saved.model?.trim(),
       asrModel: parsed.asrModel?.trim() || saved.asrModel?.trim(),
