@@ -408,8 +408,8 @@
       };
 
       const locations = [
-        { id: 'home', position: 'home', label: 'Home', image: 'location-home.png', unlocked: true },
-        { id: 'school', position: 'school', label: 'School', image: 'location-school.png' },
+        { id: 'home', position: 'home', label: 'Home', image: 'location-home.png', unlocked: true, travel: true },
+        { id: 'school', position: 'school', label: 'School', image: 'location-school.png', travel: true },
         { id: 'mall', position: 'mall', label: 'Shopping Mall', image: 'location-shopping-mall.png' },
         { id: 'park', position: 'park', label: 'Park', image: 'location-park.png' },
         { id: 'beach', position: 'beach', label: 'Beach', image: 'location-beach.png' }
@@ -498,10 +498,25 @@
           toastTimer.current = setTimeout(() => setToast(''), 1800);
         };
 
+        const travelToLocation = (location) => {
+          playSound('next');
+          const destination = new URL('/', window.location.origin);
+          if (previewMode) destination.searchParams.set('preview', '1');
+          destination.searchParams.set('location', location.id);
+          // Destination page plays Uncle Tommy while the new world pair loads.
+          setTimeout(() => {
+            window.location.href = `${destination.pathname}${destination.search}`;
+          }, 180);
+        };
+
         const chooseLocation = (location) => {
           if (!unlocked.has(location.id)) {
             playSound('locked');
             setLockedNotice(location);
+            return;
+          }
+          if (location.travel) {
+            travelToLocation(location);
             return;
           }
           playSound('unlocked');

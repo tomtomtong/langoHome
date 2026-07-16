@@ -15,9 +15,35 @@
   let returnHandler = null;
   let scoreFrame = 0;
   let scoreDelay = 0;
+  let celebrationAudio = null;
 
   function asset(name) {
     return new URL(name, assetBase).href;
+  }
+
+  function playCelebrationSfx(stars) {
+    const count = clampStars(stars);
+    if (window.GameSfx?.play) {
+      try {
+        window.GameSfx.unlock?.();
+        window.GameSfx.play("star");
+        window.GameSfx.play(count >= 3 ? "finish" : "clear", { volume: 0.55 });
+        return;
+      } catch {
+        /* fall through to victory clip */
+      }
+    }
+    try {
+      if (celebrationAudio) {
+        celebrationAudio.pause();
+        celebrationAudio = null;
+      }
+      celebrationAudio = new Audio("/assets/sfx/victory.mp3");
+      celebrationAudio.volume = count >= 3 ? 0.62 : 0.5;
+      celebrationAudio.play().catch(() => {});
+    } catch {
+      /* Audio may be blocked until a gesture; ignore. */
+    }
   }
 
   function ensureStylesheet() {
@@ -106,25 +132,37 @@
 
   function renderCelebration(count) {
     const celebration = overlay.querySelector(".lango-result__celebration");
-    const colors = ["#ffd83d", "#ff6b6b", "#58d7ff", "#77df70", "#d58cff", "#ff9a3d"];
-    const pieceCount = count === 3 ? 34 : count === 2 ? 24 : 16;
+    const colors = ["#ffd83d", "#ff6b6b", "#58d7ff", "#77df70", "#d58cff", "#ff9a3d", "#fff8a8", "#ff7ad9"];
+    const pieceCount = count === 3 ? 48 : count === 2 ? 34 : 24;
     celebration.innerHTML = "";
+
     for (let index = 0; index < pieceCount; index += 1) {
       const piece = document.createElement("i");
       piece.className = "lango-result__confetti";
-      piece.style.setProperty("--x", `${3 + ((index * 37) % 94)}%`);
-      piece.style.setProperty("--delay", `${(index % 9) * 0.07}s`);
-      piece.style.setProperty("--duration", `${1.7 + (index % 5) * 0.16}s`);
-      piece.style.setProperty("--drift", `${((index * 29) % 160) - 80}px`);
-      piece.style.setProperty("--spin", `${360 + (index % 4) * 180}deg`);
+      piece.style.setProperty("--x", `${2 + ((index * 41) % 96)}%`);
+      piece.style.setProperty("--delay", `${(index % 12) * 0.05}s`);
+      piece.style.setProperty("--duration", `${1.55 + (index % 6) * 0.18}s`);
+      piece.style.setProperty("--drift", `${((index * 31) % 200) - 100}px`);
+      piece.style.setProperty("--spin", `${420 + (index % 5) * 180}deg`);
       piece.style.setProperty("--color", colors[index % colors.length]);
+      if (index % 4 === 0) piece.classList.add("is-ribbon");
       celebration.appendChild(piece);
     }
-    for (let index = 0; index < 8; index += 1) {
+
+    for (let burst = 0; burst < (count >= 3 ? 3 : 2); burst += 1) {
+      const burstEl = document.createElement("span");
+      burstEl.className = "lango-result__burst";
+      burstEl.style.setProperty("--burst-x", `${28 + burst * 22}%`);
+      burstEl.style.setProperty("--burst-y", `${18 + (burst % 2) * 16}%`);
+      burstEl.style.setProperty("--burst-delay", `${0.12 + burst * 0.18}s`);
+      celebration.appendChild(burstEl);
+    }
+
+    for (let index = 0; index < 12; index += 1) {
       const sparkle = document.createElement("i");
       sparkle.className = "lango-result__sparkle";
-      sparkle.style.setProperty("--angle", `${index * 45}deg`);
-      sparkle.style.setProperty("--spark-delay", `${0.38 + index * 0.045}s`);
+      sparkle.style.setProperty("--angle", `${index * 30}deg`);
+      sparkle.style.setProperty("--spark-delay", `${0.28 + index * 0.04}s`);
       celebration.appendChild(sparkle);
     }
   }
@@ -168,6 +206,7 @@
     renderStars(count);
     renderCelebration(count);
     animateScore(score);
+    playCelebrationSfx(count);
     playAgainHandler = typeof onPlayAgain === "function"
       ? onPlayAgain
       : typeof onNext === "function"
@@ -186,6 +225,10 @@
     if (!overlay) return;
     cancelAnimationFrame(scoreFrame);
     clearTimeout(scoreDelay);
+    if (celebrationAudio) {
+      celebrationAudio.pause();
+      celebrationAudio = null;
+    }
     overlay.classList.remove("is-active");
     overlay.hidden = true;
     playAgainHandler = null;

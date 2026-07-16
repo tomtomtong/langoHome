@@ -17,11 +17,20 @@
     return String(value || "").replace(/[^a-zA-Z]/g, "");
   }
 
-  function isWordChopCandidate(item) {
-    const word = String(item?.content ?? item?.word ?? "").trim();
-    if (!/^[A-Za-z][A-Za-z'-]{1,22}$/.test(word)) return false;
-    if (/\s/.test(word)) return false;
-    return lettersOnly(word).length >= 3;
+  /** Prefer a single playable English word from CMS content (may be a phrase). */
+  function extractPlayableWord(content) {
+    const raw = String(content || "").trim();
+    if (!raw) return "";
+    if (/^[A-Za-z][A-Za-z'-]{1,22}$/.test(raw)) return raw;
+
+    const tokens = raw
+      .split(/[^A-Za-z'-]+/)
+      .map((token) => token.trim())
+      .filter((token) => /^[A-Za-z][A-Za-z'-]{1,22}$/.test(token) && lettersOnly(token).length >= 3);
+
+    if (!tokens.length) return "";
+    tokens.sort((a, b) => lettersOnly(b).length - lettersOnly(a).length || b.length - a.length);
+    return tokens[0];
   }
 
   function chunksFromKeywords(word, keywords) {
@@ -53,14 +62,12 @@
       const cur = lower[i];
       const next = lower[i + 1];
 
-      // V | CV
       if (vowels.has(prev) && !vowels.has(cur) && vowels.has(next)) {
         breaks.push(i);
         i += 1;
         continue;
       }
 
-      // VC | CV (keep final consonant of cluster with next syllable)
       if (vowels.has(prev) && !vowels.has(cur) && !vowels.has(next)) {
         let k = i + 1;
         while (k < lower.length && !vowels.has(lower[k])) k += 1;
@@ -100,7 +107,8 @@
   }
 
   function toWordChopEntry(item) {
-    const word = String(item?.content ?? item?.word ?? "").trim();
+    const word = extractPlayableWord(item?.content ?? item?.word);
+    if (!word) return null;
     const keywords = String(item?.keywords ?? "").trim();
     const chunks = chunksFromKeywords(word, keywords) || autoChunks(word);
     const meaning = chunksFromKeywords(word, keywords) ? "" : keywords;
@@ -119,25 +127,55 @@
   }
 
   function pickRoundWords(items) {
-    const candidates = items.filter(isWordChopCandidate).map(toWordChopEntry);
+    const seen = new Set();
+    const candidates = [];
+    for (const item of items) {
+      const entry = toWordChopEntry(item);
+      if (!entry) continue;
+      const key = entry.word.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      candidates.push(entry);
+    }
     if (!candidates.length) return [];
     return shuffle(candidates).slice(0, Math.min(ROUND_WORD_COUNT, candidates.length));
   }
 
+  async function fetchVocaItems() {
+    const res = await fetch("/api/voca", {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    });
+    const contentType = res.headers.get("content-type") || "";
+    if (!res.ok) {
+      throw new Error(`Vocabulary API failed (${res.status})`);
+    }
+    if (!contentType.includes("application/json")) {
+      throw new Error("Vocabulary API returned non-JSON (login required?)");
+    }
+    const data = await res.json();
+    return Array.isArray(data.items) ? data.items : [];
+  }
+
   async function prepareWordChopWords() {
     try {
-      const res = await fetch("/api/voca");
-      if (!res.ok) throw new Error(`voca ${res.status}`);
-      const data = await res.json();
-      const items = Array.isArray(data.items) ? data.items : [];
+      const items = await fetchVocaItems();
       const words = pickRoundWords(items);
       if (words.length) {
         globalThis.__WORD_CHOP_WORDS__ = words;
+        console.info(
+          `[Word Chop] Loaded ${words.length} word(s) from Vocabulary library:`,
+          words.map((w) => w.word).join(", ")
+        );
         return words;
       }
-    } catch {
-      /* keep built-in Word Chop list */
+      console.warn(
+        `[Word Chop] Vocabulary library has ${items.length} item(s), but none could be used for chopping. Using built-in words.`
+      );
+    } catch (err) {
+      console.warn("[Word Chop] Could not load Vocabulary library. Using built-in words.", err);
     }
+    globalThis.__WORD_CHOP_WORDS__ = null;
     return null;
   }
 

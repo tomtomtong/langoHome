@@ -45,6 +45,15 @@
   animation: lango-result-glow 1.1s ease-out 0.2s both;
 }
 
+.lango-result[data-tier="perfect"].is-active .lango-result__glow {
+  animation-name: lango-result-glow-perfect;
+  background: radial-gradient(circle, rgba(255, 248, 168, 0.95) 0 12%, rgba(255, 185, 44, 0.42) 34%, transparent 68%);
+}
+
+.lango-result[data-tier="excellent"].is-active .lango-result__glow {
+  background: radial-gradient(circle, rgba(255, 230, 140, 0.9) 0 12%, rgba(255, 160, 80, 0.36) 34%, transparent 68%);
+}
+
 .lango-result__celebration {
   position: absolute;
   inset: 0;
@@ -65,8 +74,44 @@
   box-shadow: inset 2px 0 rgba(255, 255, 255, 0.3);
 }
 
+.lango-result__confetti.is-ribbon {
+  width: clamp(4px, 0.7vw, 8px);
+  height: clamp(22px, 3.4vw, 36px);
+  border-radius: 999px;
+}
+
 .lango-result.is-active .lango-result__confetti {
   animation: lango-result-confetti var(--duration) cubic-bezier(0.16, 0.72, 0.45, 1) var(--delay) both;
+}
+
+.lango-result__burst {
+  position: absolute;
+  left: var(--burst-x);
+  top: var(--burst-y);
+  width: clamp(46px, 9vw, 92px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle, rgba(255, 248, 168, 0.95) 0 8%, transparent 9%),
+    repeating-conic-gradient(
+      from 0deg,
+      #ffd83d 0 8deg,
+      transparent 8deg 22deg,
+      #ff6b6b 22deg 30deg,
+      transparent 30deg 44deg,
+      #58d7ff 44deg 52deg,
+      transparent 52deg 66deg,
+      #77df70 66deg 74deg,
+      transparent 74deg 88deg
+    );
+  mix-blend-mode: screen;
+  transform: translate(-50%, -50%) scale(0.2);
+}
+
+.lango-result.is-active .lango-result__burst {
+  animation: lango-result-burst 0.9s cubic-bezier(0.16, 0.84, 0.3, 1) var(--burst-delay) both;
 }
 
 .lango-result__sparkle {
@@ -318,6 +363,18 @@
   100% { opacity: 0.72; transform: scale(1.18) rotate(18deg); }
 }
 
+@keyframes lango-result-glow-perfect {
+  0% { opacity: 0; transform: scale(0.4) rotate(0); }
+  45% { opacity: 1; transform: scale(1.05) rotate(10deg); }
+  100% { opacity: 0.85; transform: scale(1.28) rotate(24deg); }
+}
+
+@keyframes lango-result-burst {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.15) rotate(0deg); }
+  35% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.55) rotate(40deg); }
+}
+
 @keyframes lango-result-ribbon {
   from { opacity: 0; transform: translateX(-50%) scaleX(0.35); }
   to { opacity: 1; transform: translateX(-50%) scaleX(1); }
@@ -377,13 +434,15 @@
   .lango-result__score,
   .lango-result__actions,
   .lango-result__play-again,
+  .lango-result__burst,
   .lango-result__confetti,
   .lango-result__sparkle {
     animation: none;
   }
 
   .lango-result__confetti,
-  .lango-result__sparkle {
+  .lango-result__sparkle,
+  .lango-result__burst {
     display: none;
   }
 }

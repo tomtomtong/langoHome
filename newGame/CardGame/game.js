@@ -62,6 +62,7 @@ const Sfx = (() => {
     mismatch: 'assets/audio/mismatch.ogg',
     star: 'assets/audio/star.ogg',
     clear: 'assets/audio/board-clear.ogg',
+    finish: 'assets/audio/board-clear.ogg',
     warning: 'assets/audio/warning-tick.ogg',
     gameover: 'assets/audio/game-over.ogg',
     ready: 'assets/audio/ready-shuffle.wav',
@@ -72,6 +73,7 @@ const Sfx = (() => {
     mismatch: 0.38,
     star: 0.46,
     clear: 0.5,
+    finish: 0.55,
     warning: 0.24,
     gameover: 0.4,
     ready: 0.34,
@@ -169,9 +171,12 @@ const Sfx = (() => {
       [783.99, 1046.5, 1318.51, 1567.98].forEach((freq, index) => {
         tone(freq, 0.3, { delay: 0.025 + index * 0.055, type: 'sine', volume: 0.14 });
       });
-    } else if (name === 'clear') {
-      [392, 523.25, 659.25, 783.99].forEach((freq, index) => {
-        tone(freq, 0.3, { delay: index * 0.09, type: 'triangle', volume: 0.26 });
+    } else if (name === 'clear' || name === 'finish') {
+      [523.25, 659.25, 783.99, 1046.5].forEach((freq, index) => {
+        tone(freq, 0.32, { delay: index * 0.07, type: 'triangle', volume: 0.26 });
+      });
+      [1318.51, 1567.98].forEach((freq, index) => {
+        tone(freq, 0.22, { delay: 0.3 + index * 0.06, type: 'sine', volume: 0.14 });
       });
     } else if (name === 'warning') {
       tone(760, 0.055, { type: 'square', volume: 0.1 });
@@ -202,9 +207,9 @@ const Sfx = (() => {
     });
   }
 
-  function play(name) {
+  function play(name, options = {}) {
     if (muted || !activated) return;
-    const hasLayeredCelebration = name === 'star';
+    const hasLayeredCelebration = name === 'star' || name === 'clear' || name === 'finish';
     if (hasLayeredCelebration) playSynth(name);
     const template = recorded.get(name);
     if (!template) {
@@ -212,7 +217,7 @@ const Sfx = (() => {
       return;
     }
     const audio = template.cloneNode();
-    audio.volume = volumes[name] ?? 0.4;
+    audio.volume = Math.max(0, Math.min(1, options.volume ?? volumes[name] ?? 0.4));
     const playback = audio.play();
     if (playback?.catch) {
       playback.catch(() => {
@@ -710,11 +715,12 @@ function endGame() {
   updateProgressBar();
   Bgm.pause();
   const earnedStars = Math.max(1, starCount());
-  Sfx.play('gameover');
+  // Celebration SFX is played by GameResult (avoid sad game-over tone).
   announce(`Time is up. Final score ${score}.`);
   if (typeof GameResult !== 'undefined') {
     GameResult.show({ stars: earnedStars, score, onPlayAgain: startGame });
   } else {
+    Sfx.play('finish');
     if (completeStarsEl) completeStarsEl.textContent = starRating();
     if (completeScoreEl) completeScoreEl.textContent = score;
     if (levelCompleteEl) levelCompleteEl.classList.remove('hidden');

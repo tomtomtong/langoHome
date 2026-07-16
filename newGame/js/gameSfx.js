@@ -113,8 +113,11 @@
         tone(frequency, 0.3, { delay: 0.025 + index * 0.055, type: "sine", volume: 0.14 });
       });
     } else if (name === "clear" || name === "finish") {
-      [392, 523.25, 659.25, 783.99].forEach((frequency, index) => {
-        tone(frequency, 0.28, { delay: index * 0.08, type: "triangle", volume: 0.22 });
+      [523.25, 659.25, 783.99, 1046.5].forEach((frequency, index) => {
+        tone(frequency, 0.32, { delay: index * 0.07, type: "triangle", volume: 0.24 });
+      });
+      [1318.51, 1567.98].forEach((frequency, index) => {
+        tone(frequency, 0.22, { delay: 0.3 + index * 0.06, type: "sine", volume: 0.14 });
       });
     } else if (name === "warning") {
       tone(760, 0.055, { type: "square", volume: 0.08 });
@@ -138,7 +141,7 @@
 
   function play(name, options = {}) {
     if (muted || !activated) return;
-    const hasLayeredCelebration = name === "star";
+    const hasLayeredCelebration = name === "star" || name === "finish" || name === "clear";
     if (hasLayeredCelebration) playSynth(name);
     const template = recorded.get(name);
     if (!template) {

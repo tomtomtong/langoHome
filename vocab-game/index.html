@@ -6,10 +6,10 @@
     <title>英文生字拆字 Game</title>
     <link rel="stylesheet" href="/assets/page-motion.css" />
     <script src="/assets/page-motion.js"></script>
-    <script src="/wordchop-voca.js"></script>
+    <script src="/wordchop-voca.js?v=2"></script>
     <script type="module">
       await (window.prepareWordChopWords?.() ?? Promise.resolve());
-      await import("/vocab-game-app.js");
+      await import("/vocab-game-app.js?v=2");
     </script>
     <script src="/games/js/gameScoreReporter.js"></script>
     <script src="/games/assets/game-result.js"></script>

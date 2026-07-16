@@ -1004,6 +1004,8 @@
       filter: drop-shadow(0 4px 2px rgba(75, 31, 4, 0.24));
       transform-origin: 50% 50%;
       animation: weather-card-float 5.4s ease-in-out infinite;
+      /* Scale type/icons to the weather card itself, not the full home stage. */
+      container-type: size;
     }
 
     #hko-weather-bar[hidden] {
@@ -1022,17 +1024,18 @@
     .hko-weather-details {
       position: absolute;
       z-index: 1;
-      top: 30.7%;
+      /* Keep copy inside the frame's blue screen; leave a little more room at the bottom. */
+      top: 27.5%;
       right: 15.8%;
-      bottom: 31.9%;
+      bottom: 33.5%;
       left: 15.8%;
       box-sizing: border-box;
       display: grid;
-      grid-template-columns: 1fr auto;
-      grid-template-rows: auto 1fr;
-      gap: 1% 3%;
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: 2% 3%;
       align-content: stretch;
-      padding: 4% 6%;
+      padding: 2.5% 5%;
       overflow: hidden;
       border-radius: 9% / 20%;
       background: transparent;
@@ -1057,6 +1060,7 @@
     .hko-weather-details > * {
       position: relative;
       z-index: 1;
+      min-width: 0;
     }
 
     #hko-weather-location,
@@ -1071,35 +1075,37 @@
     #hko-weather-location {
       grid-column: 1;
       text-align: left;
-      font: 800 var(--hko-weather-location-font-size, clamp(10px, 2.1cqh, 16px))/0.95 'Baloo 2', sans-serif;
+      font: 800 var(--hko-weather-location-font-size, clamp(7px, 7.5cqh, 16px))/0.95 'Baloo 2', sans-serif;
     }
 
     #hko-weather-datetime {
       grid-column: 2;
       color: rgba(231, 243, 252, .82);
       text-align: right;
-      font: 700 var(--hko-weather-datetime-font-size, clamp(8px, 1.5cqh, 12px))/1 'Baloo 2', sans-serif;
+      font: 700 var(--hko-weather-datetime-font-size, clamp(6px, 5.5cqh, 12px))/1 'Baloo 2', sans-serif;
     }
 
     .hko-weather-row {
       grid-column: 1 / -1;
       display: grid;
-      grid-template-columns: auto 1fr auto;
-      grid-template-rows: 1fr auto;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      grid-template-rows: minmax(0, 1fr) auto;
       grid-template-areas:
         "temp temp temp"
         "icon condition humidity";
       min-width: 0;
       min-height: 0;
       align-items: end;
-      gap: 0 3%;
+      align-content: end;
+      column-gap: 3%;
+      row-gap: 4%;
     }
 
     #hko-weather-icon {
       grid-area: icon;
       align-self: center;
-      width: clamp(12px, 2.6cqh, 22px);
-      height: clamp(12px, 2.6cqh, 22px);
+      width: clamp(8px, 9.5cqh, 22px);
+      height: clamp(8px, 9.5cqh, 22px);
       object-fit: contain;
     }
 
@@ -1110,7 +1116,7 @@
       align-self: center;
       min-width: 0;
       overflow: hidden;
-      font: 700 var(--hko-weather-row-font-size, clamp(9px, 1.8cqh, 14px))/1 'Baloo 2', sans-serif;
+      font: 700 var(--hko-weather-row-font-size, clamp(6px, 6.5cqh, 14px))/1 'Baloo 2', sans-serif;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
@@ -1124,7 +1130,9 @@
       grid-area: temp;
       align-self: center;
       justify-self: start;
-      font: 400 clamp(21px, 5.2cqh, 42px)/.78 'Baloo 2', sans-serif;
+      min-width: 0;
+      min-height: 0;
+      font: 400 clamp(12px, 18cqh, 42px)/.78 'Baloo 2', sans-serif;
       letter-spacing: -.035em;
     }
 
@@ -1133,7 +1141,7 @@
     .hko-weather-humidity {
       grid-area: humidity;
       align-self: center;
-      font: 700 var(--hko-weather-row-font-size, clamp(9px, 1.8cqh, 14px))/1 'Baloo 2', sans-serif;
+      font: 700 var(--hko-weather-row-font-size, clamp(6px, 6.5cqh, 14px))/1 'Baloo 2', sans-serif;
     }
 
     .hko-weather-stat strong {
@@ -2542,6 +2550,7 @@
     .lango-home__record { top: 8%; left: 6.1%; width: 9.1%; height: 14.5%; }
     .lango-home__map { top: 24%; left: 6.4%; width: 9%; height: 12.3%; }
     .lango-home__reward { top: 38%; left: 6.4%; width: 9%; height: 12.2%; }
+    .lango-home__settings { top: 52%; left: 6.4%; width: 9%; height: 12.2%; }
     .lango-home__collections { left: 7.5%; bottom: 8.2%; width: 16.2%; height: 12%; }
     .lango-home__store { top: 30.6%; right: 7.3%; width: 8.7%; height: 12.8%; }
     .lango-home__box { top: 44.3%; right: 6.8%; width: 9.2%; height: 12.8%; }
@@ -3026,6 +3035,127 @@
     }
 
     body.in-session #collection-overlay.visible { display: none; }
+
+    /* Settings overlay — account + logout, same surface pattern as Collection. */
+    #settings-root {
+      position: absolute;
+      inset: 0;
+      z-index: 192;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    #settings-overlay {
+      display: none;
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      container-type: size;
+      isolation: isolate;
+      pointer-events: auto;
+      background:
+        radial-gradient(ellipse at 50% 18%, rgba(255, 236, 170, .35), transparent 48%),
+        linear-gradient(165deg, #f0b45a 0%, #c56a28 42%, #8f3f12 100%);
+    }
+
+    #settings-overlay.visible {
+      display: block;
+      animation: next-surface-in 520ms cubic-bezier(.16, 1, .3, 1) both;
+    }
+
+    .settings-return {
+      position: absolute;
+      z-index: 4;
+      top: 7.45%;
+      left: 5.2%;
+      width: 17.64%;
+      aspect-ratio: 241 / 79;
+      padding: 0;
+      border: 0;
+      border-radius: 18px;
+      background: transparent;
+      overflow: hidden;
+      cursor: pointer;
+      filter: drop-shadow(0 4px 2px rgba(75, 31, 4, .24));
+      transition: transform 120ms ease, filter 120ms ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .settings-return img {
+      position: absolute;
+      top: -35.84%;
+      left: 0;
+      display: block;
+      width: 100%;
+      height: 172.04%;
+      object-fit: fill;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    .settings-return:hover { transform: scale(1.035); filter: drop-shadow(0 6px 3px rgba(75, 31, 4, .32)); }
+    .settings-return:active { transform: translateY(2px) scale(.97); }
+    .settings-return:focus-visible { outline: 4px solid #fff5b2; outline-offset: 4px; }
+
+    .settings-panel {
+      position: absolute;
+      z-index: 2;
+      top: 18%;
+      left: 50%;
+      width: min(72%, 620px);
+      padding: clamp(22px, 3.4cqw, 48px) clamp(22px, 3.6cqw, 52px);
+      border: clamp(5px, .7cqw, 10px) solid #ffca3d;
+      border-radius: clamp(24px, 3.2cqw, 42px);
+      color: #fff7cf;
+      text-align: center;
+      font-family: "Baloo 2", system-ui, sans-serif;
+      background: linear-gradient(180deg, #f39122 0%, #bd5b16 100%);
+      box-shadow: inset 0 0 0 clamp(3px, .35cqw, 5px) #7e310a, 0 18px 45px rgba(53, 19, 2, .45);
+      transform: translateX(-50%);
+    }
+
+    .settings-panel h1 {
+      margin: 0 0 .9em;
+      color: #fff7c6;
+      font-size: clamp(34px, 4.6cqw, 62px);
+      font-weight: 800;
+      line-height: 1;
+      text-shadow: 0 .18cqw 0 #6e2b0b;
+    }
+
+    .settings-logout {
+      min-width: 48%;
+      padding: .55em 1.2em;
+      border: 4px solid #6f2a09;
+      border-radius: 999px;
+      color: #fff8d8;
+      font-family: inherit;
+      font-size: clamp(17px, 1.9cqw, 26px);
+      font-weight: 800;
+      cursor: pointer;
+      background: #91501f;
+      box-shadow: inset 0 0 0 3px rgba(255, 255, 255, .22), 0 5px 0 #692707;
+    }
+
+    .settings-logout:hover { filter: brightness(1.06); }
+    .settings-logout:active {
+      transform: translateY(3px);
+      box-shadow: inset 0 0 0 3px rgba(255,255,255,.18), 0 2px 0 #692707;
+    }
+    .settings-logout:focus-visible { outline: 4px solid #fff7a8; outline-offset: 3px; }
+    .settings-logout:disabled {
+      opacity: .7;
+      cursor: wait;
+    }
+
+    .settings-error {
+      margin: .85em 0 0;
+      color: #ffe0a8;
+      font-size: clamp(14px, 1.5cqw, 20px);
+      font-weight: 700;
+    }
+
+    body.in-session #settings-overlay.visible { display: none; }
   </style>
 </head>
 <body>
@@ -3441,6 +3571,7 @@
     <div id="lango-home-root"></div>
     <div id="daily-rewards-root"></div>
     <div id="collection-root"></div>
+    <div id="settings-root"></div>
     <iframe id="map-preview-frame" title="Map preview" src="/map/index.html?preview=1&amp;embedded=1"></iframe>
     <iframe id="game-preview-frame" title="Game preview"></iframe>
     <div id="idle-video-screen" aria-label="Tap to start conversation">
@@ -3580,6 +3711,20 @@
         kitchen: 'Kitchen',
         washroom: 'Washroom',
       });
+      const MAP_LOCATION_DEFAULT_SCENE = Object.freeze({
+        home: 'livingroom',
+        school: 'classroom',
+      });
+
+      function readInitialRoomScene() {
+        if (ROOM_SCENE_LABELS[window.LangoRoomScene]) return window.LangoRoomScene;
+        try {
+          const locationId = String(localStorage.getItem('lango.activeMapLocation') || '').trim().toLowerCase();
+          const fallback = MAP_LOCATION_DEFAULT_SCENE[locationId];
+          if (ROOM_SCENE_LABELS[fallback]) return fallback;
+        } catch { /* ignore */ }
+        return 'livingroom';
+      }
 
       function ImageButton({ className, image, label, onClick, sfx = 'next' }) {
         return e('button', {
@@ -3933,16 +4078,106 @@
         );
       }
 
+      function Settings() {
+        const [visible, setVisible] = React.useState(false);
+        const [loggingOut, setLoggingOut] = React.useState(false);
+        const [error, setError] = React.useState('');
+        const returnAsset = '/assets/collections/return.png';
+
+        React.useEffect(() => {
+          const close = () => setVisible(false);
+          const open = () => {
+            setError('');
+            setVisible(true);
+          };
+          const onOpen = () => { open(); };
+          window.LangoSettings = { open, close };
+          window.addEventListener('lango:open-settings', onOpen);
+          return () => {
+            window.removeEventListener('lango:open-settings', onOpen);
+            if (window.LangoSettings?.open === open) delete window.LangoSettings;
+          };
+        }, []);
+
+        React.useEffect(() => {
+          if (!visible) return undefined;
+          const onKeyDown = (event) => {
+            if (event.key === 'Escape') closeSettings();
+          };
+          window.addEventListener('keydown', onKeyDown);
+          return () => window.removeEventListener('keydown', onKeyDown);
+        }, [visible]);
+
+        const closeSettings = () => {
+          window.LangoSfx?.play('back');
+          setVisible(false);
+          document.querySelector('.lango-home__settings')?.focus();
+        };
+
+        const logout = async () => {
+          if (loggingOut) return;
+          setLoggingOut(true);
+          setError('');
+          window.LangoSfx?.play('back');
+          try {
+            if (new URLSearchParams(location.search).get('preview') === '1') {
+              window.location.href = '/login';
+              return;
+            }
+            await fetch('/api/logout', { method: 'POST' });
+            if (window.LangoPageTransition?.navigate) {
+              window.LangoPageTransition.navigate('/login');
+            } else {
+              window.location.href = '/login';
+            }
+          } catch {
+            setError('Could not log out. Please try again.');
+            setLoggingOut(false);
+          }
+        };
+
+        return e('section', {
+          id: 'settings-overlay',
+          className: visible ? 'visible' : '',
+          role: 'dialog',
+          'aria-modal': 'true',
+          'aria-hidden': visible ? 'false' : 'true',
+          'aria-labelledby': 'settings-title'
+        },
+          e('button', {
+            type: 'button',
+            className: 'settings-return',
+            onClick: closeSettings,
+            'aria-label': 'Return home'
+          },
+            e('img', { src: returnAsset, alt: '', draggable: false })
+          ),
+          e('div', { className: 'settings-panel' },
+            e('h1', { id: 'settings-title' }, 'Settings'),
+            e('button', {
+              type: 'button',
+              className: 'settings-logout',
+              onClick: logout,
+              disabled: loggingOut,
+              autoFocus: visible
+            }, loggingOut ? 'Logging out…' : 'Log out'),
+            error && e('p', { className: 'settings-error', role: 'alert' }, error)
+          )
+        );
+      }
+
       function LangoHome() {
         const [comingSoonFeature, setComingSoonFeature] = React.useState(null);
-        const [roomScene, setRoomScene] = React.useState(() => (
-          ROOM_SCENE_LABELS[window.LangoRoomScene] ? window.LangoRoomScene : 'livingroom'
-        ));
+        const [roomScene, setRoomScene] = React.useState(readInitialRoomScene);
         React.useEffect(() => {
           const syncRoomScene = (event) => {
             const scene = event.detail?.scene;
             if (ROOM_SCENE_LABELS[scene]) setRoomScene(scene);
           };
+          // Pair/config may resolve after first paint — keep header in sync.
+          if (ROOM_SCENE_LABELS[window.LangoRoomScene]) {
+            setRoomScene(window.LangoRoomScene);
+          }
           window.addEventListener('lango:room-scene', syncRoomScene);
           return () => window.removeEventListener('lango:room-scene', syncRoomScene);
         }, []);
@@ -4018,6 +4253,13 @@
           e(ImageButton, { className: 'lango-home__map', image: 'reward', label: 'Map', onClick: () => go('map', '/map') }),
           e(ImageButton, { className: 'lango-home__reward', image: 'box', label: 'Reward', onClick: () => reveal('reward', openRewards), sfx: 'powerUp' }),
           e(ImageButton, {
+            className: 'lango-home__settings',
+            image: 'settings',
+            label: 'Settings',
+            onClick: () => reveal('settings', () => window.dispatchEvent(new CustomEvent('lango:open-settings'))),
+            sfx: 'powerUp'
+          }),
+          e(ImageButton, {
             className: 'lango-home__collections',
             image: 'map',
             label: 'Collections',
@@ -4038,6 +4280,7 @@
       ReactDOM.createRoot(document.getElementById('lango-home-root')).render(e(LangoHome));
       ReactDOM.createRoot(document.getElementById('daily-rewards-root')).render(e(DailyRewards));
       ReactDOM.createRoot(document.getElementById('collection-root')).render(e(Collection));
+      ReactDOM.createRoot(document.getElementById('settings-root')).render(e(Settings));
 
       /* Collection previews do not need to wait for the heavier avatar/video
          module graph. This keeps both Figma states directly inspectable even
@@ -4310,12 +4553,13 @@
         milestones: REWARD_SLOT_DEFAULTS.map((item) => ({ ...item, status: "locked" })),
         collection: [],
         unlockedLocations: [],
+        unlockedGames: [],
       };
     }
 
     function previewRewardStatus() {
       const milestones = [
-        { day: 1, id: "word-whack", label: "New Game", title: "New Game In Garden", name: "Word-Whack Blitz", icon: "mole", cta: "Get", destination: "modal", stars: 5 },
+        { day: 1, id: "word-whack", label: "New Game", title: "New Game In Garden", name: "Word-Whack Blitz", icon: "mole", cta: "Play", destination: "game", unlockGame: "wordwhack", stars: 5 },
         { day: 3, id: "langomon-doll", type: "random-doll", label: "Langomon Doll", title: "New Langomon Doll", name: "Mystery Langomon Doll", icon: "penguin", cta: "Add to collection", destination: "modal", stars: 10 },
         { day: 5, id: "new-spot", label: "New Spot", title: "New Spot", name: "School", icon: "spot", cta: "Explore map", destination: "map", unlockLocation: "school", stars: 15 },
         { day: 7, id: "seven-day-doll", type: "random-doll", label: "Langomon Doll", title: "New Langomon Doll", name: "Mystery Langomon Doll", icon: "penguin", cta: "Add to collection", destination: "modal", stars: 0 },
@@ -4335,6 +4579,7 @@
         })),
         collection: previewUnlockedDolls,
         unlockedLocations: previewClaimedMilestones.includes("new-spot") ? ["school"] : [],
+        unlockedGames: previewClaimedMilestones.includes("word-whack") ? ["wordwhack"] : [],
       };
     }
 
@@ -4603,12 +4848,25 @@
       }
     }
 
+    function applyCheckInUnlocks(status) {
+      if (!status) return;
+      if (Array.isArray(status.unlockedGames)) {
+        syncUnlockedGames(status.unlockedGames);
+      }
+      if (Array.isArray(status.unlockedLocations)) {
+        try {
+          localStorage.setItem("lango.systemUnlockedLocations", JSON.stringify(status.unlockedLocations));
+        } catch { /* ignore */ }
+      }
+    }
+
     async function fetchDailyRewardsStatus() {
       // Always paint milestone cards before/while opening the overlay.
       // Previously we returned early when the student flag wasn't ready yet,
       // which left the React shell's empty trough visible (no 1/3/5/7 cards).
       if (PREVIEW_MODE) {
         const status = previewRewardStatus();
+        applyCheckInUnlocks(status);
         renderDailyRewards(status);
         return status;
       }
@@ -4624,6 +4882,7 @@
           return null;
         }
         const data = await res.json();
+        applyCheckInUnlocks(data);
         renderDailyRewards(data);
         return data;
       } catch {
@@ -4650,7 +4909,9 @@
         }
         previewClaimedMilestones = [...previewClaimedMilestones, reward.id];
         savePreviewRewardState();
-        renderDailyRewards(previewRewardStatus());
+        const previewStatus = previewRewardStatus();
+        applyCheckInUnlocks(previewStatus);
+        renderDailyRewards(previewStatus);
         if (!isDollReward(reward)) celebrateDailyReward();
         showRewardCongratulations(reward);
         return;
@@ -4665,11 +4926,9 @@
         });
         if (!res.ok) throw new Error("Could not claim reward");
         const data = await res.json();
+        applyCheckInUnlocks(data.status);
         renderDailyRewards(data.status);
         if (!isDollReward(data.reward)) celebrateDailyReward();
-        if (data.reward?.destination === "map") {
-          localStorage.setItem("lango.systemUnlockedLocations", JSON.stringify(data.status.unlockedLocations || []));
-        }
         if (data.reward) {
           showRewardCongratulations(data.reward);
         }
@@ -4730,6 +4989,22 @@
         } else {
           window.location.href = destination;
         }
+        return;
+      }
+      if (claimedReward?.destination === "game" || claimedReward?.unlockGame) {
+        const gameId = claimedReward.unlockGame || "wordwhack";
+        syncUnlockedGames([
+          ...(Array.isArray(dailyRewardsStatus?.unlockedGames) ? dailyRewardsStatus.unlockedGames : []),
+          gameId,
+        ]);
+        const game = getGameById(gameId);
+        if (game) {
+          hideDailyRewardsOverlay();
+          const launchTarget = PREVIEW_MODE
+            ? { ...game, url: `${game.url}${game.url.includes("?") ? "&" : "?"}preview=1` }
+            : game;
+          launchGame("daily reward unlock", launchTarget);
+        }
       }
     });
     dailyRewardsDevDayBtn?.addEventListener("click", () => {
@@ -4744,14 +5019,18 @@
         try { sessionStorage.removeItem(PREVIEW_REWARD_STATE_KEY); } catch {}
         dailyRewardsSlots.scrollLeft = 0;
         dailyRewardsDevDayBtn.hidden = false;
-        renderDailyRewards(previewRewardStatus());
+        const resetStatus = previewRewardStatus();
+        applyCheckInUnlocks(resetStatus);
+        renderDailyRewards(resetStatus);
         requestAnimationFrame(syncDailyRewardScrollbar);
         sfx?.play("back", { interrupt: true });
         return;
       }
       previewCompletedDay += 1;
       savePreviewRewardState();
-      renderDailyRewards(previewRewardStatus());
+      const dayStatus = previewRewardStatus();
+      applyCheckInUnlocks(dayStatus);
+      renderDailyRewards(dayStatus);
       sfx?.play("powerUp", { interrupt: true });
     });
     dailyRewardsSlots.addEventListener("scroll", () => requestAnimationFrame(syncDailyRewardScrollbar), { passive: true });
@@ -4857,6 +5136,42 @@
         theme: "findgame",
       },
     ];
+    const ALWAYS_AVAILABLE_GAMES = new Set(["cardgame", "findgame"]);
+    const UNLOCKED_GAMES_KEY = "lango.systemUnlockedGames";
+    let unlockedGames = new Set(ALWAYS_AVAILABLE_GAMES);
+
+    function loadUnlockedGamesFromStorage() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(UNLOCKED_GAMES_KEY) || "[]");
+        if (Array.isArray(saved)) {
+          unlockedGames = new Set([...ALWAYS_AVAILABLE_GAMES, ...saved.map(String)]);
+        }
+      } catch {
+        unlockedGames = new Set(ALWAYS_AVAILABLE_GAMES);
+      }
+    }
+
+    function syncUnlockedGames(list) {
+      const next = Array.isArray(list) ? list.map(String) : [];
+      unlockedGames = new Set([...ALWAYS_AVAILABLE_GAMES, ...next]);
+      try {
+        localStorage.setItem(
+          UNLOCKED_GAMES_KEY,
+          JSON.stringify([...unlockedGames].filter((id) => !ALWAYS_AVAILABLE_GAMES.has(id))),
+        );
+      } catch { /* ignore */ }
+    }
+
+    function isGameUnlocked(gameId) {
+      if (ALWAYS_AVAILABLE_GAMES.has(gameId)) return true;
+      return unlockedGames.has(gameId);
+    }
+
+    function availableGames() {
+      return GAME_CATALOG.filter((game) => isGameUnlocked(game.id));
+    }
+
+    loadUnlockedGamesFromStorage();
 
     function applyGameIconsFromConfig(gameIcons) {
       if (!gameIcons || typeof gameIcons !== "object") return;
@@ -4959,7 +5274,9 @@
     const CAMERA_HEIGHT_STEP = 0.05;
 
     function pickRandomGame() {
-      return GAME_CATALOG[Math.floor(Math.random() * GAME_CATALOG.length)];
+      const pool = availableGames();
+      if (!pool.length) return getGameById("cardgame") || GAME_CATALOG[0];
+      return pool[Math.floor(Math.random() * pool.length)];
     }
 
     function pickRandomDanceUrl() {
@@ -5117,7 +5434,8 @@
         await new Promise((resolve) => {
           const tick = () => {
             const elapsed = performance.now() - shuffleStart;
-            const candidate = GAME_CATALOG[shuffleIndex % GAME_CATALOG.length];
+            const pool = availableGames();
+            const candidate = pool[shuffleIndex % pool.length] || game;
             gameLaunchIcon.src = candidate.icon;
             gameLaunchIcon.alt = candidate.name;
             shuffleIndex += 1;
@@ -5173,7 +5491,16 @@
     async function launchGame(reason = "user asked to play", chosenGame = null) {
       if (launchingGame) return null;
       const surprise = !chosenGame;
-      const game = chosenGame || pickRandomGame();
+      let game = chosenGame || pickRandomGame();
+      if (game && !isGameUnlocked(game.id)) {
+        uiLog("game", `blocked locked game ${game.id}`, "warn");
+        if (surprise) {
+          game = pickRandomGame();
+        } else {
+          return null;
+        }
+      }
+      if (!game) return null;
       launchingGame = true;
       uiLog("game", `launch ${game.id} (${reason})`, "hello", { surprise });
       setStatus(`Launching ${game.name}…`, true);
@@ -5351,6 +5678,80 @@
     }
 
     const PAIR_THEME_IDS = ["default", "warm", "cool", "nature", "night"];
+    const MAP_LOCATION_STORAGE_KEY = "lango.activeMapLocation";
+    const MAP_LOCATION_SCENES = Object.freeze({
+      home: ["livingroom", "bedroom", "kitchen", "washroom", "garden"],
+      // School world: session prompts that map to classroom / library
+      school: ["classroom", "library"],
+    });
+
+    function normalizeMapLocation(value) {
+      const id = String(value ?? "").trim().toLowerCase();
+      return Object.prototype.hasOwnProperty.call(MAP_LOCATION_SCENES, id) ? id : "home";
+    }
+
+    function readStoredMapLocation() {
+      try {
+        return normalizeMapLocation(localStorage.getItem(MAP_LOCATION_STORAGE_KEY));
+      } catch {
+        return "home";
+      }
+    }
+
+    function persistMapLocation(locationId) {
+      const normalized = normalizeMapLocation(locationId);
+      try {
+        localStorage.setItem(MAP_LOCATION_STORAGE_KEY, normalized);
+      } catch { /* ignore */ }
+      return normalized;
+    }
+
+    function consumeMapLocationFromUrl() {
+      const params = new URLSearchParams(location.search);
+      if (!params.has("location")) return null;
+      const next = persistMapLocation(params.get("location"));
+      params.delete("location");
+      const nextUrl = `${location.pathname}${params.toString() ? `?${params}` : ""}${location.hash}`;
+      history.replaceState(null, "", nextUrl || "/");
+      return next;
+    }
+
+    const mapLocationFromUrl = consumeMapLocationFromUrl();
+    // Set when arriving from Map travel so we cover world/pair loading with Uncle Tommy.
+    let pendingMapWorldTransition = Boolean(mapLocationFromUrl);
+    let activeMapLocation = mapLocationFromUrl || readStoredMapLocation();
+
+    function getScenesForMapLocation(locationId = activeMapLocation) {
+      return MAP_LOCATION_SCENES[normalizeMapLocation(locationId)] || MAP_LOCATION_SCENES.home;
+    }
+
+    function getDefaultSceneForMapLocation(locationId = activeMapLocation) {
+      return getScenesForMapLocation(locationId)[0] || "livingroom";
+    }
+
+    function publishRoomScene(scene) {
+      const locationScenes = getScenesForMapLocation();
+      let next = String(scene ?? "").trim().toLowerCase();
+      if (!locationScenes.includes(next)) next = locationScenes[0] || "livingroom";
+      window.LangoRoomScene = next;
+      window.dispatchEvent(new CustomEvent("lango:room-scene", { detail: { scene: next } }));
+      return next;
+    }
+
+    // Seed header immediately for the active map world (School → classroom).
+    publishRoomScene(getDefaultSceneForMapLocation());
+
+    async function playUncleTommyWhile(work) {
+      const play = window.LangoPageTransition?.play;
+      if (typeof play !== "function") return work();
+      let result;
+      await play({
+        async onCovered() {
+          result = await work();
+        },
+      });
+      return result;
+    }
 
     function normalizePairTheme(value) {
       const theme = String(value ?? "").trim().toLowerCase();
@@ -5836,11 +6237,15 @@
       return now >= start || now <= end;
     }
 
-    function pickVideoPair(videoPairs, date = new Date(), { scene = null, excludeId = null } = {}) {
+    function pickVideoPair(videoPairs, date = new Date(), { scene = null, scenes = null, excludeId = null } = {}) {
+      const sceneFilter = scenes
+        ? new Set(scenes)
+        : (scene ? new Set([scene]) : null);
       const eligible = (videoPairs || []).filter((p) => {
         if (!p.loopVideo?.url || !isPairActiveNow(p, date)) return false;
         if (excludeId !== null && p.id === excludeId) return false;
-        return scene === null || getVideoPairScene(p) === scene;
+        if (!sceneFilter) return true;
+        return sceneFilter.has(getVideoPairScene(p));
       });
       if (!eligible.length) return null;
       return eligible[Math.floor(Math.random() * eligible.length)];
@@ -5879,14 +6284,17 @@
     }
 
     function applyActivePairScene(pair) {
-      const scene = getVideoPairScene(pair);
-      window.LangoRoomScene = scene;
-      window.dispatchEvent(new CustomEvent("lango:room-scene", { detail: { scene } }));
-      return scene;
+      const locationScenes = getScenesForMapLocation();
+      let scene = pair ? getVideoPairScene(pair) : getDefaultSceneForMapLocation();
+      // Keep header inside the active map world (e.g. School → classroom / library).
+      if (!locationScenes.includes(scene)) scene = getDefaultSceneForMapLocation();
+      return publishRoomScene(scene);
     }
 
     function setupIdleVideosFromConfig(cfg, { autoplay = false, pair } = {}) {
-      activeVideoPair = pair === undefined ? pickVideoPair(cfg.videoPairs) : pair;
+      activeVideoPair = pair === undefined
+        ? pickVideoPair(cfg.videoPairs, new Date(), { scenes: getScenesForMapLocation() })
+        : pair;
       let result;
       if (activeVideoPair) {
         result = setupIdleVideos(activeVideoPair.loopVideo, activeVideoPair.transitionVideo, {
@@ -6134,12 +6542,14 @@
       if (inSession || active || playingTransitionVideo || idleVideoStarting) return;
       const cfg = cachedConfig || await getConfig();
       const currentId = activeVideoPair?.id ?? null;
-      const currentScene = activeVideoPair ? getVideoPairScene(activeVideoPair) : null;
-      let nextPair = pickVideoPair(cfg.videoPairs, new Date(), rotateWithinScene && currentScene
-        ? { scene: currentScene, excludeId: currentId }
-        : {});
-      // At the end of a conversation, rotate to another pair in the same room.
-      // If none is available, keep the current pair so the scene never changes.
+      const locationScenes = getScenesForMapLocation();
+      // Stay inside the active map world (e.g. School → classroom + library).
+      // When rotating after a chat, also exclude the pair just used.
+      let nextPair = pickVideoPair(cfg.videoPairs, new Date(), {
+        scenes: locationScenes,
+        excludeId: rotateWithinScene ? currentId : null,
+      });
+      // If none is available in this world, keep the current pair so the scene never jumps worlds.
       if (rotateWithinScene && activeVideoPair && !nextPair) nextPair = activeVideoPair;
       const nextId = nextPair?.id ?? null;
       if (nextId === currentId) {
@@ -6806,6 +7216,17 @@
         const game = getGameById(gameToolMatch);
         if (!game) {
           sendFunctionOutput(callId, { success: false, error: `Unknown game: ${gameToolMatch}` });
+          ws.send(JSON.stringify({ type: "response.create" }));
+          return;
+        }
+        if (!isGameUnlocked(game.id)) {
+          sendFunctionOutput(callId, {
+            success: false,
+            locked: true,
+            error: `${game.name} is locked. Claim the Day 1 daily reward ("New Game") to unlock it.`,
+            game: game.id,
+            game_name: game.name,
+          });
           ws.send(JSON.stringify({ type: "response.create" }));
           return;
         }
@@ -7532,11 +7953,25 @@
       }
 
       try {
-        const idleVideoReady = await preloadMediaAssets(cfg);
-        if (SPLASH_GAME_PREVIEW) {
-          dismissSplash();
+        let idleVideoReady;
+        if (pendingMapWorldTransition) {
+          pendingMapWorldTransition = false;
+          // Map → world: Uncle Tommy portal covers pair/video switch.
+          // Dismiss splash quietly so page-motion does not queue a second portal.
+          idleVideoReady = await playUncleTommyWhile(async () => {
+            setSplashProgress(100);
+            if (splashScreenEl) splashScreenEl.setAttribute("aria-busy", "false");
+            splashClickGuardUntil = performance.now() + SPLASH_CLICK_GUARD_MS;
+            document.body.classList.add("splash-dismissed");
+            return preloadMediaAssets(cfg);
+          });
         } else {
-          await finishSplashHandoff();
+          idleVideoReady = await preloadMediaAssets(cfg);
+          if (SPLASH_GAME_PREVIEW) {
+            dismissSplash();
+          } else {
+            await finishSplashHandoff();
+          }
         }
 
         if (idleVideoReady) {
@@ -7550,6 +7985,7 @@
         initDailyRewards({ autoShow: false });
       } catch (e) {
         console.error(e);
+        pendingMapWorldTransition = false;
         await finishSplashHandoff().catch(() => dismissSplash());
         showErr(`Failed to load: ${e.message}`);
         setStatus('Tap "Start" to begin a conversation');

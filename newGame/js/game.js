@@ -678,7 +678,7 @@
     clearTimeout(state.nextRoundTimer);
     resetHoles();
     Bgm.pause();
-    Sfx.play("finish");
+    // Celebration SFX is played by GameResult.
 
     const stars = getStarsEarned();
     if (typeof GameScoreReporter !== 'undefined') {

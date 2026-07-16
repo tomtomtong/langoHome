@@ -147,10 +147,29 @@
     <div class="card">
       <h1>Account Profiles</h1>
       <p class="lead">
-        Set a child profile for each login account (user01–user20). Uncle Tommy uses this
+        Set a child profile for each login account. Uncle Tommy uses this
         information to personalize conversations when that account signs in. After each voice session,
         the system can also update these fields automatically from what the child talked about.
       </p>
+
+      <section class="section" id="add-user-section" style="padding:1.1rem 1.15rem; border:1px solid #3d4a6b; border-radius:10px; background:#151a28">
+        <h2 style="color:#e8eaed">新增學生帳號 · Add student account</h2>
+        <p class="field-hint" style="margin:0 0 1rem; color:#9aa0a6">Create a new /login username here. It will show up in the Account dropdown below.</p>
+        <div class="grid-2">
+          <div class="field" style="margin-bottom:0.75rem">
+            <label for="new-username">Username</label>
+            <input id="new-username" type="text" placeholder="e.g. demo-2" autocomplete="off" maxlength="32">
+          </div>
+          <div class="field" style="margin-bottom:0.75rem">
+            <label for="new-password">Password</label>
+            <input id="new-password" type="text" placeholder="At least 4 characters" autocomplete="off">
+          </div>
+        </div>
+        <div class="actions" style="margin-top:0.25rem">
+          <button type="button" id="btn-add-user">Add user</button>
+        </div>
+        <div id="add-user-status" class="status" role="status"></div>
+      </section>
 
       <div class="account-picker">
         <div class="field" style="margin-bottom:0">
@@ -495,20 +514,22 @@
       if (!res.ok) throw new Error("Could not load profiles.");
       const data = await res.json();
       cachedProfiles = data.profiles || {};
-      if (!accountSelect.options.length) {
-        for (const username of data.users || []) {
-          const opt = document.createElement("option");
-          opt.value = username;
-          opt.textContent = username;
-          accountSelect.appendChild(opt);
-        }
-        const params = new URLSearchParams(location.search);
-        const requested = params.get("user");
-        if (requested && data.users?.includes(requested)) {
-          accountSelect.value = requested;
-        }
-        lastAccount = accountSelect.value;
+      const previous = accountSelect.value;
+      accountSelect.innerHTML = "";
+      for (const username of data.users || []) {
+        const opt = document.createElement("option");
+        opt.value = username;
+        opt.textContent = username;
+        accountSelect.appendChild(opt);
       }
+      const params = new URLSearchParams(location.search);
+      const requested = params.get("user");
+      if (requested && data.users?.includes(requested)) {
+        accountSelect.value = requested;
+      } else if (previous && data.users?.includes(previous)) {
+        accountSelect.value = previous;
+      }
+      lastAccount = accountSelect.value;
       fillForm(cachedProfiles[selectedAccount()] || {});
       profileReady = true;
     }
@@ -584,6 +605,46 @@
 
     loadProfiles().catch((e) => {
       showStatus(e.message || "Could not load profiles.", false);
+    });
+
+    const newUsernameEl = document.getElementById("new-username");
+    const newPasswordEl = document.getElementById("new-password");
+    const btnAddUser = document.getElementById("btn-add-user");
+    const addUserStatus = document.getElementById("add-user-status");
+
+    function showAddUserStatus(message, ok) {
+      addUserStatus.textContent = message;
+      addUserStatus.className = `status ${ok ? "ok" : "err"}`;
+    }
+
+    btnAddUser.addEventListener("click", async () => {
+      const username = newUsernameEl.value.trim();
+      const password = newPasswordEl.value;
+      if (!username || !password) {
+        showAddUserStatus("Enter a username and password.", false);
+        return;
+      }
+      btnAddUser.disabled = true;
+      try {
+        const res = await fetch("/api/student-users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Could not add user.");
+        newUsernameEl.value = "";
+        newPasswordEl.value = "";
+        showAddUserStatus(`Added ${data.username}. They can sign in at /login.`, true);
+        await loadProfiles();
+        accountSelect.value = data.username;
+        lastAccount = data.username;
+        fillForm(cachedProfiles[data.username] || {});
+      } catch (e) {
+        showAddUserStatus(e.message || "Could not add user.", false);
+      } finally {
+        btnAddUser.disabled = false;
+      }
     });
   </script>
   <script src="/admin-nav.js"></script>

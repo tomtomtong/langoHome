@@ -609,7 +609,7 @@
     stopQuestionSpeech();
     renderPositionMarkers([]);
     Bgm.pause();
-    Sfx.play("finish");
+    // Celebration SFX is played by GameResult.
     const stars = score >= 500 ? 3 : score >= 300 ? 2 : 1;
     if (typeof GameResult !== "undefined") {
       GameResult.show({ stars, score, onPlayAgain: startGame });
@@ -617,6 +617,7 @@
       overlayTitle.textContent = "Time's up!";
       overlayMsg.textContent = `Score: ${score}`;
       overlay.classList.remove("hidden");
+      Sfx.play("finish");
     }
     if (typeof GameScoreReporter !== "undefined") {
       GameScoreReporter.reportGameScore("findgame", score, { stars, foundCount, timeLeft });

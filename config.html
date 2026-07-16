@@ -267,6 +267,26 @@
   <div class="card wide">
     <h1>Voice Agent Settings</h1>
     <p>Set your API key and optionally override the prompt, voice, or LLM model. Leave optional fields blank to use defaults.</p>
+
+    <section class="debug-section" id="add-user-section" style="margin-bottom:1.5rem; padding:1rem; border:1px solid #2a2f3a; border-radius:10px; background:#141722">
+      <h2 style="margin:0 0 0.35rem; font-size:1rem">新增學生帳號 · Add student account</h2>
+      <p style="margin:0 0 1rem">Create a new login for the voice app. New accounts appear in Account Profiles and can sign in at <code>/login</code>.</p>
+      <div class="field">
+        <label for="new-username">Username</label>
+        <input id="new-username" type="text" placeholder="e.g. demo-2" autocomplete="off" maxlength="32">
+        <p class="field-hint">2–32 characters: letters, numbers, underscore, or hyphen.</p>
+      </div>
+      <div class="field">
+        <label for="new-password">Password</label>
+        <input id="new-password" type="text" placeholder="At least 4 characters" autocomplete="off">
+      </div>
+      <div class="actions" style="margin-top:0">
+        <button type="button" id="btn-add-user">Add user</button>
+        <a class="btn" href="/account-config">Account Profiles</a>
+      </div>
+      <div id="add-user-status" class="status" role="status"></div>
+    </section>
+
     <form id="form">
       <div class="field">
         <label for="key">Inworld API Key</label>
@@ -800,6 +820,42 @@ ${linesText.replace(/</g, '&lt;')}</pre>
     btnRefreshModels.addEventListener('click', () => loadInworldModels({ forceRefresh: true }));
     input.addEventListener('change', () => {
       if (resolveApiKey()) loadInworldModels({ forceRefresh: true });
+    });
+
+    const newUsernameEl = document.getElementById('new-username');
+    const newPasswordEl = document.getElementById('new-password');
+    const btnAddUser = document.getElementById('btn-add-user');
+    const addUserStatus = document.getElementById('add-user-status');
+
+    function showAddUserStatus(message, ok) {
+      addUserStatus.textContent = message;
+      addUserStatus.className = `status ${ok ? 'ok' : 'err'}`;
+    }
+
+    btnAddUser.addEventListener('click', async () => {
+      const username = newUsernameEl.value.trim();
+      const password = newPasswordEl.value;
+      if (!username || !password) {
+        showAddUserStatus('Enter a username and password.', false);
+        return;
+      }
+      btnAddUser.disabled = true;
+      try {
+        const res = await fetch('/api/student-users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Could not add user.');
+        newUsernameEl.value = '';
+        newPasswordEl.value = '';
+        showAddUserStatus(`Added ${data.username}. They can sign in at /login.`, true);
+      } catch (e) {
+        showAddUserStatus(e.message || 'Could not add user.', false);
+      } finally {
+        btnAddUser.disabled = false;
+      }
     });
   </script>
   <script src="/admin-nav.js"></script>

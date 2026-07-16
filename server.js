@@ -23,6 +23,7 @@ const INWORLD_API_DISABLED_MESSAGE =
 const CONFIG_DIR = process.env.CONFIG_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH || ROOT;
 const CONFIG_PATH = join(CONFIG_DIR, 'config.json');
 const USER_PROFILES_PATH = join(CONFIG_DIR, 'user-profiles.json');
+const STUDENT_USERS_PATH = join(CONFIG_DIR, 'student-users.json');
 const CHECK_INS_PATH = join(CONFIG_DIR, 'check-ins.json');
 const SESSIONS_PATH = join(CONFIG_DIR, 'sessions.json');
 const DEBUG_LOG_PATH = join(CONFIG_DIR, 'hello-debug-log.json');
@@ -636,7 +637,7 @@ function getGamePlayDailySummary({
     endDate,
     days: daysOut,
     games: [...VALID_GAME_IDS].map((id) => ({ id, label: GAME_LABELS[id] })),
-    users: USER_LIST,
+    users: getUserList(),
   };
 }
 
@@ -645,8 +646,9 @@ const SECURITY_HEADERS = {
   'Cross-Origin-Embedder-Policy': 'require-corp',
 };
 
-const STUDENT_USERS = {
+const BUILTIN_STUDENT_USERS = {
   demo: 'demo',
+  'demo-1': '123456',
   ...Object.fromEntries(
     Array.from({ length: 20 }, (_, i) => {
       const username = `user${String(i + 1).padStart(2, '0')}`;
@@ -655,13 +657,76 @@ const STUDENT_USERS = {
   ),
 };
 
+/** Mutable map of username → password (built-ins + custom accounts from student-users.json). */
+const STUDENT_USERS = { ...BUILTIN_STUDENT_USERS };
+
 const ADMIN_USERNAME = 'admin';
 const ADMIN_PASSWORD = 'admin';
 
 const SESSION_MAX_AGE_MS = 365 * 24 * 60 * 60 * 1000;
 const SESSION_MAX_AGE_SEC = Math.floor(SESSION_MAX_AGE_MS / 1000);
 
-const USER_LIST = Object.keys(STUDENT_USERS);
+const USERNAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]{1,31}$/;
+
+function getUserList() {
+  return Object.keys(STUDENT_USERS).sort((a, b) => a.localeCompare(b));
+}
+
+function loadCustomStudentUsers() {
+  try {
+    if (!existsSync(STUDENT_USERS_PATH)) return {};
+    const data = JSON.parse(readFileSync(STUDENT_USERS_PATH, 'utf8'));
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return {};
+    const out = {};
+    for (const [username, password] of Object.entries(data)) {
+      const u = String(username || '').trim();
+      const p = String(password ?? '');
+      if (!USERNAME_RE.test(u) || u === ADMIN_USERNAME || !p) continue;
+      out[u] = p;
+    }
+    return out;
+  } catch (e) {
+    console.warn('Could not load student-users.json:', e.message);
+    return {};
+  }
+}
+
+function saveCustomStudentUsers(customUsers) {
+  ensureConfigDir();
+  writeFileSync(STUDENT_USERS_PATH, JSON.stringify(customUsers, null, 2) + '\n');
+}
+
+function mergeCustomStudentUsers() {
+  const custom = loadCustomStudentUsers();
+  for (const [username, password] of Object.entries(custom)) {
+    if (BUILTIN_STUDENT_USERS[username]) continue;
+    STUDENT_USERS[username] = password;
+  }
+}
+
+function createStudentUser(username, password) {
+  const u = String(username || '').trim();
+  const p = String(password ?? '');
+  if (!USERNAME_RE.test(u)) {
+    return { ok: false, error: 'Username must be 2–32 characters: letters, numbers, _ or -.' };
+  }
+  if (u === ADMIN_USERNAME) {
+    return { ok: false, error: 'That username is reserved.' };
+  }
+  if (!p || p.length < 4) {
+    return { ok: false, error: 'Password must be at least 4 characters.' };
+  }
+  if (STUDENT_USERS[u]) {
+    return { ok: false, error: 'That username already exists.' };
+  }
+  const custom = loadCustomStudentUsers();
+  custom[u] = p;
+  saveCustomStudentUsers(custom);
+  STUDENT_USERS[u] = p;
+  return { ok: true, username: u };
+}
+
+mergeCustomStudentUsers();
 
 const DEFAULT_USER_PROFILE = {
   childName: '',
@@ -784,7 +849,7 @@ function seedUserProfilesFromRepo() {
   const volumeProfiles = existsSync(USER_PROFILES_PATH) ? loadUserProfiles() : {};
   const updatedUsers = [];
 
-  for (const username of USER_LIST) {
+  for (const username of getUserList()) {
     const repoProfile = normalizeUserProfile(repoProfiles[username]);
     const hasRepoIdentity = PROFILE_SEED_IDENTITY_FIELDS.some((key) => repoProfile[key]);
     if (!hasRepoIdentity) continue;
@@ -1084,8 +1149,9 @@ const DAILY_REWARD_MILESTONES = [
     title: 'New Game In Garden',
     name: 'Word-Whack Blitz',
     icon: 'mole',
-    cta: 'Get',
-    destination: 'modal',
+    cta: 'Play',
+    destination: 'game',
+    unlockGame: 'wordwhack',
     stars: 5,
   },
   {
@@ -1158,11 +1224,35 @@ function defaultCheckInRecord() {
     claimedMilestones: [],
     collection: [],
     unlockedLocations: [],
+    unlockedGames: [],
   };
 }
 
 function normalizeCheckInRecord(raw) {
   const src = raw && typeof raw === 'object' ? raw : {};
+  const claimedMilestones = Array.isArray(src.claimedMilestones)
+    ? [...new Set(src.claimedMilestones.map(String))]
+    : [];
+  const collection = Array.isArray(src.collection)
+    ? [...new Set(src.collection.map(String))].filter((id) => LANGOMON_DOLL_ID_SET.has(id))
+    : [];
+  const unlockedLocations = Array.isArray(src.unlockedLocations)
+    ? [...new Set(src.unlockedLocations.map(String).map((id) => id === 'park' ? 'school' : id))]
+    : [];
+  let unlockedGames = Array.isArray(src.unlockedGames)
+    ? [...new Set(src.unlockedGames.map(String))]
+    : [];
+  // Backfill: later reward progress means Day 1 Word-Whack was already earned.
+  const earnedWordWhack =
+    claimedMilestones.includes('word-whack')
+    || claimedMilestones.includes('langomon-doll')
+    || claimedMilestones.includes('new-spot')
+    || claimedMilestones.includes('seven-day-doll')
+    || collection.length > 0
+    || unlockedLocations.length > 0;
+  if (earnedWordWhack && !unlockedGames.includes('wordwhack')) {
+    unlockedGames = [...unlockedGames, 'wordwhack'];
+  }
   return {
     currentStreak: Math.max(0, Number(src.currentStreak) || 0),
     totalCheckIns: Math.max(0, Number(src.totalCheckIns) || 0),
@@ -1170,15 +1260,10 @@ function normalizeCheckInRecord(raw) {
     lastCheckInDate: String(src.lastCheckInDate || '').trim(),
     cyclePosition: Math.max(0, Number(src.cyclePosition) || 0),
     rewardFlowDate: String(src.rewardFlowDate || '').trim(),
-    claimedMilestones: Array.isArray(src.claimedMilestones)
-      ? [...new Set(src.claimedMilestones.map(String))]
-      : [],
-    collection: Array.isArray(src.collection)
-      ? [...new Set(src.collection.map(String))].filter((id) => LANGOMON_DOLL_ID_SET.has(id))
-      : [],
-    unlockedLocations: Array.isArray(src.unlockedLocations)
-      ? [...new Set(src.unlockedLocations.map(String).map((id) => id === 'park' ? 'school' : id))]
-      : [],
+    claimedMilestones,
+    collection,
+    unlockedLocations,
+    unlockedGames,
   };
 }
 
@@ -1283,6 +1368,7 @@ function getCheckInStatus(username) {
     canClaimMilestone: checkedInToday && Boolean(nextMilestone),
     collection: record.collection,
     unlockedLocations: record.unlockedLocations,
+    unlockedGames: record.unlockedGames,
   };
 }
 
@@ -1334,6 +1420,9 @@ function claimDailyMilestone(username) {
   if (reward.unlockLocation && !updated.unlockedLocations.includes(reward.unlockLocation)) {
     updated.unlockedLocations = [...updated.unlockedLocations, reward.unlockLocation];
   }
+  if (reward.unlockGame && !updated.unlockedGames.includes(reward.unlockGame)) {
+    updated.unlockedGames = [...updated.unlockedGames, reward.unlockGame];
+  }
 
   saveCheckInRecord(username, updated);
   return { ok: true, alreadyClaimed: false, reward: claimedReward, status: getCheckInStatus(username) };
@@ -1373,6 +1462,11 @@ function recordCheckIn(username) {
   };
 }
 
+function hasUnlockedGame(username, gameId) {
+  if (!username) return true;
+  return getCheckInRecord(username).unlockedGames.includes(gameId);
+}
+
 function buildCheckInContext(username) {
   const status = getCheckInStatus(username);
   if (!status.totalCheckIns && !status.canCheckIn) return '';
@@ -1390,6 +1484,9 @@ function buildCheckInContext(username) {
     if (status.currentStreak > 0) {
       lines.push(`- Warning: if they miss today, their ${status.currentStreak}-day streak will reset.`);
     }
+  }
+  if (!status.unlockedGames.includes('wordwhack')) {
+    lines.push('- Word-Whack Blitz is LOCKED until they claim the Day 1 daily reward ("New Game"). Do not launch it; suggest claiming the daily reward or playing Picture-Word Memory Match / Find the Object instead.');
   }
   return lines.join('\n');
 }
@@ -1760,6 +1857,7 @@ function requiresAdmin(url, method) {
 
   if (url === '/api/config' && m === 'POST') return true;
   if (url.startsWith('/api/user-profiles')) return true;
+  if (url.startsWith('/api/student-users')) return true;
   if (url === '/api/debug-log' && m === 'GET') return true;
   if (url.startsWith('/api/conversations')) return true;
   if (url.startsWith('/api/profile-sync-logs')) return true;
@@ -2895,6 +2993,10 @@ function isGameStaticRoute(url) {
   return url === '/games' || url.startsWith('/games/');
 }
 
+function isWordWhackGamePage(url) {
+  return url === '/games' || url === '/games/' || url === '/games/index.html';
+}
+
 function delegateToGameApp(req, res, pathname, query) {
   const savedUrl = req.url;
   req.url = `${pathname}${query}`;
@@ -3221,17 +3323,42 @@ const server = createServer((req, res) => {
 
   if (url === '/api/user-profiles' && req.method === 'GET') {
     const profiles = loadUserProfiles();
+    const users = getUserList();
     const normalized = {};
-    for (const username of USER_LIST) {
+    for (const username of users) {
       normalized[username] = normalizeUserProfile(profiles[username]);
     }
-    sendJson(res, 200, { users: USER_LIST, profiles: normalized });
+    sendJson(res, 200, { users, profiles: normalized });
     return;
   }
 
-  const profileMatch = url.match(/^\/api\/user-profiles\/(user\d{2})$/);
+  if (url === '/api/student-users' && req.method === 'GET') {
+    sendJson(res, 200, {
+      users: getUserList(),
+      custom: Object.keys(loadCustomStudentUsers()).sort((a, b) => a.localeCompare(b)),
+    });
+    return;
+  }
+
+  if (url === '/api/student-users' && req.method === 'POST') {
+    readJsonBody(req, res, (parsed) => {
+      const result = createStudentUser(parsed.username, parsed.password);
+      if (!result.ok) {
+        sendJson(res, 400, { error: result.error });
+        return;
+      }
+      sendJson(res, 200, {
+        ok: true,
+        username: result.username,
+        users: getUserList(),
+      });
+    });
+    return;
+  }
+
+  const profileMatch = url.match(/^\/api\/user-profiles\/([^/]+)$/);
   if (profileMatch) {
-    const username = profileMatch[1];
+    const username = decodeURIComponent(profileMatch[1]);
     if (!isValidUsername(username)) {
       sendJson(res, 404, { error: 'Unknown account.' });
       return;
@@ -3346,6 +3473,18 @@ const server = createServer((req, res) => {
     if (isGameConfigPage(gamePath) && !isAdmin(req)) {
       denyAdminAccess(req, res, url);
       return;
+    }
+    const requestUrl = new URL(rawUrl, 'http://local');
+    const allowPreview =
+      requestUrl.searchParams.get('preview') === '1'
+      || requestUrl.searchParams.get('embedded') === '1';
+    if (isWordWhackGamePage(url) && !allowPreview) {
+      const session = getSession(req);
+      if (session?.role === 'student' && !hasUnlockedGame(session.username, 'wordwhack')) {
+        res.writeHead(302, { Location: '/?locked=wordwhack', ...SECURITY_HEADERS });
+        res.end();
+        return;
+      }
     }
     delegateToGameApp(req, res, gamePath, query);
     return;
@@ -3660,6 +3799,16 @@ const LEAVE_TOOL_INSTRUCTION =
 const GAME_TOOLS_INSTRUCTION =
   ' Three games are available: (1) Word-Whack Blitz — call play_wordwhack when they want whack-a-word, sentence completion, or "word whack". (2) Picture-Word Memory Match — call play_cardgame when they want the card game, memory match, flip cards, or picture-word match. (3) Find the Object — call play_findgame when they want find-the-object, tap to find, or spotting game. If they only say "let\'s play" or "play a game" without naming one, ask which of the three they want; call the matching tool once they choose or name a game clearly.';
 
+const GAME_TOOLS_INSTRUCTION_WORDWHACK_LOCKED =
+  ' Two games are available right now: (1) Picture-Word Memory Match — call play_cardgame when they want the card game, memory match, flip cards, or picture-word match. (2) Find the Object — call play_findgame when they want find-the-object, tap to find, or spotting game. Word-Whack Blitz is LOCKED until they claim the Day 1 daily reward ("New Game"). If they ask for Word-Whack, do NOT call play_wordwhack; warmly tell them to open their daily reward to unlock it, and offer one of the two unlocked games instead. If they only say "let\'s play" or "play a game" without naming one, ask which of the two unlocked games they want.';
+
+function buildGameToolsInstruction(username) {
+  if (!username || hasUnlockedGame(username, 'wordwhack')) {
+    return GAME_TOOLS_INSTRUCTION;
+  }
+  return GAME_TOOLS_INSTRUCTION_WORDWHACK_LOCKED;
+}
+
 const HAPPY_TOOL = {
   type: 'function',
   name: 'happy',
@@ -3713,7 +3862,7 @@ const PLAY_WORDWHACK_TOOL = {
   type: 'function',
   name: 'play_wordwhack',
   description:
-    'Launches Word-Whack Blitz (complete the sentence / whack-a-word). Call when the user asks for this game by name or describes whacking words or finishing sentences.',
+    'Launches Word-Whack Blitz (complete the sentence / whack-a-word). Call when the user asks for this game by name or describes whacking words or finishing sentences. If Word-Whack is locked in the session instructions, do not call this tool.',
   parameters: {
     type: 'object',
     properties: {
@@ -3775,13 +3924,15 @@ function buildSessionCfg({
   temperature,
   maxOutputTokens,
   simpleSession = false,
+  username = null,
 } = {}) {
+  const gameToolsInstruction = buildGameToolsInstruction(username);
   const session = {
     type: 'realtime',
     model: model || DEFAULT_MODEL,
     instructions: simpleSession
       ? (instructions ?? '')
-      : (instructions || DEFAULT_INSTRUCTIONS) + HAPPY_TOOL_INSTRUCTION + KUNGFU_TOOL_INSTRUCTION + GAME_TOOLS_INSTRUCTION + LEAVE_TOOL_INSTRUCTION,
+      : (instructions || DEFAULT_INSTRUCTIONS) + HAPPY_TOOL_INSTRUCTION + KUNGFU_TOOL_INSTRUCTION + gameToolsInstruction + LEAVE_TOOL_INSTRUCTION,
     output_modalities: ['audio', 'text'],
     audio: {
       input: {
@@ -4038,6 +4189,7 @@ wss.on('connection', (browser, req) => {
           sessionUser?.role === 'student' ? sessionUser.username : null,
         ),
       simpleSession,
+      username: sessionUser?.role === 'student' ? sessionUser.username : null,
       voice: parsed.voice?.trim() || saved.voice?.trim(),
       model: parsed.model?.trim() || saved.model?.trim(),
       asrModel: parsed.asrModel?.trim() || saved.asrModel?.trim(),
