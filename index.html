@@ -1392,14 +1392,26 @@
       overflow: hidden;
       container-type: size;
       isolation: isolate;
-      background: #eab253 url("/assets/daily-rewards/room-blur.png") center / cover no-repeat;
+      background: #eab253;
     }
 
     #daily-rewards-overlay.visible { display: block; }
 
+    #daily-rewards-overlay::before {
+      content: "";
+      position: absolute;
+      inset: -2.5%;
+      z-index: 0;
+      background: url("/assets/daily-rewards/room-blur.png") center / cover no-repeat;
+      filter: blur(10px);
+      transform: scale(1.035);
+      pointer-events: none;
+    }
+
     .daily-rewards-scene {
       position: absolute;
       inset: 0;
+      z-index: 1;
       overflow: hidden;
       animation: daily-reward-scene-in 0.42s cubic-bezier(.2, .8, .2, 1) both;
     }
@@ -1410,7 +1422,6 @@
       inset: 0;
       z-index: 0;
       background: rgba(248, 181, 69, 0.08);
-      backdrop-filter: blur(2px);
       pointer-events: none;
     }
 
@@ -1481,8 +1492,18 @@
       object-fit: fill;
     }
 
-    .daily-rewards-return:hover { transform: scale(1.035); }
-    .daily-rewards-return:active { transform: translateY(2px) scale(.97); }
+    .daily-rewards-return:hover:not(:disabled) {
+      transform: scale(1.035);
+      border: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+    .daily-rewards-return:active {
+      transform: translateY(2px) scale(.97);
+      border: 0;
+      background: transparent;
+      box-shadow: none;
+    }
     .daily-rewards-return:focus-visible { outline: 4px solid #fff5b2; outline-offset: 4px; }
 
     .daily-rewards-board {
@@ -1655,6 +1676,10 @@
       top: 67%;
       width: 45%;
       aspect-ratio: 622 / 124;
+      transform-origin: 50% 4%;
+      pointer-events: auto;
+      cursor: default;
+      will-change: transform;
     }
 
     .daily-rewards-quest-art {
@@ -1662,6 +1687,37 @@
       height: 100%;
       object-fit: contain;
       filter: drop-shadow(0 4px 3px rgba(85, 34, 11, .18));
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      .daily-rewards-quest:hover {
+        animation: daily-reward-sign-breeze 1.65s ease-in-out infinite;
+      }
+    }
+
+    .daily-rewards-quest.is-incomplete:not(:hover) {
+      animation: daily-reward-sign-reminder 7s ease-in-out infinite;
+    }
+
+    @keyframes daily-reward-sign-breeze {
+      0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+      18% { transform: translate3d(.35%, -.5%, 0) rotate(1.2deg); }
+      38% { transform: translate3d(-.28%, .25%, 0) rotate(-.85deg); }
+      58% { transform: translate3d(.18%, -.16%, 0) rotate(.52deg); }
+      78% { transform: translate3d(-.1%, .08%, 0) rotate(-.25deg); }
+    }
+
+    @keyframes daily-reward-sign-reminder {
+      0%, 58%, 82%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+      62% { transform: translate3d(.3%, -.42%, 0) rotate(1deg); }
+      67% { transform: translate3d(-.24%, .2%, 0) rotate(-.72deg); }
+      72% { transform: translate3d(.15%, -.12%, 0) rotate(.42deg); }
+      77% { transform: translate3d(-.08%, .06%, 0) rotate(-.18deg); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .daily-rewards-quest:hover,
+      .daily-rewards-quest.is-incomplete:not(:hover) { animation: none; }
     }
 
     .daily-rewards-meta {
@@ -2314,18 +2370,34 @@
       position: absolute;
       z-index: 20;
       border: 0;
+      border-radius: 0;
       padding: 0;
-      background: transparent;
+      background: transparent !important;
+      box-shadow: none;
       cursor: pointer;
       pointer-events: auto;
       filter: drop-shadow(0 4px 2px rgba(75, 31, 4, 0.28));
       transition: transform 120ms ease, filter 120ms ease;
-      -webkit-tap-highlight-color: transparent;
+      appearance: none;
+      -webkit-appearance: none;
+      -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+      touch-action: manipulation;
+      user-select: none;
     }
 
     .lango-home__button:hover { transform: scale(1.045); filter: drop-shadow(0 6px 3px rgba(75, 31, 4, 0.34)); }
-    .lango-home__button:active { transform: scale(.95); }
+    .lango-home__button:active {
+      background: transparent !important;
+      box-shadow: none !important;
+      transform: scale(.95);
+    }
+    .lango-home__button:focus:not(:focus-visible) {
+      outline: none;
+      background: transparent !important;
+      box-shadow: none !important;
+    }
     .lango-home__button:focus-visible { outline: 4px solid #fff5b2; outline-offset: 3px; border-radius: 18px; }
+    .lango-home__button::-moz-focus-inner { border: 0; padding: 0; }
 
     .lango-home__title { position: absolute; z-index: 15; top: -1.2%; left: 29.7%; width: 41.6%; height: 14.1%; object-fit: contain; }
     .lango-home__clock { position: absolute; z-index: 16; top: 7.2%; right: 7.4%; width: 12.4%; }
@@ -3147,7 +3219,7 @@
                 e('button', { type: 'button', id: 'daily-rewards-claim-btn' }, 'Get')
               )
             ),
-            e('div', { className: 'daily-rewards-quest' },
+            e('div', { className: 'daily-rewards-quest is-incomplete', id: 'daily-rewards-quest' },
               e('img', {
                 className: 'daily-rewards-quest-art',
                 id: 'daily-rewards-quest-art',
@@ -3589,6 +3661,7 @@
     const dailyRewardsStarsText = document.getElementById("daily-rewards-stars-text");
     const dailyRewardsStreakBadge = document.getElementById("daily-rewards-streak-badge");
     const dailyRewardsDayCount = document.getElementById("daily-rewards-day-count");
+    const dailyRewardsQuest = document.getElementById("daily-rewards-quest");
     const dailyRewardsQuestArt = document.getElementById("daily-rewards-quest-art");
     const dailyRewardsCelebrate = document.getElementById("daily-rewards-celebrate");
     const dailyRewardCongrats = document.getElementById("daily-reward-congrats");
@@ -3782,6 +3855,8 @@
         `${displayedDay} consecutive day${displayedDay === 1 ? "" : "s"} completed`,
       );
       const finishedToday = Boolean(status.checkedInToday);
+      dailyRewardsQuest.classList.toggle("is-incomplete", !finishedToday);
+      dailyRewardsQuest.classList.toggle("is-complete", finishedToday);
       dailyRewardsQuestArt.src = finishedToday
         ? "/assets/daily-rewards/reward-title-finish.png?v=20260715a"
         : "/assets/daily-rewards/reward-title-non-finish.png?v=20260715a";

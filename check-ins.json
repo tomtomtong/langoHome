@@ -1,9 +1,24 @@
 {
   "user01": {
     "currentStreak": 1,
+    "totalCheckIns": 2,
+    "totalStars": 13,
+    "lastCheckInDate": "2026-07-15",
+    "cyclePosition": 2,
+    "rewardFlowDate": "",
+    "claimedMilestones": [],
+    "collection": [],
+    "unlockedLocations": []
+  },
+  "demo": {
+    "currentStreak": 1,
     "totalCheckIns": 1,
     "totalStars": 5,
-    "lastCheckInDate": "2026-07-13",
-    "cyclePosition": 1
+    "lastCheckInDate": "2026-07-16",
+    "cyclePosition": 1,
+    "rewardFlowDate": "",
+    "claimedMilestones": [],
+    "collection": [],
+    "unlockedLocations": []
   }
 }

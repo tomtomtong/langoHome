@@ -23,21 +23,24 @@
 <div id="bga-custom-background" aria-hidden="true"></div>
 
 <button id="return-btn" class="return-btn" type="button" title="Return to conversation" aria-label="Return to conversation">
-  <img src="assets/images/return-btn.svg" alt="Return" class="return-icon">
+  <img src="../FindGame/assets/images/return-button.png" alt="Return" class="return-icon">
 </button>
 
 <div id="game">
   <header class="game-top-hud">
     <h1 class="title-text">Picture-Word Memory Match</h1>
     <div id="status-row">
-      <div id="timer-display">
-        <img src="assets/images/timer.svg" alt="timer" class="timer-icon">
-        <span id="timer-text">90</span>
+      <div id="timer-display" class="timer-chip" aria-label="Time remaining">
+        <span class="timer-readout">
+          <span id="timer-text" class="timer-num">90</span>
+          <span class="timer-unit">sec</span>
+        </span>
       </div>
       <div id="pairs-display"><span id="pairs-found">0/6</span> Pairs Found</div>
       <div id="score-display" class="live-score" aria-label="Score"><span id="score-text">0</span></div>
     </div>
   </header>
+  <button id="sound-toggle" class="sound-toggle" type="button" aria-label="Mute sound" aria-pressed="false" title="Mute sound">🔊</button>
   <div id="hud">
     <span id="timer" style="display:none;">90</span>
   </div>
@@ -45,9 +48,9 @@
   <footer class="footer">
     <div class="progress-frame">
       <div id="progressFill" class="progress-fill"></div>
-      <div class="star-milestone s1" data-milestone="1">★</div>
-      <div class="star-milestone s2" data-milestone="2">★</div>
-      <div class="star-milestone s3" data-milestone="3">★</div>
+      <div class="star-milestone s1" data-milestone="1"><img src="assets/images/star.png" alt="" class="star-img"></div>
+      <div class="star-milestone s2" data-milestone="2"><img src="assets/images/star.png" alt="" class="star-img"></div>
+      <div class="star-milestone s3" data-milestone="3"><img src="assets/images/star.png" alt="" class="star-img"></div>
     </div>
   </footer>
   <div id="level-complete" class="hidden" aria-live="polite">
@@ -57,10 +60,10 @@
       <p class="level-complete-score">Score: <span id="complete-score">0</span></p>
     </div>
   </div>
+  <div id="game-announcer" class="visually-hidden" aria-live="polite"></div>
 </div>
 <script src="../js/loadingScreen.js"></script>
 <script src="../js/vocaConfig.js"></script>
-<script src="js/imageConfig.js"></script>
 <script src="../js/gamePicker.js"></script>
 <script src="../js/gameScoreReporter.js"></script>
 <script src="../assets/game-result.js"></script>

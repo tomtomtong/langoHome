@@ -545,20 +545,39 @@ body {
 }
 
 .score-chip {
+  position: relative;
   width: clamp(190px, 15vw, 250px);
   aspect-ratio: 2.85 / 1;
   display: grid;
   place-items: center;
   box-sizing: border-box;
-  padding: 10% 0 0;
-  overflow: hidden;
-  background: transparent url("../assets/images/live-score.png") center / 100% auto no-repeat;
+  padding: 0;
+  overflow: visible;
+  background: transparent;
   color: #fff7df;
   font-family: "Fredoka", "Baloo 2", system-ui, sans-serif;
   font-size: clamp(24px, 2.5vw, 42px);
   font-weight: 800;
   line-height: 1;
   text-shadow: 0 3px 0 #3d1608, 0 0 8px rgba(255, 206, 91, 0.35);
+}
+
+.score-chip::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  z-index: 0;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  background: url("../assets/images/live-score.png") center / contain no-repeat;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.score-chip > span {
+  position: relative;
+  z-index: 1;
 }
 
 .overlay {
