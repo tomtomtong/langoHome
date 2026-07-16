@@ -3746,6 +3746,7 @@ function buildSessionCfg({
   ttsDeliveryMode,
   temperature,
   maxOutputTokens,
+  language,
 } = {}) {
   const session = {
     type: 'realtime',
@@ -3786,16 +3787,27 @@ function buildSessionCfg({
   const speed = Number(ttsSpeed);
   if (Number.isFinite(speed) && speed > 0) session.audio.output.speed = speed;
 
-  const providerData = {};
-  const vad = Number(vadThreshold);
-  if (Number.isFinite(vad) && vad >= 0 && vad <= 1) {
-    providerData.stt = { vad_threshold: vad };
+  const locale = String(language || '').trim();
+  if (locale) {
+    session.audio.input.transcription.language = locale.split('-')[0].toLowerCase();
   }
 
+  const providerData = {};
+  const sttPd = {};
+  const vad = Number(vadThreshold);
+  if (Number.isFinite(vad) && vad >= 0 && vad <= 1) {
+    sttPd.vad_threshold = vad;
+  }
+  if (locale) sttPd.language_hints = [locale];
+  if (Object.keys(sttPd).length) providerData.stt = sttPd;
+
+  const ttsPd = {};
   const deliveryMode = String(ttsDeliveryMode || '').trim().toUpperCase();
   if (deliveryMode === 'STABLE' || deliveryMode === 'BALANCED' || deliveryMode === 'CREATIVE') {
-    providerData.tts = { delivery_mode: deliveryMode };
+    ttsPd.delivery_mode = deliveryMode;
   }
+  if (locale) ttsPd.language = locale;
+  if (Object.keys(ttsPd).length) providerData.tts = ttsPd;
 
   if (Object.keys(providerData).length) session.providerData = providerData;
 
@@ -4003,6 +4015,7 @@ wss.on('connection', (browser, req) => {
       maxOutputTokens: maxOutputTokens === 'inf' || Number.isFinite(maxOutputTokens)
         ? maxOutputTokens
         : undefined,
+      language: parsed.language?.trim() || saved.language?.trim(),
     }, {
       username: sessionUser?.username || 'unknown',
       role: sessionUser?.role || 'unknown',
