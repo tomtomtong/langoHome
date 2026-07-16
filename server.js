@@ -3731,7 +3731,22 @@ const PLAY_FINDGAME_TOOL = {
   },
 };
 
-function buildSessionCfg({ instructions, voice, model } = {}) {
+const DEFAULT_ASR_MODEL = 'assemblyai/universal-streaming-english';
+const DEFAULT_VAD_EAGERNESS = 'low';
+
+function buildSessionCfg({
+  instructions,
+  voice,
+  model,
+  asrModel,
+  vadEagerness,
+  vadThreshold,
+  ttsModel,
+  ttsSpeed,
+  ttsDeliveryMode,
+  temperature,
+  maxOutputTokens,
+} = {}) {
   const session = {
     type: 'realtime',
     model: model || DEFAULT_MODEL,
@@ -3743,20 +3758,47 @@ function buildSessionCfg({ instructions, voice, model } = {}) {
       input: {
         turn_detection: {
           type: 'semantic_vad',
-          eagerness: 'low',
+          eagerness: vadEagerness || DEFAULT_VAD_EAGERNESS,
           create_response: true,
           interrupt_response: true,
         },
         transcription: {
-          model: 'assemblyai/universal-streaming-english',
+          model: asrModel || DEFAULT_ASR_MODEL,
         },
       },
       output: {
         voice: voice || DEFAULT_VOICE_ID,
-        model: DEFAULT_TTS_MODEL,
+        model: ttsModel || DEFAULT_TTS_MODEL,
       },
     },
   };
+
+  const temp = Number(temperature);
+  if (Number.isFinite(temp)) session.temperature = temp;
+
+  if (maxOutputTokens === 'inf') {
+    session.max_output_tokens = 'inf';
+  } else {
+    const maxTokens = Number(maxOutputTokens);
+    if (Number.isFinite(maxTokens) && maxTokens > 0) session.max_output_tokens = maxTokens;
+  }
+
+  const speed = Number(ttsSpeed);
+  if (Number.isFinite(speed) && speed > 0) session.audio.output.speed = speed;
+
+  const providerData = {};
+  const vad = Number(vadThreshold);
+  if (Number.isFinite(vad) && vad >= 0 && vad <= 1) {
+    providerData.stt = { vad_threshold: vad };
+  }
+
+  const deliveryMode = String(ttsDeliveryMode || '').trim().toUpperCase();
+  if (deliveryMode === 'STABLE' || deliveryMode === 'BALANCED' || deliveryMode === 'CREATIVE') {
+    providerData.tts = { delivery_mode: deliveryMode };
+  }
+
+  if (Object.keys(providerData).length) session.providerData = providerData;
+
   return JSON.stringify({ type: 'session.update', session });
 }
 
@@ -3924,6 +3966,25 @@ wss.on('connection', (browser, req) => {
       ? getUserProfile(sessionUser.username)
       : {};
     const baseInstructions = parsed.instructions?.trim() || saved.instructions?.trim();
+    const vadThresholdRaw = parsed.vadThreshold;
+    const vadThreshold = vadThresholdRaw === '' || vadThresholdRaw == null
+      ? undefined
+      : Number(vadThresholdRaw);
+    const temperatureRaw = parsed.temperature;
+    const temperature = temperatureRaw === '' || temperatureRaw == null
+      ? undefined
+      : Number(temperatureRaw);
+    const maxOutputTokensRaw = parsed.maxOutputTokens;
+    const maxOutputTokens = maxOutputTokensRaw === '' || maxOutputTokensRaw == null
+      ? undefined
+      : (String(maxOutputTokensRaw).trim().toLowerCase() === 'inf'
+        ? 'inf'
+        : Number(maxOutputTokensRaw));
+    const ttsSpeedRaw = parsed.ttsSpeed;
+    const ttsSpeed = ttsSpeedRaw === '' || ttsSpeedRaw == null
+      ? undefined
+      : Number(ttsSpeedRaw);
+
     connectToInworld(apiKey, browser, {
       instructions: mergeInstructionsWithProfile(
         baseInstructions,
@@ -3932,6 +3993,16 @@ wss.on('connection', (browser, req) => {
       ),
       voice: parsed.voice?.trim() || saved.voice?.trim(),
       model: parsed.model?.trim() || saved.model?.trim(),
+      asrModel: parsed.asrModel?.trim() || saved.asrModel?.trim(),
+      vadEagerness: parsed.vadEagerness?.trim() || saved.vadEagerness?.trim(),
+      vadThreshold: Number.isFinite(vadThreshold) ? vadThreshold : undefined,
+      ttsModel: parsed.ttsModel?.trim() || saved.ttsModel?.trim(),
+      ttsSpeed: Number.isFinite(ttsSpeed) ? ttsSpeed : undefined,
+      ttsDeliveryMode: parsed.ttsDeliveryMode?.trim() || saved.ttsDeliveryMode?.trim(),
+      temperature: Number.isFinite(temperature) ? temperature : undefined,
+      maxOutputTokens: maxOutputTokens === 'inf' || Number.isFinite(maxOutputTokens)
+        ? maxOutputTokens
+        : undefined,
     }, {
       username: sessionUser?.username || 'unknown',
       role: sessionUser?.role || 'unknown',

@@ -37,7 +37,7 @@
       font-size: 0.8rem;
       color: #444;
     }
-    input, textarea {
+    input, textarea, select {
       width: 100%;
       padding: 0.6rem 0.75rem;
       margin-bottom: 0.9rem;
@@ -138,6 +138,39 @@
       display: none;
     }
     #playback.show { display: block; }
+    button.warn {
+      background: #f9ab00;
+      border-color: #f9ab00;
+      color: #1a1a1a;
+    }
+    button.warn:hover:not(:disabled) { background: #e37400; color: #fff; }
+    .field-hint {
+      margin: -0.55rem 0 0.9rem;
+      font-size: 0.75rem;
+      color: #888;
+      line-height: 1.35;
+    }
+    .config-section {
+      margin: 1.25rem 0 0.75rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #333;
+    }
+    .config-section:first-of-type { margin-top: 0; }
+    .inline-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      margin-bottom: 0.9rem;
+    }
+    .inline-row select,
+    .inline-row input { margin-bottom: 0; }
+    .inline-row button {
+      flex: 0 0 auto;
+      padding: 0.55rem 0.75rem;
+      font-size: 0.8rem;
+    }
+    #modelCustom { display: none; }
   </style>
 </head>
 <body>
@@ -149,18 +182,78 @@
       <label for="apiKey">API key</label>
       <input id="apiKey" type="password" placeholder="From /config or enter here" autocomplete="off">
 
+      <label for="instructions">Instructions</label>
+      <textarea id="instructions" placeholder="System prompt for the agent"></textarea>
+
+      <h2 class="config-section">LLM</h2>
+
+      <label for="model">LLM model</label>
+      <div class="inline-row">
+        <select id="model" style="flex: 1;"></select>
+        <button type="button" id="btn-refresh-models">Refresh</button>
+      </div>
+      <input id="modelCustom" type="text" placeholder="provider/model (custom)">
+      <p id="models-status" class="field-hint">Loading models…</p>
+
+      <label for="temperature">Temperature</label>
+      <input id="temperature" type="number" min="0" max="2" step="0.1" placeholder="Server default">
+      <p class="field-hint">Sampling temperature (0–2). Leave empty for the server default.</p>
+
+      <label for="maxOutputTokens">Max output tokens</label>
+      <input id="maxOutputTokens" type="text" placeholder="4096 or inf">
+      <p class="field-hint">Cap response length. Use <code>inf</code> for no limit.</p>
+
+      <h2 class="config-section">TTS</h2>
+
       <label for="voice">Voice ID</label>
       <input id="voice" type="text" placeholder="default-zylgts2tamenvybeti3z0w__uncle_tommy">
 
-      <label for="model">Model</label>
-      <input id="model" type="text" placeholder="openai/gpt-4o-mini">
+      <label for="ttsModel">TTS model</label>
+      <select id="ttsModel">
+        <option value="inworld-tts-2">inworld-tts-2 (higher quality)</option>
+        <option value="inworld-tts-1.5-mini">inworld-tts-1.5-mini (lower latency)</option>
+      </select>
 
-      <label for="instructions">Instructions</label>
-      <textarea id="instructions" placeholder="System prompt for the agent"></textarea>
+      <label for="ttsSpeed">TTS speed</label>
+      <input id="ttsSpeed" type="number" min="0.5" max="2" step="0.05" placeholder="1.0">
+      <p class="field-hint">Playback speed multiplier. Leave empty for default (1.0).</p>
+
+      <label for="ttsDeliveryMode">TTS delivery mode</label>
+      <select id="ttsDeliveryMode">
+        <option value="">Default (server)</option>
+        <option value="STABLE">STABLE — consistent delivery</option>
+        <option value="BALANCED">BALANCED</option>
+        <option value="CREATIVE">CREATIVE — more expressive (TTS-2)</option>
+      </select>
+
+      <h2 class="config-section">ASR &amp; VAD</h2>
+
+      <label for="asrModel">ASR model</label>
+      <select id="asrModel">
+        <option value="inworld/inworld-stt-1">inworld/inworld-stt-1 (recommended)</option>
+        <option value="assemblyai/universal-streaming-english">assemblyai/universal-streaming-english</option>
+        <option value="assemblyai/u3-rt-pro">assemblyai/u3-rt-pro</option>
+        <option value="assemblyai/universal-streaming-multilingual">assemblyai/universal-streaming-multilingual</option>
+        <option value="soniox/stt-rt-v4">soniox/stt-rt-v4</option>
+      </select>
+
+      <label for="vadEagerness">VAD eagerness</label>
+      <select id="vadEagerness">
+        <option value="low">low — wait longer before ending turn</option>
+        <option value="medium">medium — balanced</option>
+        <option value="high">high — respond faster</option>
+        <option value="auto">auto — server default</option>
+      </select>
+
+      <label for="vadThreshold">VAD threshold override</label>
+      <input id="vadThreshold" type="number" min="0" max="1" step="0.05" placeholder="Leave empty to use eagerness preset">
+      <p class="field-hint">Speech/silence cutoff (0.0–1.0). Overrides the eagerness preset when set. See <a href="https://docs.inworld.ai/realtime/provider-data" target="_blank" rel="noopener">Inworld STT extensions</a>.</p>
 
       <div class="row">
         <button type="button" id="btn-check">Check</button>
         <button type="button" id="btn-connect" class="primary">Connect</button>
+        <button type="button" id="btn-pause" class="warn" disabled>Pause</button>
+        <button type="button" id="btn-resume" disabled>Resume</button>
         <button type="button" id="btn-disconnect" class="danger" disabled>Disconnect</button>
       </div>
     </form>
@@ -191,18 +284,34 @@
     const DEFAULT_VOICE = "default-zylgts2tamenvybeti3z0w__uncle_tommy";
     const DEFAULT_MODEL = "openai/gpt-4o-mini";
     const DEFAULT_PROMPT = "You are a friendly voice assistant. Keep responses brief.";
+    const DEFAULT_ASR_MODEL = "assemblyai/universal-streaming-english";
+    const DEFAULT_VAD_EAGERNESS = "low";
+    const DEFAULT_TTS_MODEL = "inworld-tts-2";
 
     const $ = (id) => document.getElementById(id);
     const apiKeyEl = $("apiKey");
     const voiceEl = $("voice");
     const modelEl = $("model");
+    const modelCustomEl = $("modelCustom");
+    const modelsStatusEl = $("models-status");
+    const btnRefreshModels = $("btn-refresh-models");
+    const temperatureEl = $("temperature");
+    const maxOutputTokensEl = $("maxOutputTokens");
+    const ttsModelEl = $("ttsModel");
+    const ttsSpeedEl = $("ttsSpeed");
+    const ttsDeliveryModeEl = $("ttsDeliveryMode");
     const instructionsEl = $("instructions");
+    const asrModelEl = $("asrModel");
+    const vadEagernessEl = $("vadEagerness");
+    const vadThresholdEl = $("vadThreshold");
     const statusEl = $("status");
     const checkResultEl = $("check-result");
     const userTextEl = $("user-text");
     const agentTextEl = $("agent-text");
     const btnCheck = $("btn-check");
     const btnConnect = $("btn-connect");
+    const btnPause = $("btn-pause");
+    const btnResume = $("btn-resume");
     const btnDisconnect = $("btn-disconnect");
 
     let ws = null;
@@ -211,9 +320,77 @@
     let source = null;
     let micNode = null; // AudioWorkletNode, or ScriptProcessor fallback
     let active = false;
+    let chatPaused = false;
     let nextPlayTime = 0;
     const activeSources = new Set();
     let responseText = "";
+    let inworldModels = [];
+    let pendingModelValue = DEFAULT_MODEL;
+
+    function resolveModelValue() {
+      if (modelEl.value === "__custom__") return modelCustomEl.value.trim() || DEFAULT_MODEL;
+      return modelEl.value.trim() || DEFAULT_MODEL;
+    }
+
+    function populateModelSelect(models) {
+      const options = models.map((entry) => {
+        const label = entry.modelCreator ? `${entry.id} — ${entry.modelCreator}` : entry.id;
+        return `<option value="${entry.id}">${label}</option>`;
+      });
+      options.push('<option value="__custom__">Custom…</option>');
+      modelEl.innerHTML = options.join("");
+      applyModelValue(pendingModelValue, models);
+    }
+
+    function applyModelValue(value, models = inworldModels) {
+      const trimmed = String(value || "").trim() || DEFAULT_MODEL;
+      pendingModelValue = trimmed;
+      const knownIds = new Set(models.map((entry) => entry.id));
+      if (knownIds.has(trimmed)) {
+        modelEl.value = trimmed;
+        modelCustomEl.style.display = "none";
+        modelCustomEl.value = "";
+        return;
+      }
+      modelEl.value = "__custom__";
+      modelCustomEl.style.display = "block";
+      modelCustomEl.value = trimmed;
+    }
+
+    async function loadInworldModels({ forceRefresh = false } = {}) {
+      modelsStatusEl.textContent = "Loading models…";
+      btnRefreshModels.disabled = true;
+      try {
+        const url = forceRefresh ? "/api/inworld/models?refresh=1" : "/api/inworld/models";
+        const res = await fetch(url);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Could not load models.");
+        inworldModels = Array.isArray(data.models) ? data.models : [];
+        populateModelSelect(inworldModels);
+        modelsStatusEl.textContent = `${inworldModels.length} models loaded.`;
+      } catch (e) {
+        inworldModels = [];
+        populateModelSelect([]);
+        modelsStatusEl.textContent = e.message || "Could not load models.";
+      } finally {
+        btnRefreshModels.disabled = active;
+      }
+    }
+
+    modelEl.addEventListener("change", () => {
+      if (modelEl.value === "__custom__") {
+        modelCustomEl.style.display = "block";
+        modelCustomEl.focus();
+      } else {
+        modelCustomEl.style.display = "none";
+        modelCustomEl.value = "";
+        pendingModelValue = modelEl.value;
+      }
+    });
+    modelCustomEl.addEventListener("input", () => {
+      pendingModelValue = modelCustomEl.value.trim() || DEFAULT_MODEL;
+    });
+    btnRefreshModels.addEventListener("click", () => loadInworldModels({ forceRefresh: true }));
 
     // Mic capture runs in an AudioWorklet (audio thread) so low-end devices
     // don't drop microphone chunks when the main thread is busy. It
@@ -268,11 +445,47 @@
     }
 
     function getFormCfg() {
+      const vadRaw = vadThresholdEl.value.trim();
+      const vadParsed = vadRaw === "" ? undefined : Number(vadRaw);
+      const tempRaw = temperatureEl.value.trim();
+      const tempParsed = tempRaw === "" ? undefined : Number(tempRaw);
+      const maxRaw = maxOutputTokensEl.value.trim();
+      const maxParsed = maxRaw === ""
+        ? undefined
+        : (maxRaw.toLowerCase() === "inf" ? "inf" : Number(maxRaw));
+      const speedRaw = ttsSpeedEl.value.trim();
+      const speedParsed = speedRaw === "" ? undefined : Number(speedRaw);
       return {
         apiKey: apiKeyEl.value.trim(),
         voice: voiceEl.value.trim() || DEFAULT_VOICE,
-        model: modelEl.value.trim() || DEFAULT_MODEL,
+        model: resolveModelValue(),
         instructions: instructionsEl.value.trim() || DEFAULT_PROMPT,
+        temperature: Number.isFinite(tempParsed) ? tempParsed : undefined,
+        maxOutputTokens: maxParsed === "inf" || Number.isFinite(maxParsed) ? maxParsed : undefined,
+        ttsModel: ttsModelEl.value.trim() || DEFAULT_TTS_MODEL,
+        ttsSpeed: Number.isFinite(speedParsed) ? speedParsed : undefined,
+        ttsDeliveryMode: ttsDeliveryModeEl.value.trim() || undefined,
+        asrModel: asrModelEl.value.trim() || DEFAULT_ASR_MODEL,
+        vadEagerness: vadEagernessEl.value.trim() || DEFAULT_VAD_EAGERNESS,
+        vadThreshold: Number.isFinite(vadParsed) ? vadParsed : undefined,
+      };
+    }
+
+    function authPayload(cfg, apiKey) {
+      return {
+        type: "client.auth",
+        apiKey,
+        instructions: cfg.instructions,
+        voice: cfg.voice,
+        model: cfg.model,
+        temperature: cfg.temperature,
+        maxOutputTokens: cfg.maxOutputTokens,
+        ttsModel: cfg.ttsModel,
+        ttsSpeed: cfg.ttsSpeed,
+        ttsDeliveryMode: cfg.ttsDeliveryMode,
+        asrModel: cfg.asrModel,
+        vadEagerness: cfg.vadEagerness,
+        vadThreshold: cfg.vadThreshold,
       };
     }
 
@@ -294,10 +507,43 @@
       btnConnect.disabled = on;
       btnCheck.disabled = on;
       btnDisconnect.disabled = !on;
+      btnPause.disabled = !on || chatPaused;
+      btnResume.disabled = !on || !chatPaused;
       apiKeyEl.disabled = on;
       voiceEl.disabled = on;
       modelEl.disabled = on;
+      modelCustomEl.disabled = on;
+      btnRefreshModels.disabled = on;
+      temperatureEl.disabled = on;
+      maxOutputTokensEl.disabled = on;
+      ttsModelEl.disabled = on;
+      ttsSpeedEl.disabled = on;
+      ttsDeliveryModeEl.disabled = on;
       instructionsEl.disabled = on;
+      asrModelEl.disabled = on;
+      vadEagernessEl.disabled = on;
+      vadThresholdEl.disabled = on;
+    }
+
+    function pauseChat() {
+      if (!active || chatPaused) return;
+      chatPaused = true;
+      stopAudio();
+      try { stream?.getTracks().forEach((t) => { t.enabled = false; }); } catch {}
+      if (ctx?.state === "running") ctx.suspend().catch(() => {});
+      btnPause.disabled = true;
+      btnResume.disabled = false;
+      setStatus("Paused — mic and playback muted", "");
+    }
+
+    function resumeChat() {
+      if (!active || !chatPaused) return;
+      chatPaused = false;
+      try { stream?.getTracks().forEach((t) => { t.enabled = true; }); } catch {}
+      if (ctx?.state === "suspended") ctx.resume().catch(() => {});
+      btnPause.disabled = false;
+      btnResume.disabled = true;
+      setStatus("Live — speak anytime", "live");
     }
 
     function b64(buf) {
@@ -329,8 +575,19 @@
         const cfg = await res.json();
         if (cfg.apiKey) apiKeyEl.placeholder = "Loaded from server (••••••••)";
         if (cfg.voice) voiceEl.value = cfg.voice;
-        if (cfg.model) modelEl.value = cfg.model;
+        if (cfg.model) pendingModelValue = cfg.model;
+        applyModelValue(pendingModelValue);
         if (cfg.instructions) instructionsEl.value = cfg.instructions;
+        if (cfg.temperature != null && cfg.temperature !== "") temperatureEl.value = cfg.temperature;
+        if (cfg.maxOutputTokens != null && cfg.maxOutputTokens !== "") {
+          maxOutputTokensEl.value = cfg.maxOutputTokens;
+        }
+        if (cfg.ttsModel) ttsModelEl.value = cfg.ttsModel;
+        if (cfg.ttsSpeed != null && cfg.ttsSpeed !== "") ttsSpeedEl.value = cfg.ttsSpeed;
+        if (cfg.ttsDeliveryMode) ttsDeliveryModeEl.value = cfg.ttsDeliveryMode;
+        if (cfg.asrModel) asrModelEl.value = cfg.asrModel;
+        if (cfg.vadEagerness) vadEagernessEl.value = cfg.vadEagerness;
+        if (cfg.vadThreshold != null && cfg.vadThreshold !== "") vadThresholdEl.value = cfg.vadThreshold;
         return cfg;
       } catch {
         return null;
@@ -349,7 +606,15 @@
 
       lines.push(`API key: ${apiKey ? "present" : "MISSING"}`);
       lines.push(`Voice: ${cfg.voice}`);
-      lines.push(`Model: ${cfg.model}`);
+      lines.push(`LLM: ${cfg.model}`);
+      lines.push(`Temperature: ${cfg.temperature ?? "(default)"}`);
+      lines.push(`Max tokens: ${cfg.maxOutputTokens ?? "(default)"}`);
+      lines.push(`TTS: ${cfg.ttsModel}`);
+      lines.push(`TTS speed: ${cfg.ttsSpeed ?? "(default)"}`);
+      lines.push(`TTS delivery: ${cfg.ttsDeliveryMode ?? "(default)"}`);
+      lines.push(`ASR: ${cfg.asrModel}`);
+      lines.push(`VAD eagerness: ${cfg.vadEagerness}`);
+      lines.push(`VAD threshold: ${cfg.vadThreshold ?? "(eagerness preset)"}`);
       lines.push(`Instructions: ${cfg.instructions.slice(0, 60)}${cfg.instructions.length > 60 ? "…" : ""}`);
 
       if (!apiKey) {
@@ -372,13 +637,7 @@
           const timer = setTimeout(() => reject(new Error("Timeout (12s)")), 12000);
 
           socket.onopen = () => {
-            socket.send(JSON.stringify({
-              type: "client.auth",
-              apiKey,
-              instructions: cfg.instructions,
-              voice: cfg.voice,
-              model: cfg.model,
-            }));
+            socket.send(JSON.stringify(authPayload(cfg, apiKey)));
           };
 
           socket.onmessage = ({ data }) => {
@@ -426,13 +685,7 @@
       const socket = new WebSocket(`${wsProtocol}//${location.host}/ws`);
       return new Promise((resolve, reject) => {
         socket.onopen = () => {
-          socket.send(JSON.stringify({
-            type: "client.auth",
-            apiKey,
-            instructions: cfg.instructions,
-            voice: cfg.voice,
-            model: cfg.model,
-          }));
+          socket.send(JSON.stringify(authPayload(cfg, apiKey)));
           resolve(socket);
         };
         socket.onerror = () => reject(new Error("WebSocket failed"));
@@ -444,7 +697,7 @@
     }
 
     function sendMicChunk(pcmBuffer) {
-      if (ws?.readyState !== WebSocket.OPEN) return;
+      if (chatPaused || ws?.readyState !== WebSocket.OPEN) return;
       ws.send(JSON.stringify({ type: "input_audio_buffer.append", audio: b64(pcmBuffer) }));
     }
 
@@ -507,6 +760,7 @@
     // waiting for onended callbacks — those run on the main thread and cause
     // gaps on slow devices.
     function schedulePcmChunk(arrayBuffer) {
+      if (chatPaused) return;
       const pcm16 = new Int16Array(arrayBuffer);
       const len = pcm16.length;
       if (!len) return;
@@ -580,6 +834,7 @@
     }
 
     function cleanup() {
+      chatPaused = false;
       stopAudio();
       try { ws?.close(); } catch {}
       ws = null;
@@ -591,6 +846,7 @@
 
     async function connect() {
       if (active) return;
+      chatPaused = false;
 
       const serverCfg = await loadServerConfig().catch(() => null);
       const cfg = getFormCfg();
@@ -644,6 +900,8 @@
 
     btnCheck.addEventListener("click", checkConnection);
     btnConnect.addEventListener("click", connect);
+    btnPause.addEventListener("click", pauseChat);
+    btnResume.addEventListener("click", resumeChat);
     btnDisconnect.addEventListener("click", () => {
       try { ws?.close(); } catch {}
       cleanup();
@@ -742,9 +1000,15 @@
     });
 
     voiceEl.value = DEFAULT_VOICE;
-    modelEl.value = DEFAULT_MODEL;
+    pendingModelValue = DEFAULT_MODEL;
     instructionsEl.value = DEFAULT_PROMPT;
-    loadServerConfig();
+    ttsModelEl.value = DEFAULT_TTS_MODEL;
+    asrModelEl.value = DEFAULT_ASR_MODEL;
+    vadEagernessEl.value = DEFAULT_VAD_EAGERNESS;
+    (async () => {
+      await loadInworldModels();
+      await loadServerConfig();
+    })();
   </script>
 </body>
 </html>
