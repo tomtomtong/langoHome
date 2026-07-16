@@ -3710,7 +3710,7 @@
             e('div', { className: 'daily-rewards-track', id: 'daily-rewards-track', 'aria-hidden': 'true' },
               e('div', { className: 'daily-rewards-track-fill', id: 'daily-rewards-track-fill' })
             ),
-              e('div', { className: 'daily-rewards-actions' },
+              e('div', { className: 'daily-rewards-actions', hidden: true },
                 e('button', { type: 'button', id: 'daily-rewards-claim-btn' }, 'Get')
               )
             ),
@@ -4299,6 +4299,20 @@
       dailyRewardScrollbarDrag = null;
     }
 
+    function lockedDailyRewardStatus() {
+      return {
+        currentStreak: 0,
+        checkedInToday: false,
+        totalStars: 0,
+        canClaimMilestone: false,
+        nextMilestone: null,
+        claimedMilestones: [],
+        milestones: REWARD_SLOT_DEFAULTS.map((item) => ({ ...item, status: "locked" })),
+        collection: [],
+        unlockedLocations: [],
+      };
+    }
+
     function previewRewardStatus() {
       const milestones = [
         { day: 1, id: "word-whack", label: "New Game", title: "New Game In Garden", name: "Word-Whack Blitz", icon: "mole", cta: "Get", destination: "modal", stars: 5 },
@@ -4326,7 +4340,7 @@
 
     function renderDailyRewards(status) {
       dailyRewardsStatus = status;
-      if (!status) return;
+      if (!status || !dailyRewardsSlots) return;
 
       dailyRewardsStreakText.textContent = `Streak: ${status.currentStreak} day${status.currentStreak === 1 ? "" : "s"}`;
       dailyRewardsStarsText.textContent = `⭐ ${status.totalStars} stars`;
@@ -4574,15 +4588,46 @@
       dailyRewardCongrats.closest(".daily-rewards-scene").scrollTop = 0;
     }
 
+    async function ensureDailyRewardsStudent() {
+      if (dailyRewardsStudent || PREVIEW_MODE) return dailyRewardsStudent;
+      try {
+        const meRes = await fetch("/api/me");
+        if (!meRes.ok) return false;
+        const me = await meRes.json();
+        if (me.role !== "student") return false;
+        dailyRewardsStudent = true;
+        document.body.classList.add("rewards-enabled");
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
     async function fetchDailyRewardsStatus() {
-      if (!dailyRewardsStudent) return null;
+      // Always paint milestone cards before/while opening the overlay.
+      // Previously we returned early when the student flag wasn't ready yet,
+      // which left the React shell's empty trough visible (no 1/3/5/7 cards).
+      if (PREVIEW_MODE) {
+        const status = previewRewardStatus();
+        renderDailyRewards(status);
+        return status;
+      }
+      await ensureDailyRewardsStudent();
+      if (!dailyRewardsStudent) {
+        renderDailyRewards(lockedDailyRewardStatus());
+        return null;
+      }
       try {
         const res = await fetch("/api/check-in");
-        if (!res.ok) return null;
+        if (!res.ok) {
+          renderDailyRewards(lockedDailyRewardStatus());
+          return null;
+        }
         const data = await res.json();
         renderDailyRewards(data);
         return data;
       } catch {
+        renderDailyRewards(lockedDailyRewardStatus());
         return null;
       }
     }
@@ -4650,6 +4695,11 @@
         }
       } catch { /* ignore */ }
     }
+
+    // Seed the milestone row immediately so the trough is never blank if the
+    // user opens rewards before /api/me + /api/check-in finish.
+    if (PREVIEW_MODE) restorePreviewRewardState();
+    renderDailyRewards(PREVIEW_MODE ? previewRewardStatus() : lockedDailyRewardStatus());
 
     dailyRewardsBtn.addEventListener("click", (event) => {
       if (event.isTrusted) sfx?.play("powerUp");
