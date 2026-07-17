@@ -710,6 +710,17 @@
 
     #status.active { color: #81c995; }
 
+    #conn-speed {
+      color: rgba(196, 199, 197, 0.85);
+      font-size: 0.75rem;
+      font-variant-numeric: tabular-nums;
+      text-align: center;
+      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+      min-height: 1.1em;
+    }
+
+    #conn-speed:empty { display: none; }
+
     #avatar-status {
       margin: 0;
       font-size: 0.75rem;
@@ -3639,6 +3650,7 @@
         </div>
       </div>
       <div class="overlay-bottom">
+        <div id="conn-speed" aria-live="polite"></div>
         <div id="status">Connecting…</div>
         <div id="err"></div>
         <button id="btn-stop" type="button">End Conversation</button>
@@ -4363,6 +4375,7 @@
     const btnStart = document.getElementById("btn-start");
     const btnStop = document.getElementById("btn-stop");
     const statusEl = document.getElementById("status");
+    const connSpeedEl = document.getElementById("conn-speed");
     const statusIdleEl = document.getElementById("status-idle");
     const errEl = document.getElementById("err");
     const errIdleEl = document.getElementById("err-idle");
@@ -7075,6 +7088,7 @@
     function cleanupSession({ keepSessionView = false } = {}) {
       uiLog("cleanup", "begin", "hello", { keepSessionView });
       abortConnectPrep();
+      connSpeed.stop();
       clearConversationCaptions();
       directSessionEntry = false;
       active = false;
@@ -7568,6 +7582,93 @@
       releasePrepMic(prep);
     }
 
+    const CONN_SPEED_WINDOW_MS = 2000;
+    const wsDataEncoder = new TextEncoder();
+    const connSpeed = {
+      upSamples: [],
+      downSamples: [],
+      pollId: 0,
+      wsDataByteLength(data) {
+        if (typeof data === "string") return wsDataEncoder.encode(data).length;
+        if (data instanceof ArrayBuffer) return data.byteLength;
+        if (ArrayBuffer.isView(data)) return data.byteLength;
+        if (data instanceof Blob) return data.size;
+        return 0;
+      },
+      noteUp(bytes) {
+        if (!bytes || bytes < 0) return;
+        const now = performance.now();
+        this.upSamples.push({ t: now, bytes });
+        this.trimSamples(this.upSamples, now);
+      },
+      noteDown(bytes) {
+        if (!bytes || bytes < 0) return;
+        const now = performance.now();
+        this.downSamples.push({ t: now, bytes });
+        this.trimSamples(this.downSamples, now);
+      },
+      trimSamples(samples, now) {
+        const cutoff = now - CONN_SPEED_WINDOW_MS;
+        while (samples.length && samples[0].t < cutoff) samples.shift();
+      },
+      kbpsForSamples(samples) {
+        const now = performance.now();
+        const cutoff = now - CONN_SPEED_WINDOW_MS;
+        let bytes = 0;
+        let oldest = now;
+        for (const sample of samples) {
+          if (sample.t < cutoff) continue;
+          bytes += sample.bytes;
+          oldest = Math.min(oldest, sample.t);
+        }
+        if (!bytes) return 0;
+        const elapsedSec = Math.max((now - oldest) / 1000, 0.25);
+        return bytes / 1024 / elapsedSec;
+      },
+      syncUI() {
+        if (!active) {
+          if (connSpeedEl) connSpeedEl.textContent = "";
+          return;
+        }
+        const up = this.kbpsForSamples(this.upSamples);
+        const down = this.kbpsForSamples(this.downSamples);
+        const total = up + down;
+        if (!connSpeedEl) return;
+        if (total > 0) {
+          connSpeedEl.textContent = `Connection: ${Math.round(total).toLocaleString()} KB/s (↑ ${Math.round(up).toLocaleString()} · ↓ ${Math.round(down).toLocaleString()})`;
+        } else {
+          connSpeedEl.textContent = "Connection: measuring…";
+        }
+      },
+      start() {
+        this.upSamples = [];
+        this.downSamples = [];
+        this.syncUI();
+        if (this.pollId) return;
+        this.pollId = setInterval(() => this.syncUI(), 250);
+      },
+      stop() {
+        if (this.pollId) {
+          clearInterval(this.pollId);
+          this.pollId = 0;
+        }
+        this.upSamples = [];
+        this.downSamples = [];
+        if (connSpeedEl) connSpeedEl.textContent = "";
+      },
+    };
+
+    function ensureWsByteTracking(socket) {
+      if (!socket || socket._byteTracking) return socket;
+      socket._byteTracking = true;
+      const origSend = socket.send.bind(socket);
+      socket.send = (data) => {
+        connSpeed.noteUp(connSpeed.wsDataByteLength(data));
+        return origSend(data);
+      };
+      return socket;
+    }
+
     function waitForWsOpen(socket, timeoutMs = 12000) {
       if (socket.readyState === WebSocket.OPEN) return Promise.resolve();
       if (socket.readyState === WebSocket.CLOSING || socket.readyState === WebSocket.CLOSED) {
@@ -7588,7 +7689,7 @@
 
     function openSessionWebSocket(cfg, apiKey) {
       const wsProtocol = location.protocol === "https:" ? "wss:" : "ws:";
-      const socket = new WebSocket(`${wsProtocol}//${location.host}/ws`);
+      const socket = ensureWsByteTracking(new WebSocket(`${wsProtocol}//${location.host}/ws`));
       return new Promise((resolve, reject) => {
         socket.onopen = () => {
           uiLog("session", "ws open", "hello");
@@ -7710,6 +7811,7 @@
 
     function attachWsHandlers(socket) {
       socket.onmessage = ({ data }) => {
+        connSpeed.noteDown(connSpeed.wsDataByteLength(data));
         try { handleWsMessage(data); } catch (err) {
           uiLog("session", `message handler: ${err?.message || err}`, "err");
         }
@@ -7759,7 +7861,7 @@
         })();
 
         const wsProtocol = location.protocol === "https:" ? "wss:" : "ws:";
-        prep.ws = new WebSocket(`${wsProtocol}//${location.host}/ws`);
+        prep.ws = ensureWsByteTracking(new WebSocket(`${wsProtocol}//${location.host}/ws`));
 
         prep.ws.onopen = () => {
           if (prep.aborted) return;
@@ -7773,6 +7875,7 @@
         };
 
         prep.ws.onmessage = ({ data }) => {
+          connSpeed.noteDown(connSpeed.wsDataByteLength(data));
           if (prep.aborted || active) return;
           prep.messageQueue.push(data);
         };
@@ -8032,6 +8135,7 @@
       clearConversationCaptions();
       attachWsHandlers(ws);
       active = true;
+      connSpeed.start();
       setupMicPipeline();
       sfx?.play("loginSuccess", { interrupt: true });
       uiLog("session", "session live", "hello", { prep: Boolean(prep), queued: queuedMessages.length });
