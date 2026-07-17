@@ -42,6 +42,24 @@
     }
     #status.live { background: #152a45; color: #8ec5ff; }
     #status.err { background: #3a1f1f; color: #ffb4ab; }
+    #uploadStats {
+      margin: -0.35rem 0 0.75rem;
+      padding: 0.5rem 0.85rem;
+      border-radius: 8px;
+      background: #151c26;
+      border: 1px solid #2a3544;
+      font-size: 0.8rem;
+      font-variant-numeric: tabular-nums;
+      color: #9aa7b5;
+      min-height: 2.25rem;
+    }
+    #uploadStats.active { color: #c5d4e3; border-color: #3d5266; }
+    #uploadStats .speed {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #7eb8ff;
+      margin-top: 0.15rem;
+    }
     #timer {
       font-variant-numeric: tabular-nums;
       font-size: 2rem;
@@ -154,6 +172,7 @@
     </p>
 
     <div id="status">Tap “Start conversation” to begin.</div>
+    <div id="uploadStats">Upload: —</div>
     <div id="timer" class="idle">20</div>
 
     <label for="systemPrompt">System prompt</label>
@@ -168,6 +187,7 @@
     const SAMPLE_RATE = 16000;
 
     const statusEl = document.getElementById("status");
+    const uploadStatsEl = document.getElementById("uploadStats");
     const timerEl = document.getElementById("timer");
     const logEl = document.getElementById("log");
     const systemPromptEl = document.getElementById("systemPrompt");
@@ -183,6 +203,36 @@
     function setStatus(text, { live = false, err = false } = {}) {
       statusEl.textContent = text;
       statusEl.className = err ? "err" : live ? "live" : "";
+    }
+
+    function formatKiB(bytes) {
+      return `${(bytes / 1024).toFixed(1)} KB`;
+    }
+
+    function formatUploadSpeed(bytesPerSec) {
+      const kbPerSec = bytesPerSec / 1024;
+      if (kbPerSec >= 1024) {
+        return `${(kbPerSec / 1024).toFixed(2)} MB/s`;
+      }
+      return `${kbPerSec.toFixed(1)} KB/s`;
+    }
+
+    function setUploadStats(html, { active = false } = {}) {
+      uploadStatsEl.innerHTML = html;
+      uploadStatsEl.classList.toggle("active", active);
+    }
+
+    function clearUploadStats() {
+      setUploadStats("Upload: —", { active: false });
+    }
+
+    function renderUploadProgress({ loaded, total, bytesPerSec, phase }) {
+      const pct = total > 0 ? Math.min(100, Math.round((loaded / total) * 100)) : 0;
+      const speedLine = formatUploadSpeed(bytesPerSec);
+      setUploadStats(
+        `${phase} ${formatKiB(loaded)} / ${formatKiB(total)} (${pct}%)<div class="speed">${speedLine}</div>`,
+        { active: true },
+      );
     }
 
     function appendTurn(role, text) {
@@ -323,14 +373,103 @@
       return data;
     }
 
-    async function transcribe(base64Wav) {
-      const data = await postJson("/api/inworld/stt", {
-        audioContent: base64Wav,
-        audioEncoding: "LINEAR16",
-        sampleRateHertz: SAMPLE_RATE,
-        numberOfChannels: 1,
-        language: "en",
+    function postJsonWithUploadProgress(url, body, onProgress) {
+      return new Promise((resolve, reject) => {
+        const json = JSON.stringify(body);
+        const totalBytes = new Blob([json]).size;
+        const xhr = new XMLHttpRequest();
+        const startTime = performance.now();
+        let lastProgressAt = startTime;
+        let lastLoaded = 0;
+
+        xhr.open("POST", url);
+        xhr.setRequestHeader("Content-Type", "application/json");
+
+        xhr.upload.onprogress = (event) => {
+          const now = performance.now();
+          const loaded = event.loaded;
+          const total = event.lengthComputable ? event.total : totalBytes;
+          const elapsed = (now - startTime) / 1000;
+          const avgSpeed = elapsed > 0 ? loaded / elapsed : 0;
+          const dt = (now - lastProgressAt) / 1000;
+          const instantSpeed = dt > 0 ? (loaded - lastLoaded) / dt : avgSpeed;
+          lastProgressAt = now;
+          lastLoaded = loaded;
+          onProgress?.({
+            loaded,
+            total,
+            bytesPerSec: instantSpeed > 0 ? instantSpeed : avgSpeed,
+            avgBytesPerSec: avgSpeed,
+          });
+        };
+
+        xhr.onload = () => {
+          const contentType = xhr.getResponseHeader("content-type") || "";
+          if (!contentType.includes("application/json")) {
+            reject(new Error("Server returned non-JSON. Is npm start running?"));
+            return;
+          }
+          let data;
+          try {
+            data = JSON.parse(xhr.responseText);
+          } catch {
+            reject(new Error("Invalid JSON from server."));
+            return;
+          }
+          if (xhr.status < 200 || xhr.status >= 300) {
+            reject(new Error(data.error || `Request failed (${xhr.status})`));
+            return;
+          }
+          const elapsed = (performance.now() - startTime) / 1000;
+          onProgress?.({
+            loaded: totalBytes,
+            total: totalBytes,
+            bytesPerSec: elapsed > 0 ? totalBytes / elapsed : 0,
+            avgBytesPerSec: elapsed > 0 ? totalBytes / elapsed : 0,
+            done: true,
+          });
+          resolve(data);
+        };
+
+        xhr.onerror = () => reject(new Error("Network error during upload."));
+        xhr.onabort = () => reject(new Error("Upload aborted."));
+        xhr.send(json);
       });
+    }
+
+    async function transcribe(base64Wav) {
+      const audioBytes = Math.floor((base64Wav.length * 3) / 4);
+      setUploadStats(
+        `Audio payload ~${formatKiB(audioBytes)} (WAV, base64 in JSON will be larger)`,
+        { active: true },
+      );
+
+      const data = await postJsonWithUploadProgress(
+        "/api/inworld/stt",
+        {
+          audioContent: base64Wav,
+          audioEncoding: "LINEAR16",
+          sampleRateHertz: SAMPLE_RATE,
+          numberOfChannels: 1,
+          language: "en",
+        },
+        (progress) => {
+          if (progress.done) {
+            setUploadStats(
+              `Upload complete — avg ${formatUploadSpeed(progress.avgBytesPerSec)} `
+              + `(${formatKiB(progress.total)} sent)`,
+              { active: false },
+            );
+            return;
+          }
+          renderUploadProgress({
+            loaded: progress.loaded,
+            total: progress.total,
+            bytesPerSec: progress.bytesPerSec,
+            phase: "Uploading for transcribe:",
+          });
+        },
+      );
       return data.transcript || "";
     }
 
