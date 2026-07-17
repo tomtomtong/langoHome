@@ -120,6 +120,50 @@
       border-color: #5f6368;
       color: #e8eaed;
     }
+    button.danger {
+      background: transparent;
+      border-color: #8b3a3a;
+      color: #f28b82;
+    }
+    button.danger:hover:not(:disabled) {
+      background: #3a1e1e;
+      border-color: #c5221f;
+    }
+    .login-meta-section {
+      margin: 0 0 1.25rem;
+      padding: 1rem 1.1rem;
+      border: 1px solid #2a2f3a;
+      border-radius: 10px;
+      background: #151a22;
+    }
+    .login-meta-section h2 {
+      margin: 0 0 0.35rem;
+      font-size: 0.95rem;
+      color: #e8eaed;
+    }
+    .login-meta-table-wrap { overflow-x: auto; margin-top: 0.75rem; }
+    .login-meta-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8125rem;
+    }
+    .login-meta-table th,
+    .login-meta-table td {
+      padding: 0.5rem 0.65rem;
+      border-bottom: 1px solid #2a2f3a;
+      text-align: left;
+    }
+    .login-meta-table th { color: #9aa0a6; font-weight: 500; }
+    .login-meta-table tr.active td { background: #1f2a40; }
+    .device-pill {
+      display: inline-block;
+      padding: 0.15rem 0.45rem;
+      border-radius: 999px;
+      background: #243049;
+      color: #c5d5ff;
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
     .status {
       margin-top: 1rem;
       padding: 0.625rem 0.75rem;
@@ -177,7 +221,29 @@
           <select id="account-select"></select>
         </div>
         <button type="button" class="secondary" id="load-btn">Reload</button>
+        <button type="button" class="danger" id="clear-profile-btn">Clear profile fields</button>
       </div>
+
+      <section class="login-meta-section" id="login-meta-section">
+        <h2>Sign-in devices</h2>
+        <p class="field-hint" style="margin:0">Recorded when a learner signs in at <code>/login</code> (iPad, Android, Mac, Windows PC, etc.).</p>
+        <div class="login-meta-table-wrap">
+          <table class="login-meta-table">
+            <thead>
+              <tr>
+                <th>Account</th>
+                <th>Device</th>
+                <th>OS</th>
+                <th>Browser</th>
+                <th>Last sign-in</th>
+              </tr>
+            </thead>
+            <tbody id="login-meta-body">
+              <tr><td colspan="5">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       <form id="profile-form">
         <section class="section">
@@ -197,7 +263,7 @@
             </div>
             <div class="field">
               <label for="grade">Grade</label>
-              <input id="grade" name="grade" type="text" placeholder="P2" autocomplete="off">
+              <input id="grade" name="grade" type="text" placeholder="P1 / P2 / P3" autocomplete="off">
             </div>
             <div class="field">
               <label for="mainLearningLanguage">Main Learning Language</label>
@@ -469,8 +535,11 @@
     const profileForm = document.getElementById("profile-form");
     const statusEl = document.getElementById("status");
     const loadBtn = document.getElementById("load-btn");
+    const clearProfileBtn = document.getElementById("clear-profile-btn");
+    const loginMetaBody = document.getElementById("login-meta-body");
 
     let cachedProfiles = {};
+    let cachedLoginMeta = {};
     let dirty = false;
     let lastAccount = "";
     let saveTimer = null;
@@ -484,6 +553,44 @@
     function clearStatus() {
       statusEl.textContent = "";
       statusEl.className = "status";
+    }
+
+    function formatLoginTime(ms) {
+      if (!ms) return "—";
+      return new Date(ms).toLocaleString();
+    }
+
+    function renderLoginMetaTable(users) {
+      if (!users?.length) {
+        loginMetaBody.innerHTML = '<tr><td colspan="5">No accounts.</td></tr>';
+        return;
+      }
+      const selected = selectedAccount();
+      loginMetaBody.innerHTML = users.map((username) => {
+        const meta = cachedLoginMeta[username] || {};
+        const device = meta.deviceLabel || "—";
+        const os = meta.os || "—";
+        const browser = meta.browser || "—";
+        const when = formatLoginTime(meta.lastLoginAt);
+        const active = username === selected ? " active" : "";
+        const deviceCell = device === "—"
+          ? "—"
+          : `<span class="device-pill">${device}</span>`;
+        return `<tr class="login-meta-row${active}" data-user="${username}">
+          <td>${username}</td>
+          <td>${deviceCell}</td>
+          <td>${os}</td>
+          <td>${browser}</td>
+          <td>${when}</td>
+        </tr>`;
+      }).join("");
+
+      loginMetaBody.querySelectorAll(".login-meta-row").forEach((row) => {
+        row.addEventListener("click", () => {
+          accountSelect.value = row.dataset.user;
+          accountSelect.dispatchEvent(new Event("change"));
+        });
+      });
     }
 
     function readFormProfile() {
@@ -514,6 +621,7 @@
       if (!res.ok) throw new Error("Could not load profiles.");
       const data = await res.json();
       cachedProfiles = data.profiles || {};
+      cachedLoginMeta = data.loginMeta || {};
       const previous = accountSelect.value;
       accountSelect.innerHTML = "";
       for (const username of data.users || []) {
@@ -531,7 +639,51 @@
       }
       lastAccount = accountSelect.value;
       fillForm(cachedProfiles[selectedAccount()] || {});
+      renderLoginMetaTable(data.users || []);
       profileReady = true;
+    }
+
+    function emptyProfile() {
+      const profile = {};
+      for (const key of PROFILE_FIELDS) profile[key] = "";
+      return profile;
+    }
+
+    async function clearProfileFields() {
+      const username = selectedAccount();
+      if (!username) return;
+      if (!confirm(`Clear every profile field for “${username}”? Saved data for this account will be removed.`)) {
+        return;
+      }
+
+      clearTimeout(saveTimer);
+      saveTimer = null;
+      dirty = false;
+      const profile = emptyProfile();
+      fillForm(profile);
+
+      try {
+        const res = await fetch(`/api/user-profiles/${encodeURIComponent(username)}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ profile }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Clear failed.");
+        }
+        const data = await res.json();
+        cachedProfiles[username] = data.profile;
+        fillForm(data.profile);
+        showStatus(`Cleared all profile fields for ${username}.`, true);
+      } catch (e) {
+        showStatus(e.message || "Could not clear profile fields.", false);
+        try {
+          await loadProfiles();
+        } catch {
+          /* reload error already surfaced */
+        }
+      }
     }
 
     async function saveProfile() {
@@ -588,6 +740,7 @@
       }
       lastAccount = accountSelect.value;
       fillForm(cachedProfiles[selectedAccount()] || {});
+      renderLoginMetaTable(Array.from(accountSelect.options).map((o) => o.value));
       clearStatus();
     });
 
@@ -601,6 +754,10 @@
       } catch (e) {
         showStatus(e.message || "Reload failed.", false);
       }
+    });
+
+    clearProfileBtn.addEventListener("click", () => {
+      clearProfileFields().catch(() => {});
     });
 
     loadProfiles().catch((e) => {

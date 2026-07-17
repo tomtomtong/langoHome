@@ -240,6 +240,13 @@ const listVocaStmt = db.prepare(`
   FROM voca_items
   ORDER BY sort_order, id
 `);
+const listVocaByLevelStmt = db.prepare(`
+  SELECT id, import_no, type, level, language_code, category, sub_category,
+         content, keywords, image_url, sort_order, updated_at
+  FROM voca_items
+  WHERE level = ?
+  ORDER BY sort_order, id
+`);
 const getVocaStmt = db.prepare(`
   SELECT id, import_no, type, level, language_code, category, sub_category,
          content, keywords, image_url, sort_order, updated_at
@@ -345,6 +352,34 @@ async function attachVocaImages(items) {
   return { items: enriched, imageCount, missingImageCount: items.length - imageCount };
 }
 
+function parseStudentGrade(value) {
+  const raw = String(value || "").trim().toUpperCase();
+  if (!raw) return null;
+  const match = raw.match(/\bP\s*([123])\b/) || raw.match(/^([123])$/);
+  return match ? `P${match[1]}` : null;
+}
+
+function gradeToVocaLevel(grade) {
+  const normalized = parseStudentGrade(grade);
+  if (!normalized) return null;
+  return Number(normalized.slice(1));
+}
+
+function vocaLevelToGrade(level) {
+  const n = Number(level);
+  if (!Number.isFinite(n) || n < 1 || n > 3) return null;
+  return `P${Math.floor(n)}`;
+}
+
+function parseVocaLevelInput(value) {
+  if (value == null || value === "") return null;
+  const grade = parseStudentGrade(value);
+  if (grade) return gradeToVocaLevel(grade);
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 1) return null;
+  return Math.floor(n);
+}
+
 function normalizeVocaInput(item, rowLabel = "Row") {
   const importNo = String(
     item?.importNo ?? item?.import_no ?? item?.["Import No."] ?? ""
@@ -362,11 +397,10 @@ function normalizeVocaInput(item, rowLabel = "Row") {
   ).trim();
   const keywords = String(item?.keywords ?? item?.Keywords ?? "").trim();
 
-  let level = Number(item?.level ?? item?.Level ?? 1);
-  if (!Number.isFinite(level) || level < 1) {
-    throw new Error(`${rowLabel}: Level must be a positive number.`);
+  const level = parseVocaLevelInput(item?.level ?? item?.Level ?? 1);
+  if (level == null) {
+    throw new Error(`${rowLabel}: Level must be P1, P2, P3, or a positive number.`);
   }
-  level = Math.floor(level);
 
   if (!importNo) {
     throw new Error(`${rowLabel}: Import No. is required.`);
@@ -928,9 +962,37 @@ app.post("/api/findgame/levels/reset", (_req, res) => {
   res.json({ levels: rows.map(rowToLevel) });
 });
 
-app.get("/api/voca", (_req, res) => {
-  const rows = listVocaStmt.all();
-  res.json({ items: rows.map(rowToVocaItem) });
+app.get("/api/voca", (req, res) => {
+  const requestedGrade = parseStudentGrade(req.query?.grade);
+  const requestedLevel =
+    parseVocaLevelInput(req.query?.level) ??
+    (requestedGrade ? gradeToVocaLevel(requestedGrade) : null);
+  const wantAll = String(req.query?.all || "") === "1";
+
+  let rows = listVocaStmt.all();
+  let appliedGrade = null;
+  let appliedLevel = null;
+  let gradeFallback = false;
+
+  if (!wantAll && requestedLevel != null) {
+    const filtered = listVocaByLevelStmt.all(requestedLevel);
+    if (filtered.length) {
+      rows = filtered;
+      appliedLevel = requestedLevel;
+      appliedGrade = vocaLevelToGrade(requestedLevel) || requestedGrade;
+    } else {
+      gradeFallback = true;
+      appliedGrade = requestedGrade || vocaLevelToGrade(requestedLevel);
+      appliedLevel = requestedLevel;
+    }
+  }
+
+  res.json({
+    items: rows.map(rowToVocaItem),
+    grade: appliedGrade,
+    level: appliedLevel,
+    gradeFallback,
+  });
 });
 
 app.get("/api/voca/image-search", async (req, res) => {
@@ -1469,6 +1531,8 @@ function logGameRoutes(basePath = "") {
 module.exports = app;
 module.exports.DB_PATH = DB_PATH;
 module.exports.DATA_DIR = DATA_DIR;
+module.exports.parseStudentGrade = parseStudentGrade;
+module.exports.gradeToVocaLevel = gradeToVocaLevel;
 
 if (require.main === module) {
   app.listen(PORT, "0.0.0.0", () => {

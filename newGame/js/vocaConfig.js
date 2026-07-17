@@ -16,13 +16,19 @@ const VocaConfig = (() => {
     if (loadPromise) return loadPromise;
     loadPromise = (async () => {
       try {
-        const res = await fetch("/api/voca");
+        const res = await fetch("/api/voca", { credentials: "same-origin" });
         if (!res.ok) throw new Error("fetch failed");
         const data = await res.json();
         items = Array.isArray(data.items)
           ? data.items.map(normalizeItem).filter((item) => item.word)
           : [];
         loaded = true;
+        if (data.grade) {
+          console.info(
+            `[Voca] Loaded ${items.length} word(s) for grade ${data.grade}` +
+              (data.gradeFallback ? " (no matching words; using full list)" : "")
+          );
+        }
       } catch {
         items = [];
         loaded = false;

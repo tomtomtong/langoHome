@@ -23,7 +23,8 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           username: document.getElementById("username").value.trim(),
-          password: document.getElementById("password").value
+          password: document.getElementById("password").value,
+          userAgent: navigator.userAgent
         })
       });
       if (!res.ok) {

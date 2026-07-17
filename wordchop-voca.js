@@ -154,6 +154,12 @@
       throw new Error("Vocabulary API returned non-JSON (login required?)");
     }
     const data = await res.json();
+    if (data.grade) {
+      console.info(
+        `[Word Chop] Vocabulary filtered for grade ${data.grade}` +
+          (data.gradeFallback ? " (no matching words; using full list)" : "")
+      );
+    }
     return Array.isArray(data.items) ? data.items : [];
   }
 

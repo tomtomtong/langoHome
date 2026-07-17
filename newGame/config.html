@@ -111,7 +111,7 @@
       <div class="voca-header">
         <div>
           <h2 class="voca-heading">Vocabulary library</h2>
-          <p class="voca-desc">Import vocabulary from CSV with columns: <code>Import No., Type, Level, Language Code, Category, Sub Category, Content, Keywords</code>. Images are looked up from the Lango material image API during import. Import replaces the entire list. Used by Word-Whack, Card Game, and Word Chop. For Word Chop, put syllable splits in Keywords (e.g. <code>in/ter/est/ing</code>); otherwise syllables are guessed automatically.</p>
+          <p class="voca-desc">Import vocabulary from CSV with columns: <code>Import No., Type, Level, Language Code, Category, Sub Category, Content, Keywords</code>. Set <code>Level</code> to <code>P1</code>, <code>P2</code>, or <code>P3</code> (or 1/2/3). Games fetch words matching the student’s Grade profile field. Images are looked up from the Lango material image API during import. Import replaces the entire list. Used by Word-Whack, Card Game, and Word Chop. For Word Chop, put syllable splits in Keywords (e.g. <code>in/ter/est/ing</code>); otherwise syllables are guessed automatically.</p>
         </div>
         <div class="voca-actions">
           <button type="button" class="btn-voca-import" id="importVocaBtn">Import CSV</button>
@@ -149,7 +149,10 @@
           <option value="">All types</option>
         </select>
         <select class="voca-filter" id="vocaFilterLevel">
-          <option value="">All levels</option>
+          <option value="">All grades</option>
+          <option value="1">P1</option>
+          <option value="2">P2</option>
+          <option value="3">P3</option>
         </select>
         <select class="voca-filter" id="vocaFilterLanguage">
           <option value="">All languages</option>
@@ -166,7 +169,7 @@
             <tr>
               <th>Import No.</th>
               <th>Type</th>
-              <th>Level</th>
+              <th>Grade</th>
               <th>Language</th>
               <th>Category</th>
               <th>Sub Category</th>
@@ -193,7 +196,7 @@
               <tr>
                 <th>Import No.</th>
                 <th>Type</th>
-                <th>Level</th>
+                <th>Grade</th>
                 <th>Language</th>
                 <th>Category</th>
                 <th>Sub Category</th>
@@ -1285,9 +1288,10 @@
           return index == null ? "" : String(record[index] ?? "").trim();
         };
         const levelRaw = getValue("level");
-        const level = levelRaw ? Number(levelRaw) : 1;
+        const gradeMatch = String(levelRaw || "").trim().toUpperCase().match(/\bP\s*([123])\b/);
+        let level = gradeMatch ? Number(gradeMatch[1]) : levelRaw ? Number(levelRaw) : 1;
         if (!Number.isFinite(level) || level < 1) {
-          throw new Error(`Row ${rowNumber}: Level must be a positive number.`);
+          throw new Error(`Row ${rowNumber}: Level must be P1, P2, P3, or a positive number.`);
         }
 
         const item = {
@@ -1366,7 +1370,19 @@
         };
 
         fillSelect(vocaFilterType, uniqueSorted(items.map((item) => item.type)), "All types");
-        fillSelect(vocaFilterLevel, uniqueSorted(items.map((item) => item.level)), "All levels");
+        const levelValues = uniqueSorted(items.map((item) => item.level));
+        const currentLevel = vocaFilterLevel.value;
+        vocaFilterLevel.innerHTML = '<option value="">All grades</option>';
+        levelValues.forEach((value) => {
+          const option = document.createElement("option");
+          option.value = String(value);
+          const n = Number(value);
+          option.textContent = n === 1 ? "P1" : n === 2 ? "P2" : n === 3 ? "P3" : `Level ${value}`;
+          vocaFilterLevel.appendChild(option);
+        });
+        if ([...vocaFilterLevel.options].some((option) => option.value === currentLevel)) {
+          vocaFilterLevel.value = currentLevel;
+        }
         fillSelect(
           vocaFilterLanguage,
           uniqueSorted(items.map((item) => item.languageCode)),
@@ -1416,12 +1432,20 @@
         return `<img class="voca-image-thumb" src="${escapeAttr(proxyUrl)}" alt="" loading="lazy" />`;
       }
 
+      function formatVocaGrade(level) {
+        const n = Number(level);
+        if (n === 1) return "P1";
+        if (n === 2) return "P2";
+        if (n === 3) return "P3";
+        return String(level ?? "");
+      }
+
       function renderVocaTableRow(item, includeDelete = true) {
         return `
           <tr>
             <td>${escapeHtml(item.importNo)}</td>
             <td>${escapeHtml(item.type)}</td>
-            <td>${escapeHtml(item.level)}</td>
+            <td>${escapeHtml(formatVocaGrade(item.level))}</td>
             <td>${escapeHtml(item.languageCode)}</td>
             <td>${escapeHtml(item.category)}</td>
             <td>${escapeHtml(item.subCategory)}</td>
@@ -1450,7 +1474,7 @@
 
       async function loadVocaList() {
         try {
-          const res = await fetch("/api/voca");
+          const res = await fetch("/api/voca?all=1");
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || "Failed to load vocabulary");
           vocaItems = data.items || [];

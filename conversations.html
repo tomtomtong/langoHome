@@ -205,6 +205,12 @@
       padding-bottom: 1rem;
       border-bottom: 1px solid #2a2f3a;
     }
+    .detail-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+    }
     .detail-meta {
       font-size: 0.8125rem;
       color: #9aa0a6;
@@ -298,6 +304,7 @@
         </select>
       </div>
       <button type="button" id="refresh-btn">Refresh</button>
+      <button type="button" class="danger" id="clear-all-btn">Clear all sessions</button>
     </div>
 
     <div class="split-grid">
@@ -359,7 +366,10 @@
       <div class="detail" id="detail-panel">
         <div class="detail-header">
           <div class="detail-meta" id="detail-meta"></div>
-          <button type="button" class="danger" id="delete-btn">Delete session</button>
+          <div class="detail-actions">
+            <button type="button" class="secondary" id="export-btn" disabled>Export session</button>
+            <button type="button" class="danger" id="delete-btn" disabled>Delete session</button>
+          </div>
         </div>
         <div class="user-audio-panel" id="user-audio-panel" hidden>
           <h3>Session audio</h3>
@@ -395,6 +405,8 @@
     const profileDetailBody = document.getElementById('profile-detail-body');
     const userAudioPanel = document.getElementById('user-audio-panel');
     const userAudioPlayer = document.getElementById('user-audio-player');
+    const exportBtn = document.getElementById('export-btn');
+    const deleteBtn = document.getElementById('delete-btn');
     const turnsEl = document.getElementById('turns');
     const pager = document.getElementById('pager');
     const profilePager = document.getElementById('profile-pager');
@@ -671,6 +683,8 @@
       }
 
       detailPanel.classList.add('visible');
+      exportBtn.disabled = false;
+      deleteBtn.disabled = false;
 
       if (!skipProfileLogFetch) {
         if (data.profileSyncLog) {
@@ -694,6 +708,48 @@
       }
     }
 
+    function parseContentDispositionFilename(header) {
+      if (!header) return null;
+      const utf8 = header.match(/filename\*=UTF-8''([^;]+)/i);
+      if (utf8?.[1]) {
+        try {
+          return decodeURIComponent(utf8[1]);
+        } catch {
+          return utf8[1];
+        }
+      }
+      const plain = header.match(/filename="([^"]+)"/i);
+      return plain?.[1] || null;
+    }
+
+    async function exportSession() {
+      if (!selectedId) return;
+      clearStatus();
+      exportBtn.disabled = true;
+      showStatus('Preparing export…');
+      try {
+        const res = await fetch(`/api/conversations/${encodeURIComponent(selectedId)}/export`);
+        if (!res.ok) {
+          showStatus('Could not export session.');
+          return;
+        }
+        const blob = await res.blob();
+        const filename = parseContentDispositionFilename(res.headers.get('Content-Disposition'))
+          || `conversation-${selectedId}.zip`;
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        link.click();
+        URL.revokeObjectURL(url);
+        clearStatus();
+      } catch {
+        showStatus('Could not export session.');
+      } finally {
+        exportBtn.disabled = !selectedId;
+      }
+    }
+
     async function deleteSession() {
       if (!selectedId) return;
       if (!confirm('Delete this conversation and all transcript turns?')) return;
@@ -710,6 +766,8 @@
       selectedProfileLogId = null;
       detailPanel.classList.remove('visible');
       profileDetailPanel.classList.remove('visible');
+      exportBtn.disabled = true;
+      deleteBtn.disabled = true;
       await loadSessions();
       await loadProfileLogs();
     }
@@ -721,10 +779,47 @@
       selectedProfileLogId = null;
       detailPanel.classList.remove('visible');
       profileDetailPanel.classList.remove('visible');
+      exportBtn.disabled = true;
+      deleteBtn.disabled = true;
       await Promise.all([loadSessions(), loadProfileLogs()]);
     }
 
+    async function clearAllSessions() {
+      const username = userFilter.value;
+      const scopeLabel = username ? `for account “${username}”` : 'for every account';
+      const message = username
+        ? `Delete all conversation history ${scopeLabel}? Transcripts, session audio, and profile summary logs for this account will be removed.`
+        : `Delete ALL conversation history ${scopeLabel}? This cannot be undone.`;
+      if (!confirm(message)) return;
+
+      const params = new URLSearchParams();
+      if (username) params.set('username', username);
+
+      clearStatus();
+      const res = await fetch(`/api/conversations?${params}`, { method: 'DELETE' });
+      if (!res.ok) {
+        showStatus('Could not clear sessions.');
+        return;
+      }
+
+      const data = await res.json().catch(() => ({}));
+      selectedId = null;
+      selectedProfileLogId = null;
+      offset = 0;
+      profileOffset = 0;
+      detailPanel.classList.remove('visible');
+      profileDetailPanel.classList.remove('visible');
+      exportBtn.disabled = true;
+      deleteBtn.disabled = true;
+      await Promise.all([loadSessions(), loadProfileLogs()]);
+      const count = data.deleted ?? 0;
+      showStatus(count
+        ? `Cleared ${count} session${count === 1 ? '' : 's'} ${scopeLabel}.`
+        : `No sessions to clear ${scopeLabel}.`);
+    }
+
     document.getElementById('refresh-btn').addEventListener('click', refreshAll);
+    document.getElementById('clear-all-btn').addEventListener('click', clearAllSessions);
     userFilter.addEventListener('change', () => {
       offset = 0;
       profileOffset = 0;
@@ -732,6 +827,8 @@
       selectedProfileLogId = null;
       detailPanel.classList.remove('visible');
       profileDetailPanel.classList.remove('visible');
+      exportBtn.disabled = true;
+      deleteBtn.disabled = true;
       Promise.all([loadSessions(), loadProfileLogs()]);
     });
     document.getElementById('prev-btn').addEventListener('click', () => {
@@ -754,7 +851,8 @@
         loadProfileLogs();
       }
     });
-    document.getElementById('delete-btn').addEventListener('click', deleteSession);
+    exportBtn.addEventListener('click', exportSession);
+    deleteBtn.addEventListener('click', deleteSession);
 
     refreshAll();
   </script>

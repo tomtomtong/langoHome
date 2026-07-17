@@ -1497,11 +1497,7 @@
       box-shadow: 0 1px 0 #4a2a0e, 0 4px 12px rgba(0, 0, 0, 0.3);
     }
 
-    #daily-rewards-btn.visible { display: flex; }
-
-    body.rewards-enabled.has-idle-video:not(.in-session):not(.idle-video-dismissed) #daily-rewards-btn {
-      display: flex !important;
-    }
+    /* Top-right pill hidden on home; use lango-home REWARD nav instead. */
     #daily-rewards-btn.has-claim {
       animation: reward-btn-glow 2s ease-in-out infinite;
     }
@@ -4270,8 +4266,6 @@
               )
             )
           ),
-          e('img', { className: 'lango-home__starbar', src: asset('starbar'), alt: '' }),
-          e('span', { className: 'lango-home__stars', 'aria-label': '30 stars' }, '30'),
           e(ImageButton, { className: 'lango-home__record', image: 'store', label: 'Record', onClick: () => setComingSoonFeature('Record'), sfx: 'weakness' }),
           e(ImageButton, { className: 'lango-home__map', image: 'reward', label: 'Map', onClick: () => go('map', '/map') }),
           e(ImageButton, { className: 'lango-home__reward', image: 'box', label: 'Reward', onClick: () => reveal('reward', openRewards), sfx: 'powerUp' }),
@@ -4341,7 +4335,7 @@
     </div>
   </div>
 
-  <button type="button" id="daily-rewards-btn" aria-label="Daily rewards">
+  <button type="button" id="daily-rewards-btn" aria-label="Daily rewards" hidden>
     <span class="reward-btn-icon" aria-hidden="true">🎁</span>
     <span>Rewards</span>
     <span class="reward-streak-badge" id="daily-rewards-streak-badge" hidden>0</span>

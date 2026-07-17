@@ -23,6 +23,7 @@ const INWORLD_API_DISABLED_MESSAGE =
 const CONFIG_DIR = process.env.CONFIG_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH || ROOT;
 const CONFIG_PATH = join(CONFIG_DIR, 'config.json');
 const USER_PROFILES_PATH = join(CONFIG_DIR, 'user-profiles.json');
+const USER_LOGIN_META_PATH = join(CONFIG_DIR, 'user-login-meta.json');
 const STUDENT_USERS_PATH = join(CONFIG_DIR, 'student-users.json');
 const CHECK_INS_PATH = join(CONFIG_DIR, 'check-ins.json');
 const SESSIONS_PATH = join(CONFIG_DIR, 'sessions.json');
@@ -155,6 +156,15 @@ const deleteConversationTurnsStmt = conversationsDb.prepare(`DELETE FROM convers
 const deleteProfileSyncLogsForConversationStmt = conversationsDb.prepare(`
   DELETE FROM profile_sync_logs WHERE conversation_id = ?
 `);
+const listConversationAudioPathsStmt = conversationsDb.prepare(`
+  SELECT id, user_audio_path FROM conversations WHERE (? IS NULL OR username = ?)
+`);
+const deleteConversationTurnsForUserStmt = conversationsDb.prepare(`
+  DELETE FROM conversation_turns
+  WHERE conversation_id IN (SELECT id FROM conversations WHERE username = ?)
+`);
+const deleteConversationsForUserStmt = conversationsDb.prepare(`DELETE FROM conversations WHERE username = ?`);
+const deleteProfileSyncLogsForUserStmt = conversationsDb.prepare(`DELETE FROM profile_sync_logs WHERE username = ?`);
 const insertProfileSyncLogStmt = conversationsDb.prepare(`
   INSERT INTO profile_sync_logs (
     conversation_id, username, model, status, message, changed_fields, updates_json, created_at
@@ -381,6 +391,170 @@ function deleteConversationRecord(id) {
   deleteProfileSyncLogsForConversationStmt.run(id);
   const result = deleteConversationStmt.run(id);
   return result.changes > 0;
+}
+
+function deleteAllConversationRecords({ username = null } = {}) {
+  const filterUser = username ? String(username).trim() : null;
+  const rows = listConversationAudioPathsStmt.all(filterUser, filterUser);
+  for (const row of rows) {
+    if (row.user_audio_path) deleteUserSessionAudio(row.user_audio_path);
+  }
+
+  const runBulk = conversationsDb.transaction(() => {
+    if (filterUser) {
+      deleteConversationTurnsForUserStmt.run(filterUser);
+      deleteProfileSyncLogsForUserStmt.run(filterUser);
+      return deleteConversationsForUserStmt.run(filterUser).changes;
+    }
+    conversationsDb.exec('DELETE FROM conversation_turns');
+    conversationsDb.exec('DELETE FROM profile_sync_logs');
+    return conversationsDb.prepare('DELETE FROM conversations').run().changes;
+  });
+
+  const deleted = runBulk();
+  return { deleted, username: filterUser };
+}
+
+function transcriptRoleLabel(role) {
+  if (role === 'user') return 'Child';
+  if (role === 'assistant') return 'Uncle Tommy';
+  if (role === 'tool') return 'Tool';
+  return role || 'unknown';
+}
+
+function formatConversationTranscriptText(record) {
+  const lines = [
+    'Uncle Tommy — conversation transcript',
+    `Conversation ID: ${record.id}`,
+    `Account: ${record.username}`,
+    `Role: ${record.role}`,
+    `Started: ${record.startedAt ? new Date(record.startedAt).toISOString() : '—'}`,
+    `Ended: ${record.endedAt ? new Date(record.endedAt).toISOString() : '—'}`,
+    `Turns: ${record.turnCount || 0}`,
+    '',
+    '---',
+    '',
+  ];
+
+  if (!record.turns?.length) {
+    lines.push('(No transcript turns captured for this session.)');
+    return lines.join('\n');
+  }
+
+  for (const turn of record.turns) {
+    const when = turn.createdAt ? new Date(turn.createdAt).toISOString() : '';
+    lines.push(`[${when}] ${transcriptRoleLabel(turn.role)}:`);
+    lines.push(String(turn.text || '').trim());
+    lines.push('');
+  }
+
+  return lines.join('\n').trimEnd() + '\n';
+}
+
+function buildConversationExportFilename(record) {
+  const started = record.startedAt ? new Date(record.startedAt) : new Date();
+  const stamp = started.toISOString().replace(/[-:]/g, '').replace(/\..+/, '').replace('T', '-');
+  const user = String(record.username || 'unknown').replace(/[^a-zA-Z0-9_-]+/g, '-');
+  return `conversation-${user}-${stamp}.zip`;
+}
+
+function crc32(buffer) {
+  let crc = ~0;
+  for (let i = 0; i < buffer.length; i++) {
+    crc ^= buffer[i];
+    for (let j = 0; j < 8; j++) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+    }
+  }
+  return (~crc) >>> 0;
+}
+
+function buildZipStoreArchive(entries) {
+  const localParts = [];
+  const centralParts = [];
+  let offset = 0;
+
+  for (const entry of entries) {
+    const name = Buffer.from(entry.name, 'utf8');
+    const data = entry.data;
+    const crc = crc32(data);
+    const fileStart = offset;
+
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(0, 6);
+    local.writeUInt16LE(0, 8);
+    local.writeUInt16LE(0, 10);
+    local.writeUInt16LE(0, 12);
+    local.writeUInt32LE(crc, 14);
+    local.writeUInt32LE(data.length, 18);
+    local.writeUInt32LE(data.length, 22);
+    local.writeUInt16LE(name.length, 26);
+    local.writeUInt16LE(0, 28);
+
+    localParts.push(local, name, data);
+    offset += local.length + name.length + data.length;
+
+    const central = Buffer.alloc(46);
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt16LE(20, 4);
+    central.writeUInt16LE(20, 6);
+    central.writeUInt16LE(0, 8);
+    central.writeUInt16LE(0, 10);
+    central.writeUInt16LE(0, 12);
+    central.writeUInt16LE(0, 14);
+    central.writeUInt32LE(crc, 16);
+    central.writeUInt32LE(data.length, 20);
+    central.writeUInt32LE(data.length, 24);
+    central.writeUInt16LE(name.length, 28);
+    central.writeUInt16LE(0, 30);
+    central.writeUInt16LE(0, 32);
+    central.writeUInt16LE(0, 34);
+    central.writeUInt16LE(0, 36);
+    central.writeUInt32LE(0, 38);
+    central.writeUInt32LE(fileStart, 42);
+    centralParts.push(central, name);
+  }
+
+  const centralDir = Buffer.concat(centralParts);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(0, 4);
+  end.writeUInt16LE(0, 6);
+  end.writeUInt16LE(entries.length, 8);
+  end.writeUInt16LE(entries.length, 10);
+  end.writeUInt32LE(centralDir.length, 12);
+  end.writeUInt32LE(offset, 16);
+  end.writeUInt16LE(0, 20);
+
+  return Buffer.concat([...localParts, centralDir, end]);
+}
+
+function buildConversationExportArchive(conversationId) {
+  const record = getConversationRecord(conversationId);
+  if (!record) return null;
+
+  const entries = [{
+    name: 'transcript.txt',
+    data: Buffer.from(formatConversationTranscriptText(record), 'utf8'),
+  }];
+
+  const row = getConversationStmt.get(conversationId);
+  if (row?.user_audio_path) {
+    const audioPath = join(SESSION_AUDIO_DIR, row.user_audio_path);
+    if (existsSync(audioPath)) {
+      entries.push({
+        name: 'session-audio.wav',
+        data: readFileSync(audioPath),
+      });
+    }
+  }
+
+  return {
+    buffer: buildZipStoreArchive(entries),
+    filename: buildConversationExportFilename(record),
+  };
 }
 
 function rowToProfileSyncLog(row) {
@@ -823,6 +997,109 @@ function saveUserProfile(username, profile) {
   return true;
 }
 
+function parseBrowserName(userAgent) {
+  const ua = String(userAgent || '');
+  if (/\bEdg\//.test(ua)) return 'Edge';
+  if (/\bOPR\//.test(ua) || /\bOpera\//.test(ua)) return 'Opera';
+  if (/\bFirefox\//.test(ua)) return 'Firefox';
+  if (/\bCriOS\//.test(ua)) return 'Chrome';
+  if (/\bChrome\//.test(ua) && !/\bEdg\//.test(ua)) return 'Chrome';
+  if (/\bSafari\//.test(ua) && !/\bChrome\//.test(ua)) return 'Safari';
+  return '';
+}
+
+function classifyClientDevice(userAgent) {
+  const ua = String(userAgent || '');
+  if (!ua.trim()) {
+    return { deviceLabel: 'Unknown', deviceType: 'unknown', os: '', browser: '' };
+  }
+
+  const browser = parseBrowserName(ua);
+  const isIPad = /\biPad\b/.test(ua) || (/\bMacintosh\b/.test(ua) && /\bMobile\b/.test(ua));
+  if (isIPad) {
+    return { deviceLabel: 'iPad', deviceType: 'tablet', os: 'iOS', browser };
+  }
+  if (/\biPhone\b/.test(ua) || /\biPod\b/.test(ua)) {
+    return { deviceLabel: 'iPhone', deviceType: 'phone', os: 'iOS', browser };
+  }
+  if (/\bAndroid\b/.test(ua)) {
+    if (/\bMobile\b/i.test(ua)) {
+      return { deviceLabel: 'Android phone', deviceType: 'phone', os: 'Android', browser };
+    }
+    return { deviceLabel: 'Android tablet', deviceType: 'tablet', os: 'Android', browser };
+  }
+  if (/\bWindows NT\b/.test(ua)) {
+    return { deviceLabel: 'Windows PC', deviceType: 'desktop', os: 'Windows', browser };
+  }
+  if (/\bMacintosh\b/.test(ua)) {
+    return { deviceLabel: 'Mac', deviceType: 'desktop', os: 'macOS', browser };
+  }
+  if (/\bCrOS\b/.test(ua)) {
+    return { deviceLabel: 'Chromebook', deviceType: 'desktop', os: 'Chrome OS', browser };
+  }
+  if (/\bLinux\b/.test(ua)) {
+    return { deviceLabel: 'Linux PC', deviceType: 'desktop', os: 'Linux', browser };
+  }
+  return { deviceLabel: 'Other device', deviceType: 'unknown', os: '', browser };
+}
+
+function normalizeUserLoginMeta(raw) {
+  const src = raw && typeof raw === 'object' ? raw : {};
+  const classified = classifyClientDevice(src.userAgent);
+  const deviceLabel = String(src.deviceLabel ?? '').trim() || classified.deviceLabel;
+  return {
+    deviceLabel,
+    deviceType: String(src.deviceType ?? '').trim() || classified.deviceType,
+    os: String(src.os ?? '').trim() || classified.os,
+    browser: String(src.browser ?? '').trim() || classified.browser,
+    userAgent: String(src.userAgent ?? '').trim().slice(0, 512),
+    lastLoginAt: Number(src.lastLoginAt) || 0,
+  };
+}
+
+function loadUserLoginMeta() {
+  try {
+    if (existsSync(USER_LOGIN_META_PATH)) {
+      const data = JSON.parse(readFileSync(USER_LOGIN_META_PATH, 'utf8'));
+      if (data && typeof data === 'object' && !Array.isArray(data)) return data;
+    }
+  } catch (e) {
+    console.warn('Could not load user-login-meta.json:', e.message);
+  }
+  return {};
+}
+
+function saveUserLoginMeta(meta) {
+  ensureConfigDir();
+  writeFileSync(USER_LOGIN_META_PATH, JSON.stringify(meta, null, 2) + '\n');
+}
+
+function getUserLoginMeta(username) {
+  const meta = loadUserLoginMeta();
+  return normalizeUserLoginMeta(meta[username]);
+}
+
+function getUserLoginMetaForUsers(usernames) {
+  const all = loadUserLoginMeta();
+  const out = {};
+  for (const username of usernames) {
+    out[username] = normalizeUserLoginMeta(all[username]);
+  }
+  return out;
+}
+
+function recordStudentLogin(username, userAgent) {
+  if (!STUDENT_USERS[username]) return;
+  const classified = classifyClientDevice(userAgent);
+  const all = loadUserLoginMeta();
+  all[username] = {
+    ...classified,
+    userAgent: String(userAgent || '').trim().slice(0, 512),
+    lastLoginAt: Date.now(),
+  };
+  saveUserLoginMeta(all);
+}
+
 const REPO_USER_PROFILES_PATH = join(ROOT, 'user-profiles.json');
 const PROFILE_SEED_IDENTITY_FIELDS = ['childName', 'nickname', 'grade', 'schoolGrade'];
 
@@ -892,8 +1169,89 @@ const INWORLD_LLM_URL = 'https://api.inworld.ai/v1/chat/completions';
 const INWORLD_MODELS_URL = 'https://api.inworld.ai/llm/v1alpha/models';
 const INWORLD_MODELS_CACHE_MS = 5 * 60 * 1000;
 const PROFILE_SYNC_MIN_USER_TURNS = 1;
+const PROFILE_SYNC_TRANSCRIPT_SETTLE_MS = 2500;
 const DEFAULT_PROFILE_SYNC_MODEL = 'openai/gpt-4o-mini';
 const PROFILE_FIELD_KEYS = Object.keys(DEFAULT_USER_PROFILE);
+
+/** Human labels for sync prompts — keep in sync with account-config.html / buildProfileContext. */
+const PROFILE_FIELD_CATALOG = [
+  { key: 'childName', label: 'Child Name', section: 'Basic Profile' },
+  { key: 'nickname', label: 'Nickname', section: 'Basic Profile' },
+  { key: 'age', label: 'Age', section: 'Basic Profile' },
+  { key: 'grade', label: 'Grade', section: 'Basic Profile' },
+  { key: 'mainLearningLanguage', label: 'Main Learning Language', section: 'Basic Profile' },
+  { key: 'homeLanguage', label: 'Home Language', section: 'Basic Profile' },
+  { key: 'personalityType', label: 'Personality Type', section: 'Basic Profile' },
+  { key: 'confidenceLevel', label: 'Confidence Level', section: 'Basic Profile' },
+  { key: 'attentionSpan', label: 'Attention Span', section: 'Basic Profile' },
+  { key: 'preferredPraise', label: 'Preferred Praise', section: 'Basic Profile' },
+  { key: 'favoriteToy', label: 'Favorite Toy', section: 'Favorite Items' },
+  { key: 'favoriteCharacter', label: 'Favorite Character', section: 'Favorite Items' },
+  { key: 'favoriteFood', label: 'Favorite Food', section: 'Favorite Items' },
+  { key: 'favoriteDrink', label: 'Favorite Drink', section: 'Favorite Items' },
+  { key: 'favoriteColor', label: 'Favorite Color', section: 'Favorite Items' },
+  { key: 'favoriteAnimal', label: 'Favorite Animal', section: 'Favorite Items' },
+  { key: 'favoriteHobby', label: 'Favorite Hobby', section: 'Favorite Items' },
+  { key: 'favoriteSport', label: 'Favorite Sport', section: 'Favorite Items' },
+  { key: 'favoriteMusic', label: 'Favorite Song / Music Type', section: 'Favorite Items' },
+  { key: 'favoritePlace', label: 'Favorite Place', section: 'Favorite Items' },
+  { key: 'favoriteGameType', label: 'Favorite Game Type', section: 'Favorite Items' },
+  { key: 'learningLevelSource', label: 'Source', section: 'Learning Level' },
+  { key: 'vocabularyLevel', label: 'Vocabulary Level', section: 'Learning Level' },
+  { key: 'grammarFocus', label: 'Grammar Focus', section: 'Learning Level' },
+  { key: 'spellingLevel', label: 'Spelling Level', section: 'Learning Level' },
+  { key: 'readingSpeed', label: 'Reading Speed', section: 'Learning Level' },
+  { key: 'commonMistakes', label: 'Common Mistakes', section: 'Learning Level' },
+  { key: 'strongAreas', label: 'Strong Areas', section: 'Learning Level' },
+  { key: 'weakAreas', label: 'Weak Areas', section: 'Learning Level' },
+  { key: 'preferredDifficulty', label: 'Preferred Difficulty', section: 'Learning Level' },
+  { key: 'reviewFrequency', label: 'Review Frequency', section: 'Learning Level' },
+  { key: 'motivationTriggers', label: 'Motivation Triggers', section: 'Emotional & Motivation' },
+  { key: 'favoriteReward', label: 'Favorite Reward', section: 'Emotional & Motivation' },
+  { key: 'frustrationSignal', label: 'Frustration Signal', section: 'Emotional & Motivation' },
+  { key: 'encouragement', label: 'Encouragement', section: 'Emotional & Motivation' },
+  { key: 'competitionPreference', label: 'Competition Preference', section: 'Emotional & Motivation' },
+  { key: 'correctionStyle', label: 'Correction Style', section: 'Emotional & Motivation' },
+  { key: 'preferredRoleplay', label: 'Preferred Roleplay', section: 'Emotional & Motivation' },
+  { key: 'fearDislike', label: 'Fear / Dislike', section: 'Emotional & Motivation' },
+  { key: 'schoolGrade', label: 'School Grade', section: 'School & Curriculum' },
+  { key: 'currentUnit', label: 'Current Unit', section: 'School & Curriculum' },
+  { key: 'weeklyVocabulary', label: 'Weekly Vocabulary', section: 'School & Curriculum' },
+  { key: 'currentGrammar', label: 'Current Grammar', section: 'School & Curriculum' },
+  { key: 'homeworkType', label: 'Homework Type', section: 'School & Curriculum' },
+  { key: 'dictationWords', label: 'Dictation Words', section: 'School & Curriculum' },
+  { key: 'upcomingTest', label: 'Upcoming Test', section: 'School & Curriculum' },
+  { key: 'parentPriority', label: 'Parent Priority', section: 'School & Curriculum' },
+  { key: 'recentlyMentioned', label: 'Recently Mentioned', section: 'Conversation Memory' },
+  { key: 'recentAchievement', label: 'Recent Achievement', section: 'Conversation Memory' },
+  { key: 'recentMistake', label: 'Recent Mistake', section: 'Conversation Memory' },
+  { key: 'recentEmotion', label: 'Recent Emotion', section: 'Conversation Memory' },
+  { key: 'recentPromise', label: 'Recent Promise', section: 'Conversation Memory' },
+  { key: 'nextFollowUp', label: 'Next Follow-up', section: 'Conversation Memory' },
+];
+
+const PROFILE_MEMORY_KEYS = new Set([
+  'recentlyMentioned',
+  'recentAchievement',
+  'recentMistake',
+  'recentEmotion',
+  'recentPromise',
+  'nextFollowUp',
+]);
+
+const PROFILE_OBSERVABLE_KEYS = new Set([
+  'personalityType',
+  'confidenceLevel',
+  'attentionSpan',
+  'preferredPraise',
+  'frustrationSignal',
+  'encouragement',
+  'correctionStyle',
+  'commonMistakes',
+  'strongAreas',
+  'weakAreas',
+  'preferredDifficulty',
+]);
 
 let inworldModelsCache = { fetchedAt: 0, models: [] };
 
@@ -964,22 +1322,81 @@ function formatTranscriptForProfileSync(turns) {
     .join('\n');
 }
 
-function buildProfileSyncSystemPrompt() {
+function formatProfileFieldCatalog() {
+  const bySection = new Map();
+  for (const entry of PROFILE_FIELD_CATALOG) {
+    if (!bySection.has(entry.section)) bySection.set(entry.section, []);
+    bySection.get(entry.section).push(`  - ${entry.key} (${entry.label})`);
+  }
+  const lines = [];
+  for (const [section, fields] of bySection) {
+    lines.push(`${section}:`);
+    lines.push(...fields);
+  }
+  return lines.join('\n');
+}
+
+function listProfileFields(profile, predicate) {
+  return PROFILE_FIELD_CATALOG
+    .filter(({ key }) => predicate(profile[key], key))
+    .map(({ key, label }) => `${key} (${label})`);
+}
+
+function parseProfileSyncJson(content) {
+  const raw = String(content || '').trim();
+  if (!raw) throw new Error('Empty content');
+  try {
+    return JSON.parse(raw);
+  } catch {
+    const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (fenced?.[1]) return JSON.parse(fenced[1].trim());
+    const start = raw.indexOf('{');
+    const end = raw.lastIndexOf('}');
+    if (start >= 0 && end > start) return JSON.parse(raw.slice(start, end + 1));
+    throw new Error('Invalid JSON');
+  }
+}
+
+function buildProfileSyncSystemPrompt(currentProfile) {
+  const profile = normalizeUserProfile(currentProfile);
+  const emptyFields = listProfileFields(profile, (value) => !value);
+  const filledFields = listProfileFields(profile, (value) => Boolean(value));
+
   return `You update a child learner profile for a voice tutoring app based on ONE completed conversation.
 Return ONLY valid JSON with this shape:
 { "updates": { "fieldKey": "new value" } }
 
-Rules:
-- Include ONLY profile fields that should change based on NEW evidence from this conversation.
-- Valid field keys: ${PROFILE_FIELD_KEYS.join(', ')}
-- Keep existing profile values unless the conversation clearly adds or corrects information.
-- Always refresh conversation-memory fields when there is relevant session content:
-  recentlyMentioned, recentAchievement, recentMistake, recentEmotion, recentPromise, nextFollowUp
-- Update favorites, learning level, school, and emotional fields only when the child clearly stated them or they were demonstrated in this chat.
-- Keep each value concise (under 140 characters).
-- Use simple English unless the child mainly spoke another language.
-- Do not invent facts. If nothing new was learned for a field, omit it from updates.
-- If the session was too short or empty to learn anything, return { "updates": {} }`;
+Goal: capture EVERY usable fact from this session into the correct profile field so empty fields get filled whenever the conversation supports them.
+
+Field catalog (use these exact camelCase keys):
+${formatProfileFieldCatalog()}
+
+Currently EMPTY fields (fill any of these if the conversation supports them):
+${emptyFields.length ? emptyFields.map((f) => `- ${f}`).join('\n') : '- (none)'}
+
+Already filled fields (update only to correct, refine, or replace with clearer evidence):
+${filledFields.length ? filledFields.map((f) => `- ${f}`).join('\n') : '- (none)'}
+
+Extraction rules:
+1. Scan the WHOLE transcript. Prefer filling EMPTY fields over leaving them blank.
+2. Map likes/preferences to the specific favorite field — do NOT dump them only into recentlyMentioned:
+   - "I like sushi" / "my favorite food is sushi" → favoriteFood
+   - toys, LEGO, dolls → favoriteToy
+   - Iron Man, Pokémon, Disney characters → favoriteCharacter
+   - drinks / milk / juice → favoriteDrink
+   - colors → favoriteColor
+   - animals / pets → favoriteAnimal
+   - hobbies, sports, songs, places, game types → matching favorite* fields
+3. Soft evidence counts. Accept child statements, tutor confirmations, and clear implications such as:
+   "I like…", "my favorite…", "I love…", "I want…", "I play with…", "I drink…", "my color is…".
+4. Observable traits may be inferred from behaviour in this session when empty:
+   ${[...PROFILE_OBSERVABLE_KEYS].join(', ')}.
+5. Always refresh conversation-memory fields when relevant:
+   ${[...PROFILE_MEMORY_KEYS].join(', ')}
+6. Keep each value concise (under 140 characters). Use simple English unless the child mainly spoke another language.
+7. Do not invent facts with no transcript support. If a field has no evidence, omit it.
+8. Include ALL supported fields in updates in one response — do not stop after memory fields.
+9. If the session was too short to learn anything, return { "updates": {} }.`;
 }
 
 async function syncUserProfileFromConversation({ username, apiKey, conversationId }) {
@@ -1005,6 +1422,11 @@ async function syncUserProfileFromConversation({ username, apiKey, conversationI
     return;
   }
 
+  // Wait briefly so late STT completions can land before we read the transcript.
+  if (PROFILE_SYNC_TRANSCRIPT_SETTLE_MS > 0) {
+    await new Promise((resolve) => setTimeout(resolve, PROFILE_SYNC_TRANSCRIPT_SETTLE_MS));
+  }
+
   const record = getConversationRecord(conversationId);
   if (!record) {
     recordProfileSyncLog({ ...logBase, status: 'skipped', message: 'Conversation not found.' });
@@ -1026,14 +1448,19 @@ async function syncUserProfileFromConversation({ username, apiKey, conversationI
   }
 
   const currentProfile = getUserProfile(username);
+  const emptyFields = listProfileFields(currentProfile, (value) => !value);
   const userPrompt = `Account: ${username}
+
 Current profile JSON:
 ${JSON.stringify(currentProfile, null, 2)}
+
+Empty fields that still need values if this conversation mentions them:
+${emptyFields.length ? emptyFields.join(', ') : '(none)'}
 
 Conversation transcript:
 ${transcript}
 
-Update the profile based on this session.`;
+Extract every supported profile update from this session. Fill empty matching fields. Return JSON { "updates": { ... } }.`;
 
   try {
     const upstream = await fetch(INWORLD_LLM_URL, {
@@ -1045,15 +1472,15 @@ Update the profile based on this session.`;
       body: JSON.stringify({
         model,
         messages: [
-          { role: 'system', content: buildProfileSyncSystemPrompt() },
+          { role: 'system', content: buildProfileSyncSystemPrompt(currentProfile) },
           { role: 'user', content: userPrompt },
         ],
         response_format: { type: 'json_object' },
-        temperature: 0.3,
+        temperature: 0.1,
       }),
     });
 
-    const payload = await upstream.json();
+    const payload = await upstream.json().catch(() => ({}));
     if (!upstream.ok) {
       const message = payload?.error?.message || payload?.error || 'Inworld LLM request failed.';
       console.warn(`[profile-sync] failed for ${username}:`, message);
@@ -1071,7 +1498,7 @@ Update the profile based on this session.`;
 
     let parsed;
     try {
-      parsed = JSON.parse(content);
+      parsed = parseProfileSyncJson(content);
     } catch {
       const message = 'Inworld returned invalid JSON.';
       console.warn(`[profile-sync] invalid JSON for ${username}`);
@@ -1095,7 +1522,10 @@ Update the profile based on this session.`;
     for (const field of changedKeys) appliedUpdates[field] = merged[field];
 
     saveUserProfile(username, merged);
-    const message = `Updated ${changedKeys.length} field(s).`;
+    const filledEmpty = changedKeys.filter((field) => !currentProfile[field]);
+    const message = `Updated ${changedKeys.length} field(s)`
+      + (filledEmpty.length ? ` (filled ${filledEmpty.length} empty)` : '')
+      + '.';
     console.log(`[profile-sync] updated ${username} (${conversationId}): ${changedKeys.join(', ')}`);
     recordProfileSyncLog({
       ...logBase,
@@ -1914,6 +2344,7 @@ const MIME = {
   '.webp': 'image/webp',
   '.mp3': 'audio/mpeg',
   '.wav': 'audio/wav',
+  '.zip': 'application/zip',
   '.mp4': 'video/mp4',
   '.webm': 'video/webm',
   '.mov': 'video/quicktime',
@@ -3117,6 +3548,8 @@ const server = createServer((req, res) => {
         sendJson(res, 401, { error: 'Invalid username or password.' });
         return;
       }
+      const userAgent = String(req.headers['user-agent'] || parsed.userAgent || '');
+      recordStudentLogin(username, userAgent);
       const token = createSession(username, 'student');
       res.writeHead(200, {
         'Content-Type': 'application/json',
@@ -3328,7 +3761,11 @@ const server = createServer((req, res) => {
     for (const username of users) {
       normalized[username] = normalizeUserProfile(profiles[username]);
     }
-    sendJson(res, 200, { users, profiles: normalized });
+    sendJson(res, 200, {
+      users,
+      profiles: normalized,
+      loginMeta: getUserLoginMetaForUsers(users),
+    });
     return;
   }
 
@@ -3364,7 +3801,11 @@ const server = createServer((req, res) => {
       return;
     }
     if (req.method === 'GET') {
-      sendJson(res, 200, { username, profile: getUserProfile(username) });
+      sendJson(res, 200, {
+        username,
+        profile: getUserProfile(username),
+        loginMeta: getUserLoginMeta(username),
+      });
       return;
     }
     if (req.method === 'PUT' || req.method === 'POST') {
@@ -3383,6 +3824,24 @@ const server = createServer((req, res) => {
   }
 
   const conversationMatch = url.match(/^\/api\/conversations\/([^/]+)$/);
+  const conversationExportMatch = url.match(/^\/api\/conversations\/([^/]+)\/export$/);
+  if (conversationExportMatch && req.method === 'GET') {
+    const conversationId = conversationExportMatch[1];
+    const archive = buildConversationExportArchive(conversationId);
+    if (!archive) {
+      sendJson(res, 404, { error: 'Conversation not found.' });
+      return;
+    }
+    res.writeHead(200, {
+      'Content-Type': 'application/zip',
+      'Content-Disposition': `attachment; filename="${archive.filename}"`,
+      'Content-Length': archive.buffer.length,
+      ...SECURITY_HEADERS,
+    });
+    res.end(archive.buffer);
+    return;
+  }
+
   const userAudioMatch = url.match(/^\/api\/conversations\/([^/]+)\/user-audio$/);
   if (userAudioMatch && req.method === 'GET') {
     const conversationId = userAudioMatch[1];
@@ -3431,6 +3890,14 @@ const server = createServer((req, res) => {
     return;
   }
 
+  if (url === '/api/conversations' && req.method === 'DELETE') {
+    const params = new URL(rawUrl, 'http://local').searchParams;
+    const username = params.get('username')?.trim() || null;
+    const result = deleteAllConversationRecords({ username });
+    sendJson(res, 200, { ok: true, ...result });
+    return;
+  }
+
   const profileSyncLogMatch = url.match(/^\/api\/profile-sync-logs\/(\d+)$/);
   if (profileSyncLogMatch && req.method === 'GET') {
     const log = getProfileSyncLogRecord(Number(profileSyncLogMatch[1]));
@@ -3464,6 +3931,24 @@ const server = createServer((req, res) => {
   }
 
   if (isGameApiRoute(url)) {
+    if (url === '/api/voca' && req.method === 'GET') {
+      const params = new URL(rawUrl, 'http://local').searchParams;
+      const hasExplicitFilter = params.has('grade') || params.has('level') || params.get('all') === '1';
+      if (!hasExplicitFilter) {
+        const session = getSession(req);
+        if (session?.role === 'student') {
+          const profile = getUserProfile(session.username);
+          const grade = gameApp.parseStudentGrade?.(
+            profile.grade || profile.schoolGrade || profile.vocabularyLevel,
+          ) || null;
+          if (grade) {
+            params.set('grade', grade);
+            delegateToGameApp(req, res, url, `?${params.toString()}`);
+            return;
+          }
+        }
+      }
+    }
     delegateToGameApp(req, res, url, query);
     return;
   }
@@ -4093,8 +4578,14 @@ function connectToInworld(apiKey, browser, session, userInfo = {}) {
   });
 
   browser.on('close', () => {
-    finishConversation();
-    api.close();
+    // Keep the Inworld socket open briefly so final STT transcripts can arrive
+    // before we end the conversation and run profile sync.
+    setTimeout(() => {
+      finishConversation();
+      if (api.readyState === WebSocket.OPEN || api.readyState === WebSocket.CONNECTING) {
+        api.close();
+      }
+    }, PROFILE_SYNC_TRANSCRIPT_SETTLE_MS);
   });
   api.on('close', () => {
     finishConversation();
