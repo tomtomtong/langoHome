@@ -459,12 +459,33 @@
       transition: width 0.3s ease-out;
     }
 
+    .splash-loading-meta {
+      width: min(86%, 620px);
+      margin: 0;
+      text-align: center;
+      color: rgba(101, 49, 140, .72);
+      font-size: clamp(11px, 1.45vw, 14px);
+      font-weight: 600;
+      line-height: 1.35;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .splash-loading-meta.splash-load-speed {
+      font-size: clamp(10px, 1.25vw, 13px);
+      font-weight: 700;
+      color: rgba(101, 49, 140, .55);
+      font-variant-numeric: tabular-nums;
+    }
+
     @media (max-height: 520px) {
       #splash-screen { padding: 8px 18px; }
       .splash-content { gap: 6px; width: min(86vw, 680px); }
       .splash-brand { width: 150px; }
       .splash-game-shell { max-height: 58vh; }
       .splash-loading-row { width: 82%; }
+      .splash-loading-meta { width: 82%; }
     }
 
     body.splash-dismissed #splash-screen {
@@ -3211,6 +3232,8 @@
           <div class="splash-loading-bar-fill" id="splash-progress-fill"></div>
         </div>
       </div>
+      <p class="splash-loading-meta" id="splash-load-status" aria-live="polite"></p>
+      <p class="splash-loading-meta splash-load-speed" id="splash-load-speed" aria-live="polite"></p>
     </div>
   </div>
 
@@ -3575,8 +3598,8 @@
     <iframe id="map-preview-frame" title="Map preview" src="/map/index.html?preview=1&amp;embedded=1"></iframe>
     <iframe id="game-preview-frame" title="Game preview"></iframe>
     <div id="idle-video-screen" aria-label="Tap to start conversation">
-      <video id="idle-video" class="screen-video" loop playsinline preload="auto"></video>
-      <video id="transition-video" class="screen-video" playsinline preload="auto"></video>
+      <video id="idle-video" class="screen-video" loop muted playsinline webkit-playsinline preload="auto"></video>
+      <video id="transition-video" class="screen-video" muted playsinline webkit-playsinline preload="auto"></video>
       <div id="idle-video-loading">Loading videos…</div>
       <div id="idle-video-hint">Tap to start conversation</div>
     </div>
@@ -5229,6 +5252,8 @@
     const queue = [];
     const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
                    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    configureVideoElementForInlinePlayback(idleVideoEl);
+    configureVideoElementForInlinePlayback(transitionVideoEl);
     // iOS Safari needs a much longer delay for the mic to be released
     // after getUserMedia stops before SpeechRecognition can grab it again.
     const WAKE_WORD_RESTART_DELAY = IS_IOS ? 1500 : 500;
@@ -5803,19 +5828,64 @@
       document.body.classList.toggle("videos-loading", loading);
     }
 
+    function splashLabelFromUrl(url, fallback = "Asset") {
+      if (!url) return fallback;
+      try {
+        const file = decodeURIComponent(String(url).split("/").pop()?.split("?")[0] || "");
+        return file || fallback;
+      } catch {
+        return fallback;
+      }
+    }
+
     function preloadImage(url) {
+      return preloadImageTracked(url);
+    }
+
+    function preloadImageTracked(url) {
       if (!url) return Promise.resolve();
-      return new Promise((resolve, reject) => {
+      return prefetchResponseToCache(url).then((blob) => new Promise((resolve, reject) => {
         const img = new Image();
-        img.onload = () => resolve();
-        img.onerror = () => reject(new Error(`Failed to preload image: ${url}`));
-        img.src = url;
-      });
+        img.onload = () => {
+          if (blob) URL.revokeObjectURL(img.src);
+          resolve();
+        };
+        img.onerror = () => {
+          if (blob) URL.revokeObjectURL(img.src);
+          reject(new Error(`Failed to preload image: ${url}`));
+        };
+        img.src = blob ? URL.createObjectURL(blob) : url;
+      }));
+    }
+
+    async function prefetchResponseToCache(url) {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Prefetch failed: ${url}`);
+      if (!res.body?.getReader) {
+        const buf = await res.arrayBuffer();
+        splashLoadTracker.addBytes(buf.byteLength);
+        return new Blob([buf], { type: res.headers.get("content-type") || undefined });
+      }
+      const reader = res.body.getReader();
+      const chunks = [];
+      let received = 0;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        received += value.byteLength;
+        splashLoadTracker.addBytes(value.byteLength);
+        chunks.push(value);
+      }
+      return new Blob(chunks, { type: res.headers.get("content-type") || undefined });
     }
 
     function prefetchAsset(url) {
+      return prefetchAssetTracked(url);
+    }
+
+    function prefetchAssetTracked(url) {
       if (!url) return Promise.resolve();
-      return fetch(url).then(() => {}).catch((e) => {
+      return prefetchResponseToCache(url).then(() => {}).catch((e) => {
         console.warn("Prefetch failed:", url, e);
       });
     }
@@ -5823,6 +5893,78 @@
     const splashProgressFill = document.getElementById("splash-progress-fill");
     const splashScreenEl = document.getElementById("splash-screen");
     const splashLoadingLabel = splashScreenEl?.querySelector(".splash-loading-label");
+    const splashLoadStatusEl = document.getElementById("splash-load-status");
+    const splashLoadSpeedEl = document.getElementById("splash-load-speed");
+    const SPLASH_SPEED_WINDOW_MS = 2000;
+    const splashLoadTracker = {
+      active: new Map(),
+      speedSamples: [],
+      pollId: 0,
+      begin(label) {
+        const id = Symbol(label);
+        this.active.set(id, label);
+        this.syncUI();
+        return id;
+      },
+      end(id) {
+        this.active.delete(id);
+        this.syncUI();
+      },
+      addBytes(byteCount) {
+        if (!byteCount || byteCount < 0) return;
+        const now = performance.now();
+        this.speedSamples.push({ t: now, bytes: byteCount });
+        const cutoff = now - SPLASH_SPEED_WINDOW_MS;
+        while (this.speedSamples.length && this.speedSamples[0].t < cutoff) {
+          this.speedSamples.shift();
+        }
+        this.syncUI();
+      },
+      getSpeedKbps() {
+        const now = performance.now();
+        const cutoff = now - SPLASH_SPEED_WINDOW_MS;
+        let bytes = 0;
+        let oldest = now;
+        for (const sample of this.speedSamples) {
+          if (sample.t < cutoff) continue;
+          bytes += sample.bytes;
+          oldest = Math.min(oldest, sample.t);
+        }
+        if (!bytes) return 0;
+        const elapsedSec = Math.max((now - oldest) / 1000, 0.25);
+        return bytes / 1024 / elapsedSec;
+      },
+      syncUI() {
+        if (splashLoadStatusEl) {
+          const labels = [...new Set(this.active.values())];
+          splashLoadStatusEl.textContent = labels.length ? labels.join(" · ") : "";
+        }
+        if (splashLoadSpeedEl) {
+          const kbps = this.getSpeedKbps();
+          splashLoadSpeedEl.textContent = kbps > 0
+            ? `${Math.round(kbps).toLocaleString()} KB/s`
+            : this.active.size ? "Measuring…" : "";
+        }
+      },
+      startPolling() {
+        if (this.pollId) return;
+        this.pollId = setInterval(() => this.syncUI(), 250);
+      },
+      stopPolling() {
+        if (!this.pollId) return;
+        clearInterval(this.pollId);
+        this.pollId = 0;
+      },
+      reset() {
+        this.active.clear();
+        this.speedSamples = [];
+        this.syncUI();
+      },
+      runTracked(label, task) {
+        const id = this.begin(label);
+        return Promise.resolve(task).finally(() => this.end(id));
+      },
+    };
     const SPLASH_LOCK_AT = 88;
     const SPLASH_HANDOFF_MS = 750;
     const SPLASH_CLICK_GUARD_MS = 700;
@@ -5926,7 +6068,17 @@
       if (!videoAudioRoutes.has(transitionVideoEl)) transitionVideoEl.volume = fallbackVolume;
     }
 
+    function configureVideoElementForInlinePlayback(videoEl) {
+      if (!videoEl) return;
+      videoEl.playsInline = true;
+      videoEl.setAttribute("playsinline", "");
+      videoEl.setAttribute("webkit-playsinline", "");
+    }
+
     function ensureVideoAudioBalance() {
+      // iOS Safari often fails to play (or shows a black frame) when the
+      // <video> element is wired through Web Audio; use volume ducking instead.
+      if (IS_IOS) return false;
       const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
       if (!AudioContextCtor) return false;
       try {
@@ -5980,18 +6132,41 @@
       ensureVideoAudioBalance();
       applyVideoAudioSettings(idleVideoEl);
       applyVideoAudioSettings(transitionVideoEl);
+      if (IS_IOS && idleVideoUrl && !inSession && !active && !idleVideoEl.paused) {
+        idleVideoEl.play().catch(() => {});
+      }
     }
 
     async function playVideoWithSound(videoEl) {
+      configureVideoElementForInlinePlayback(videoEl);
       if (videoSoundUnlocked) ensureVideoAudioBalance();
-      videoEl.volume = videoAudioRoutes.has(videoEl) ? 1 : FALLBACK_VIDEO_VOLUME;
+      const routed = videoAudioRoutes.has(videoEl);
+      const setVolume = () => {
+        videoEl.volume = routed ? 1 : FALLBACK_VIDEO_VOLUME;
+      };
+
+      if (!videoSoundUnlocked) {
+        videoEl.muted = true;
+        setVolume();
+        try {
+          await videoEl.play();
+          return;
+        } catch (e) {
+          console.warn("Muted video play failed:", e);
+        }
+      }
+
+      setVolume();
       videoEl.muted = false;
       try {
         await videoEl.play();
         videoSoundUnlocked = true;
         return;
-      } catch {}
+      } catch (e) {
+        console.warn("Unmuted video play failed; retrying muted:", e);
+      }
       videoEl.muted = true;
+      setVolume();
       await videoEl.play().catch(() => {});
     }
 
@@ -6128,31 +6303,59 @@
     }
 
     async function preloadMediaAssets(cfg) {
+      splashLoadTracker.reset();
+      splashLoadTracker.startPolling();
+      try {
       const rawTasks = [
-        preloadImage("/langoLogo.jpeg").catch(() => {}),
-        ...DANCE_ANIMATIONS.map(prefetchAsset),
-        ...KUNGFU_ANIMATIONS.map(prefetchAsset),
-        prefetchAsset(BYEBYE_URL),
-        prefetchAsset("/Animation/Idle.fbx"),
-        ...BYEBYE_VOICES.map(prefetchAsset),
+        splashLoadTracker.runTracked("Logo", preloadImage("/langoLogo.jpeg").catch(() => {})),
+        ...DANCE_ANIMATIONS.map((url) => splashLoadTracker.runTracked(
+          splashLabelFromUrl(url, "Dance animation"),
+          prefetchAsset(url),
+        )),
+        ...KUNGFU_ANIMATIONS.map((url) => splashLoadTracker.runTracked(
+          splashLabelFromUrl(url, "Kung fu animation"),
+          prefetchAsset(url),
+        )),
+        splashLoadTracker.runTracked(
+          splashLabelFromUrl(BYEBYE_URL, "Bye-bye animation"),
+          prefetchAsset(BYEBYE_URL),
+        ),
+        splashLoadTracker.runTracked(
+          splashLabelFromUrl("/Animation/Idle.fbx", "Idle animation"),
+          prefetchAsset("/Animation/Idle.fbx"),
+        ),
+        ...BYEBYE_VOICES.map((url) => splashLoadTracker.runTracked(
+          splashLabelFromUrl(url, "Voice clip"),
+          prefetchAsset(url),
+        )),
       ];
 
       applyGameIconsFromConfig(cfg.gameIcons);
       for (const game of GAME_CATALOG) {
-        if (game.icon) rawTasks.push(preloadImage(game.icon).catch(() => {}));
+        if (game.icon) {
+          rawTasks.push(splashLoadTracker.runTracked(
+            `${game.name} icon`,
+            preloadImage(game.icon).catch(() => {}),
+          ));
+        }
       }
 
-      rawTasks.push(setupIdleVideosFromConfig(cfg));
+      rawTasks.push(splashLoadTracker.runTracked("Scene videos", setupIdleVideosFromConfig(cfg)));
 
       const bgUrl = applyActivePairBackground(cfg);
-      if (bgUrl) rawTasks.push(preloadImage(bgUrl).catch(() => {}));
+      if (bgUrl) {
+        rawTasks.push(splashLoadTracker.runTracked(
+          splashLabelFromUrl(bgUrl, "Background image"),
+          preloadImage(bgUrl).catch(() => {}),
+        ));
+      }
 
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       rawTasks.push(
-        ensureAvatar().catch((e) => {
+        splashLoadTracker.runTracked("Uncle Tommy avatar", ensureAvatar().catch((e) => {
           console.error(e);
           showErr(`Avatar failed to load: ${e.message}`);
-        }),
+        })),
       );
 
       let done = 0;
@@ -6167,41 +6370,97 @@
       await Promise.all(tasks);
       setSplashProgress(100);
       return Boolean(idleVideoUrl);
+      } finally {
+        splashLoadTracker.stopPolling();
+        if (splashLoadStatusEl) splashLoadStatusEl.textContent = "";
+        if (splashLoadSpeedEl) splashLoadSpeedEl.textContent = "";
+      }
     }
 
-    function preloadVideoElement(video, url) {
+    function preloadVideoElement(video, url, label = "Video") {
       if (!url) return Promise.resolve(false);
+      configureVideoElementForInlinePlayback(video);
 
       return new Promise((resolve, reject) => {
+        let timeoutId = 0;
+        let settled = false;
+        const trackId = splashLoadTracker.begin(label);
+
         const cleanup = () => {
+          splashLoadTracker.end(trackId);
+          if (timeoutId) clearTimeout(timeoutId);
           video.removeEventListener("canplaythrough", onReady);
+          video.removeEventListener("canplay", onReady);
+          video.removeEventListener("loadeddata", onLoadedData);
           video.removeEventListener("error", onError);
         };
 
-        const onReady = () => {
+        const finish = (ok) => {
+          if (settled) return;
+          settled = true;
           cleanup();
-          resolve(true);
+          if (ok) resolve(true);
+          else reject(new Error(`Failed to preload video: ${url}`));
         };
 
-        const onError = () => {
-          cleanup();
-          reject(new Error(`Failed to preload video: ${url}`));
+        const onReady = () => finish(true);
+        const onError = () => finish(false);
+
+        const hasEnoughToPlay = () => {
+          if (video.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) return true;
+          // iOS Safari often never fires canplaythrough for streamed MP4s.
+          return IS_IOS && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA;
+        };
+
+        const onLoadedData = () => {
+          if (hasEnoughToPlay()) onReady();
+        };
+
+        const attachAndWait = () => {
+          if (hasEnoughToPlay()) {
+            onReady();
+            return;
+          }
+
+          video.addEventListener("canplaythrough", onReady, { once: true });
+          if (IS_IOS) {
+            video.addEventListener("canplay", onReady, { once: true });
+            video.addEventListener("loadeddata", onLoadedData);
+            timeoutId = setTimeout(() => {
+              if (video.error) {
+                onError();
+                return;
+              }
+              if (video.readyState >= HTMLMediaElement.HAVE_METADATA) onReady();
+              else onError();
+            }, 12000);
+          }
+          video.addEventListener("error", onError, { once: true });
         };
 
         video.preload = "auto";
         if (video.dataset.preloadUrl !== url) {
           video.dataset.preloadUrl = url;
-          video.src = url;
-          video.load();
-        }
-
-        if (video.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) {
-          onReady();
+          prefetchResponseToCache(url)
+            .then((blob) => {
+              const prevBlob = video.dataset.blobUrl;
+              if (prevBlob) URL.revokeObjectURL(prevBlob);
+              const objectUrl = URL.createObjectURL(blob);
+              video.dataset.blobUrl = objectUrl;
+              video.src = objectUrl;
+              video.load();
+              attachAndWait();
+            })
+            .catch(() => {
+              video.removeAttribute("data-blob-url");
+              video.src = url;
+              video.load();
+              attachAndWait();
+            });
           return;
         }
 
-        video.addEventListener("canplaythrough", onReady, { once: true });
-        video.addEventListener("error", onError, { once: true });
+        attachAndWait();
       });
     }
 
@@ -6318,6 +6577,8 @@
     }
 
     async function setupIdleVideos(idleVideo, transitionVideo, { autoplay = true, hintText = "Tap to start conversation" } = {}) {
+      configureVideoElementForInlinePlayback(idleVideoEl);
+      configureVideoElementForInlinePlayback(transitionVideoEl);
       transitionVideoUrl = transitionVideo?.url || null;
       idleVideosReady = false;
       idleVideoHintText = hintText?.trim() || "Tap to start conversation";
@@ -6343,9 +6604,19 @@
       applyVideoAudioSettings(transitionVideoEl);
       transitionVideoEl.pause();
 
-      const preloadTasks = [preloadVideoElement(idleVideoEl, idleVideo.url)];
+      const preloadTasks = [
+        preloadVideoElement(
+          idleVideoEl,
+          idleVideo.url,
+          `Loop video: ${splashLabelFromUrl(idleVideo.url, "loop")}`,
+        ),
+      ];
       if (transitionVideoUrl) {
-        preloadTasks.push(preloadVideoElement(transitionVideoEl, transitionVideoUrl));
+        preloadTasks.push(preloadVideoElement(
+          transitionVideoEl,
+          transitionVideoUrl,
+          `Transition video: ${splashLabelFromUrl(transitionVideoUrl, "transition")}`,
+        ));
       }
 
       try {
@@ -6456,7 +6727,7 @@
           reject(new Error("Transition video failed to play."));
         };
 
-        transitionVideoEl.play().catch(reject);
+        playVideoWithSound(transitionVideoEl).catch(reject);
       });
     }
 
@@ -6533,10 +6804,13 @@
       }
     }
 
-    idleVideoScreen.addEventListener("click", (e) => {
+    function handleIdleVideoScreenActivate(e) {
       if (playingTransitionVideo || e.target.closest("button, a, input, select, textarea")) return;
+      unlockVideoSound();
       startConversationFromIdleTap();
-    });
+    }
+
+    idleVideoScreen.addEventListener("click", handleIdleVideoScreenActivate);
 
     async function refreshIdleVideosForCurrentPeriod({ rotateWithinScene = false } = {}) {
       if (inSession || active || playingTransitionVideo || idleVideoStarting) return;
