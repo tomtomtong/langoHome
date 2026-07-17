@@ -605,12 +605,21 @@
       top: 0;
       left: 0;
       right: 0;
-      display: flex;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, auto) minmax(0, 1fr);
       align-items: center;
-      justify-content: space-between;
+      gap: 0.5rem;
       padding: max(0.75rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) 0.75rem max(1rem, env(safe-area-inset-left));
       pointer-events: auto;
       background: linear-gradient(to bottom, rgba(15, 17, 23, 0.75), transparent);
+    }
+
+    .overlay-top #avatar-status {
+      justify-self: start;
+    }
+
+    .overlay-top .overlay-top-actions {
+      justify-self: end;
     }
 
     .overlay-bottom {
@@ -711,11 +720,17 @@
     #status.active { color: #81c995; }
 
     #conn-speed {
-      color: rgba(196, 199, 197, 0.85);
-      font-size: 0.75rem;
+      justify-self: center;
+      max-width: 100%;
+      color: #9ec5ff;
+      font-size: clamp(0.65rem, 1.6vw, 0.75rem);
+      font-weight: 600;
       font-variant-numeric: tabular-nums;
       text-align: center;
       text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
       min-height: 1.1em;
     }
 
@@ -3633,6 +3648,7 @@
       </div>
       <div class="overlay-top">
         <span id="avatar-status"></span>
+        <span id="conn-speed" aria-live="polite"></span>
         <div class="overlay-top-actions">
           <span id="camera-save-status" aria-live="polite"></span>
           <button id="btn-cancel-camera" type="button">Cancel</button>
@@ -3650,7 +3666,6 @@
         </div>
       </div>
       <div class="overlay-bottom">
-        <div id="conn-speed" aria-live="polite"></div>
         <div id="status">Connecting…</div>
         <div id="err"></div>
         <button id="btn-stop" type="button">End Conversation</button>
