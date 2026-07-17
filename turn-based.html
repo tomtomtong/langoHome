@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inworld turn-based (no WebRTC)</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f1419;
+      color: #e7ecf1;
+    }
+    body {
+      display: flex;
+      justify-content: center;
+      padding: 1.5rem 1rem 2rem;
+    }
+    main {
+      width: min(100%, 520px);
+    }
+    h1 {
+      margin: 0 0 0.35rem;
+      font-size: 1.2rem;
+      font-weight: 600;
+    }
+    .sub {
+      margin: 0 0 1.25rem;
+      font-size: 0.85rem;
+      color: #9aa7b5;
+      line-height: 1.45;
+    }
+    .sub a { color: #7eb8ff; }
+    #status {
+      padding: 0.65rem 0.85rem;
+      margin-bottom: 0.75rem;
+      border-radius: 8px;
+      background: #1a2330;
+      font-size: 0.9rem;
+    }
+    #status.live { background: #152a45; color: #8ec5ff; }
+    #status.err { background: #3a1f1f; color: #ffb4ab; }
+    #timer {
+      font-variant-numeric: tabular-nums;
+      font-size: 2rem;
+      font-weight: 600;
+      text-align: center;
+      margin: 0.5rem 0 1rem;
+      color: #7eb8ff;
+    }
+    #timer.idle { color: #6b7785; }
+    label {
+      display: block;
+      margin-bottom: 0.35rem;
+      font-size: 0.78rem;
+      color: #9aa7b5;
+    }
+    textarea {
+      width: 100%;
+      padding: 0.6rem 0.75rem;
+      margin-bottom: 0.85rem;
+      border: 1px solid #2a3544;
+      border-radius: 8px;
+      background: #151c26;
+      color: #e7ecf1;
+      font-size: 0.85rem;
+      font-family: inherit;
+      resize: vertical;
+      min-height: 3.5rem;
+    }
+    #log {
+      border: 1px solid #2a3544;
+      border-radius: 8px;
+      background: #151c26;
+      padding: 0.75rem;
+      min-height: 12rem;
+      max-height: 22rem;
+      overflow-y: auto;
+      font-size: 0.85rem;
+      line-height: 1.45;
+    }
+    .turn {
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid #243040;
+    }
+    .turn:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+    .role {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #7a8794;
+      margin-bottom: 0.2rem;
+    }
+    .role.user { color: #8ec5ff; }
+    .role.assistant { color: #a8e6a1; }
+    .start-overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(8, 12, 18, 0.88);
+      padding: 1rem;
+    }
+    .start-overlay.hidden { display: none; }
+    .start-card {
+      max-width: 360px;
+      padding: 1.25rem;
+      border-radius: 12px;
+      background: #151c26;
+      border: 1px solid #2a3544;
+      text-align: center;
+    }
+    .start-card p {
+      margin: 0 0 1rem;
+      font-size: 0.9rem;
+      color: #b8c4d0;
+      line-height: 1.45;
+    }
+    button.primary {
+      padding: 0.65rem 1.25rem;
+      border: none;
+      border-radius: 8px;
+      background: #1a73e8;
+      color: #fff;
+      font-size: 0.95rem;
+      cursor: pointer;
+    }
+    button.primary:hover { background: #1557b0; }
+  </style>
+</head>
+<body>
+  <div id="startOverlay" class="start-overlay">
+    <div class="start-card">
+      <p>
+        Turn-based test: each turn records your mic for <strong>20 seconds</strong>, then STT → LLM → TTS.
+        No WebRTC. Browsers require one tap to allow the microphone.
+      </p>
+      <button type="button" class="primary" id="startBtn">Start conversation</button>
+    </div>
+  </div>
+
+  <main>
+    <h1>Turn-based voice (REST)</h1>
+    <p class="sub">
+      Uses REST STT → LLM → TTS (no WebRTC). On Railway, set
+      <code>INWORLD_API_KEY</code> in service variables, deploy, then open
+      <code>/turn-based</code> on your <code>*.up.railway.app</code> URL (HTTPS required for mic).
+      Optional: <code>INWORLD_VOICE_ID</code>, <code>INWORLD_API_ENABLED=1</code>.
+      Admin config: <a href="/config">/config</a>.
+    </p>
+
+    <div id="status">Tap “Start conversation” to begin.</div>
+    <div id="timer" class="idle">20</div>
+
+    <label for="systemPrompt">System prompt</label>
+    <textarea id="systemPrompt">You are a friendly English tutor. Keep replies short (1–3 sentences) for voice.</textarea>
+
+    <label>Transcript</label>
+    <div id="log"></div>
+  </main>
+
+  <script>
+    const LISTEN_SECONDS = 20;
+    const SAMPLE_RATE = 16000;
+
+    const statusEl = document.getElementById("status");
+    const timerEl = document.getElementById("timer");
+    const logEl = document.getElementById("log");
+    const systemPromptEl = document.getElementById("systemPrompt");
+    const startOverlay = document.getElementById("startOverlay");
+    const startBtn = document.getElementById("startBtn");
+
+    let running = false;
+    let abortTurn = false;
+    let history = [];
+    let replyAudio = null;
+    let timerInterval = null;
+
+    function setStatus(text, { live = false, err = false } = {}) {
+      statusEl.textContent = text;
+      statusEl.className = err ? "err" : live ? "live" : "";
+    }
+
+    function appendTurn(role, text) {
+      const wrap = document.createElement("div");
+      wrap.className = "turn";
+      const label = document.createElement("div");
+      label.className = `role ${role}`;
+      label.textContent = role === "user" ? "You" : "Assistant";
+      const body = document.createElement("div");
+      body.textContent = text;
+      wrap.append(label, body);
+      logEl.append(wrap);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function floatTo16BitPCM(float32Array) {
+      const buffer = new ArrayBuffer(float32Array.length * 2);
+      const view = new DataView(buffer);
+      for (let i = 0; i < float32Array.length; i += 1) {
+        const s = Math.max(-1, Math.min(1, float32Array[i]));
+        view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+      }
+      return new Uint8Array(buffer);
+    }
+
+    function encodeWavBase64(pcmBytes, sampleRate, numChannels) {
+      const byteRate = sampleRate * numChannels * 2;
+      const blockAlign = numChannels * 2;
+      const dataSize = pcmBytes.length;
+      const buffer = new ArrayBuffer(44 + dataSize);
+      const view = new DataView(buffer);
+
+      function writeStr(offset, str) {
+        for (let i = 0; i < str.length; i += 1) view.setUint8(offset + i, str.charCodeAt(i));
+      }
+
+      writeStr(0, "RIFF");
+      view.setUint32(4, 36 + dataSize, true);
+      writeStr(8, "WAVE");
+      writeStr(12, "fmt ");
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, numChannels, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, byteRate, true);
+      view.setUint16(32, blockAlign, true);
+      view.setUint16(34, 16, true);
+      writeStr(36, "data");
+      view.setUint32(40, dataSize, true);
+      new Uint8Array(buffer, 44).set(pcmBytes);
+
+      let binary = "";
+      const bytes = new Uint8Array(buffer);
+      const chunk = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunk) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+      }
+      return btoa(binary);
+    }
+
+    function startCountdown(seconds) {
+      let left = seconds;
+      timerEl.classList.remove("idle");
+      timerEl.textContent = String(left);
+      clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        left -= 1;
+        if (left >= 0) timerEl.textContent = String(left);
+        if (left <= 0) clearInterval(timerInterval);
+      }, 1000);
+    }
+
+    function stopCountdown() {
+      clearInterval(timerInterval);
+      timerEl.classList.add("idle");
+      timerEl.textContent = String(LISTEN_SECONDS);
+    }
+
+    async function recordPcmSeconds(seconds) {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          channelCount: 1,
+        },
+      });
+
+      const ctx = new AudioContext({ sampleRate: SAMPLE_RATE });
+      const source = ctx.createMediaStreamSource(stream);
+      const processor = ctx.createScriptProcessor(4096, 1, 1);
+      const chunks = [];
+
+      processor.onaudioprocess = (event) => {
+        chunks.push(new Float32Array(event.inputBuffer.getChannelData(0)));
+      };
+
+      source.connect(processor);
+      const mute = ctx.createGain();
+      mute.gain.value = 0;
+      processor.connect(mute);
+      mute.connect(ctx.destination);
+
+      startCountdown(seconds);
+      await new Promise((resolve) => {
+        setTimeout(resolve, seconds * 1000);
+      });
+
+      processor.disconnect();
+      source.disconnect();
+      stream.getTracks().forEach((t) => t.stop());
+      await ctx.close();
+      stopCountdown();
+
+      const totalLength = chunks.reduce((sum, c) => sum + c.length, 0);
+      const merged = new Float32Array(totalLength);
+      let offset = 0;
+      for (const chunk of chunks) {
+        merged.set(chunk, offset);
+        offset += chunk.length;
+      }
+
+      const pcm = floatTo16BitPCM(merged);
+      return encodeWavBase64(pcm, SAMPLE_RATE, 1);
+    }
+
+    async function postJson(url, body) {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const contentType = res.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        throw new Error("Server returned non-JSON. Is npm start running?");
+      }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+      return data;
+    }
+
+    async function transcribe(base64Wav) {
+      const data = await postJson("/api/inworld/stt", {
+        audioContent: base64Wav,
+        audioEncoding: "LINEAR16",
+        sampleRateHertz: SAMPLE_RATE,
+        numberOfChannels: 1,
+        language: "en",
+      });
+      return data.transcript || "";
+    }
+
+    async function chat(userMessage) {
+      const data = await postJson("/api/inworld/llm/chat", {
+        systemPrompt: systemPromptEl.value.trim(),
+        userMessage,
+        history,
+      });
+      return data.reply;
+    }
+
+    function playReply(base64Mp3) {
+      return new Promise((resolve, reject) => {
+        if (replyAudio) {
+          replyAudio.pause();
+          replyAudio = null;
+        }
+        replyAudio = new Audio(`data:audio/mpeg;base64,${base64Mp3}`);
+        replyAudio.onended = () => resolve();
+        replyAudio.onerror = () => reject(new Error("Could not play TTS audio."));
+        replyAudio.play().catch(reject);
+      });
+    }
+
+    async function speak(text) {
+      const data = await postJson("/api/inworld/tts", { text });
+      await playReply(data.audioContent);
+    }
+
+    async function runTurn() {
+      if (abortTurn) return;
+
+      setStatus(`Listening… speak anytime (${LISTEN_SECONDS}s)`, { live: true });
+      const wavBase64 = await recordPcmSeconds(LISTEN_SECONDS);
+      if (abortTurn) return;
+
+      setStatus("Transcribing…", { live: true });
+      const transcript = (await transcribe(wavBase64)).trim();
+      if (abortTurn) return;
+
+      if (!transcript) {
+        setStatus("No speech detected — listening again…", { live: true });
+        return runTurn();
+      }
+
+      appendTurn("user", transcript);
+      history.push({ role: "user", content: transcript });
+
+      setStatus("Thinking…", { live: true });
+      const reply = await chat(transcript);
+      if (abortTurn) return;
+
+      appendTurn("assistant", reply);
+      history.push({ role: "assistant", content: reply });
+
+      setStatus("Speaking…", { live: true });
+      await speak(reply);
+      if (abortTurn) return;
+
+      setStatus("Your turn — listening starts in a moment…", { live: true });
+      await new Promise((r) => setTimeout(r, 400));
+      if (running && !abortTurn) await runTurn();
+    }
+
+    async function startConversation() {
+      startOverlay.classList.add("hidden");
+      running = true;
+      abortTurn = false;
+      history = [];
+      logEl.innerHTML = "";
+
+      try {
+        const ready = await fetch("/api/inworld/ready").then((r) => r.json());
+        if (!ready.enabled) {
+          setStatus("Inworld API is disabled on the server (INWORLD_API_ENABLED).", { err: true });
+          running = false;
+          startOverlay.classList.remove("hidden");
+          return;
+        }
+        if (!ready.configured) {
+          setStatus(
+            "Inworld API key missing. Set INWORLD_API_KEY on Railway or save key at /config.",
+            { err: true },
+          );
+          running = false;
+          startOverlay.classList.remove("hidden");
+          return;
+        }
+      } catch {
+        setStatus("Could not reach server (/api/inworld/ready).", { err: true });
+        running = false;
+        startOverlay.classList.remove("hidden");
+        return;
+      }
+
+      try {
+        await runTurn();
+      } catch (err) {
+        setStatus(err.message || "Something went wrong.", { err: true });
+        running = false;
+      }
+    }
+
+    startBtn.addEventListener("click", () => {
+      startConversation();
+    });
+
+    window.addEventListener("beforeunload", () => {
+      abortTurn = true;
+      running = false;
+    });
+  </script>
+</body>
+</html>

@@ -2230,10 +2230,22 @@ function isPublicPath(url) {
     || url === '/admin/login'
     || url === '/api/login'
     || url === '/api/admin/login'
+    || url === '/turn-based'
+    || url === '/turn-based.html'
     || url === '/assets/page-motion.css'
     || url === '/assets/page-motion.js'
     || /^\/assets\/uncle-tommy-transition\/(?:uncle-tommy-transition\.(?:css|js)|user_uncletommy_[1-4]\.png)$/i.test(url)
     || url === '/langoLogo.jpeg';
+}
+
+/** Turn-based test page: REST STT / LLM / TTS without login (Railway-friendly sandbox). */
+function isTurnBasedPublicApi(url, method) {
+  const m = (method || 'GET').toUpperCase();
+  if (m === 'GET' && url === '/api/inworld/ready') return true;
+  if (m !== 'POST') return false;
+  return url === '/api/inworld/stt'
+    || url === '/api/inworld/llm/chat'
+    || url === '/api/inworld/tts';
 }
 
 function isPreviewStaticAsset(url) {
@@ -2355,7 +2367,15 @@ function requiresAdmin(url, method) {
   if (url === '/api/video-pairs' && m === 'POST') return true;
 
   if (isGameApiRoute(url)) {
-    if (m === 'POST' && (url === '/api/inworld/tts' || url === '/api/inworld/llm/wordwhack-round')) return false;
+    if (
+      m === 'POST'
+      && (
+        url === '/api/inworld/tts'
+        || url === '/api/inworld/stt'
+        || url === '/api/inworld/llm/chat'
+        || url === '/api/inworld/llm/wordwhack-round'
+      )
+    ) return false;
     if (m === 'GET') {
       if (url === '/api/game-data/export') return true;
       if (url === '/api/settings/inworld') return true;
@@ -3476,6 +3496,7 @@ const pages = {
   '/vocab-game': 'vocab-game/index.html',
   '/vocab-game/': 'vocab-game/index.html',
   '/session-simple': 'session-simple.html',
+  '/turn-based': 'turn-based.html',
   '/agents': 'agents.html',
 };
 
@@ -3498,7 +3519,9 @@ const GAME_API_PREFIXES = [
   '/api/settings/inworld',
   '/api/settings/lango-image',
   '/api/inworld/tts',
+  '/api/inworld/stt',
   '/api/inworld/llm',
+  '/api/inworld/ready',
   '/api/game-data',
 ];
 
@@ -3701,7 +3724,12 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  if (!isPublicPath(url) && !isPreviewSafeRequest(req, url, rawUrl) && !isAuthenticated(req)) {
+  if (
+    !isPublicPath(url)
+    && !isTurnBasedPublicApi(url, req.method)
+    && !isPreviewSafeRequest(req, url, rawUrl)
+    && !isAuthenticated(req)
+  ) {
     if (wantsHtml(req)) {
       redirectToLogin(res, url);
       return;

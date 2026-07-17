@@ -22,6 +22,10 @@ const DATA_DIR =
     ? path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH, "game-data")
     : path.join(__dirname, "data"));
 const DB_PATH = path.join(DATA_DIR, "game.db");
+const APP_ROOT = path.join(__dirname, "..");
+const CONFIG_DIR =
+  process.env.CONFIG_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH || APP_ROOT;
+const CONFIG_PATH = path.join(CONFIG_DIR, "config.json");
 const WORDWHACK_SLOTS = new Set([
   "background",
   "cloud",
@@ -188,7 +192,10 @@ ensureVocaItemsSchema();
 
 const DEFAULT_INWORLD_VOICE_ID = "default-zylgts2tamenvybeti3z0w__uncle_tommy";
 const INWORLD_TTS_URL = "https://api.inworld.ai/tts/v1/voice";
+const INWORLD_STT_URL = "https://api.inworld.ai/stt/v1/transcribe";
 const INWORLD_LLM_URL = "https://api.inworld.ai/v1/chat/completions";
+const DEFAULT_INWORLD_LLM_MODEL = "openai/gpt-4o-mini";
+const DEFAULT_INWORLD_STT_MODEL = "inworld/inworld-stt-1";
 const LANGO_API_BASE_URL = (
   process.env.LANGO_API_BASE_URL || "https://dev.api.lango.ai"
 ).replace(/\/$/, "");
@@ -232,6 +239,35 @@ function getSetting(key) {
 
 function setSetting(key, value) {
   upsertSettingStmt.run(key, value, Date.now());
+}
+
+function loadAppConfig() {
+  try {
+    if (fs.existsSync(CONFIG_PATH)) {
+      return JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
+    }
+  } catch {
+    /* ignore */
+  }
+  return {};
+}
+
+function getInworldApiKey() {
+  return (
+    getSetting("inworld_api_key")?.trim() ||
+    loadAppConfig().apiKey?.trim() ||
+    process.env.INWORLD_API_KEY?.trim() ||
+    ""
+  );
+}
+
+function getInworldVoiceId() {
+  return (
+    getSetting("inworld_voice_id")?.trim() ||
+    loadAppConfig().voiceId?.trim() ||
+    process.env.INWORLD_VOICE_ID?.trim() ||
+    DEFAULT_INWORLD_VOICE_ID
+  );
 }
 
 const listVocaStmt = db.prepare(`
@@ -1174,8 +1210,8 @@ app.post("/api/voca/import", express.json(), async (req, res) => {
 });
 
 app.get("/api/settings/inworld", (_req, res) => {
-  const apiKey = getSetting("inworld_api_key");
-  const voiceId = getSetting("inworld_voice_id") || DEFAULT_INWORLD_VOICE_ID;
+  const apiKey = getInworldApiKey();
+  const voiceId = getInworldVoiceId();
   res.json({
     enabled: INWORLD_API_ENABLED,
     configured: Boolean(apiKey),
@@ -1203,8 +1239,8 @@ app.put("/api/settings/inworld", express.json(), (req, res) => {
     setSetting("inworld_voice_id", trimmedVoice);
   }
 
-  const savedKey = getSetting("inworld_api_key");
-  const savedVoice = getSetting("inworld_voice_id") || DEFAULT_INWORLD_VOICE_ID;
+  const savedKey = getInworldApiKey();
+  const savedVoice = getInworldVoiceId();
   res.json({
     ok: true,
     configured: Boolean(savedKey),
@@ -1282,11 +1318,148 @@ function normalizeRoundWords(words, requiredWord) {
   return out;
 }
 
+app.get("/api/inworld/ready", (_req, res) => {
+  res.json({
+    enabled: INWORLD_API_ENABLED,
+    configured: Boolean(getInworldApiKey()),
+  });
+});
+
+app.post("/api/inworld/stt", express.json({ limit: "12mb" }), async (req, res) => {
+  if (!INWORLD_API_ENABLED) {
+    return res.status(503).json({ error: INWORLD_API_DISABLED_MESSAGE });
+  }
+  const apiKey = getInworldApiKey();
+  if (!apiKey) {
+    return res.status(503).json({ error: "Inworld API key not configured." });
+  }
+
+  const audioContent = String(req.body?.audioContent || "").trim();
+  if (!audioContent) {
+    return res.status(400).json({ error: "audioContent (base64) is required." });
+  }
+
+  const audioEncoding = String(req.body?.audioEncoding || "LINEAR16").trim() || "LINEAR16";
+  const language = String(req.body?.language || "en").trim() || "en";
+  const modelId = String(req.body?.modelId || DEFAULT_INWORLD_STT_MODEL).trim()
+    || DEFAULT_INWORLD_STT_MODEL;
+  const sampleRateHertz = Number(req.body?.sampleRateHertz) || 16000;
+  const numberOfChannels = Number(req.body?.numberOfChannels) || 1;
+
+  const transcribeConfig = {
+    modelId,
+    language,
+    audioEncoding,
+    numberOfChannels,
+  };
+  if (audioEncoding === "LINEAR16") {
+    transcribeConfig.sampleRateHertz = sampleRateHertz;
+  }
+
+  try {
+    const upstream = await fetch(INWORLD_STT_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        transcribeConfig,
+        audioData: { content: audioContent },
+      }),
+    });
+
+    const payload = await upstream.json().catch(() => ({}));
+    if (!upstream.ok) {
+      const message =
+        payload?.message ||
+        payload?.error?.message ||
+        payload?.error ||
+        "Inworld STT request failed.";
+      return res.status(upstream.status).json({ error: message });
+    }
+
+    const transcript = String(
+      payload?.transcription?.transcript ||
+        payload?.transcript ||
+        "",
+    ).trim();
+
+    res.json({ transcript, raw: payload });
+  } catch (err) {
+    res.status(502).json({ error: err.message || "Failed to reach Inworld STT." });
+  }
+});
+
+app.post("/api/inworld/llm/chat", express.json(), async (req, res) => {
+  if (!INWORLD_API_ENABLED) {
+    return res.status(503).json({ error: INWORLD_API_DISABLED_MESSAGE });
+  }
+  const apiKey = getInworldApiKey();
+  if (!apiKey) {
+    return res.status(503).json({ error: "Inworld API key not configured." });
+  }
+
+  const systemPrompt = String(req.body?.systemPrompt || "").trim();
+  const userMessage = String(req.body?.userMessage || "").trim();
+  const history = Array.isArray(req.body?.history) ? req.body.history : [];
+  const model = String(req.body?.model || DEFAULT_INWORLD_LLM_MODEL).trim()
+    || DEFAULT_INWORLD_LLM_MODEL;
+
+  if (!userMessage) {
+    return res.status(400).json({ error: "userMessage is required." });
+  }
+
+  const messages = [];
+  if (systemPrompt) {
+    messages.push({ role: "system", content: systemPrompt });
+  }
+  for (const turn of history) {
+    const role = turn?.role === "assistant" ? "assistant" : "user";
+    const content = String(turn?.content || "").trim();
+    if (content) messages.push({ role, content });
+  }
+  messages.push({ role: "user", content: userMessage });
+
+  try {
+    const upstream = await fetch(INWORLD_LLM_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature: 0.7,
+      }),
+    });
+
+    const payload = await upstream.json().catch(() => ({}));
+    if (!upstream.ok) {
+      const message =
+        payload?.error?.message ||
+        payload?.error ||
+        "Inworld LLM request failed.";
+      return res.status(upstream.status).json({ error: message });
+    }
+
+    const reply = String(payload?.choices?.[0]?.message?.content || "").trim();
+    if (!reply) {
+      return res.status(502).json({ error: "Inworld returned empty content." });
+    }
+
+    res.json({ reply, model });
+  } catch (err) {
+    res.status(502).json({ error: err.message || "Failed to reach Inworld LLM." });
+  }
+});
+
 app.post("/api/inworld/llm/wordwhack-round", express.json(), async (req, res) => {
   if (!INWORLD_API_ENABLED) {
     return res.status(503).json({ error: INWORLD_API_DISABLED_MESSAGE });
   }
-  const apiKey = getSetting("inworld_api_key");
+  const apiKey = getInworldApiKey();
   if (!apiKey) {
     return res.status(503).json({ error: "Inworld API key not configured." });
   }
@@ -1385,7 +1558,7 @@ app.post("/api/inworld/tts", express.json(), async (req, res) => {
   if (!INWORLD_API_ENABLED) {
     return res.status(503).json({ error: INWORLD_API_DISABLED_MESSAGE });
   }
-  const apiKey = getSetting("inworld_api_key");
+  const apiKey = getInworldApiKey();
   if (!apiKey) {
     return res.status(503).json({ error: "Inworld API key not configured." });
   }
@@ -1398,7 +1571,7 @@ app.post("/api/inworld/tts", express.json(), async (req, res) => {
     return res.status(400).json({ error: "text exceeds 2000 characters." });
   }
 
-  const voiceId = getSetting("inworld_voice_id") || DEFAULT_INWORLD_VOICE_ID;
+  const voiceId = getInworldVoiceId();
 
   try {
     const upstream = await fetch(INWORLD_TTS_URL, {
