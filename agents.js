@@ -1,11 +1,5 @@
 const { Conversation } = ElevenLabsClient;
 
-const STORAGE = {
-  apiKey: "elevenagents_api_key",
-  agentId: "elevenagents_agent_id",
-  voiceId: "elevenagents_voice_id",
-};
-
 const apiKeyInput = document.getElementById("apiKey");
 const agentIdInput = document.getElementById("agentId");
 const voiceIdInput = document.getElementById("voiceId");
@@ -21,7 +15,14 @@ const settingsHint = document.getElementById("settingsHint");
 const logEl = document.getElementById("log");
 
 let conversation = null;
-let serverDefaults = { voiceId: "", defaultAgentId: "", hasApiKey: false };
+let serverConfig = {
+  apiKey: "",
+  voiceId: "",
+  defaultAgentId: "",
+  hasApiKey: false,
+  persisted: false,
+  updatedAt: null,
+};
 
 function appendLog(text, className = "meta") {
   const line = document.createElement("div");
@@ -44,34 +45,58 @@ function elevenLabsFetchHeaders() {
   return { "X-ElevenLabs-Api-Key": key };
 }
 
-function saveSettingsToStorage() {
-  localStorage.setItem(STORAGE.apiKey, apiKeyInput.value.trim());
-  localStorage.setItem(STORAGE.agentId, agentIdInput.value.trim());
-  localStorage.setItem(STORAGE.voiceId, voiceIdInput.value.trim());
-  settingsHint.textContent = "Saved in this browser.";
+function applyConfigToForm(cfg) {
+  if (cfg.apiKey) apiKeyInput.value = cfg.apiKey;
+  if (cfg.voiceId) voiceIdInput.value = cfg.voiceId;
+  if (cfg.defaultAgentId) agentIdInput.value = cfg.defaultAgentId;
 }
 
-function loadSettingsFromStorage() {
-  const storedKey = localStorage.getItem(STORAGE.apiKey);
-  const storedAgent = localStorage.getItem(STORAGE.agentId);
-  const storedVoice = localStorage.getItem(STORAGE.voiceId);
-  if (storedKey) apiKeyInput.value = storedKey;
-  if (storedAgent) agentIdInput.value = storedAgent;
-  if (storedVoice) voiceIdInput.value = storedVoice;
+function formatSavedHint(cfg) {
+  if (cfg.persisted && cfg.updatedAt) {
+    const when = new Date(cfg.updatedAt).toLocaleString();
+    settingsHint.textContent = `Saved on server (shared across devices). Last updated: ${when}.`;
+    return;
+  }
+  if (cfg.hasApiKey) {
+    settingsHint.textContent =
+      "Using server env defaults. Click Save to store settings on the server for other computers.";
+    return;
+  }
+  settingsHint.textContent = "Enter credentials and click Save to store them on the server.";
 }
 
-async function loadServerDefaults() {
+async function loadServerConfig() {
   const res = await fetch("/api/elevenlabs/config");
-  serverDefaults = await res.json();
-  if (!voiceIdInput.value.trim() && serverDefaults.voiceId) {
-    voiceIdInput.value = serverDefaults.voiceId;
+  serverConfig = await res.json();
+  applyConfigToForm(serverConfig);
+  formatSavedHint(serverConfig);
+}
+
+async function saveSettingsToServer() {
+  const payload = {
+    apiKey: apiKeyInput.value.trim(),
+    voiceId: voiceIdInput.value.trim(),
+    agentId: agentIdInput.value.trim(),
+  };
+  const res = await fetch("/api/elevenlabs/config", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || JSON.stringify(data));
   }
-  if (!agentIdInput.value.trim() && serverDefaults.defaultAgentId) {
-    agentIdInput.value = serverDefaults.defaultAgentId;
-  }
-  if (!apiKeyInput.value.trim() && serverDefaults.hasApiKey) {
-    settingsHint.textContent = "Server has an API key; leave the key field empty to use it.";
-  }
+  serverConfig = {
+    ...serverConfig,
+    ...payload,
+    defaultAgentId: payload.agentId,
+    hasApiKey: Boolean(payload.apiKey),
+    persisted: true,
+    updatedAt: data.updatedAt,
+  };
+  formatSavedHint(serverConfig);
+  appendLog("Settings saved on server.", "meta");
 }
 
 function resolveAgentId() {
@@ -81,7 +106,6 @@ function resolveAgentId() {
 }
 
 async function loadAgents() {
-  saveSettingsToStorage();
   agentSelect.innerHTML = "";
   const placeholder = document.createElement("option");
   placeholder.value = "";
@@ -139,7 +163,6 @@ async function fetchConversationToken(agentId) {
 }
 
 async function startConversation() {
-  saveSettingsToStorage();
   const agentId = resolveAgentId();
   if (!agentId) {
     appendLog("Set an agent ID or pick one from the list.", "err");
@@ -153,7 +176,7 @@ async function startConversation() {
     await navigator.mediaDevices.getUserMedia({ audio: true });
     const token = await fetchConversationToken(agentId);
 
-    const voiceId = voiceIdInput.value.trim() || serverDefaults.voiceId;
+    const voiceId = voiceIdInput.value.trim() || serverConfig.voiceId;
     const overrides = { tts: { voiceId } };
     const firstMessage = firstMessageInput.value.trim();
     if (firstMessage) {
@@ -210,10 +233,13 @@ agentSelect.addEventListener("change", () => {
 
 startBtn.addEventListener("click", startConversation);
 stopBtn.addEventListener("click", stopConversation);
-saveBtn.addEventListener("click", saveSettingsToStorage);
+saveBtn.addEventListener("click", () => {
+  saveSettingsToServer().catch((err) => appendLog(String(err), "err"));
+});
 loadAgentsBtn.addEventListener("click", () => {
   loadAgents().catch((err) => appendLog(String(err), "err"));
 });
 
-loadSettingsFromStorage();
-loadServerDefaults().catch((err) => appendLog(String(err), "err"));
+loadServerConfig()
+  .then(() => loadAgents())
+  .catch((err) => appendLog(String(err), "err"));

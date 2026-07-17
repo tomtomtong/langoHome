@@ -9,7 +9,7 @@
 <body>
   <main>
     <h1>Eleven Agents</h1>
-    <p class="sub">Settings are saved in this browser (localStorage). Server env vars are used only when a field is left empty.</p>
+    <p class="sub">Click <strong>Save settings</strong> to store API key, agent ID, and voice ID on the server (same data on any computer). On Railway, use a persistent volume for <code>CONFIG_DIR</code> so saves survive redeploys.</p>
 
     <fieldset class="settings">
       <legend>Credentials</legend>
@@ -23,7 +23,7 @@
       <input id="voiceId" type="text" autocomplete="off" spellcheck="false" placeholder="Taae9YSyOLxij6fj32HF">
 
       <div class="row">
-        <button type="button" id="saveBtn">Save settings</button>
+        <button type="button" id="saveBtn">Save settings (server)</button>
         <button type="button" id="loadAgentsBtn">Load agents from account</button>
       </div>
       <p class="field-hint" id="settingsHint"></p>

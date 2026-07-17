@@ -46,7 +46,7 @@ function getRequestElevenLabsApiKey(req) {
   const raw = req.headers['x-elevenlabs-api-key'];
   const fromHeader = (Array.isArray(raw) ? raw[0] : raw)?.trim();
   if (fromHeader) return fromHeader;
-  return ELEVENLABS_API_KEY;
+  return getEffectiveElevenLabsSettings().apiKey;
 }
 
 function requireElevenLabsApiKey(req, res) {
@@ -72,6 +72,7 @@ function isElevenAgentsPublicPath(url) {
 // Local: ./config.json  |  Railway: mount a volume (e.g. /app/data) — uses RAILWAY_VOLUME_MOUNT_PATH
 const CONFIG_DIR = process.env.CONFIG_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH || ROOT;
 const CONFIG_PATH = join(CONFIG_DIR, 'config.json');
+const ELEVENLABS_CONFIG_PATH = join(CONFIG_DIR, 'elevenlabs-config.json');
 const USER_PROFILES_PATH = join(CONFIG_DIR, 'user-profiles.json');
 const USER_LOGIN_META_PATH = join(CONFIG_DIR, 'user-login-meta.json');
 const STUDENT_USERS_PATH = join(CONFIG_DIR, 'student-users.json');
@@ -3368,6 +3369,39 @@ function saveConfig(config) {
   writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2) + '\n');
 }
 
+function loadElevenLabsSavedConfig() {
+  try {
+    if (existsSync(ELEVENLABS_CONFIG_PATH)) {
+      return JSON.parse(readFileSync(ELEVENLABS_CONFIG_PATH, 'utf8'));
+    }
+  } catch (e) {
+    console.warn('Could not load elevenlabs-config.json:', e.message);
+  }
+  return {};
+}
+
+function saveElevenLabsSavedConfig(data) {
+  ensureConfigDir();
+  const payload = {
+    apiKey: String(data.apiKey ?? '').trim(),
+    voiceId: String(data.voiceId ?? '').trim(),
+    agentId: String(data.agentId ?? '').trim(),
+    updatedAt: new Date().toISOString(),
+  };
+  writeFileSync(ELEVENLABS_CONFIG_PATH, JSON.stringify(payload, null, 2) + '\n');
+  return payload;
+}
+
+function getEffectiveElevenLabsSettings() {
+  const saved = loadElevenLabsSavedConfig();
+  return {
+    apiKey: saved.apiKey?.trim() || ELEVENLABS_API_KEY,
+    voiceId: saved.voiceId?.trim() || ELEVENLABS_VOICE_ID,
+    agentId: saved.agentId?.trim() || ELEVENLABS_AGENT_ID,
+    updatedAt: saved.updatedAt || null,
+  };
+}
+
 function loadDebugLogs() {
   try {
     if (existsSync(DEBUG_LOG_PATH)) {
@@ -4145,10 +4179,33 @@ const server = createServer(async (req, res) => {
   }
 
   if (url === '/api/elevenlabs/config' && req.method === 'GET') {
+    const effective = getEffectiveElevenLabsSettings();
     sendJson(res, 200, {
-      voiceId: ELEVENLABS_VOICE_ID,
-      defaultAgentId: ELEVENLABS_AGENT_ID,
-      hasApiKey: Boolean(ELEVENLABS_API_KEY),
+      apiKey: effective.apiKey,
+      voiceId: effective.voiceId,
+      defaultAgentId: effective.agentId,
+      hasApiKey: Boolean(effective.apiKey),
+      persisted: Boolean(effective.updatedAt),
+      updatedAt: effective.updatedAt,
+    });
+    return;
+  }
+
+  if (url === '/api/elevenlabs/config' && req.method === 'POST') {
+    readJsonBody(req, res, (parsed) => {
+      const saved = saveElevenLabsSavedConfig({
+        apiKey: parsed.apiKey,
+        voiceId: parsed.voiceId,
+        agentId: parsed.agentId ?? parsed.defaultAgentId,
+      });
+      sendJson(res, 200, {
+        ok: true,
+        voiceId: saved.voiceId || ELEVENLABS_VOICE_ID,
+        defaultAgentId: saved.agentId,
+        hasApiKey: Boolean(saved.apiKey?.trim() || ELEVENLABS_API_KEY),
+        persisted: true,
+        updatedAt: saved.updatedAt,
+      });
     });
     return;
   }
@@ -4169,7 +4226,7 @@ const server = createServer(async (req, res) => {
     const apiKey = requireElevenLabsApiKey(req, res);
     if (!apiKey) return;
     const params = new URL(rawUrl, 'http://local').searchParams;
-    const agentId = String(params.get('agent_id') || ELEVENLABS_AGENT_ID || '').trim();
+    const agentId = String(params.get('agent_id') || getEffectiveElevenLabsSettings().agentId || '').trim();
     if (!agentId) {
       sendJson(res, 400, { error: 'agent_id query parameter is required' });
       return;

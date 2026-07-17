@@ -4,6 +4,7 @@ node_modules/
 .env
 eleven-agents-test/.env
 config.json
+elevenlabs-config.json
 sessions.json
 student-users.json
 hello-debug-log.json
