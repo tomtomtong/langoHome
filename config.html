@@ -266,7 +266,7 @@
 <body>
   <div class="card wide">
     <h1>Voice Agent Settings</h1>
-    <p>Set your API key and optionally override the prompt, voice, or LLM model. Leave optional fields blank to use defaults.</p>
+    <p>Set your API key and optionally override the prompt, voice, LLM, speech (ASR/TTS/VAD), and language settings. Leave optional fields blank to use server defaults.</p>
 
     <section class="debug-section" id="add-user-section" style="margin-bottom:1.5rem; padding:1rem; border:1px solid #2a2f3a; border-radius:10px; background:#141722">
       <h2 style="margin:0 0 0.35rem; font-size:1rem">新增學生帳號 · Add student account</h2>
@@ -323,6 +323,74 @@
         <p class="field-hint">Inworld LLM used after each session to summarize the conversation into the learner&rsquo;s account profile.</p>
       </div>
       <hr class="section-divider" style="margin: 1.5rem 0 1.25rem">
+      <h2 style="margin: 0 0 0.375rem; font-size: 1rem">Speech &amp; audio (realtime)</h2>
+      <p style="margin: 0 0 1rem">Applied to every voice session on the main app (and any client that does not override them). Same options as the <a href="/session-simple.html">simple session tester</a>.</p>
+      <div class="field">
+        <label for="ttsModel">TTS model <span style="color:#5f6368;font-weight:400">(optional)</span></label>
+        <select id="ttsModel">
+          <option value="">Default: inworld-tts-2</option>
+          <option value="inworld-tts-2">inworld-tts-2 (higher quality)</option>
+          <option value="inworld-tts-1.5-mini">inworld-tts-1.5-mini (lower latency)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="ttsLanguage">TTS language <span style="color:#5f6368;font-weight:400">(optional)</span></label>
+        <input id="ttsLanguage" type="text" placeholder="e.g. en-US, zh-HK" autocomplete="off">
+        <p class="field-hint">BCP-47 code for synthesis. Leave empty to let TTS infer.</p>
+      </div>
+      <div class="field">
+        <label for="ttsSpeed">TTS speed <span style="color:#5f6368;font-weight:400">(optional)</span></label>
+        <input id="ttsSpeed" type="number" min="0.5" max="2" step="0.05" placeholder="1.0">
+      </div>
+      <div class="field">
+        <label for="ttsDeliveryMode">TTS delivery mode <span style="color:#5f6368;font-weight:400">(optional)</span></label>
+        <select id="ttsDeliveryMode">
+          <option value="">Default (server)</option>
+          <option value="STABLE">STABLE — consistent delivery</option>
+          <option value="BALANCED">BALANCED</option>
+          <option value="CREATIVE">CREATIVE — more expressive (TTS-2)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="asrModel">ASR model <span style="color:#5f6368;font-weight:400">(optional)</span></label>
+        <select id="asrModel">
+          <option value="">Default: assemblyai/universal-streaming-english</option>
+          <option value="inworld/inworld-stt-1">inworld/inworld-stt-1</option>
+          <option value="assemblyai/universal-streaming-english">assemblyai/universal-streaming-english</option>
+          <option value="assemblyai/u3-rt-pro">assemblyai/u3-rt-pro</option>
+          <option value="assemblyai/universal-streaming-multilingual">assemblyai/universal-streaming-multilingual</option>
+          <option value="soniox/stt-rt-v4">soniox/stt-rt-v4</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="asrLanguage">ASR language <span style="color:#5f6368;font-weight:400">(optional)</span></label>
+        <input id="asrLanguage" type="text" placeholder="e.g. en, es, zh" autocomplete="off">
+        <p class="field-hint">BCP-47 code for speech recognition. Leave empty for auto-detect.</p>
+      </div>
+      <div class="field">
+        <label for="vadEagerness">VAD eagerness <span style="color:#5f6368;font-weight:400">(optional)</span></label>
+        <select id="vadEagerness">
+          <option value="">Default: low</option>
+          <option value="low">low — wait longer before ending turn</option>
+          <option value="medium">medium — balanced</option>
+          <option value="high">high — respond faster</option>
+          <option value="auto">auto</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="vadThreshold">VAD threshold override <span style="color:#5f6368;font-weight:400">(optional)</span></label>
+        <input id="vadThreshold" type="number" min="0" max="1" step="0.05" placeholder="0.0–1.0">
+        <p class="field-hint">Overrides the eagerness preset when set. See <a href="https://docs.inworld.ai/realtime/provider-data" target="_blank" rel="noopener">Inworld STT extensions</a>.</p>
+      </div>
+      <div class="field">
+        <label for="temperature">LLM temperature <span style="color:#5f6368;font-weight:400">(optional)</span></label>
+        <input id="temperature" type="number" min="0" max="2" step="0.1" placeholder="Server default">
+      </div>
+      <div class="field">
+        <label for="maxOutputTokens">Max output tokens <span style="color:#5f6368;font-weight:400">(optional)</span></label>
+        <input id="maxOutputTokens" type="text" placeholder="4096 or inf" autocomplete="off">
+      </div>
+      <hr class="section-divider" style="margin: 1.5rem 0 1.25rem">
       <h2 style="margin: 0 0 0.375rem; font-size: 1rem">Conversation game icons</h2>
       <p style="margin: 0 0 1rem">Icons on the game shortcuts during a conversation. Upload a custom image per game, or leave empty to use the built-in default. Square PNG or WebP works best.</p>
       <div id="game-icons-grid" class="game-icons-grid"></div>
@@ -366,6 +434,16 @@
     const modelCustom = document.getElementById('modelCustom');
     const profileSyncModel = document.getElementById('profileSyncModel');
     const profileSyncModelCustom = document.getElementById('profileSyncModelCustom');
+    const ttsModel = document.getElementById('ttsModel');
+    const ttsLanguage = document.getElementById('ttsLanguage');
+    const ttsSpeed = document.getElementById('ttsSpeed');
+    const ttsDeliveryMode = document.getElementById('ttsDeliveryMode');
+    const asrModel = document.getElementById('asrModel');
+    const asrLanguage = document.getElementById('asrLanguage');
+    const vadEagerness = document.getElementById('vadEagerness');
+    const vadThreshold = document.getElementById('vadThreshold');
+    const temperature = document.getElementById('temperature');
+    const maxOutputTokens = document.getElementById('maxOutputTokens');
     const modelsStatus = document.getElementById('models-status');
     const btnRefreshModels = document.getElementById('btn-refresh-models');
     const status = document.getElementById('status');
@@ -382,6 +460,21 @@
     function resolveModelSelectValue(selectEl, customEl) {
       if (selectEl.value === '__custom__') return customEl.value.trim();
       return selectEl.value.trim();
+    }
+
+    function optionalInputNumber(el) {
+      const raw = el.value.trim();
+      if (!raw) return '';
+      const n = Number(raw);
+      return Number.isFinite(n) ? n : '';
+    }
+
+    function applyOptionalNumberInput(el, value) {
+      if (value === '' || value == null) {
+        el.value = '';
+        return;
+      }
+      el.value = value;
     }
 
     function populateModelSelect(selectEl, models, { allowEmpty = false, emptyLabel = '' } = {}) {
@@ -723,6 +816,16 @@ ${linesText.replace(/</g, '&lt;')}</pre>
         );
       }
       applyGameIcons(cfg.gameIcons);
+      ttsModel.value = cfg.ttsModel ?? '';
+      ttsLanguage.value = cfg.ttsLanguage ?? '';
+      applyOptionalNumberInput(ttsSpeed, cfg.ttsSpeed);
+      ttsDeliveryMode.value = cfg.ttsDeliveryMode ?? '';
+      asrModel.value = cfg.asrModel ?? '';
+      asrLanguage.value = cfg.asrLanguage ?? '';
+      vadEagerness.value = cfg.vadEagerness ?? '';
+      applyOptionalNumberInput(vadThreshold, cfg.vadThreshold);
+      applyOptionalNumberInput(temperature, cfg.temperature);
+      maxOutputTokens.value = cfg.maxOutputTokens === 'inf' ? 'inf' : (cfg.maxOutputTokens ?? '');
     }
 
     function loadFromLocalStorage() {
@@ -755,6 +858,16 @@ ${linesText.replace(/</g, '&lt;')}</pre>
         voice: voice.value.trim(),
         model: resolveModelSelectValue(model, modelCustom),
         profileSyncModel: resolveProfileSyncModelValue(),
+        ttsModel: ttsModel.value.trim(),
+        ttsLanguage: ttsLanguage.value.trim(),
+        ttsSpeed: optionalInputNumber(ttsSpeed),
+        ttsDeliveryMode: ttsDeliveryMode.value.trim(),
+        asrModel: asrModel.value.trim(),
+        asrLanguage: asrLanguage.value.trim(),
+        vadEagerness: vadEagerness.value.trim(),
+        vadThreshold: optionalInputNumber(vadThreshold),
+        temperature: optionalInputNumber(temperature),
+        maxOutputTokens: maxOutputTokens.value.trim(),
         lipsync: serverConfig?.lipsync,
         avatar: serverConfig?.avatar,
         lighting: serverConfig?.lighting,
@@ -812,7 +925,11 @@ ${linesText.replace(/</g, '&lt;')}</pre>
     loadConfig();
 
     document.getElementById('form').addEventListener('submit', (e) => e.preventDefault());
-    [input, prompt, voice].forEach((el) => {
+    [input, prompt, voice, ttsLanguage, asrLanguage, maxOutputTokens].forEach((el) => {
+      el.addEventListener('input', scheduleSave);
+    });
+    [ttsModel, ttsDeliveryMode, asrModel, vadEagerness, ttsSpeed, vadThreshold, temperature].forEach((el) => {
+      el.addEventListener('change', scheduleSave);
       el.addEventListener('input', scheduleSave);
     });
     wireModelSelect(model, modelCustom);

@@ -3389,6 +3389,101 @@ function saveConfig(config) {
   writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2) + '\n');
 }
 
+function optionalConfigNumber(value) {
+  if (value === '' || value == null) return undefined;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function optionalConfigMaxOutputTokens(value) {
+  if (value === '' || value == null) return undefined;
+  const s = String(value).trim();
+  if (!s) return undefined;
+  if (s.toLowerCase() === 'inf') return 'inf';
+  const n = Number(s);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
+function voiceRealtimeSettingsForApi(cfg = {}) {
+  const vadThreshold = optionalConfigNumber(cfg.vadThreshold);
+  const ttsSpeed = optionalConfigNumber(cfg.ttsSpeed);
+  const temperature = optionalConfigNumber(cfg.temperature);
+  const maxOutputTokens = optionalConfigMaxOutputTokens(cfg.maxOutputTokens);
+  return {
+    asrModel: String(cfg.asrModel ?? '').trim(),
+    asrLanguage: String(cfg.asrLanguage ?? '').trim(),
+    vadEagerness: String(cfg.vadEagerness ?? '').trim(),
+    vadThreshold: vadThreshold ?? '',
+    ttsModel: String(cfg.ttsModel ?? '').trim(),
+    ttsLanguage: String(cfg.ttsLanguage ?? '').trim(),
+    ttsSpeed: ttsSpeed ?? '',
+    ttsDeliveryMode: String(cfg.ttsDeliveryMode ?? '').trim(),
+    temperature: temperature ?? '',
+    maxOutputTokens: maxOutputTokens === 'inf' ? 'inf' : (maxOutputTokens ?? ''),
+  };
+}
+
+function applyVoiceRealtimeSettingsToConfig(existing, parsed) {
+  const next = { ...existing };
+  const textKeys = [
+    'asrModel',
+    'asrLanguage',
+    'vadEagerness',
+    'ttsModel',
+    'ttsLanguage',
+    'ttsDeliveryMode',
+  ];
+  for (const key of textKeys) {
+    if (parsed[key] != null) next[key] = String(parsed[key]).trim();
+  }
+  const numericKeys = ['vadThreshold', 'ttsSpeed', 'temperature'];
+  for (const key of numericKeys) {
+    if (!Object.prototype.hasOwnProperty.call(parsed, key)) continue;
+    const n = optionalConfigNumber(parsed[key]);
+    if (n === undefined) delete next[key];
+    else next[key] = n;
+  }
+  if (Object.prototype.hasOwnProperty.call(parsed, 'maxOutputTokens')) {
+    const maxTok = optionalConfigMaxOutputTokens(parsed.maxOutputTokens);
+    if (maxTok === undefined) delete next.maxOutputTokens;
+    else next.maxOutputTokens = maxTok;
+  }
+  return next;
+}
+
+function mergeVoiceRealtimeAuthOptions(parsed, saved) {
+  const pickStr = (key) => parsed[key]?.trim() || saved[key]?.trim() || undefined;
+  const pickNum = (key) => {
+    if (Object.prototype.hasOwnProperty.call(parsed, key)
+      && parsed[key] !== ''
+      && parsed[key] != null) {
+      const fromClient = optionalConfigNumber(parsed[key]);
+      if (fromClient !== undefined) return fromClient;
+    }
+    return optionalConfigNumber(saved[key]);
+  };
+  let maxOutputTokens;
+  if (Object.prototype.hasOwnProperty.call(parsed, 'maxOutputTokens')
+    && parsed.maxOutputTokens !== ''
+    && parsed.maxOutputTokens != null) {
+    maxOutputTokens = optionalConfigMaxOutputTokens(parsed.maxOutputTokens);
+  } else {
+    maxOutputTokens = optionalConfigMaxOutputTokens(saved.maxOutputTokens);
+  }
+  return {
+    asrModel: pickStr('asrModel'),
+    asrLanguage: pickStr('asrLanguage'),
+    vadEagerness: pickStr('vadEagerness'),
+    vadThreshold: pickNum('vadThreshold'),
+    ttsModel: pickStr('ttsModel'),
+    ttsLanguage: pickStr('ttsLanguage'),
+    ttsSpeed: pickNum('ttsSpeed'),
+    ttsDeliveryMode: pickStr('ttsDeliveryMode'),
+    temperature: pickNum('temperature'),
+    maxOutputTokens,
+  };
+}
+
 function loadElevenLabsSavedConfig() {
   try {
     if (existsSync(ELEVENLABS_CONFIG_PATH)) {
@@ -4118,6 +4213,7 @@ const server = createServer(async (req, res) => {
         voice: cfg.voice ?? '',
         model: cfg.model ?? '',
         profileSyncModel: cfg.profileSyncModel ?? '',
+        ...voiceRealtimeSettingsForApi(cfg),
         avatar: normalizeAvatar(cfg.avatar),
         lipsync: normalizeLipsync(cfg.lipsync),
         lighting: normalizeLighting(cfg.lighting),
@@ -4138,7 +4234,8 @@ const server = createServer(async (req, res) => {
           return;
         }
         const existing = loadConfig();
-        saveConfig({
+        saveConfig(applyVoiceRealtimeSettingsToConfig({
+          ...existing,
           apiKey,
           instructions: parsed.instructions?.trim() || '',
           voice: parsed.voice?.trim() || '',
@@ -4151,7 +4248,7 @@ const server = createServer(async (req, res) => {
           lighting: parsed.lighting != null
             ? normalizeLighting(parsed.lighting)
             : normalizeLighting(existing.lighting),
-        });
+        }, parsed));
         sendJson(res, 200, { ok: true });
       });
       return;
@@ -4843,24 +4940,7 @@ wss.on('connection', (browser, req) => {
     const baseInstructions = simpleSession
       ? (typeof parsed.instructions === 'string' ? parsed.instructions.trim() : '')
       : (parsed.instructions?.trim() || saved.instructions?.trim());
-    const vadThresholdRaw = parsed.vadThreshold;
-    const vadThreshold = vadThresholdRaw === '' || vadThresholdRaw == null
-      ? undefined
-      : Number(vadThresholdRaw);
-    const temperatureRaw = parsed.temperature;
-    const temperature = temperatureRaw === '' || temperatureRaw == null
-      ? undefined
-      : Number(temperatureRaw);
-    const maxOutputTokensRaw = parsed.maxOutputTokens;
-    const maxOutputTokens = maxOutputTokensRaw === '' || maxOutputTokensRaw == null
-      ? undefined
-      : (String(maxOutputTokensRaw).trim().toLowerCase() === 'inf'
-        ? 'inf'
-        : Number(maxOutputTokensRaw));
-    const ttsSpeedRaw = parsed.ttsSpeed;
-    const ttsSpeed = ttsSpeedRaw === '' || ttsSpeedRaw == null
-      ? undefined
-      : Number(ttsSpeedRaw);
+    const realtime = mergeVoiceRealtimeAuthOptions(parsed, saved);
 
     connectToInworld(apiKey, browser, {
       instructions: simpleSession
@@ -4874,18 +4954,7 @@ wss.on('connection', (browser, req) => {
       username: sessionUser?.role === 'student' ? sessionUser.username : null,
       voice: parsed.voice?.trim() || saved.voice?.trim(),
       model: parsed.model?.trim() || saved.model?.trim(),
-      asrModel: parsed.asrModel?.trim() || saved.asrModel?.trim(),
-      asrLanguage: parsed.asrLanguage?.trim() || saved.asrLanguage?.trim(),
-      vadEagerness: parsed.vadEagerness?.trim() || saved.vadEagerness?.trim(),
-      vadThreshold: Number.isFinite(vadThreshold) ? vadThreshold : undefined,
-      ttsModel: parsed.ttsModel?.trim() || saved.ttsModel?.trim(),
-      ttsLanguage: parsed.ttsLanguage?.trim() || saved.ttsLanguage?.trim(),
-      ttsSpeed: Number.isFinite(ttsSpeed) ? ttsSpeed : undefined,
-      ttsDeliveryMode: parsed.ttsDeliveryMode?.trim() || saved.ttsDeliveryMode?.trim(),
-      temperature: Number.isFinite(temperature) ? temperature : undefined,
-      maxOutputTokens: maxOutputTokens === 'inf' || Number.isFinite(maxOutputTokens)
-        ? maxOutputTokens
-        : undefined,
+      ...realtime,
     }, {
       username: sessionUser?.username || 'unknown',
       role: sessionUser?.role || 'unknown',
