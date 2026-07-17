@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eleven Agents</title>
+  <link rel="stylesheet" href="/agents.css">
+</head>
+<body>
+  <main>
+    <h1>Eleven Agents</h1>
+    <p class="sub">Settings are saved in this browser (localStorage). Server env vars are used only when a field is left empty.</p>
+
+    <fieldset class="settings">
+      <legend>Credentials</legend>
+      <label for="apiKey">ElevenLabs API key</label>
+      <input id="apiKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk_…">
+
+      <label for="agentId">Agent ID</label>
+      <input id="agentId" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. rCpOsMUkO0YwxCI3EDaZ">
+
+      <label for="voiceId">Voice ID</label>
+      <input id="voiceId" type="text" autocomplete="off" spellcheck="false" placeholder="Taae9YSyOLxij6fj32HF">
+
+      <div class="row">
+        <button type="button" id="saveBtn">Save settings</button>
+        <button type="button" id="loadAgentsBtn">Load agents from account</button>
+      </div>
+      <p class="field-hint" id="settingsHint"></p>
+    </fieldset>
+
+    <label for="agentSelect">Or pick an agent</label>
+    <select id="agentSelect">
+      <option value="">Enter API key and click “Load agents”</option>
+    </select>
+
+    <label for="firstMessage">First message override (optional)</label>
+    <input id="firstMessage" type="text" placeholder="Leave empty to use agent default">
+
+    <div class="status-grid">
+      <div class="status-card">
+        <div class="label">Connection</div>
+        <div class="value" id="connectionStatus">Idle</div>
+      </div>
+      <div class="status-card">
+        <div class="label">Agent mode</div>
+        <div class="value" id="agentStatus">—</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <button type="button" class="primary" id="startBtn">Start conversation</button>
+      <button type="button" class="danger" id="stopBtn" disabled>Stop</button>
+    </div>
+
+    <label for="log">Transcript log</label>
+    <pre class="log" id="log" aria-live="polite"></pre>
+  </main>
+
+  <script src="/vendor/elevenlabs-client/lib.iife.js"></script>
+  <script src="/agents.js"></script>
+</body>
+</html>

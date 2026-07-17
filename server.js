@@ -19,6 +19,56 @@ const INWORLD_API_ENABLED = !/^(0|false|no|off)$/i.test(
 const INWORLD_API_DISABLED_MESSAGE =
   'Inworld API is disabled. Unset INWORLD_API_ENABLED=0 or set INWORLD_API_ENABLED=1.';
 
+const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY?.trim() || '';
+const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID?.trim() || 'Taae9YSyOLxij6fj32HF';
+const ELEVENLABS_AGENT_ID = process.env.ELEVENLABS_AGENT_ID?.trim() || '';
+const ELEVENLABS_CLIENT_DIST = join(ROOT, 'node_modules', '@elevenlabs', 'client', 'dist');
+
+async function elevenLabsFetch(apiKey, urlPath, init = {}) {
+  const res = await fetch(`https://api.elevenlabs.io${urlPath}`, {
+    ...init,
+    headers: {
+      'xi-api-key': apiKey,
+      ...(init.headers || {}),
+    },
+  });
+  const text = await res.text();
+  let body;
+  try {
+    body = text ? JSON.parse(text) : null;
+  } catch {
+    body = text;
+  }
+  return { res, body };
+}
+
+function getRequestElevenLabsApiKey(req) {
+  const raw = req.headers['x-elevenlabs-api-key'];
+  const fromHeader = (Array.isArray(raw) ? raw[0] : raw)?.trim();
+  if (fromHeader) return fromHeader;
+  return ELEVENLABS_API_KEY;
+}
+
+function requireElevenLabsApiKey(req, res) {
+  const apiKey = getRequestElevenLabsApiKey(req);
+  if (apiKey) return apiKey;
+  sendJson(res, 400, {
+    error: 'Missing ElevenLabs API key. Enter it on the page or set ELEVENLABS_API_KEY on the server.',
+  });
+  return null;
+}
+
+function isElevenAgentsPublicPath(url) {
+  return url === '/agents'
+    || url === '/agents.html'
+    || url === '/agents.js'
+    || url === '/agents.css'
+    || url.startsWith('/vendor/elevenlabs-client/')
+    || url === '/api/elevenlabs/config'
+    || url === '/api/elevenlabs/agents'
+    || url === '/api/elevenlabs/conversation-token';
+}
+
 // Local: ./config.json  |  Railway: mount a volume (e.g. /app/data) — uses RAILWAY_VOLUME_MOUNT_PATH
 const CONFIG_DIR = process.env.CONFIG_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH || ROOT;
 const CONFIG_PATH = join(CONFIG_DIR, 'config.json');
@@ -2174,7 +2224,8 @@ function redirectToAdminLogin(res, nextUrl) {
 }
 
 function isPublicPath(url) {
-  return url === '/login'
+  return isElevenAgentsPublicPath(url)
+    || url === '/login'
     || url === '/admin/login'
     || url === '/api/login'
     || url === '/api/admin/login'
@@ -3391,6 +3442,7 @@ const pages = {
   '/vocab-game': 'vocab-game/index.html',
   '/vocab-game/': 'vocab-game/index.html',
   '/session-simple': 'session-simple.html',
+  '/agents': 'agents.html',
 };
 
 function resolvePage(url) {
@@ -3530,7 +3582,7 @@ async function fetchHkoWeatherIcon(code) {
   return Buffer.from(await res.arrayBuffer());
 }
 
-const server = createServer((req, res) => {
+const server = createServer(async (req, res) => {
   const rawUrl = req.url ?? '/';
   const qIndex = rawUrl.indexOf('?');
   const url = qIndex === -1 ? rawUrl : rawUrl.slice(0, qIndex);
@@ -4089,6 +4141,60 @@ const server = createServer((req, res) => {
   }
 
   if (handleVideoPairsApi(req, res, url)) {
+    return;
+  }
+
+  if (url === '/api/elevenlabs/config' && req.method === 'GET') {
+    sendJson(res, 200, {
+      voiceId: ELEVENLABS_VOICE_ID,
+      defaultAgentId: ELEVENLABS_AGENT_ID,
+      hasApiKey: Boolean(ELEVENLABS_API_KEY),
+    });
+    return;
+  }
+
+  if (url === '/api/elevenlabs/agents' && req.method === 'GET') {
+    const apiKey = requireElevenLabsApiKey(req, res);
+    if (!apiKey) return;
+    const { res: apiRes, body } = await elevenLabsFetch(apiKey, '/v1/convai/agents?page_size=100');
+    if (!apiRes.ok) {
+      sendJson(res, apiRes.status, { error: 'Failed to list agents', detail: body });
+      return;
+    }
+    sendJson(res, 200, body);
+    return;
+  }
+
+  if (url === '/api/elevenlabs/conversation-token' && req.method === 'GET') {
+    const apiKey = requireElevenLabsApiKey(req, res);
+    if (!apiKey) return;
+    const params = new URL(rawUrl, 'http://local').searchParams;
+    const agentId = String(params.get('agent_id') || ELEVENLABS_AGENT_ID || '').trim();
+    if (!agentId) {
+      sendJson(res, 400, { error: 'agent_id query parameter is required' });
+      return;
+    }
+    const qs = new URLSearchParams({ agent_id: agentId });
+    const { res: apiRes, body } = await elevenLabsFetch(apiKey, `/v1/convai/conversation/token?${qs}`);
+    if (!apiRes.ok) {
+      sendJson(res, apiRes.status, { error: 'Failed to get conversation token', detail: body });
+      return;
+    }
+    res.writeHead(200, {
+      'Content-Type': 'text/plain; charset=utf-8',
+      ...SECURITY_HEADERS,
+    });
+    res.end(body.token);
+    return;
+  }
+
+  if (url.startsWith('/vendor/elevenlabs-client/')) {
+    const rel = url.slice('/vendor/elevenlabs-client/'.length);
+    if (!rel || rel.includes('..')) {
+      res.writeHead(400, SECURITY_HEADERS).end();
+      return;
+    }
+    serveFile(res, join(ELEVENLABS_CLIENT_DIST, rel));
     return;
   }
 
@@ -4711,6 +4817,7 @@ server.listen(port, '0.0.0.0', () => {
   console.log(`Game database: ${GAME_DB_PATH}`);
   console.log(`Conversation logs: ${CONVERSATIONS_DB_PATH}`);
   console.log(`Session audio: ${SESSION_AUDIO_DIR}`);
-  console.log(`Inworld API: ${INWORLD_API_ENABLED ? 'enabled' : 'disabled'}`);
+  console.log(`Eleven Agents: http://0.0.0.0:${port}/agents.html  (public, no login)`);
+  console.log(`ElevenLabs API: ${ELEVENLABS_API_KEY ? 'configured' : 'missing ELEVENLABS_API_KEY'}`);
   if (CONFIG_DIR !== ROOT) console.log(`Config stored at ${CONFIG_PATH}`);
 });
