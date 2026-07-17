@@ -2,6 +2,7 @@ node_modules/
 .DS_Store
 /langoHome/
 .env
+eleven-agents-test/.env
 config.json
 sessions.json
 student-users.json

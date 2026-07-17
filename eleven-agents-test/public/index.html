@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ElevenLabs test hub</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main>
+    <h1>ElevenLabs test hub</h1>
+    <p class="sub">Local sandbox for Eleven Agents. API keys stay on the Node server (<code>eleven-agents-test/.env</code>).</p>
+    <nav class="links">
+      <a href="/agents.html">Eleven Agents voice chat</a>
+    </nav>
+    <p class="field-hint" id="configStatus">Loading config…</p>
+  </main>
+  <script>
+    fetch("/api/config")
+      .then((r) => r.json())
+      .then((cfg) => {
+        const el = document.getElementById("configStatus");
+        if (!cfg.hasApiKey) {
+          el.textContent = "No API key found. Copy .env.example to .env and set ELEVENLABS_API_KEY.";
+          el.className = "field-hint err";
+          return;
+        }
+        el.textContent = `Voice override default: ${cfg.voiceId}${cfg.defaultAgentId ? ` · Default agent: ${cfg.defaultAgentId}` : " · Pick an agent on the Agents page."}`;
+      })
+      .catch(() => {
+        document.getElementById("configStatus").textContent = "Could not load /api/config.";
+      });
+  </script>
+</body>
+</html>

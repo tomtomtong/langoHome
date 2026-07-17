@@ -1,0 +1,177 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+  background: #0f1117;
+  color: #e8eaed;
+}
+
+body {
+  display: flex;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+
+main {
+  width: min(100%, 520px);
+}
+
+h1 {
+  margin: 0 0 0.35rem;
+  font-size: 1.35rem;
+  font-weight: 600;
+}
+
+.sub,
+.field-hint {
+  margin: 0 0 1.25rem;
+  font-size: 0.85rem;
+  color: #9aa0a6;
+  line-height: 1.45;
+}
+
+nav.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+nav.links a {
+  color: #8ab4f8;
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+
+nav.links a:hover {
+  text-decoration: underline;
+}
+
+label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.8rem;
+  color: #bdc1c6;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.9rem;
+  border: 1px solid #3c4043;
+  border-radius: 8px;
+  background: #1a1d24;
+  color: #e8eaed;
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 4rem;
+}
+
+.row {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+button {
+  padding: 0.55rem 1rem;
+  border: 1px solid #5f6368;
+  border-radius: 8px;
+  background: #2a2f3a;
+  color: #e8eaed;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: #353b48;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+button.primary {
+  background: #1a73e8;
+  border-color: #1a73e8;
+}
+
+button.primary:hover:not(:disabled) {
+  background: #1557b0;
+}
+
+button.danger {
+  background: #c5221f;
+  border-color: #c5221f;
+}
+
+.status-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.status-card {
+  padding: 0.75rem;
+  border-radius: 8px;
+  background: #1a1d24;
+  border: 1px solid #3c4043;
+}
+
+.status-card .label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #9aa0a6;
+  margin-bottom: 0.25rem;
+}
+
+.status-card .value {
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.log {
+  margin: 0;
+  padding: 0.75rem;
+  min-height: 12rem;
+  max-height: 22rem;
+  overflow: auto;
+  border-radius: 8px;
+  background: #0b0d12;
+  border: 1px solid #3c4043;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.log .err {
+  color: #f28b82;
+}
+
+.log .user {
+  color: #81c995;
+}
+
+.log .agent {
+  color: #8ab4f8;
+}
+
+.log .meta {
+  color: #9aa0a6;
+}

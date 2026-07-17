@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eleven Agents test</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main>
+    <nav class="links">
+      <a href="/">← Hub</a>
+    </nav>
+    <h1>Eleven Agents</h1>
+    <p class="sub">Voice conversation via WebRTC. Voice ID is overridden per session from your <code>.env</code>.</p>
+
+    <label for="agentSelect">Agent</label>
+    <select id="agentSelect">
+      <option value="">Loading agents…</option>
+    </select>
+
+    <label for="voiceId">TTS voice ID override</label>
+    <input id="voiceId" type="text" autocomplete="off" spellcheck="false">
+
+    <label for="firstMessage">First message override (optional)</label>
+    <input id="firstMessage" type="text" placeholder="Leave empty to use agent default">
+
+    <div class="status-grid">
+      <div class="status-card">
+        <div class="label">Connection</div>
+        <div class="value" id="connectionStatus">Idle</div>
+      </div>
+      <div class="status-card">
+        <div class="label">Agent mode</div>
+        <div class="value" id="agentStatus">—</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <button type="button" class="primary" id="startBtn">Start conversation</button>
+      <button type="button" class="danger" id="stopBtn" disabled>Stop</button>
+    </div>
+
+    <label for="log">Transcript log</label>
+    <pre class="log" id="log" aria-live="polite"></pre>
+  </main>
+
+  <script src="/vendor/elevenlabs-client/lib.iife.js"></script>
+  <script src="/agents.js"></script>
+</body>
+</html>
