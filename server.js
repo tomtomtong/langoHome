@@ -4710,8 +4710,10 @@ function buildSessionCfg({
     audio: {
       input: {
         turn_detection: {
-          type: 'semantic_vad',
-          eagerness: vadEagerness || DEFAULT_VAD_EAGERNESS,
+          type: 'server_vad',
+          threshold: 0.35,
+          prefix_padding_ms: 500,
+          silence_duration_ms: 1800,
           create_response: true,
           interrupt_response: true,
         },
