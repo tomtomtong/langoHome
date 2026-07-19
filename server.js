@@ -4482,6 +4482,7 @@ const wss = new WebSocketServer({ server, path: '/ws' });
 
 const DEFAULT_VOICE_ID = 'default-zylgts2tamenvybeti3z0w__uncle_tommy';
 const DEFAULT_TTS_MODEL = 'inworld-tts-2';
+const DEFAULT_TTS_SPEED = 0.85;
 const DEFAULT_INSTRUCTIONS = 'You are Uncle Tommy, a friendly voice assistant. Keep responses brief.';
 const DEFAULT_MODEL = 'openai/gpt-4o-mini';
 
@@ -4724,6 +4725,7 @@ function buildSessionCfg({
       output: {
         voice: voice || DEFAULT_VOICE_ID,
         model: ttsModel || DEFAULT_TTS_MODEL,
+        speed: DEFAULT_TTS_SPEED,
       },
     },
   };
