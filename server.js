@@ -3425,14 +3425,21 @@ function optionalConfigMaxOutputTokens(value) {
 
 function voiceRealtimeSettingsForApi(cfg = {}) {
   const vadThreshold = optionalConfigNumber(cfg.vadThreshold);
+  const endOfTurnConfidence = optionalConfigNumber(cfg.endOfTurnConfidence);
+  const minEndOfTurnSilence = optionalConfigNumber(cfg.minEndOfTurnSilence);
+  const maxTurnSilence = optionalConfigNumber(cfg.maxTurnSilence);
   const ttsSpeed = optionalConfigNumber(cfg.ttsSpeed);
   const temperature = optionalConfigNumber(cfg.temperature);
   const maxOutputTokens = optionalConfigMaxOutputTokens(cfg.maxOutputTokens);
   return {
     asrModel: String(cfg.asrModel ?? '').trim(),
     asrLanguage: String(cfg.asrLanguage ?? '').trim(),
+    noiseReduction: String(cfg.noiseReduction ?? '').trim(),
     vadEagerness: String(cfg.vadEagerness ?? '').trim(),
     vadThreshold: vadThreshold ?? '',
+    endOfTurnConfidence: endOfTurnConfidence ?? '',
+    minEndOfTurnSilence: minEndOfTurnSilence ?? '',
+    maxTurnSilence: maxTurnSilence ?? '',
     ttsModel: String(cfg.ttsModel ?? '').trim(),
     ttsLanguage: String(cfg.ttsLanguage ?? '').trim(),
     ttsSpeed: ttsSpeed ?? '',
@@ -3447,6 +3454,7 @@ function applyVoiceRealtimeSettingsToConfig(existing, parsed) {
   const textKeys = [
     'asrModel',
     'asrLanguage',
+    'noiseReduction',
     'vadEagerness',
     'ttsModel',
     'ttsLanguage',
@@ -3455,7 +3463,14 @@ function applyVoiceRealtimeSettingsToConfig(existing, parsed) {
   for (const key of textKeys) {
     if (parsed[key] != null) next[key] = String(parsed[key]).trim();
   }
-  const numericKeys = ['vadThreshold', 'ttsSpeed', 'temperature'];
+  const numericKeys = [
+    'vadThreshold',
+    'endOfTurnConfidence',
+    'minEndOfTurnSilence',
+    'maxTurnSilence',
+    'ttsSpeed',
+    'temperature',
+  ];
   for (const key of numericKeys) {
     if (!Object.prototype.hasOwnProperty.call(parsed, key)) continue;
     const n = optionalConfigNumber(parsed[key]);
@@ -3492,8 +3507,12 @@ function mergeVoiceRealtimeAuthOptions(parsed, saved) {
   return {
     asrModel: pickStr('asrModel'),
     asrLanguage: pickStr('asrLanguage'),
+    noiseReduction: pickStr('noiseReduction'),
     vadEagerness: pickStr('vadEagerness'),
     vadThreshold: pickNum('vadThreshold'),
+    endOfTurnConfidence: pickNum('endOfTurnConfidence'),
+    minEndOfTurnSilence: pickNum('minEndOfTurnSilence'),
+    maxTurnSilence: pickNum('maxTurnSilence'),
     ttsModel: pickStr('ttsModel'),
     ttsLanguage: pickStr('ttsLanguage'),
     ttsSpeed: pickNum('ttsSpeed'),
@@ -4234,6 +4253,7 @@ const server = createServer(async (req, res) => {
         model: cfg.model ?? '',
         profileSyncModel: cfg.profileSyncModel ?? '',
         ...voiceRealtimeSettingsForApi(cfg),
+        recommendedRealtimeDefaults: RECOMMENDED_REALTIME_DEFAULTS,
         avatar: normalizeAvatar(cfg.avatar),
         lipsync: normalizeLipsync(cfg.lipsync),
         lighting: normalizeLighting(cfg.lighting),
@@ -4703,14 +4723,55 @@ const PLAY_FINDGAME_TOOL = {
 const DEFAULT_ASR_MODEL = 'assemblyai/universal-streaming-english';
 const DEFAULT_VAD_EAGERNESS = 'low';
 
+// Tuned for the main use case: a child speaking to a low-end tablet in a loud
+// room (classroom / living room with TV). far_field noise reduction cleans up
+// distant-mic input; a raised VAD threshold keeps background chatter from
+// triggering turns or interrupting Tommy; generous end-of-turn silences stop
+// slow, pausing child speech from being cut off mid-sentence.
+const RECOMMENDED_REALTIME_DEFAULTS = Object.freeze({
+  asrModel: DEFAULT_ASR_MODEL,
+  noiseReduction: 'far_field',
+  vadEagerness: 'low',
+  vadThreshold: 0.6,
+  endOfTurnConfidence: 0.7,
+  minEndOfTurnSilence: 800,
+  maxTurnSilence: 4000,
+});
+const REALTIME_DEFAULTS_VERSION = 1;
+
+// Write the recommended values into config.json once (per version bump) so
+// they show up in the CMS voice settings, persist across restarts, and remain
+// editable/clearable by the admin. Fields the admin already set are kept.
+function seedRecommendedRealtimeDefaults() {
+  const cfg = loadConfig();
+  if (Number(cfg.realtimeDefaultsVersion) >= REALTIME_DEFAULTS_VERSION) return;
+  const next = { ...cfg };
+  const isUnset = (v) => v === undefined || v === null || String(v).trim() === '';
+  for (const [key, value] of Object.entries(RECOMMENDED_REALTIME_DEFAULTS)) {
+    if (isUnset(next[key])) next[key] = value;
+  }
+  next.realtimeDefaultsVersion = REALTIME_DEFAULTS_VERSION;
+  try {
+    saveConfig(next);
+    console.log('[config] seeded recommended realtime listening defaults (far-field noise reduction, VAD threshold 0.6, child-friendly turn timing)');
+  } catch (e) {
+    console.warn('[config] could not seed realtime defaults:', e.message);
+  }
+}
+seedRecommendedRealtimeDefaults();
+
 function buildSessionCfg({
   instructions,
   voice,
   model,
   asrModel,
   asrLanguage,
+  noiseReduction,
   vadEagerness,
   vadThreshold,
+  endOfTurnConfidence,
+  minEndOfTurnSilence,
+  maxTurnSilence,
   ttsModel,
   ttsLanguage,
   ttsSpeed,
@@ -4758,6 +4819,11 @@ function buildSessionCfg({
   const asrLang = String(asrLanguage || '').trim();
   if (asrLang) session.audio.input.transcription.language = asrLang;
 
+  const noiseMode = String(noiseReduction || '').trim().toLowerCase();
+  if (noiseMode === 'near_field' || noiseMode === 'far_field') {
+    session.audio.input.noise_reduction = { type: noiseMode };
+  }
+
   const temp = Number(temperature);
   if (Number.isFinite(temp)) session.temperature = temp;
 
@@ -4772,10 +4838,22 @@ function buildSessionCfg({
   if (Number.isFinite(speed) && speed > 0) session.audio.output.speed = speed;
 
   const providerData = {};
+  const sttPd = {};
   const vad = Number(vadThreshold);
-  if (Number.isFinite(vad) && vad >= 0 && vad <= 1) {
-    providerData.stt = { vad_threshold: vad };
+  if (Number.isFinite(vad) && vad >= 0 && vad <= 1) sttPd.vad_threshold = vad;
+  const eotConfidence = Number(endOfTurnConfidence);
+  if (Number.isFinite(eotConfidence) && eotConfidence >= 0 && eotConfidence <= 1) {
+    sttPd.end_of_turn_confidence_threshold = eotConfidence;
   }
+  const minEotSilence = Number(minEndOfTurnSilence);
+  if (Number.isFinite(minEotSilence) && minEotSilence > 0) {
+    sttPd.min_end_of_turn_silence = Math.round(minEotSilence);
+  }
+  const maxSilence = Number(maxTurnSilence);
+  if (Number.isFinite(maxSilence) && maxSilence > 0) {
+    sttPd.max_turn_silence = Math.round(maxSilence);
+  }
+  if (Object.keys(sttPd).length) providerData.stt = sttPd;
 
   const ttsPd = {};
   const deliveryMode = String(ttsDeliveryMode || '').trim().toUpperCase();

@@ -7871,7 +7871,7 @@
         const micWork = (async () => {
           prep.ctx = new AudioContext({ sampleRate: 24000 });
           prep.stream = await navigator.mediaDevices.getUserMedia({
-            audio: { sampleRate: 24000, channelCount: 1, echoCancellation: true, noiseSuppression: true },
+            audio: { sampleRate: 24000, channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
           });
         })();
 
@@ -8123,7 +8123,7 @@
         if (!stream || !ctx) {
           ctx = new AudioContext({ sampleRate: 24000 });
           stream = await navigator.mediaDevices.getUserMedia({
-            audio: { sampleRate: 24000, channelCount: 1, echoCancellation: true, noiseSuppression: true },
+            audio: { sampleRate: 24000, channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
           });
         }
 

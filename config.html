@@ -323,8 +323,11 @@
         <p class="field-hint">Inworld LLM used after each session to summarize the conversation into the learner&rsquo;s account profile.</p>
       </div>
       <hr class="section-divider" style="margin: 1.5rem 0 1.25rem">
-      <h2 style="margin: 0 0 0.375rem; font-size: 1rem">Speech &amp; audio (realtime)</h2>
-      <p style="margin: 0 0 1rem">Applied to every voice session on the main app (and any client that does not override them). Same options as the <a href="/session-simple.html">simple session tester</a>.</p>
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:0.75rem; margin: 0 0 0.375rem">
+        <h2 style="margin: 0; font-size: 1rem">Speech &amp; audio (realtime)</h2>
+        <button type="button" id="btn-load-recommended" class="secondary" style="flex:0 0 auto; padding:0.35rem 0.65rem; font-size:0.75rem">Load recommended defaults</button>
+      </div>
+      <p style="margin: 0 0 1rem">Applied to every voice session on the main app (and any client that does not override them). Same options as the <a href="/session-simple.html">simple session tester</a>. <strong>Load recommended defaults</strong> restores the tuned preset for loud rooms and low-end devices (far-field noise reduction, higher VAD threshold, patient turn-taking for kids).</p>
       <div class="field">
         <label for="ttsModel">TTS model <span style="color:#5f6368;font-weight:400">(optional)</span></label>
         <select id="ttsModel">
@@ -368,6 +371,15 @@
         <p class="field-hint">BCP-47 code for speech recognition. Leave empty for auto-detect.</p>
       </div>
       <div class="field">
+        <label for="noiseReduction">Noise reduction <span style="color:#5f6368;font-weight:400">(optional)</span></label>
+        <select id="noiseReduction">
+          <option value="">Off (server default)</option>
+          <option value="near_field">near_field — close mic (headset, phone held near mouth)</option>
+          <option value="far_field">far_field — distant mic / loud room (recommended for tablets)</option>
+        </select>
+        <p class="field-hint">Server-side cleanup of the mic input before speech recognition. <strong>far_field</strong> works best for kids talking to a tablet across a noisy room.</p>
+      </div>
+      <div class="field">
         <label for="vadEagerness">VAD eagerness <span style="color:#5f6368;font-weight:400">(optional)</span></label>
         <select id="vadEagerness">
           <option value="">Default: low</option>
@@ -380,7 +392,22 @@
       <div class="field">
         <label for="vadThreshold">VAD threshold override <span style="color:#5f6368;font-weight:400">(optional)</span></label>
         <input id="vadThreshold" type="number" min="0" max="1" step="0.05" placeholder="0.0–1.0">
-        <p class="field-hint">Overrides the eagerness preset when set. See <a href="https://docs.inworld.ai/realtime/provider-data" target="_blank" rel="noopener">Inworld STT extensions</a>.</p>
+        <p class="field-hint">Speech/silence cutoff. Higher (0.5–0.7) ignores more background noise in loud rooms; lower picks up quiet voices. Overrides the eagerness preset when set. See <a href="https://docs.inworld.ai/realtime/provider-data" target="_blank" rel="noopener">Inworld STT extensions</a>.</p>
+      </div>
+      <div class="field">
+        <label for="endOfTurnConfidence">End-of-turn confidence <span style="color:#5f6368;font-weight:400">(optional)</span></label>
+        <input id="endOfTurnConfidence" type="number" min="0" max="1" step="0.05" placeholder="0.0–1.0">
+        <p class="field-hint">How sure the model must be that the speaker finished before ending the turn. Higher (0.7+) waits longer — good for slow, pausing child speech.</p>
+      </div>
+      <div class="field">
+        <label for="minEndOfTurnSilence">Min end-of-turn silence (ms) <span style="color:#5f6368;font-weight:400">(optional)</span></label>
+        <input id="minEndOfTurnSilence" type="number" min="0" max="5000" step="50" placeholder="e.g. 800">
+        <p class="field-hint">Minimum trailing silence before a turn is considered finished. Higher values stop kids being cut off mid-sentence.</p>
+      </div>
+      <div class="field">
+        <label for="maxTurnSilence">Max turn silence (ms) <span style="color:#5f6368;font-weight:400">(optional)</span></label>
+        <input id="maxTurnSilence" type="number" min="0" max="15000" step="100" placeholder="e.g. 4000">
+        <p class="field-hint">Hard ceiling on within-turn silence before the turn is force-closed.</p>
       </div>
       <div class="field">
         <label for="temperature">LLM temperature <span style="color:#5f6368;font-weight:400">(optional)</span></label>
@@ -440,8 +467,13 @@
     const ttsDeliveryMode = document.getElementById('ttsDeliveryMode');
     const asrModel = document.getElementById('asrModel');
     const asrLanguage = document.getElementById('asrLanguage');
+    const noiseReduction = document.getElementById('noiseReduction');
     const vadEagerness = document.getElementById('vadEagerness');
     const vadThreshold = document.getElementById('vadThreshold');
+    const endOfTurnConfidence = document.getElementById('endOfTurnConfidence');
+    const minEndOfTurnSilence = document.getElementById('minEndOfTurnSilence');
+    const maxTurnSilence = document.getElementById('maxTurnSilence');
+    const btnLoadRecommended = document.getElementById('btn-load-recommended');
     const temperature = document.getElementById('temperature');
     const maxOutputTokens = document.getElementById('maxOutputTokens');
     const modelsStatus = document.getElementById('models-status');
@@ -822,8 +854,12 @@ ${linesText.replace(/</g, '&lt;')}</pre>
       ttsDeliveryMode.value = cfg.ttsDeliveryMode ?? '';
       asrModel.value = cfg.asrModel ?? '';
       asrLanguage.value = cfg.asrLanguage ?? '';
+      noiseReduction.value = cfg.noiseReduction ?? '';
       vadEagerness.value = cfg.vadEagerness ?? '';
       applyOptionalNumberInput(vadThreshold, cfg.vadThreshold);
+      applyOptionalNumberInput(endOfTurnConfidence, cfg.endOfTurnConfidence);
+      applyOptionalNumberInput(minEndOfTurnSilence, cfg.minEndOfTurnSilence);
+      applyOptionalNumberInput(maxTurnSilence, cfg.maxTurnSilence);
       applyOptionalNumberInput(temperature, cfg.temperature);
       maxOutputTokens.value = cfg.maxOutputTokens === 'inf' ? 'inf' : (cfg.maxOutputTokens ?? '');
     }
@@ -864,8 +900,12 @@ ${linesText.replace(/</g, '&lt;')}</pre>
         ttsDeliveryMode: ttsDeliveryMode.value.trim(),
         asrModel: asrModel.value.trim(),
         asrLanguage: asrLanguage.value.trim(),
+        noiseReduction: noiseReduction.value.trim(),
         vadEagerness: vadEagerness.value.trim(),
         vadThreshold: optionalInputNumber(vadThreshold),
+        endOfTurnConfidence: optionalInputNumber(endOfTurnConfidence),
+        minEndOfTurnSilence: optionalInputNumber(minEndOfTurnSilence),
+        maxTurnSilence: optionalInputNumber(maxTurnSilence),
         temperature: optionalInputNumber(temperature),
         maxOutputTokens: maxOutputTokens.value.trim(),
         lipsync: serverConfig?.lipsync,
@@ -928,9 +968,39 @@ ${linesText.replace(/</g, '&lt;')}</pre>
     [input, prompt, voice, ttsLanguage, asrLanguage, maxOutputTokens].forEach((el) => {
       el.addEventListener('input', scheduleSave);
     });
-    [ttsModel, ttsDeliveryMode, asrModel, vadEagerness, ttsSpeed, vadThreshold, temperature].forEach((el) => {
+    [
+      ttsModel, ttsDeliveryMode, asrModel, noiseReduction, vadEagerness,
+      ttsSpeed, vadThreshold, endOfTurnConfidence, minEndOfTurnSilence,
+      maxTurnSilence, temperature,
+    ].forEach((el) => {
       el.addEventListener('change', scheduleSave);
       el.addEventListener('input', scheduleSave);
+    });
+
+    // Fallback mirrors the server's RECOMMENDED_REALTIME_DEFAULTS in case the
+    // config API predates the recommendedRealtimeDefaults field.
+    const FALLBACK_RECOMMENDED_DEFAULTS = {
+      asrModel: 'assemblyai/universal-streaming-english',
+      noiseReduction: 'far_field',
+      vadEagerness: 'low',
+      vadThreshold: 0.6,
+      endOfTurnConfidence: 0.7,
+      minEndOfTurnSilence: 800,
+      maxTurnSilence: 4000,
+    };
+
+    btnLoadRecommended.addEventListener('click', () => {
+      const rec = serverConfig?.recommendedRealtimeDefaults || FALLBACK_RECOMMENDED_DEFAULTS;
+      asrModel.value = rec.asrModel ?? '';
+      noiseReduction.value = rec.noiseReduction ?? '';
+      vadEagerness.value = rec.vadEagerness ?? '';
+      applyOptionalNumberInput(vadThreshold, rec.vadThreshold);
+      applyOptionalNumberInput(endOfTurnConfidence, rec.endOfTurnConfidence);
+      applyOptionalNumberInput(minEndOfTurnSilence, rec.minEndOfTurnSilence);
+      applyOptionalNumberInput(maxTurnSilence, rec.maxTurnSilence);
+      status.textContent = 'Recommended defaults loaded — saving…';
+      status.className = 'status ok';
+      scheduleSave();
     });
     wireModelSelect(model, modelCustom);
     wireModelSelect(profileSyncModel, profileSyncModelCustom);
