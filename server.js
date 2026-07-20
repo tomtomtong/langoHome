@@ -2248,6 +2248,25 @@ function isTurnBasedPublicApi(url, method) {
     || url === '/api/inworld/tts';
 }
 
+function isTurnBasedSafeRequest(req, url) {
+  const method = (req.method || 'GET').toUpperCase();
+  if (method !== 'GET' && method !== 'HEAD') return false;
+
+  let turnBasedReferrer = false;
+  try {
+    const referrer = new URL(req.headers.referer || '', 'http://local');
+    turnBasedReferrer = (
+      referrer.pathname === '/turn-based'
+      || referrer.pathname === '/turn-based.html'
+      || referrer.pathname.startsWith('/visme/')
+      || referrer.pathname.startsWith('/Animation/')
+    );
+  } catch {}
+  if (!turnBasedReferrer) return false;
+
+  return isPreviewStaticAsset(url);
+}
+
 function isPreviewStaticAsset(url) {
   return /^\/visme\/.+\.(?:js|mjs|vrm|fbx|wasm|json)$/i.test(url)
     || /^\/Animation\/.+\.fbx$/i.test(url)
@@ -3822,6 +3841,7 @@ const server = createServer(async (req, res) => {
   if (
     !isPublicPath(url)
     && !isTurnBasedPublicApi(url, req.method)
+    && !isTurnBasedSafeRequest(req, url)
     && !isPreviewSafeRequest(req, url, rawUrl)
     && !isAuthenticated(req)
   ) {

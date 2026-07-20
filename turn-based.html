@@ -3,7 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Inworld turn-based (no WebRTC)</title>
+  <title>Turn-based voice test</title>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/",
+        "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.3.4/lib/three-vrm.module.js",
+        "@pixiv/three-vrm-animation": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm-animation@3.3.4/lib/three-vrm-animation.module.js",
+        "vrm-mixamo-retarget": "https://cdn.jsdelivr.net/npm/vrm-mixamo-retarget@1.0.3/dist/index.esm.js"
+      }
+    }
+  </script>
   <style>
     * { box-sizing: border-box; }
     html, body {
@@ -16,10 +27,10 @@
     body {
       display: flex;
       justify-content: center;
-      padding: 1.5rem 1rem 2rem;
+      padding: 1rem 1rem 2rem;
     }
     main {
-      width: min(100%, 520px);
+      width: min(100%, 560px);
     }
     h1 {
       margin: 0 0 0.35rem;
@@ -27,12 +38,38 @@
       font-weight: 600;
     }
     .sub {
-      margin: 0 0 1.25rem;
+      margin: 0 0 1rem;
       font-size: 0.85rem;
       color: #9aa7b5;
       line-height: 1.45;
     }
     .sub a { color: #7eb8ff; }
+    #avatar-wrap {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      margin-bottom: 1rem;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid #2a3544;
+      background: #0b1222;
+    }
+    #vrm-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    #avatar-status {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      padding: 0.45rem 0.65rem;
+      font-size: 0.78rem;
+      color: #b8c4d0;
+      background: linear-gradient(transparent, rgba(8, 12, 18, 0.85));
+      pointer-events: none;
+    }
     #status {
       padding: 0.65rem 0.85rem;
       margin-bottom: 0.75rem;
@@ -42,33 +79,33 @@
     }
     #status.live { background: #152a45; color: #8ec5ff; }
     #status.err { background: #3a1f1f; color: #ffb4ab; }
-    #uploadStats {
-      margin: -0.35rem 0 0.75rem;
-      padding: 0.5rem 0.85rem;
+    .controls {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    button {
+      flex: 1;
+      padding: 0.75rem 1rem;
+      border: none;
       border-radius: 8px;
-      background: #151c26;
-      border: 1px solid #2a3544;
-      font-size: 0.8rem;
-      font-variant-numeric: tabular-nums;
-      color: #9aa7b5;
-      min-height: 2.25rem;
+      font-size: 0.95rem;
+      cursor: pointer;
     }
-    #uploadStats.active { color: #c5d4e3; border-color: #3d5266; }
-    #uploadStats .speed {
-      font-size: 1rem;
-      font-weight: 600;
-      color: #7eb8ff;
-      margin-top: 0.15rem;
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
     }
-    #timer {
-      font-variant-numeric: tabular-nums;
-      font-size: 2rem;
-      font-weight: 600;
-      text-align: center;
-      margin: 0.5rem 0 1rem;
-      color: #7eb8ff;
+    button.record {
+      background: #1a73e8;
+      color: #fff;
     }
-    #timer.idle { color: #6b7785; }
+    button.record:hover:not(:disabled) { background: #1557b0; }
+    button.stop {
+      background: #c62828;
+      color: #fff;
+    }
+    button.stop:hover:not(:disabled) { background: #a31f1f; }
     label {
       display: block;
       margin-bottom: 0.35rem;
@@ -86,166 +123,107 @@
       font-size: 0.85rem;
       font-family: inherit;
       resize: vertical;
-      min-height: 3.5rem;
+      min-height: 3.25rem;
     }
     #log {
       border: 1px solid #2a3544;
       border-radius: 8px;
       background: #151c26;
       padding: 0.75rem;
-      min-height: 12rem;
-      max-height: 22rem;
+      min-height: 8rem;
+      max-height: 18rem;
       overflow-y: auto;
-      font-size: 0.85rem;
+      font-size: 0.9rem;
       line-height: 1.45;
     }
-    .turn {
+    .entry {
       margin-bottom: 0.75rem;
       padding-bottom: 0.75rem;
       border-bottom: 1px solid #243040;
     }
-    .turn:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
-    .role {
+    .entry:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+    .entry .meta {
       font-size: 0.72rem;
       text-transform: uppercase;
       letter-spacing: 0.04em;
-      color: #7a8794;
       margin-bottom: 0.2rem;
     }
-    .role.user { color: #8ec5ff; }
-    .role.assistant { color: #a8e6a1; }
-    .start-overlay {
-      position: fixed;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(8, 12, 18, 0.88);
-      padding: 1rem;
-    }
-    .start-overlay.hidden { display: none; }
-    .start-card {
-      max-width: 360px;
-      padding: 1.25rem;
-      border-radius: 12px;
-      background: #151c26;
-      border: 1px solid #2a3544;
-      text-align: center;
-    }
-    .start-card p {
-      margin: 0 0 1rem;
-      font-size: 0.9rem;
-      color: #b8c4d0;
-      line-height: 1.45;
-    }
-    button.primary {
-      padding: 0.65rem 1.25rem;
-      border: none;
-      border-radius: 8px;
-      background: #1a73e8;
-      color: #fff;
-      font-size: 0.95rem;
-      cursor: pointer;
-    }
-    button.primary:hover { background: #1557b0; }
+    .entry .meta.user { color: #8ec5ff; }
+    .entry .meta.assistant { color: #a8e6a1; }
   </style>
 </head>
 <body>
-  <div id="startOverlay" class="start-overlay">
-    <div class="start-card">
-      <p>
-        Turn-based test: each turn records your mic for <strong>20 seconds</strong>, then STT → LLM → TTS.
-        No WebRTC. Browsers require one tap to allow the microphone.
-      </p>
-      <button type="button" class="primary" id="startBtn">Start conversation</button>
-    </div>
-  </div>
-
   <main>
-    <h1>Turn-based voice (REST)</h1>
+    <h1>Turn-based voice test</h1>
     <p class="sub">
-      Uses REST STT → LLM → TTS (no WebRTC). On Railway, set
-      <code>INWORLD_API_KEY</code> in service variables, deploy, then open
-      <code>/turn-based</code> on your <code>*.up.railway.app</code> URL (HTTPS required for mic).
-      Optional: <code>INWORLD_VOICE_ID</code>, <code>INWORLD_API_ENABLED=1</code>.
-      Admin config: <a href="/config">/config</a>.
+      Record, stop to transcribe, then LLM reply with avatar lipsync.
+      Requires <code>INWORLD_API_KEY</code> and <code>INWORLD_API_ENABLED=1</code>.
     </p>
 
-    <div id="status">Tap “Start conversation” to begin.</div>
-    <div id="uploadStats">Upload: —</div>
-    <div id="timer" class="idle">20</div>
+    <div id="avatar-wrap">
+      <canvas id="vrm-canvas"></canvas>
+      <div id="avatar-status">Loading avatar…</div>
+    </div>
+
+    <div id="status">Loading avatar…</div>
+
+    <div class="controls">
+      <button type="button" class="record" id="recordBtn" disabled>Record</button>
+      <button type="button" class="stop" id="stopBtn" disabled>Stop</button>
+    </div>
 
     <label for="systemPrompt">System prompt</label>
     <textarea id="systemPrompt">You are a friendly English tutor. Keep replies short (1–3 sentences) for voice.</textarea>
 
-    <label>Transcript</label>
+    <label>Conversation</label>
     <div id="log"></div>
   </main>
 
-  <script>
-    const LISTEN_SECONDS = 20;
+  <script type="module">
+    import {
+      TommyAvatar,
+      DEFAULT_AVATAR,
+      DEFAULT_LIPSYNC,
+      DEFAULT_LIGHTING,
+    } from "/visme/avatar.js";
+
     const SAMPLE_RATE = 16000;
 
     const statusEl = document.getElementById("status");
-    const uploadStatsEl = document.getElementById("uploadStats");
-    const timerEl = document.getElementById("timer");
+    const avatarStatusEl = document.getElementById("avatar-status");
     const logEl = document.getElementById("log");
     const systemPromptEl = document.getElementById("systemPrompt");
-    const startOverlay = document.getElementById("startOverlay");
-    const startBtn = document.getElementById("startBtn");
+    const recordBtn = document.getElementById("recordBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const canvasEl = document.getElementById("vrm-canvas");
 
-    let running = false;
-    let abortTurn = false;
+    let avatar = null;
+    let avatarLoading = null;
     let history = [];
+    let recording = false;
+    let processing = false;
+    let audioCtx = null;
+    let mediaStream = null;
+    let processor = null;
+    let pcmChunks = [];
     let replyAudio = null;
-    let timerInterval = null;
+    let lipsyncRaf = null;
 
     function setStatus(text, { live = false, err = false } = {}) {
       statusEl.textContent = text;
       statusEl.className = err ? "err" : live ? "live" : "";
     }
 
-    function formatKiB(bytes) {
-      return `${(bytes / 1024).toFixed(1)} KB`;
-    }
-
-    function formatUploadSpeed(bytesPerSec) {
-      const kbPerSec = bytesPerSec / 1024;
-      if (kbPerSec >= 1024) {
-        return `${(kbPerSec / 1024).toFixed(2)} MB/s`;
-      }
-      return `${kbPerSec.toFixed(1)} KB/s`;
-    }
-
-    function setUploadStats(html, { active = false } = {}) {
-      uploadStatsEl.innerHTML = html;
-      uploadStatsEl.classList.toggle("active", active);
-    }
-
-    function clearUploadStats() {
-      setUploadStats("Upload: —", { active: false });
-    }
-
-    function renderUploadProgress({ loaded, total, bytesPerSec, phase }) {
-      const pct = total > 0 ? Math.min(100, Math.round((loaded / total) * 100)) : 0;
-      const speedLine = formatUploadSpeed(bytesPerSec);
-      setUploadStats(
-        `${phase} ${formatKiB(loaded)} / ${formatKiB(total)} (${pct}%)<div class="speed">${speedLine}</div>`,
-        { active: true },
-      );
-    }
-
     function appendTurn(role, text) {
       const wrap = document.createElement("div");
-      wrap.className = "turn";
-      const label = document.createElement("div");
-      label.className = `role ${role}`;
-      label.textContent = role === "user" ? "You" : "Assistant";
+      wrap.className = "entry";
+      const meta = document.createElement("div");
+      meta.className = `meta ${role}`;
+      meta.textContent = role === "user" ? "You" : "Assistant";
       const body = document.createElement("div");
       body.textContent = text;
-      wrap.append(label, body);
-      logEl.append(wrap);
-      logEl.scrollTop = logEl.scrollHeight;
+      wrap.append(meta, body);
+      logEl.prepend(wrap);
     }
 
     function floatTo16BitPCM(float32Array) {
@@ -293,59 +271,7 @@
       return btoa(binary);
     }
 
-    function startCountdown(seconds) {
-      let left = seconds;
-      timerEl.classList.remove("idle");
-      timerEl.textContent = String(left);
-      clearInterval(timerInterval);
-      timerInterval = setInterval(() => {
-        left -= 1;
-        if (left >= 0) timerEl.textContent = String(left);
-        if (left <= 0) clearInterval(timerInterval);
-      }, 1000);
-    }
-
-    function stopCountdown() {
-      clearInterval(timerInterval);
-      timerEl.classList.add("idle");
-      timerEl.textContent = String(LISTEN_SECONDS);
-    }
-
-    async function recordPcmSeconds(seconds) {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          channelCount: 1,
-        },
-      });
-
-      const ctx = new AudioContext({ sampleRate: SAMPLE_RATE });
-      const source = ctx.createMediaStreamSource(stream);
-      const processor = ctx.createScriptProcessor(4096, 1, 1);
-      const chunks = [];
-
-      processor.onaudioprocess = (event) => {
-        chunks.push(new Float32Array(event.inputBuffer.getChannelData(0)));
-      };
-
-      source.connect(processor);
-      const mute = ctx.createGain();
-      mute.gain.value = 0;
-      processor.connect(mute);
-      mute.connect(ctx.destination);
-
-      startCountdown(seconds);
-      await new Promise((resolve) => {
-        setTimeout(resolve, seconds * 1000);
-      });
-
-      processor.disconnect();
-      source.disconnect();
-      stream.getTracks().forEach((t) => t.stop());
-      await ctx.close();
-      stopCountdown();
-
+    function mergeChunks(chunks) {
       const totalLength = chunks.reduce((sum, c) => sum + c.length, 0);
       const merged = new Float32Array(totalLength);
       let offset = 0;
@@ -353,9 +279,7 @@
         merged.set(chunk, offset);
         offset += chunk.length;
       }
-
-      const pcm = floatTo16BitPCM(merged);
-      return encodeWavBase64(pcm, SAMPLE_RATE, 1);
+      return merged;
     }
 
     async function postJson(url, body) {
@@ -373,215 +297,226 @@
       return data;
     }
 
-    function postJsonWithUploadProgress(url, body, onProgress) {
-      return new Promise((resolve, reject) => {
-        const json = JSON.stringify(body);
-        const totalBytes = new Blob([json]).size;
-        const xhr = new XMLHttpRequest();
-        const startTime = performance.now();
-        let lastProgressAt = startTime;
-        let lastLoaded = 0;
+    async function checkReady() {
+      const ready = await fetch("/api/inworld/ready").then((r) => r.json());
+      if (!ready.enabled) {
+        throw new Error("Inworld API is disabled (INWORLD_API_ENABLED).");
+      }
+      if (!ready.configured) {
+        throw new Error("INWORLD_API_KEY missing. Set it on the server or at /config.");
+      }
+    }
 
-        xhr.open("POST", url);
-        xhr.setRequestHeader("Content-Type", "application/json");
-
-        xhr.upload.onprogress = (event) => {
-          const now = performance.now();
-          const loaded = event.loaded;
-          const total = event.lengthComputable ? event.total : totalBytes;
-          const elapsed = (now - startTime) / 1000;
-          const avgSpeed = elapsed > 0 ? loaded / elapsed : 0;
-          const dt = (now - lastProgressAt) / 1000;
-          const instantSpeed = dt > 0 ? (loaded - lastLoaded) / dt : avgSpeed;
-          lastProgressAt = now;
-          lastLoaded = loaded;
-          onProgress?.({
-            loaded,
-            total,
-            bytesPerSec: instantSpeed > 0 ? instantSpeed : avgSpeed,
-            avgBytesPerSec: avgSpeed,
-          });
+    async function ensureAvatar() {
+      if (avatar?.loaded) return avatar;
+      if (avatarLoading) return avatarLoading;
+      avatarLoading = (async () => {
+        avatar = new TommyAvatar(canvasEl, {
+          ...DEFAULT_AVATAR,
+          lipsync: DEFAULT_LIPSYNC,
+          lighting: DEFAULT_LIGHTING,
+          interactiveCamera: false,
+        });
+        avatar.onStatus = (msg) => {
+          avatarStatusEl.textContent = msg;
         };
+        await avatar.load();
+        await new Promise((r) => requestAnimationFrame(r));
+        avatar.refreshAfterVisible();
+        avatarStatusEl.textContent = "";
+        return avatar;
+      })();
+      return avatarLoading;
+    }
 
-        xhr.onload = () => {
-          const contentType = xhr.getResponseHeader("content-type") || "";
-          if (!contentType.includes("application/json")) {
-            reject(new Error("Server returned non-JSON. Is npm start running?"));
-            return;
-          }
-          let data;
-          try {
-            data = JSON.parse(xhr.responseText);
-          } catch {
-            reject(new Error("Invalid JSON from server."));
-            return;
-          }
-          if (xhr.status < 200 || xhr.status >= 300) {
-            reject(new Error(data.error || `Request failed (${xhr.status})`));
-            return;
-          }
-          const elapsed = (performance.now() - startTime) / 1000;
-          onProgress?.({
-            loaded: totalBytes,
-            total: totalBytes,
-            bytesPerSec: elapsed > 0 ? totalBytes / elapsed : 0,
-            avgBytesPerSec: elapsed > 0 ? totalBytes / elapsed : 0,
-            done: true,
-          });
-          resolve(data);
+    function stopSpeaking() {
+      if (lipsyncRaf) {
+        cancelAnimationFrame(lipsyncRaf);
+        lipsyncRaf = null;
+      }
+      if (replyAudio) {
+        replyAudio.pause();
+        replyAudio = null;
+      }
+      avatar?.endSpeech();
+    }
+
+    async function speakReply(text, base64Mp3) {
+      stopSpeaking();
+      const av = await ensureAvatar();
+      replyAudio = new Audio(`data:audio/mpeg;base64,${base64Mp3}`);
+
+      await new Promise((resolve, reject) => {
+        replyAudio.addEventListener("loadedmetadata", () => resolve(), { once: true });
+        replyAudio.addEventListener("error", () => reject(new Error("Could not load TTS audio.")), { once: true });
+      });
+
+      const durationMs = replyAudio.duration * 1000;
+      av.updateSpeechText(text, durationMs);
+      av.beginSpeech();
+
+      await new Promise((resolve, reject) => {
+        const tick = () => {
+          if (!av.speaking) return;
+          av.setSpeechElapsedMs(replyAudio.currentTime * 1000);
+          lipsyncRaf = requestAnimationFrame(tick);
         };
-
-        xhr.onerror = () => reject(new Error("Network error during upload."));
-        xhr.onabort = () => reject(new Error("Upload aborted."));
-        xhr.send(json);
-      });
-    }
-
-    async function transcribe(base64Wav) {
-      const audioBytes = Math.floor((base64Wav.length * 3) / 4);
-      setUploadStats(
-        `Audio payload ~${formatKiB(audioBytes)} (WAV, base64 in JSON will be larger)`,
-        { active: true },
-      );
-
-      const data = await postJsonWithUploadProgress(
-        "/api/inworld/stt",
-        {
-          audioContent: base64Wav,
-          audioEncoding: "LINEAR16",
-          sampleRateHertz: SAMPLE_RATE,
-          numberOfChannels: 1,
-          language: "en",
-        },
-        (progress) => {
-          if (progress.done) {
-            setUploadStats(
-              `Upload complete — avg ${formatUploadSpeed(progress.avgBytesPerSec)} `
-              + `(${formatKiB(progress.total)} sent)`,
-              { active: false },
-            );
-            return;
-          }
-          renderUploadProgress({
-            loaded: progress.loaded,
-            total: progress.total,
-            bytesPerSec: progress.bytesPerSec,
-            phase: "Uploading for transcribe:",
-          });
-        },
-      );
-      return data.transcript || "";
-    }
-
-    async function chat(userMessage) {
-      const data = await postJson("/api/inworld/llm/chat", {
-        systemPrompt: systemPromptEl.value.trim(),
-        userMessage,
-        history,
-      });
-      return data.reply;
-    }
-
-    function playReply(base64Mp3) {
-      return new Promise((resolve, reject) => {
-        if (replyAudio) {
-          replyAudio.pause();
-          replyAudio = null;
-        }
-        replyAudio = new Audio(`data:audio/mpeg;base64,${base64Mp3}`);
-        replyAudio.onended = () => resolve();
-        replyAudio.onerror = () => reject(new Error("Could not play TTS audio."));
+        replyAudio.addEventListener("play", () => {
+          lipsyncRaf = requestAnimationFrame(tick);
+        }, { once: true });
+        replyAudio.addEventListener("ended", () => {
+          stopSpeaking();
+          resolve();
+        }, { once: true });
+        replyAudio.addEventListener("error", () => {
+          stopSpeaking();
+          reject(new Error("Could not play TTS audio."));
+        }, { once: true });
         replyAudio.play().catch(reject);
       });
     }
 
-    async function speak(text) {
-      const data = await postJson("/api/inworld/tts", { text });
-      await playReply(data.audioContent);
+    function setControls({ canRecord, canStop }) {
+      recordBtn.disabled = !canRecord;
+      stopBtn.disabled = !canStop;
     }
 
-    async function runTurn() {
-      if (abortTurn) return;
+    async function startRecording() {
+      if (processing || recording) return;
+      await checkReady();
+      stopSpeaking();
 
-      setStatus(`Listening… speak anytime (${LISTEN_SECONDS}s)`, { live: true });
-      const wavBase64 = await recordPcmSeconds(LISTEN_SECONDS);
-      if (abortTurn) return;
+      mediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          channelCount: 1,
+        },
+      });
 
-      setStatus("Transcribing…", { live: true });
-      const transcript = (await transcribe(wavBase64)).trim();
-      if (abortTurn) return;
+      pcmChunks = [];
+      audioCtx = new AudioContext({ sampleRate: SAMPLE_RATE });
+      const source = audioCtx.createMediaStreamSource(mediaStream);
+      processor = audioCtx.createScriptProcessor(4096, 1, 1);
 
-      if (!transcript) {
-        setStatus("No speech detected — listening again…", { live: true });
-        return runTurn();
-      }
+      processor.onaudioprocess = (event) => {
+        pcmChunks.push(new Float32Array(event.inputBuffer.getChannelData(0)));
+      };
 
-      appendTurn("user", transcript);
-      history.push({ role: "user", content: transcript });
+      source.connect(processor);
+      const mute = audioCtx.createGain();
+      mute.gain.value = 0;
+      processor.connect(mute);
+      mute.connect(audioCtx.destination);
 
-      setStatus("Thinking…", { live: true });
-      const reply = await chat(transcript);
-      if (abortTurn) return;
-
-      appendTurn("assistant", reply);
-      history.push({ role: "assistant", content: reply });
-
-      setStatus("Speaking…", { live: true });
-      await speak(reply);
-      if (abortTurn) return;
-
-      setStatus("Your turn — listening starts in a moment…", { live: true });
-      await new Promise((r) => setTimeout(r, 400));
-      if (running && !abortTurn) await runTurn();
+      recording = true;
+      setControls({ canRecord: false, canStop: true });
+      setStatus("Recording… click Stop when done.", { live: true });
     }
 
-    async function startConversation() {
-      startOverlay.classList.add("hidden");
-      running = true;
-      abortTurn = false;
-      history = [];
-      logEl.innerHTML = "";
+    async function stopRecording() {
+      if (!recording || processing) return;
 
-      try {
-        const ready = await fetch("/api/inworld/ready").then((r) => r.json());
-        if (!ready.enabled) {
-          setStatus("Inworld API is disabled on the server (INWORLD_API_ENABLED).", { err: true });
-          running = false;
-          startOverlay.classList.remove("hidden");
-          return;
-        }
-        if (!ready.configured) {
-          setStatus(
-            "Inworld API key missing. Set INWORLD_API_KEY on Railway or save key at /config.",
-            { err: true },
-          );
-          running = false;
-          startOverlay.classList.remove("hidden");
-          return;
-        }
-      } catch {
-        setStatus("Could not reach server (/api/inworld/ready).", { err: true });
-        running = false;
-        startOverlay.classList.remove("hidden");
+      recording = false;
+      processing = true;
+      setControls({ canRecord: false, canStop: false });
+      setStatus("Stopping…", { live: true });
+
+      processor?.disconnect();
+      mediaStream?.getTracks().forEach((t) => t.stop());
+      if (audioCtx) await audioCtx.close();
+
+      processor = null;
+      mediaStream = null;
+      audioCtx = null;
+
+      const merged = mergeChunks(pcmChunks);
+      pcmChunks = [];
+
+      if (merged.length === 0) {
+        setStatus("No audio captured. Try again.", { err: true });
+        processing = false;
+        setControls({ canRecord: true, canStop: false });
         return;
       }
 
+      const wavBase64 = encodeWavBase64(floatTo16BitPCM(merged), SAMPLE_RATE, 1);
+
       try {
-        await runTurn();
+        setStatus("Transcribing…", { live: true });
+        const sttData = await postJson("/api/inworld/stt", {
+          audioContent: wavBase64,
+          audioEncoding: "LINEAR16",
+          sampleRateHertz: SAMPLE_RATE,
+          numberOfChannels: 1,
+          language: "en",
+        });
+        const transcript = (sttData.transcript || "").trim();
+        if (!transcript) {
+          setStatus("No speech detected. Click Record to try again.");
+          return;
+        }
+
+        appendTurn("user", transcript);
+        history.push({ role: "user", content: transcript });
+
+        setStatus("Thinking…", { live: true });
+        const chatData = await postJson("/api/inworld/llm/chat", {
+          systemPrompt: systemPromptEl.value.trim(),
+          userMessage: transcript,
+          history: history.slice(0, -1),
+        });
+        const reply = (chatData.reply || "").trim();
+        if (!reply) {
+          setStatus("No reply from LLM. Click Record to try again.", { err: true });
+          return;
+        }
+
+        appendTurn("assistant", reply);
+        history.push({ role: "assistant", content: reply });
+
+        setStatus("Speaking…", { live: true });
+        const ttsData = await postJson("/api/inworld/tts", { text: reply });
+        await speakReply(reply, ttsData.audioContent);
+
+        setStatus("Done. Click Record for another turn.");
       } catch (err) {
         setStatus(err.message || "Something went wrong.", { err: true });
-        running = false;
+      } finally {
+        processing = false;
+        setControls({ canRecord: true, canStop: false });
       }
     }
 
-    startBtn.addEventListener("click", () => {
-      startConversation();
+    recordBtn.addEventListener("click", () => {
+      startRecording().catch((err) => {
+        setStatus(err.message || "Could not start recording.", { err: true });
+        recording = false;
+        processing = false;
+        setControls({ canRecord: true, canStop: false });
+      });
+    });
+
+    stopBtn.addEventListener("click", () => {
+      stopRecording();
     });
 
     window.addEventListener("beforeunload", () => {
-      abortTurn = true;
-      running = false;
+      stopSpeaking();
+      mediaStream?.getTracks().forEach((t) => t.stop());
     });
+
+    (async () => {
+      try {
+        await checkReady();
+        await ensureAvatar();
+        setStatus("Click Record to start.");
+        setControls({ canRecord: true, canStop: false });
+      } catch (err) {
+        setStatus(err.message || "Could not initialize.", { err: true });
+        avatarStatusEl.textContent = err.message || "Avatar unavailable";
+      }
+    })();
   </script>
 </body>
 </html>
