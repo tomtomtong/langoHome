@@ -5925,8 +5925,6 @@
     }
 
     const mapLocationFromUrl = consumeMapLocationFromUrl();
-    // Set when arriving from Map travel so we cover world/pair loading with Uncle Tommy.
-    let pendingMapWorldTransition = Boolean(mapLocationFromUrl);
     let activeMapLocation = mapLocationFromUrl || readStoredMapLocation();
 
     function getScenesForMapLocation(locationId = activeMapLocation) {
@@ -5948,18 +5946,6 @@
 
     // Seed header immediately for the active map world (School → classroom).
     publishRoomScene(getDefaultSceneForMapLocation());
-
-    async function playUncleTommyWhile(work) {
-      const play = window.LangoPageTransition?.play;
-      if (typeof play !== "function") return work();
-      let result;
-      await play({
-        async onCovered() {
-          result = await work();
-        },
-      });
-      return result;
-    }
 
     function normalizePairTheme(value) {
       const theme = String(value ?? "").trim().toLowerCase();
@@ -8501,25 +8487,11 @@
       }
 
       try {
-        let idleVideoReady;
-        if (pendingMapWorldTransition) {
-          pendingMapWorldTransition = false;
-          // Map → world: Uncle Tommy portal covers pair/video switch.
-          // Dismiss splash quietly so page-motion does not queue a second portal.
-          idleVideoReady = await playUncleTommyWhile(async () => {
-            setSplashProgress(100);
-            if (splashScreenEl) splashScreenEl.setAttribute("aria-busy", "false");
-            splashClickGuardUntil = performance.now() + SPLASH_CLICK_GUARD_MS;
-            document.body.classList.add("splash-dismissed");
-            return preloadMediaAssets(cfg);
-          });
+        const idleVideoReady = await preloadMediaAssets(cfg);
+        if (SPLASH_GAME_PREVIEW) {
+          dismissSplash();
         } else {
-          idleVideoReady = await preloadMediaAssets(cfg);
-          if (SPLASH_GAME_PREVIEW) {
-            dismissSplash();
-          } else {
-            await finishSplashHandoff();
-          }
+          await finishSplashHandoff();
         }
 
         if (idleVideoReady) {
@@ -8533,7 +8505,6 @@
         initDailyRewards({ autoShow: false });
       } catch (e) {
         console.error(e);
-        pendingMapWorldTransition = false;
         await finishSplashHandoff().catch(() => dismissSplash());
         showErr(`Failed to load: ${e.message}`);
         setStatus('Tap "Start" to begin a conversation');

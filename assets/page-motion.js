@@ -1,85 +1,23 @@
 (() => {
   document.documentElement.classList.add('lango-motion-booting');
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-  const transitionBase = '/assets/uncle-tommy-transition/';
-  const transitionAssetVersion = '20260716-4x3';
-  const transitionSkipKey = 'lango:uncle-tommy-transition-complete';
   const isTopLevelPage = window.self === window.top;
   let navigationStarted = false;
 
-  function addTransitionStyles() {
-    if (document.querySelector('link[data-uncle-tommy-transition]')) return;
-    const stylesheet = document.createElement('link');
-    stylesheet.rel = 'stylesheet';
-    stylesheet.href = `${transitionBase}uncle-tommy-transition.css?v=${transitionAssetVersion}`;
-    stylesheet.dataset.uncleTommyTransition = '';
-    document.head.appendChild(stylesheet);
-  }
-
-  function loadTransition() {
-    addTransitionStyles();
-    if (window.UncleTommyTransition) {
-      return Promise.resolve(window.UncleTommyTransition);
-    }
-
-    return new Promise((resolve, reject) => {
-      const existing = document.querySelector('script[data-uncle-tommy-transition]');
-      if (existing) {
-        existing.addEventListener('load', () => resolve(window.UncleTommyTransition), { once: true });
-        existing.addEventListener('error', reject, { once: true });
-        return;
-      }
-
-      const script = document.createElement('script');
-      script.src = `${transitionBase}uncle-tommy-transition.js?v=${transitionAssetVersion}`;
-      script.dataset.uncleTommyTransition = '';
-      script.addEventListener('load', () => resolve(window.UncleTommyTransition), { once: true });
-      script.addEventListener('error', reject, { once: true });
-      document.head.appendChild(script);
-    });
-  }
-
-  const transitionReady = loadTransition().then((transition) => {
-    transition?.preload();
-    return transition;
-  });
-
   function playTransition(options) {
-    return transitionReady.then(
-      (transition) => transition?.play
-        ? transition.play(options)
-        : options?.onCovered?.(),
-      () => options?.onCovered?.(),
-    );
-  }
-
-  function setArrivalSkip() {
-    try {
-      sessionStorage.setItem(transitionSkipKey, '1');
-    } catch {}
-  }
-
-  function takeArrivalSkip() {
-    try {
-      const shouldSkip = sessionStorage.getItem(transitionSkipKey) === '1';
-      sessionStorage.removeItem(transitionSkipKey);
-      return shouldSkip;
-    } catch {
-      return false;
+    const onCovered = options?.onCovered;
+    if (typeof onCovered === 'function') {
+      return Promise.resolve(onCovered());
     }
+    return Promise.resolve();
   }
 
   function navigateWithTransition(destination) {
     if (navigationStarted) return Promise.resolve();
     navigationStarted = true;
     const targetUrl = new URL(destination, window.location.href).href;
-
-    return playTransition({
-      onCovered() {
-        setArrivalSkip();
-        window.location.assign(targetUrl);
-      },
-    });
+    window.location.assign(targetUrl);
+    return Promise.resolve();
   }
 
   function getInternalNavigation(anchor) {
@@ -118,7 +56,6 @@
     navigate: navigateWithTransition,
   });
 
-  const skipArrivalTransition = !isTopLevelPage || takeArrivalSkip();
   const visualSelector = [
     'body > *',
     'main > *',
@@ -182,11 +119,6 @@
   function start() {
     // Two frames allow synchronous React roots and image-backed layouts to settle.
     requestAnimationFrame(() => requestAnimationFrame(animatePageElements));
-    // A dedicated splash screen is already the page's entrance experience.
-    // Playing the full-screen portal above it would hide its loading UI/game.
-    const hasVisibleSplash = Boolean(document.querySelector('#splash-screen:not([hidden])'))
-      && !document.body.classList.contains('splash-dismissed');
-    if (!skipArrivalTransition && !hasVisibleSplash) playTransition();
   }
 
   function replayAfterReveal() {
@@ -204,8 +136,4 @@
   } else {
     start();
   }
-
-  window.addEventListener('pageshow', (event) => {
-    if (isTopLevelPage && event.persisted) playTransition();
-  });
 })();
