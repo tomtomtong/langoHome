@@ -155,6 +155,15 @@
     }
     .login-meta-table th { color: #9aa0a6; font-weight: 500; }
     .login-meta-table tr.active td { background: #1f2a40; }
+    .learned-vocab-empty {
+      margin: 0.75rem 0 0;
+      font-size: 0.8125rem;
+      color: #5f6368;
+    }
+    .learned-vocab-actions button {
+      padding: 0.25rem 0.5rem;
+      font-size: 0.75rem;
+    }
     .device-pill {
       display: inline-block;
       padding: 0.15rem 0.45rem;
@@ -467,6 +476,30 @@
           </div>
         </section>
 
+        <section class="section login-meta-section" id="learned-vocab-section">
+          <h2>Learned Vocabulary (Smartpen)</h2>
+          <p class="field-hint" style="margin: 0 0 0.75rem">
+            Words synced from the Bluetooth smartpen via <code>POST /api/learned-vocabulary</code>.
+            Uncle Tommy also uses the 20 most recent words in voice sessions.
+          </p>
+          <div class="login-meta-table-wrap">
+            <table class="login-meta-table" id="learned-vocab-table">
+              <thead>
+                <tr>
+                  <th>Word</th>
+                  <th>Learned</th>
+                  <th>Source</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="learned-vocab-body">
+                <tr><td colspan="4">Select an account to view learned words.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="learned-vocab-empty" id="learned-vocab-summary"></p>
+        </section>
+
         <section class="section">
           <h2>Conversation Memory Profile</h2>
           <p class="field-hint" style="margin: -0.5rem 0 1rem">
@@ -537,6 +570,8 @@
     const loadBtn = document.getElementById("load-btn");
     const clearProfileBtn = document.getElementById("clear-profile-btn");
     const loginMetaBody = document.getElementById("login-meta-body");
+    const learnedVocabBody = document.getElementById("learned-vocab-body");
+    const learnedVocabSummary = document.getElementById("learned-vocab-summary");
 
     let cachedProfiles = {};
     let cachedLoginMeta = {};
@@ -558,6 +593,61 @@
     function formatLoginTime(ms) {
       if (!ms) return "—";
       return new Date(ms).toLocaleString();
+    }
+
+    function formatLearnedTime(ms) {
+      if (!ms) return "—";
+      return new Date(ms).toLocaleString();
+    }
+
+    function renderLearnedVocabulary(items, total) {
+      if (!items?.length) {
+        learnedVocabBody.innerHTML = '<tr><td colspan="4">No learned words yet.</td></tr>';
+        learnedVocabSummary.textContent = total ? `Showing 0 of ${total} words.` : "";
+        return;
+      }
+      learnedVocabBody.innerHTML = items.map((item) => `
+        <tr>
+          <td>${item.word}</td>
+          <td>${formatLearnedTime(item.learnedAt)}</td>
+          <td>${item.source || "smartpen"}</td>
+          <td class="learned-vocab-actions">
+            <button type="button" class="danger secondary" data-delete-vocab="${item.id}">Remove</button>
+          </td>
+        </tr>
+      `).join("");
+      learnedVocabSummary.textContent = `Showing ${items.length} of ${total} learned words.`;
+      learnedVocabBody.querySelectorAll("[data-delete-vocab]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const id = btn.dataset.deleteVocab;
+          if (!confirm("Remove this learned word?")) return;
+          try {
+            const res = await fetch(`/api/learned-vocabulary/${id}`, { method: "DELETE" });
+            if (!res.ok) {
+              const data = await res.json().catch(() => ({}));
+              throw new Error(data.error || "Delete failed.");
+            }
+            await loadLearnedVocabulary(selectedAccount());
+            showStatus("Removed learned word.", true);
+          } catch (e) {
+            showStatus(e.message || "Could not remove learned word.", false);
+          }
+        });
+      });
+    }
+
+    async function loadLearnedVocabulary(username) {
+      if (!username) {
+        renderLearnedVocabulary([], 0);
+        return;
+      }
+      const res = await fetch(`/api/learned-vocabulary?username=${encodeURIComponent(username)}&limit=100`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Could not load learned vocabulary.");
+      }
+      const data = await res.json();
+      renderLearnedVocabulary(data.items || [], data.total || 0);
     }
 
     function renderLoginMetaTable(users) {
@@ -640,6 +730,7 @@
       lastAccount = accountSelect.value;
       fillForm(cachedProfiles[selectedAccount()] || {});
       renderLoginMetaTable(data.users || []);
+      await loadLearnedVocabulary(selectedAccount());
       profileReady = true;
     }
 
@@ -741,6 +832,9 @@
       lastAccount = accountSelect.value;
       fillForm(cachedProfiles[selectedAccount()] || {});
       renderLoginMetaTable(Array.from(accountSelect.options).map((o) => o.value));
+      loadLearnedVocabulary(selectedAccount()).catch((e) => {
+        showStatus(e.message || "Could not load learned vocabulary.", false);
+      });
       clearStatus();
     });
 

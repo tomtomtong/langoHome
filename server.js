@@ -19,6 +19,8 @@ const INWORLD_API_ENABLED = !/^(0|false|no|off)$/i.test(
 const INWORLD_API_DISABLED_MESSAGE =
   'Inworld API is disabled. Unset INWORLD_API_ENABLED=0 or set INWORLD_API_ENABLED=1.';
 
+const PEN_API_KEY = process.env.PEN_API_KEY?.trim() || process.env.SMARTPEN_API_KEY?.trim() || '';
+
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY?.trim() || '';
 const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID?.trim() || 'Taae9YSyOLxij6fj32HF';
 const ELEVENLABS_AGENT_ID = process.env.ELEVENLABS_AGENT_ID?.trim() || '';
@@ -175,6 +177,16 @@ conversationsDb.exec(`
   CREATE INDEX IF NOT EXISTS idx_crash_reports_created ON crash_reports(created_at DESC);
   CREATE INDEX IF NOT EXISTS idx_crash_reports_source ON crash_reports(source, created_at DESC);
   CREATE INDEX IF NOT EXISTS idx_crash_reports_platform ON crash_reports(platform, created_at DESC);
+  CREATE TABLE IF NOT EXISTS learned_vocabulary (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL,
+    word TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT 'smartpen',
+    learned_at INTEGER NOT NULL,
+    metadata_json TEXT,
+    UNIQUE(username, word)
+  );
+  CREATE INDEX IF NOT EXISTS idx_learned_vocabulary_user ON learned_vocabulary(username, learned_at DESC);
 `);
 try {
   conversationsDb.exec(`ALTER TABLE conversations ADD COLUMN user_audio_path TEXT`);
@@ -740,6 +752,167 @@ const getGamePlayStmt = conversationsDb.prepare(`
   SELECT id, username, game_id, score, play_date, played_at, details_json
   FROM game_plays WHERE id = ?
 `);
+
+const upsertLearnedVocabularyStmt = conversationsDb.prepare(`
+  INSERT INTO learned_vocabulary (username, word, source, learned_at, metadata_json)
+  VALUES (?, ?, ?, ?, ?)
+  ON CONFLICT(username, word) DO UPDATE SET
+    source = excluded.source,
+    learned_at = excluded.learned_at,
+    metadata_json = excluded.metadata_json
+`);
+const getLearnedVocabularyStmt = conversationsDb.prepare(`
+  SELECT id, username, word, source, learned_at, metadata_json
+  FROM learned_vocabulary WHERE id = ?
+`);
+const deleteLearnedVocabularyStmt = conversationsDb.prepare(`
+  DELETE FROM learned_vocabulary WHERE id = ?
+`);
+
+const VALID_LEARNED_VOCAB_SOURCES = new Set(['smartpen', 'bluetooth-pen', 'pen', 'manual']);
+
+function rowToLearnedVocabulary(row) {
+  let metadata = null;
+  try {
+    if (row.metadata_json) metadata = JSON.parse(row.metadata_json);
+  } catch { /* ignore */ }
+  return {
+    id: row.id,
+    username: row.username,
+    word: row.word,
+    source: row.source,
+    learnedAt: row.learned_at,
+    metadata,
+  };
+}
+
+function normalizeLearnedWordInput(raw) {
+  if (typeof raw === 'string') {
+    const word = raw.trim();
+    if (!word) return null;
+    return { word, source: 'smartpen', learnedAt: Date.now(), metadata: null };
+  }
+  if (!raw || typeof raw !== 'object') return null;
+  const word = String(raw.word || raw.content || '').trim();
+  if (!word) return null;
+  const source = String(raw.source || 'smartpen').trim().toLowerCase();
+  return {
+    word: word.slice(0, 256),
+    source: VALID_LEARNED_VOCAB_SOURCES.has(source) ? source : 'smartpen',
+    learnedAt: Math.max(0, Number(raw.learnedAt || raw.learned_at) || Date.now()),
+    metadata: raw.metadata && typeof raw.metadata === 'object' ? raw.metadata : null,
+  };
+}
+
+function recordLearnedVocabulary(username, wordsInput) {
+  if (!STUDENT_USERS[username]) return { ok: false, error: 'Invalid user.' };
+  const rawWords = Array.isArray(wordsInput) ? wordsInput : [wordsInput];
+  const items = [];
+  let added = 0;
+  let updated = 0;
+  let skipped = 0;
+  for (const raw of rawWords) {
+    const normalized = normalizeLearnedWordInput(raw);
+    if (!normalized) {
+      skipped += 1;
+      continue;
+    }
+    const existing = conversationsDb.prepare(`
+      SELECT id FROM learned_vocabulary WHERE username = ? AND word = ?
+    `).get(username, normalized.word);
+    const metadataJson = normalized.metadata ? JSON.stringify(normalized.metadata) : null;
+    const result = upsertLearnedVocabularyStmt.run(
+      username,
+      normalized.word,
+      normalized.source,
+      normalized.learnedAt,
+      metadataJson,
+    );
+    const itemId = existing
+      ? existing.id
+      : Number(result.lastInsertRowid);
+    const item = rowToLearnedVocabulary(getLearnedVocabularyStmt.get(itemId));
+    items.push(item);
+    if (existing) updated += 1;
+    else added += 1;
+  }
+  if (!items.length) {
+    return { ok: false, error: 'No valid words provided.' };
+  }
+  console.log(`[learned-vocabulary] ${username} added=${added} updated=${updated} skipped=${skipped}`);
+  return { ok: true, added, updated, skipped, items };
+}
+
+function listLearnedVocabulary({
+  username = null,
+  source = null,
+  limit = 50,
+  offset = 0,
+} = {}) {
+  const conditions = [];
+  const params = [];
+  if (username) {
+    conditions.push('username = ?');
+    params.push(String(username));
+  }
+  if (source && VALID_LEARNED_VOCAB_SOURCES.has(source)) {
+    conditions.push('source = ?');
+    params.push(String(source));
+  }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 200);
+  const safeOffset = Math.max(Number(offset) || 0, 0);
+  const total = conversationsDb.prepare(
+    `SELECT COUNT(*) AS total FROM learned_vocabulary ${where}`,
+  ).get(...params).total;
+  const rows = conversationsDb.prepare(`
+    SELECT id, username, word, source, learned_at, metadata_json
+    FROM learned_vocabulary
+    ${where}
+    ORDER BY learned_at DESC
+    LIMIT ? OFFSET ?
+  `).all(...params, safeLimit, safeOffset);
+  return {
+    items: rows.map(rowToLearnedVocabulary),
+    total,
+    limit: safeLimit,
+    offset: safeOffset,
+  };
+}
+
+function listRecentLearnedVocabulary(username, limit = 20) {
+  if (!username) return [];
+  const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 50);
+  const rows = conversationsDb.prepare(`
+    SELECT id, username, word, source, learned_at, metadata_json
+    FROM learned_vocabulary
+    WHERE username = ?
+    ORDER BY learned_at DESC
+    LIMIT ?
+  `).all(username, safeLimit);
+  return rows.map(rowToLearnedVocabulary);
+}
+
+function deleteLearnedVocabulary(id) {
+  const row = getLearnedVocabularyStmt.get(Number(id));
+  if (!row) return { ok: false, error: 'Not found.' };
+  deleteLearnedVocabularyStmt.run(row.id);
+  return { ok: true, deleted: rowToLearnedVocabulary(row) };
+}
+
+function isPenApiAuthorized(req) {
+  if (!PEN_API_KEY) return false;
+  const auth = String(req.headers.authorization || '');
+  const match = auth.match(/^Bearer\s+(.+)$/i);
+  if (!match) return false;
+  const token = match[1].trim();
+  if (token.length !== PEN_API_KEY.length) return false;
+  try {
+    return timingSafeEqual(Buffer.from(token), Buffer.from(PEN_API_KEY));
+  } catch {
+    return false;
+  }
+}
 
 function rowToGamePlay(row) {
   let details = null;
@@ -2222,11 +2395,22 @@ function buildProfileContext(profile) {
   return lines.join('\n');
 }
 
+function buildLearnedVocabularyContext(username) {
+  const learned = listRecentLearnedVocabulary(username, 20);
+  if (!learned.length) return '';
+  const lines = [
+    'Words learned on smartpen recently:',
+    ...learned.map((item) => `- ${item.word}`),
+  ];
+  return lines.join('\n');
+}
+
 function mergeInstructionsWithProfile(baseInstructions, profile, username) {
   const base = (baseInstructions || DEFAULT_INSTRUCTIONS).trim();
   const profileBlock = buildProfileContext(profile);
+  const learnedVocabBlock = username ? buildLearnedVocabularyContext(username) : '';
   const checkInBlock = username ? buildCheckInContext(username) : '';
-  const blocks = [profileBlock, checkInBlock].filter(Boolean);
+  const blocks = [profileBlock, learnedVocabBlock, checkInBlock].filter(Boolean);
   if (!blocks.length) return base;
   return `${base}\n\n${blocks.join('\n\n')}`;
 }
@@ -2376,6 +2560,12 @@ function isCrashReportPublicApi(url, method) {
   return url === '/api/crashes' && (method || 'GET').toUpperCase() === 'POST';
 }
 
+function isLearnedVocabularyPenApi(url, method, req) {
+  return url === '/api/learned-vocabulary'
+    && (method || 'GET').toUpperCase() === 'POST'
+    && isPenApiAuthorized(req);
+}
+
 /** Turn-based test page: REST STT / LLM / TTS without login (Railway-friendly sandbox). */
 function isTurnBasedPublicApi(url, method) {
   const m = (method || 'GET').toUpperCase();
@@ -2515,6 +2705,7 @@ function requiresAdmin(url, method) {
   if (url.startsWith('/api/profile-sync-logs')) return true;
   if (url.startsWith('/api/game-plays') && m !== 'POST') return true;
   if (url.startsWith('/api/crashes') && m !== 'POST') return true;
+  if (url.match(/^\/api\/learned-vocabulary\/\d+$/) && m === 'DELETE') return true;
   if (url === '/api/inworld/models') return true;
 
   const uploadPaths = ['/api/idle-video', '/api/transition-video', '/api/avatar-background'];
@@ -3983,6 +4174,7 @@ const server = createServer(async (req, res) => {
     !isPublicPath(url)
     && !isTurnBasedPublicApi(url, req.method)
     && !isCrashReportPublicApi(url, req.method)
+    && !isLearnedVocabularyPenApi(url, req.method, req)
     && !isTurnBasedSafeRequest(req, url)
     && !isPreviewSafeRequest(req, url, rawUrl)
     && !isAuthenticated(req)
@@ -4095,6 +4287,68 @@ const server = createServer(async (req, res) => {
     const limit = params.get('limit');
     const offset = params.get('offset');
     sendJson(res, 200, listGamePlays({ username, playDate, gameId, limit, offset }));
+    return;
+  }
+
+  if (url === '/api/learned-vocabulary' && req.method === 'POST') {
+    const session = getSession(req);
+    const penAuthorized = isPenApiAuthorized(req);
+    if (!penAuthorized && (!session || session.role !== 'student')) {
+      sendJson(res, 403, { error: 'Student login or pen API key required.' });
+      return;
+    }
+    readJsonBody(req, res, (parsed) => {
+      const username = penAuthorized
+        ? String(parsed.username || '').trim()
+        : session.username;
+      if (!username) {
+        sendJson(res, 400, { error: 'username is required.' });
+        return;
+      }
+      if (penAuthorized && !STUDENT_USERS[username]) {
+        sendJson(res, 400, { error: 'Invalid user.' });
+        return;
+      }
+      const words = parsed.words ?? parsed.word ?? parsed.vocabulary;
+      const result = recordLearnedVocabulary(username, words);
+      if (!result.ok) {
+        sendJson(res, 400, { error: result.error || 'Could not record learned vocabulary.' });
+        return;
+      }
+      sendJson(res, 200, result);
+    });
+    return;
+  }
+
+  if (url === '/api/learned-vocabulary' && req.method === 'GET') {
+    const session = getSession(req);
+    if (!session) {
+      sendJson(res, 401, { error: 'Login required.' });
+      return;
+    }
+    const params = new URL(rawUrl, 'http://local').searchParams;
+    let username = params.get('username')?.trim() || null;
+    if (session.role === 'student') {
+      username = session.username;
+    } else if (username && !STUDENT_USERS[username]) {
+      sendJson(res, 400, { error: 'Invalid username.' });
+      return;
+    }
+    const source = params.get('source')?.trim() || null;
+    const limit = params.get('limit');
+    const offset = params.get('offset');
+    sendJson(res, 200, listLearnedVocabulary({ username, source, limit, offset }));
+    return;
+  }
+
+  const learnedVocabDeleteMatch = url.match(/^\/api\/learned-vocabulary\/(\d+)$/);
+  if (learnedVocabDeleteMatch && req.method === 'DELETE') {
+    const result = deleteLearnedVocabulary(learnedVocabDeleteMatch[1]);
+    if (!result.ok) {
+      sendJson(res, 404, { error: result.error || 'Not found.' });
+      return;
+    }
+    sendJson(res, 200, result);
     return;
   }
 
