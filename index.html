@@ -2653,8 +2653,37 @@
       }
     }
 
+    .lango-home__record.is-reminding img {
+      transform-origin: 50% 78%;
+      animation: vocab-game-reminder-flash 1.25s ease-in-out infinite;
+    }
+
+    .lango-home-toast {
+      position: absolute;
+      z-index: 50;
+      left: 50%;
+      bottom: 5%;
+      max-width: 80%;
+      padding: .55em 1.25em;
+      border: 4px solid #ffd153;
+      border-radius: 999px;
+      transform: translateX(-50%);
+      background: rgba(111, 46, 12, .95);
+      color: #fff7cc;
+      box-shadow: 0 8px 20px rgba(61, 21, 3, .38);
+      font-size: clamp(15px, 1.7cqw, 23px);
+      font-weight: 800;
+      white-space: nowrap;
+      animation: lango-home-toast-in 180ms ease both;
+    }
+
+    @keyframes lango-home-toast-in {
+      from { opacity: 0; transform: translate(-50%, 30%); }
+    }
+
     @media (prefers-reduced-motion: reduce) {
-      .lango-home__box.is-reminding img { animation: none; }
+      .lango-home__box.is-reminding img,
+      .lango-home__record.is-reminding img { animation: none; }
     }
 
     .lango-home__nav {
@@ -4332,6 +4361,10 @@
 
       function LangoHome() {
         const [comingSoonFeature, setComingSoonFeature] = React.useState(null);
+        const [recordReminding, setRecordReminding] = React.useState(false);
+        const [toast, setToast] = React.useState('');
+        const toastTimer = React.useRef(null);
+        const recordRemindTimer = React.useRef(null);
         const [roomScene, setRoomScene] = React.useState(readInitialRoomScene);
         React.useEffect(() => {
           const syncRoomScene = (event) => {
@@ -4362,6 +4395,37 @@
           };
           window.addEventListener('pageshow', syncVocabGameReminder);
           return () => window.removeEventListener('pageshow', syncVocabGameReminder);
+        }, []);
+        const announce = (message) => {
+          setToast(message);
+          clearTimeout(toastTimer.current);
+          toastTimer.current = setTimeout(() => setToast(''), 1800);
+        };
+        React.useEffect(() => {
+          const flashRecord = () => {
+            setRecordReminding(true);
+            clearTimeout(recordRemindTimer.current);
+            recordRemindTimer.current = setTimeout(() => setRecordReminding(false), 8000);
+          };
+          const onPenWordLearned = ({ word, username } = {}) => {
+            flashRecord();
+            window.dispatchEvent(new CustomEvent('lango:pen-word-learned', {
+              detail: { word, username },
+            }));
+          };
+          const onPenConnected = ({ deviceName } = {}) => {
+            const label = deviceName ? `Pen connected: ${deviceName}` : 'Pen connected';
+            announce(label);
+            window.dispatchEvent(new CustomEvent('lango:pen-connected', {
+              detail: { deviceName },
+            }));
+          };
+          window.LangoHost = { onPenWordLearned, onPenConnected };
+          return () => {
+            clearTimeout(toastTimer.current);
+            clearTimeout(recordRemindTimer.current);
+            if (window.LangoHost?.onPenWordLearned === onPenWordLearned) delete window.LangoHost;
+          };
         }, []);
         const transitionBusy = React.useRef(false);
         const openRewards = () => document.getElementById('daily-rewards-btn')?.click();
@@ -4411,7 +4475,17 @@
               )
             )
           ),
-          e(ImageButton, { className: 'lango-home__record', image: 'store', label: 'Record', onClick: () => setComingSoonFeature('Record'), sfx: 'weakness' }),
+          e(ImageButton, {
+            className: `lango-home__record${recordReminding ? ' is-reminding' : ''}`,
+            image: 'store',
+            label: 'Record',
+            onClick: () => {
+              setRecordReminding(false);
+              clearTimeout(recordRemindTimer.current);
+              setComingSoonFeature('Record');
+            },
+            sfx: 'weakness'
+          }),
           e(ImageButton, { className: 'lango-home__map', image: 'reward', label: 'Map', onClick: () => go('map', '/map') }),
           e(ImageButton, { className: 'lango-home__reward', image: 'box', label: 'Reward', onClick: () => reveal('reward', openRewards), sfx: 'powerUp' }),
           e(ImageButton, {
@@ -4435,7 +4509,8 @@
             label: 'Play Word Chop vocab game',
             onClick: () => go('game', '/vocab-game/index.html')
           }),
-          e('div', { className: 'lango-home__frame', 'aria-hidden': true })
+          e('div', { className: 'lango-home__frame', 'aria-hidden': true }),
+          toast && e('div', { className: 'lango-home-toast', role: 'status', 'aria-live': 'polite' }, toast)
         );
       }
 

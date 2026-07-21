@@ -1707,6 +1707,163 @@ function parseProfileSyncJson(content) {
   }
 }
 
+function buildParentVocabSuggestionsSystemPrompt() {
+  return `You help parents reinforce English vocabulary their child recently learned with a Bluetooth smart pen.
+Return ONLY valid JSON with this shape:
+{
+  "summary": "1-2 warm sentences for the parent about what the child learned",
+  "generalTips": ["short tip for natural home practice", "another tip"],
+  "wordSuggestions": [
+    {
+      "word": "apple",
+      "questions": ["natural question 1", "natural question 2", "natural question 3"],
+      "activityTip": "one short idea for everyday reinforcement"
+    }
+  ]
+}
+
+Rules:
+1. Questions should feel like casual conversation, not a test or worksheet.
+2. Match the child's grade and language level when profile context is provided.
+3. Use the child's name when available.
+4. Include 2-4 questions per word. Prefer open-ended questions that invite the child to use the word.
+5. Cover every word listed in the user message in wordSuggestions (same spelling).
+6. generalTips should have 2-4 items about timing, tone, and praise.
+7. Keep each question under 120 characters. Use simple English unless home language suggests otherwise.
+8. If no words were provided, return empty wordSuggestions and explain gently in summary.`;
+}
+
+async function generateParentVocabSuggestions(username, { limit = 20 } = {}) {
+  if (!STUDENT_USERS[username]) {
+    return { ok: false, error: 'Invalid user.' };
+  }
+
+  const words = listRecentLearnedVocabulary(username, limit);
+  if (!words.length) {
+    return {
+      ok: true,
+      words: [],
+      suggestions: {
+        summary: 'No smartpen words have been synced yet. Once your child writes vocabulary with the Bluetooth pen, they will appear here with question ideas.',
+        generalTips: [
+          'Make sure the mobile app is connected to the smartpen and logged into this account.',
+          'Short daily chats work better than long review sessions.',
+        ],
+        wordSuggestions: [],
+      },
+      generated: false,
+    };
+  }
+
+  if (!INWORLD_API_ENABLED) {
+    return {
+      ok: false,
+      error: INWORLD_API_DISABLED_MESSAGE,
+      words,
+    };
+  }
+
+  const key = resolveInworldApiKey();
+  if (!key) {
+    return { ok: false, error: 'No Inworld API key configured.', words };
+  }
+
+  const profile = getUserProfile(username);
+  const model = getProfileSyncModel();
+  const wordLines = words.map((item) => {
+    const when = new Date(item.learnedAt).toISOString().slice(0, 10);
+    return `- ${item.word} (learned ${when}, source: ${item.source})`;
+  });
+
+  const profileBits = [
+    profile.childName && `Child name: ${profile.childName}`,
+    profile.nickname && `Nickname: ${profile.nickname}`,
+    profile.grade && `Grade: ${profile.grade}`,
+    profile.schoolGrade && `School grade: ${profile.schoolGrade}`,
+    profile.mainLearningLanguage && `Learning language: ${profile.mainLearningLanguage}`,
+    profile.homeLanguage && `Home language: ${profile.homeLanguage}`,
+    profile.vocabularyLevel && `Vocabulary level: ${profile.vocabularyLevel}`,
+    profile.parentPriority && `Parent priority: ${profile.parentPriority}`,
+  ].filter(Boolean);
+
+  const userPrompt = `Student account: ${username}
+
+${profileBits.length ? `Learner context:\n${profileBits.join('\n')}\n` : ''}
+Recently learned smartpen vocabulary (${words.length} words):
+${wordLines.join('\n')}
+
+Suggest conversation questions parents can ask at home to reinforce these words naturally.`;
+
+  try {
+    const upstream = await fetch(INWORLD_LLM_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: buildParentVocabSuggestionsSystemPrompt() },
+          { role: 'user', content: userPrompt },
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0.4,
+      }),
+    });
+
+    const payload = await upstream.json().catch(() => ({}));
+    if (!upstream.ok) {
+      const message = payload?.error?.message || payload?.error || 'Inworld LLM request failed.';
+      return { ok: false, error: String(message), words };
+    }
+
+    const content = payload?.choices?.[0]?.message?.content;
+    if (!content) {
+      return { ok: false, error: 'Inworld returned empty content.', words };
+    }
+
+    let parsed;
+    try {
+      parsed = parseProfileSyncJson(content);
+    } catch {
+      return { ok: false, error: 'Inworld returned invalid JSON.', words };
+    }
+
+    const wordSuggestions = Array.isArray(parsed?.wordSuggestions)
+      ? parsed.wordSuggestions
+        .filter((entry) => entry && typeof entry.word === 'string')
+        .map((entry) => ({
+          word: String(entry.word).trim(),
+          questions: Array.isArray(entry.questions)
+            ? entry.questions.map((q) => String(q).trim()).filter(Boolean).slice(0, 5)
+            : [],
+          activityTip: String(entry.activityTip || '').trim(),
+        }))
+        .filter((entry) => entry.word)
+      : [];
+
+    const generalTips = Array.isArray(parsed?.generalTips)
+      ? parsed.generalTips.map((tip) => String(tip).trim()).filter(Boolean).slice(0, 6)
+      : [];
+
+    return {
+      ok: true,
+      words,
+      suggestions: {
+        summary: String(parsed?.summary || '').trim()
+          || `Your child recently learned ${words.length} word(s) with the smartpen.`,
+        generalTips,
+        wordSuggestions,
+      },
+      generated: true,
+      model,
+    };
+  } catch (e) {
+    return { ok: false, error: e.message || 'Could not generate suggestions.', words };
+  }
+}
+
 function buildProfileSyncSystemPrompt(currentProfile) {
   const profile = normalizeUserProfile(currentProfile);
   const emptyFields = listProfileFields(profile, (value) => !value);
@@ -2534,9 +2691,25 @@ function redirectToAdminLogin(res, nextUrl) {
   res.end();
 }
 
+function isParentPath(url) {
+  return url === '/parent'
+    || url === '/parent/'
+    || url === '/parent/login'
+    || url.startsWith('/parent/');
+}
+
+function redirectToParentLogin(res, nextUrl) {
+  const loc = nextUrl && nextUrl !== '/parent/login'
+    ? `/parent/login?next=${encodeURIComponent(nextUrl)}`
+    : '/parent/login';
+  res.writeHead(302, { Location: loc, ...SECURITY_HEADERS });
+  res.end();
+}
+
 function isPublicPath(url) {
   return isElevenAgentsPublicPath(url)
     || url === '/login'
+    || url === '/parent/login'
     || url === '/admin/login'
     || url === '/api/login'
     || url === '/api/admin/login'
@@ -3935,6 +4108,9 @@ const pages = {
   '/session-simple': 'session-simple.html',
   '/turn-based': 'turn-based.html',
   '/agents': 'agents.html',
+  '/parent': 'parent.html',
+  '/parent/': 'parent.html',
+  '/parent/login': 'parent-login.html',
 };
 
 function resolvePage(url) {
@@ -4153,6 +4329,33 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  if (url === '/parent/login' && getSession(req)?.role === 'student') {
+    const next = new URL(rawUrl, 'http://local').searchParams.get('next');
+    const dest = next && next.startsWith('/') ? next : '/parent';
+    res.writeHead(302, { Location: dest, ...SECURITY_HEADERS });
+    res.end();
+    return;
+  }
+
+  if (isParentPath(url) && url !== '/parent/login' && getSession(req)?.role === 'admin') {
+    if (wantsHtml(req)) {
+      res.writeHead(302, { Location: '/admin', ...SECURITY_HEADERS });
+      res.end();
+      return;
+    }
+    sendJson(res, 403, { error: 'Parent portal is for student accounts. Use admin CMS for learner data.' });
+    return;
+  }
+
+  if (isParentPath(url) && url !== '/parent/login' && getSession(req)?.role !== 'student') {
+    if (wantsHtml(req)) {
+      redirectToParentLogin(res, url);
+      return;
+    }
+    sendJson(res, 401, { error: 'Student login required.' });
+    return;
+  }
+
   if (url === '/admin/login' && isAdmin(req)) {
     const next = new URL(rawUrl, 'http://local').searchParams.get('next');
     const dest = next && next.startsWith('/') ? next : '/admin';
@@ -4171,7 +4374,11 @@ const server = createServer(async (req, res) => {
     && !isAuthenticated(req)
   ) {
     if (wantsHtml(req)) {
-      redirectToLogin(res, url);
+      if (isParentPath(url)) {
+        redirectToParentLogin(res, url);
+      } else {
+        redirectToLogin(res, url);
+      }
       return;
     }
     sendJson(res, 401, { error: 'Login required.' });
@@ -4188,6 +4395,27 @@ const server = createServer(async (req, res) => {
     sendJson(res, 200, {
       username: session.username,
       profile: getUserProfile(session.username),
+    });
+    return;
+  }
+
+  if (url === '/api/parent/vocab-suggestions' && req.method === 'POST') {
+    const session = getSession(req);
+    if (!session || session.role !== 'student') {
+      sendJson(res, 403, { error: 'Student login required.' });
+      return;
+    }
+    readJsonBody(req, res, async (parsed) => {
+      const limit = Math.min(Math.max(Number(parsed?.limit) || 20, 1), 50);
+      const result = await generateParentVocabSuggestions(session.username, { limit });
+      if (!result.ok) {
+        sendJson(res, result.words ? 503 : 400, {
+          error: result.error || 'Could not generate suggestions.',
+          words: result.words || [],
+        });
+        return;
+      }
+      sendJson(res, 200, result);
     });
     return;
   }
@@ -5429,6 +5657,7 @@ server.listen(port, '0.0.0.0', () => {
   console.log(`Game database: ${GAME_DB_PATH}`);
   console.log(`Conversation logs: ${CONVERSATIONS_DB_PATH}`);
   console.log(`Session audio: ${SESSION_AUDIO_DIR}`);
+  console.log(`Parent portal: http://0.0.0.0:${port}/parent  (login: /parent/login)`);
   console.log(`Eleven Agents: http://0.0.0.0:${port}/agents.html  (public, no login)`);
   console.log(`ElevenLabs API: ${ELEVENLABS_API_KEY ? 'configured' : 'missing ELEVENLABS_API_KEY'}`);
   if (CONFIG_DIR !== ROOT) console.log(`Config stored at ${CONFIG_PATH}`);

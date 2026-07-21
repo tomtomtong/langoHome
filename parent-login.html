@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Parent Sign In — Lango</title>
+  <link rel="stylesheet" href="/assets/page-motion.css">
+  <script src="/assets/page-motion.js"></script>
+  <link rel="preload" href="/langoLogo.jpeg" as="image">
+  <style>
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: linear-gradient(160deg, #15192b 0%, #0f1117 45%, #12151f 100%);
+      color: #e8eaed;
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+
+    .login-card {
+      width: min(100%, 420px);
+      padding: 2.5rem 2rem;
+      border-radius: 18px;
+      background: rgba(26, 29, 39, 0.96);
+      border: 1px solid #2f3547;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35);
+    }
+
+    .logo-wrap {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 1.25rem;
+    }
+
+    .logo-wrap img {
+      width: min(50vw, 140px);
+      height: auto;
+      object-fit: contain;
+    }
+
+    .badge {
+      display: inline-block;
+      margin: 0 auto 0.75rem;
+      padding: 0.25rem 0.65rem;
+      border-radius: 999px;
+      background: rgba(108, 140, 255, 0.14);
+      border: 1px solid rgba(108, 140, 255, 0.35);
+      color: #b4c5ff;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+
+    .title-wrap {
+      text-align: center;
+      margin-bottom: 1.75rem;
+    }
+
+    h1 {
+      margin: 0 0 0.35rem;
+      font-size: 1.45rem;
+      font-weight: 650;
+    }
+
+    .subtitle {
+      margin: 0;
+      font-size: 0.92rem;
+      color: #9aa0a6;
+      line-height: 1.55;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 0.4rem;
+      font-size: 0.85rem;
+      color: #bdc1c6;
+    }
+
+    input {
+      width: 100%;
+      padding: 0.78rem 0.9rem;
+      margin-bottom: 1rem;
+      border: 1px solid #3c4048;
+      border-radius: 10px;
+      background: #0f1117;
+      color: #e8eaed;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    input:focus {
+      border-color: #7c9cff;
+    }
+
+    button {
+      width: 100%;
+      padding: 0.88rem;
+      margin-top: 0.35rem;
+      border: none;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #5a7cff, #4664e8);
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.15s;
+    }
+
+    button:hover:not(:disabled) {
+      opacity: 0.95;
+      transform: translateY(-1px);
+    }
+
+    button:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+
+    .error {
+      display: none;
+      margin-bottom: 1rem;
+      padding: 0.75rem 0.9rem;
+      border-radius: 10px;
+      background: rgba(234, 67, 53, 0.12);
+      border: 1px solid rgba(234, 67, 53, 0.35);
+      color: #f28b82;
+      font-size: 0.9rem;
+      text-align: center;
+    }
+
+    .error.visible {
+      display: block;
+    }
+
+    .hint {
+      margin: 1.25rem 0 0;
+      font-size: 0.82rem;
+      color: #7d848c;
+      line-height: 1.5;
+      text-align: center;
+    }
+
+    .hint a {
+      color: #9eb0ff;
+      text-decoration: none;
+    }
+
+    .hint a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <div class="logo-wrap">
+      <img src="/langoLogo.jpeg" alt="Lango" width="140" height="140" decoding="async">
+    </div>
+    <div class="title-wrap">
+      <div class="badge">Parent Portal</div>
+      <h1>See what your child learned</h1>
+      <p class="subtitle">Sign in with your child’s learner account to view smartpen vocabulary and get conversation ideas.</p>
+    </div>
+
+    <div id="error" class="error" role="alert"></div>
+
+    <form id="login-form">
+      <label for="username">Learner username</label>
+      <input id="username" name="username" type="text" autocomplete="username" required autofocus placeholder="e.g. user01">
+
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required>
+
+      <button type="submit" id="submit-btn">View vocabulary</button>
+    </form>
+
+    <p class="hint">
+      Looking for Uncle Tommy voice practice?
+      <a href="/login">Student sign in</a>
+    </p>
+  </div>
+
+  <script>
+    const form = document.getElementById("login-form");
+    const errorEl = document.getElementById("error");
+    const submitBtn = document.getElementById("submit-btn");
+    const nextUrl = new URLSearchParams(location.search).get("next") || "/parent";
+
+    function showError(message) {
+      errorEl.textContent = message;
+      errorEl.classList.add("visible");
+    }
+
+    function clearError() {
+      errorEl.textContent = "";
+      errorEl.classList.remove("visible");
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      clearError();
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Signing in…";
+
+      try {
+        const res = await fetch("/api/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: document.getElementById("username").value.trim(),
+            password: document.getElementById("password").value,
+            userAgent: navigator.userAgent,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error || "Sign in failed.");
+        }
+        location.href = nextUrl.startsWith("/") ? nextUrl : "/parent";
+      } catch (err) {
+        showError(err.message || "Could not sign in.");
+        submitBtn.disabled = false;
+        submitBtn.textContent = "View vocabulary";
+      }
+    });
+  </script>
+</body>
+</html>
