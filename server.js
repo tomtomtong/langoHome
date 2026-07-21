@@ -311,23 +311,59 @@ function ensureSessionAudioDir() {
 }
 
 function createSessionAudioRecorder(sampleRate = USER_AUDIO_SAMPLE_RATE) {
-  const startedAt = Date.now();
   const segments = [];
+  let timelineEnd = 0;
+  let userRecordingEnabled = false;
+  let userRunStart = null;
   let userSampleCursor = 0;
-  let userBaseSample = null;
   let currentAgentResponseId = null;
-  let agentResponseStartSample = 0;
-  let agentResponseSampleCursor = 0;
+  let agentRunStart = null;
+  let agentSampleCursor = 0;
+  let agentSpeaking = false;
 
-  const wallClockSample = () => Math.round(((Date.now() - startedAt) / 1000) * sampleRate);
+  const finalizeUserRun = () => {
+    if (userRunStart === null) return;
+    timelineEnd = Math.max(timelineEnd, userRunStart + userSampleCursor);
+    userRunStart = null;
+    userSampleCursor = 0;
+  };
+
+  const finalizeAgentRun = () => {
+    if (agentRunStart === null) return;
+    timelineEnd = Math.max(timelineEnd, agentRunStart + agentSampleCursor);
+    agentRunStart = null;
+    agentSampleCursor = 0;
+    agentSpeaking = false;
+    currentAgentResponseId = null;
+    userRecordingEnabled = true;
+  };
+
+  const beginUserRun = () => {
+    if (userRunStart !== null) return;
+    userRunStart = timelineEnd;
+    userSampleCursor = 0;
+  };
+
+  const beginAgentRun = (responseId) => {
+    if (responseId === currentAgentResponseId) return;
+    finalizeUserRun();
+    if (agentRunStart !== null) {
+      timelineEnd = Math.max(timelineEnd, agentRunStart + agentSampleCursor);
+    }
+    currentAgentResponseId = responseId;
+    agentRunStart = timelineEnd;
+    agentSampleCursor = 0;
+    agentSpeaking = true;
+  };
 
   return {
     appendUserPcm(buf) {
-      if (!buf?.length) return;
-      if (userBaseSample === null) userBaseSample = wallClockSample();
-      const start = userBaseSample + userSampleCursor;
-      segments.push({ start, pcm: buf });
-      userSampleCursor += buf.length / 2;
+      if (!buf?.length || !userRecordingEnabled || agentSpeaking) return;
+      beginUserRun();
+      const sampleCount = buf.length / 2;
+      segments.push({ start: userRunStart + userSampleCursor, pcm: buf });
+      userSampleCursor += sampleCount;
+      timelineEnd = Math.max(timelineEnd, userRunStart + userSampleCursor);
     },
 
     appendUserFromMessage(msg) {
@@ -347,18 +383,21 @@ function createSessionAudioRecorder(sampleRate = USER_AUDIO_SAMPLE_RATE) {
       if (!buf.length) return;
 
       const responseId = parsed.response_id || parsed.item_id || '__default__';
-      if (responseId !== currentAgentResponseId) {
-        currentAgentResponseId = responseId;
-        agentResponseStartSample = wallClockSample();
-        agentResponseSampleCursor = 0;
-      }
+      beginAgentRun(responseId);
 
-      const start = agentResponseStartSample + agentResponseSampleCursor;
-      segments.push({ start, pcm: buf });
-      agentResponseSampleCursor += buf.length / 2;
+      const sampleCount = buf.length / 2;
+      segments.push({ start: agentRunStart + agentSampleCursor, pcm: buf });
+      agentSampleCursor += sampleCount;
+      timelineEnd = Math.max(timelineEnd, agentRunStart + agentSampleCursor);
+    },
+
+    endAgentResponse() {
+      finalizeAgentRun();
     },
 
     buildPcmBuffer() {
+      finalizeUserRun();
+      finalizeAgentRun();
       if (!segments.length) return null;
 
       let maxEnd = 0;
@@ -5521,6 +5560,8 @@ function connectToInworld(apiKey, browser, session, userInfo = {}) {
       recordInworldMessage(parsed);
       if (parsed.type === 'response.output_audio.delta') {
         sessionAudio.appendAgentDelta(parsed);
+      } else if (parsed.type === 'response.output_audio.done') {
+        sessionAudio.endAgentResponse();
       }
     }
     const t = parsed?.type;
