@@ -3,7 +3,6 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="screen-orientation" content="landscape">
   <title>Uncle Tommy — Voice Agent</title>
   <link rel="stylesheet" href="/assets/page-motion.css">
   <script src="/assets/page-motion.js"></script>
@@ -42,40 +41,6 @@
       font-family: system-ui, -apple-system, sans-serif;
       background: #0f1117;
       color: #e8eaed;
-    }
-
-    /* ── Portrait blocker ── */
-    #portrait-prompt {
-      display: none;
-      position: fixed;
-      inset: 0;
-      z-index: 100;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 1rem;
-      padding: 2rem;
-      background: #0f1117;
-      text-align: center;
-    }
-
-    #portrait-prompt svg {
-      width: 64px;
-      height: 64px;
-      color: #6c8cff;
-      animation: rotate-hint 2s ease-in-out infinite;
-    }
-
-    @keyframes rotate-hint {
-      0%, 100% { transform: rotate(0deg); }
-      50% { transform: rotate(90deg); }
-    }
-
-    @media (orientation: portrait) and (max-width: 900px) {
-      #portrait-prompt { display: flex; }
-      #app { display: none !important; }
-      html.preview-mode #portrait-prompt { display: none; }
-      html.preview-mode #app { display: block !important; }
     }
 
     #app {
@@ -3765,14 +3730,6 @@
     })();
   </script>
 
-  <div id="portrait-prompt">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-      <rect x="5" y="2" width="14" height="20" rx="2"/>
-      <path d="M12 18v.01"/>
-    </svg>
-    <p>Rotate your device to landscape to use Uncle Tommy</p>
-  </div>
-
   <div id="app">
     <div id="lango-home-root"></div>
     <div id="daily-rewards-root"></div>
@@ -7217,9 +7174,6 @@
         console.error(e);
         showErr(`Avatar failed to load: ${e.message}`);
       }
-      try {
-        await screen.orientation?.lock?.("landscape");
-      } catch {}
       avatar?.refreshAfterVisible();
     }
 
@@ -7228,7 +7182,6 @@
       inSession = false;
       setCameraEditMode(false);
       document.body.classList.remove("in-session");
-      try { screen.orientation?.unlock?.(); } catch {}
     }
 
     function releaseMicSync() {
