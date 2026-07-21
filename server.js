@@ -898,6 +898,14 @@ function deleteLearnedVocabulary(id) {
   return { ok: true, deleted: rowToLearnedVocabulary(row) };
 }
 
+function clearLearnedVocabulary(username) {
+  if (!STUDENT_USERS[username]) return { ok: false, error: 'Invalid user.' };
+  const result = conversationsDb.prepare(
+    'DELETE FROM learned_vocabulary WHERE username = ?',
+  ).run(username);
+  return { ok: true, deleted: result.changes };
+}
+
 function rowToGamePlay(row) {
   let details = null;
   try {
@@ -2688,6 +2696,7 @@ function requiresAdmin(url, method) {
   if (url.startsWith('/api/game-plays') && m !== 'POST') return true;
   if (url.startsWith('/api/crashes') && m !== 'POST') return true;
   if (url.match(/^\/api\/learned-vocabulary\/\d+$/) && m === 'DELETE') return true;
+  if (url === '/api/learned-vocabulary' && m === 'DELETE') return true;
   if (url === '/api/inworld/models') return true;
 
   const uploadPaths = ['/api/idle-video', '/api/transition-video', '/api/avatar-background'];
@@ -4311,6 +4320,22 @@ const server = createServer(async (req, res) => {
     const limit = params.get('limit');
     const offset = params.get('offset');
     sendJson(res, 200, listLearnedVocabulary({ username, source, limit, offset }));
+    return;
+  }
+
+  if (url === '/api/learned-vocabulary' && req.method === 'DELETE') {
+    const params = new URL(rawUrl, 'http://local').searchParams;
+    const username = params.get('username')?.trim() || '';
+    if (!username) {
+      sendJson(res, 400, { error: 'username is required.' });
+      return;
+    }
+    const result = clearLearnedVocabulary(username);
+    if (!result.ok) {
+      sendJson(res, 400, { error: result.error || 'Could not clear learned vocabulary.' });
+      return;
+    }
+    sendJson(res, 200, result);
     return;
   }
 

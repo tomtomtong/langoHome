@@ -482,6 +482,9 @@
             Words synced from the Bluetooth smartpen via <code>POST /api/learned-vocabulary</code>.
             Uncle Tommy also uses the 20 most recent words in voice sessions.
           </p>
+          <div class="actions" style="margin: 0 0 0.75rem">
+            <button type="button" id="clear-learned-vocab-btn" class="danger secondary">Clear all learned words</button>
+          </div>
           <div class="login-meta-table-wrap">
             <table class="login-meta-table" id="learned-vocab-table">
               <thead>
@@ -572,6 +575,7 @@
     const loginMetaBody = document.getElementById("login-meta-body");
     const learnedVocabBody = document.getElementById("learned-vocab-body");
     const learnedVocabSummary = document.getElementById("learned-vocab-summary");
+    const clearLearnedVocabBtn = document.getElementById("clear-learned-vocab-btn");
 
     let cachedProfiles = {};
     let cachedLoginMeta = {};
@@ -648,6 +652,27 @@
       }
       const data = await res.json();
       renderLearnedVocabulary(data.items || [], data.total || 0);
+    }
+
+    async function clearLearnedVocabulary() {
+      const username = selectedAccount();
+      if (!username) return;
+      if (!confirm(`Clear all smartpen learned words for “${username}”?`)) return;
+      try {
+        const res = await fetch(
+          `/api/learned-vocabulary?username=${encodeURIComponent(username)}`,
+          { method: "DELETE" },
+        );
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Clear failed.");
+        }
+        const data = await res.json();
+        await loadLearnedVocabulary(username);
+        showStatus(`Cleared ${data.deleted || 0} learned words for ${username}.`, true);
+      } catch (e) {
+        showStatus(e.message || "Could not clear learned vocabulary.", false);
+      }
     }
 
     function renderLoginMetaTable(users) {
@@ -852,6 +877,10 @@
 
     clearProfileBtn.addEventListener("click", () => {
       clearProfileFields().catch(() => {});
+    });
+
+    clearLearnedVocabBtn.addEventListener("click", () => {
+      clearLearnedVocabulary().catch(() => {});
     });
 
     loadProfiles().catch((e) => {
