@@ -158,6 +158,23 @@ conversationsDb.exec(`
   CREATE INDEX IF NOT EXISTS idx_game_plays_username_date ON game_plays(username, play_date DESC);
   CREATE INDEX IF NOT EXISTS idx_game_plays_played_at ON game_plays(played_at DESC);
   CREATE INDEX IF NOT EXISTS idx_game_plays_date_game ON game_plays(play_date, game_id);
+  CREATE TABLE IF NOT EXISTS crash_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source TEXT NOT NULL,
+    message TEXT,
+    stack TEXT,
+    fatal INTEGER NOT NULL DEFAULT 0,
+    platform TEXT,
+    app_version TEXT,
+    build_number TEXT,
+    package_name TEXT,
+    client_timestamp TEXT,
+    username TEXT,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_crash_reports_created ON crash_reports(created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_crash_reports_source ON crash_reports(source, created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_crash_reports_platform ON crash_reports(platform, created_at DESC);
 `);
 try {
   conversationsDb.exec(`ALTER TABLE conversations ADD COLUMN user_audio_path TEXT`);
@@ -701,6 +718,20 @@ const GAME_LABELS = {
   wordchop: 'Word Chop',
 };
 
+const VALID_CRASH_SOURCES = new Set(['flutter', 'zone', 'platform', 'webview_console']);
+
+const insertCrashReportStmt = conversationsDb.prepare(`
+  INSERT INTO crash_reports (
+    source, message, stack, fatal, platform, app_version, build_number,
+    package_name, client_timestamp, username, created_at
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+`);
+const getCrashReportStmt = conversationsDb.prepare(`
+  SELECT id, source, message, stack, fatal, platform, app_version, build_number,
+         package_name, client_timestamp, username, created_at
+  FROM crash_reports WHERE id = ?
+`);
+
 const insertGamePlayStmt = conversationsDb.prepare(`
   INSERT INTO game_plays (username, game_id, score, play_date, played_at, details_json)
   VALUES (?, ?, ?, ?, ?, ?)
@@ -725,6 +756,109 @@ function rowToGamePlay(row) {
     playedAt: row.played_at,
     details,
   };
+}
+
+function rowToCrashReport(row) {
+  return {
+    id: row.id,
+    source: row.source,
+    message: row.message || '',
+    stack: row.stack || '',
+    fatal: Boolean(row.fatal),
+    platform: row.platform || '',
+    appVersion: row.app_version || '',
+    buildNumber: row.build_number || '',
+    packageName: row.package_name || '',
+    timestamp: row.client_timestamp || '',
+    username: row.username || '',
+    createdAt: row.created_at,
+  };
+}
+
+function recordCrashReport(payload = {}, username = null) {
+  const source = String(payload.source || 'flutter').trim().toLowerCase();
+  if (!VALID_CRASH_SOURCES.has(source)) {
+    return { ok: false, error: 'Invalid source.' };
+  }
+  const message = String(payload.message || '').slice(0, 8000);
+  const stack = String(payload.stack || '').slice(0, 32000);
+  const fatal = payload.fatal === true || payload.fatal === 1 || payload.fatal === 'true';
+  const platform = String(payload.platform || '').slice(0, 64);
+  const appVersion = String(payload.appVersion || payload.app_version || '').slice(0, 64);
+  const buildNumber = String(payload.buildNumber || payload.build_number || '').slice(0, 64);
+  const packageName = String(payload.packageName || payload.package_name || '').slice(0, 256);
+  const clientTimestamp = String(payload.timestamp || '').slice(0, 64);
+  const createdAt = Date.now();
+  const result = insertCrashReportStmt.run(
+    source,
+    message || null,
+    stack || null,
+    fatal ? 1 : 0,
+    platform || null,
+    appVersion || null,
+    buildNumber || null,
+    packageName || null,
+    clientTimestamp || null,
+    username || null,
+    createdAt,
+  );
+  const report = rowToCrashReport(getCrashReportStmt.get(result.lastInsertRowid));
+  console.error('[mobile-crash]', JSON.stringify(report));
+  return { ok: true, report };
+}
+
+function listCrashReports({
+  source = null,
+  platform = null,
+  fatal = null,
+  packageName = null,
+  limit = 50,
+  offset = 0,
+} = {}) {
+  const conditions = [];
+  const params = [];
+  if (source && VALID_CRASH_SOURCES.has(source)) {
+    conditions.push('source = ?');
+    params.push(source);
+  }
+  if (platform) {
+    conditions.push('platform = ?');
+    params.push(String(platform));
+  }
+  if (fatal === true || fatal === 'true' || fatal === '1') {
+    conditions.push('fatal = 1');
+  } else if (fatal === false || fatal === 'false' || fatal === '0') {
+    conditions.push('fatal = 0');
+  }
+  if (packageName) {
+    conditions.push('package_name = ?');
+    params.push(String(packageName));
+  }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 200);
+  const safeOffset = Math.max(Number(offset) || 0, 0);
+  const total = conversationsDb.prepare(
+    `SELECT COUNT(*) AS total FROM crash_reports ${where}`,
+  ).get(...params).total;
+  const rows = conversationsDb.prepare(`
+    SELECT id, source, message, stack, fatal, platform, app_version, build_number,
+           package_name, client_timestamp, username, created_at
+    FROM crash_reports
+    ${where}
+    ORDER BY created_at DESC
+    LIMIT ? OFFSET ?
+  `).all(...params, safeLimit, safeOffset);
+  return {
+    crashes: rows.map(rowToCrashReport),
+    total,
+    limit: safeLimit,
+    offset: safeOffset,
+  };
+}
+
+function clearCrashReports() {
+  const result = conversationsDb.prepare('DELETE FROM crash_reports').run();
+  return { ok: true, deleted: result.changes };
 }
 
 function recordGamePlay(username, { gameId, score, details } = {}) {
@@ -2238,6 +2372,10 @@ function isPublicPath(url) {
     || url === '/langoLogo.jpeg';
 }
 
+function isCrashReportPublicApi(url, method) {
+  return url === '/api/crashes' && (method || 'GET').toUpperCase() === 'POST';
+}
+
 /** Turn-based test page: REST STT / LLM / TTS without login (Railway-friendly sandbox). */
 function isTurnBasedPublicApi(url, method) {
   const m = (method || 'GET').toUpperCase();
@@ -2357,6 +2495,7 @@ const ADMIN_PAGE_PATHS = new Set([
   '/video-pairs',
   '/conversations',
   '/game-plays',
+  '/crashes',
 ]);
 
 function isGameConfigPage(gamePath) {
@@ -2375,6 +2514,7 @@ function requiresAdmin(url, method) {
   if (url.startsWith('/api/conversations')) return true;
   if (url.startsWith('/api/profile-sync-logs')) return true;
   if (url.startsWith('/api/game-plays') && m !== 'POST') return true;
+  if (url.startsWith('/api/crashes') && m !== 'POST') return true;
   if (url === '/api/inworld/models') return true;
 
   const uploadPaths = ['/api/idle-video', '/api/transition-video', '/api/avatar-background'];
@@ -3604,6 +3744,7 @@ const pages = {
   '/video-pairs': 'video-pairs.html',
   '/conversations': 'conversations.html',
   '/game-plays': 'game-plays.html',
+  '/crashes': 'crashes.html',
   '/visme': 'visme/index.html',
   '/map': 'map/index.html',
   '/map/': 'map/index.html',
@@ -3841,6 +3982,7 @@ const server = createServer(async (req, res) => {
   if (
     !isPublicPath(url)
     && !isTurnBasedPublicApi(url, req.method)
+    && !isCrashReportPublicApi(url, req.method)
     && !isTurnBasedSafeRequest(req, url)
     && !isPreviewSafeRequest(req, url, rawUrl)
     && !isAuthenticated(req)
@@ -4271,6 +4413,46 @@ const server = createServer(async (req, res) => {
         }, parsed));
         sendJson(res, 200, { ok: true });
       });
+      return;
+    }
+    sendJson(res, 405, { error: 'Method not allowed.' });
+    return;
+  }
+
+  if (url === '/api/crashes') {
+    if (req.method === 'GET') {
+      const query = new URL(rawUrl, 'http://localhost').searchParams;
+      const source = query.get('source');
+      const platform = query.get('platform');
+      const fatal = query.get('fatal');
+      const packageName = query.get('packageName');
+      const limit = query.get('limit');
+      const offset = query.get('offset');
+      sendJson(res, 200, listCrashReports({
+        source,
+        platform,
+        fatal,
+        packageName,
+        limit,
+        offset,
+      }));
+      return;
+    }
+    if (req.method === 'POST') {
+      readJsonBody(req, res, (parsed) => {
+        const session = getSession(req);
+        const result = recordCrashReport(parsed, session?.username || null);
+        if (!result.ok) {
+          sendJson(res, 400, { error: result.error });
+          return;
+        }
+        res.writeHead(204, SECURITY_HEADERS);
+        res.end();
+      });
+      return;
+    }
+    if (req.method === 'DELETE') {
+      sendJson(res, 200, clearCrashReports());
       return;
     }
     sendJson(res, 405, { error: 'Method not allowed.' });

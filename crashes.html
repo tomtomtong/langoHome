@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crash Logs — Uncle Tommy</title>
+  <link rel="stylesheet" href="/assets/page-motion.css">
+  <script src="/assets/page-motion.js"></script>
+  <link rel="stylesheet" href="/admin-nav.css">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      margin: 0;
+      min-height: 100vh;
+      background: #0f1117;
+      color: #e8eaed;
+      padding: 1.5rem;
+    }
+    .page { width: min(100%, 1400px); margin: 0 auto; }
+    h1 { margin: 0 0 0.25rem; font-size: 1.35rem; }
+    .lead {
+      margin: 0 0 1.5rem;
+      color: #9aa0a6;
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: end;
+      margin-bottom: 1rem;
+    }
+    .field { margin: 0; }
+    label {
+      display: block;
+      margin-bottom: 0.35rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: #9aa0a6;
+    }
+    select, input, button {
+      padding: 0.55rem 0.75rem;
+      border-radius: 8px;
+      border: 1px solid #3c4043;
+      background: #0f1117;
+      color: #e8eaed;
+      font-size: 0.875rem;
+    }
+    button {
+      cursor: pointer;
+      background: #3c4048;
+      border-color: #565c66;
+      color: #fff;
+      font-weight: 500;
+    }
+    button:hover { background: #4a505b; }
+    button.secondary {
+      background: transparent;
+      border-color: #3c4043;
+      color: #c4c7c5;
+    }
+    button.danger {
+      background: #5c2b2b;
+      border-color: #8f3f3f;
+    }
+    button.danger:hover { background: #6f3434; }
+    .card {
+      background: #1a1d27;
+      border: 1px solid #2a2f3a;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 1rem;
+    }
+    .card-head {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid #2a2f3a;
+      font-size: 0.95rem;
+      color: #c4c7c5;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+    }
+    .table-wrap { overflow-x: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8125rem;
+    }
+    th, td {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid #2a2f3a;
+      vertical-align: top;
+    }
+    th {
+      color: #9aa0a6;
+      font-weight: 500;
+      background: #151821;
+    }
+    tr[data-id] { cursor: pointer; }
+    tr[data-id]:hover td { background: #1f2430; }
+    tr.expanded td { background: #1f2430; }
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.45rem;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      background: #2a3348;
+      color: #c4c7c5;
+      text-transform: lowercase;
+    }
+    .badge.flutter { background: #1e2f3a; color: #8ab4f8; }
+    .badge.zone { background: #2f1e3a; color: #d7aefb; }
+    .badge.platform { background: #1e3a2f; color: #81c995; }
+    .badge.webview_console { background: #3a2f1e; color: #fdd663; }
+    .badge.fatal { background: #5c2b2b; color: #f28b82; }
+    .badge.nonfatal { background: #2a3348; color: #9aa0a6; }
+    .message {
+      max-width: 28rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .empty {
+      padding: 2rem 1rem;
+      text-align: center;
+      color: #9aa0a6;
+      font-size: 0.875rem;
+    }
+    .status {
+      margin-top: 0.75rem;
+      font-size: 0.8125rem;
+      color: #9aa0a6;
+    }
+    .status.err { color: #f28b82; }
+    .pager {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      justify-content: flex-end;
+      padding: 0.75rem 1rem;
+      border-top: 1px solid #2a2f3a;
+      font-size: 0.8125rem;
+      color: #9aa0a6;
+    }
+    .pager button { padding: 0.35rem 0.65rem; font-size: 0.8125rem; }
+    .detail-row td {
+      padding: 0;
+      background: #151821;
+    }
+    .detail-panel {
+      padding: 1rem 1.25rem;
+      font-size: 0.8125rem;
+      color: #c4c7c5;
+    }
+    .detail-panel h3 {
+      margin: 0 0 0.5rem;
+      font-size: 0.8rem;
+      color: #9aa0a6;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .detail-panel pre {
+      margin: 0 0 1rem;
+      padding: 0.75rem;
+      border-radius: 8px;
+      background: #0f1117;
+      border: 1px solid #2a2f3a;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.75rem;
+      line-height: 1.5;
+    }
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .detail-grid div {
+      padding: 0.65rem 0.75rem;
+      border-radius: 8px;
+      background: #0f1117;
+      border: 1px solid #2a2f3a;
+    }
+    .detail-grid strong {
+      display: block;
+      font-size: 0.7rem;
+      color: #9aa0a6;
+      margin-bottom: 0.25rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .count-pill {
+      font-size: 0.75rem;
+      color: #9aa0a6;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1>Crash Logs</h1>
+    <p class="lead">
+      Mobile crash reports from the Flutter app. Reports are sent to <code>POST /api/crashes</code> and logged in Railway with the <code>[mobile-crash]</code> tag.
+    </p>
+
+    <div class="toolbar">
+      <div class="field">
+        <label for="source-filter">Source</label>
+        <select id="source-filter">
+          <option value="">All sources</option>
+          <option value="flutter">flutter</option>
+          <option value="zone">zone</option>
+          <option value="platform">platform</option>
+          <option value="webview_console">webview_console</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="platform-filter">Platform</label>
+        <select id="platform-filter">
+          <option value="">All platforms</option>
+          <option value="android">android</option>
+          <option value="ios">ios</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="fatal-filter">Severity</label>
+        <select id="fatal-filter">
+          <option value="">All</option>
+          <option value="true">Fatal only</option>
+          <option value="false">Non-fatal only</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="package-filter">Package</label>
+        <input id="package-filter" type="text" placeholder="com.example.app">
+      </div>
+      <button type="button" id="reload-btn">Reload</button>
+      <button type="button" class="danger" id="clear-btn">Clear all</button>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <span>Crash reports</span>
+        <span class="count-pill" id="total-label">—</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Source</th>
+              <th>Platform</th>
+              <th>Severity</th>
+              <th>App</th>
+              <th>Package</th>
+              <th>Message</th>
+            </tr>
+          </thead>
+          <tbody id="crashes-body">
+            <tr><td colspan="7" class="empty">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <button type="button" class="secondary" id="prev-btn" disabled>Previous</button>
+        <span id="pager-label">—</span>
+        <button type="button" class="secondary" id="next-btn" disabled>Next</button>
+      </div>
+    </div>
+
+    <p id="status" class="status" role="status"></p>
+  </div>
+
+  <script>
+    const sourceFilter = document.getElementById('source-filter');
+    const platformFilter = document.getElementById('platform-filter');
+    const fatalFilter = document.getElementById('fatal-filter');
+    const packageFilter = document.getElementById('package-filter');
+    const crashesBody = document.getElementById('crashes-body');
+    const statusEl = document.getElementById('status');
+    const pagerLabel = document.getElementById('pager-label');
+    const totalLabel = document.getElementById('total-label');
+    const prevBtn = document.getElementById('prev-btn');
+    const nextBtn = document.getElementById('next-btn');
+
+    const PAGE_SIZE = 50;
+    let offset = 0;
+    let totalCrashes = 0;
+    let expandedId = null;
+
+    function showStatus(message, isError) {
+      statusEl.textContent = message || '';
+      statusEl.className = `status${isError ? ' err' : ''}`;
+    }
+
+    function formatTime(ts) {
+      if (!ts) return '—';
+      return new Date(ts).toLocaleString();
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function queryParams() {
+      const params = new URLSearchParams();
+      if (sourceFilter.value) params.set('source', sourceFilter.value);
+      if (platformFilter.value) params.set('platform', platformFilter.value);
+      if (fatalFilter.value) params.set('fatal', fatalFilter.value);
+      if (packageFilter.value.trim()) params.set('packageName', packageFilter.value.trim());
+      params.set('limit', String(PAGE_SIZE));
+      params.set('offset', String(offset));
+      return params;
+    }
+
+    function renderDetailPanel(crash) {
+      return `
+        <div class="detail-panel">
+          <div class="detail-grid">
+            <div><strong>Build</strong>${escapeHtml(crash.buildNumber || '—')}</div>
+            <div><strong>Client timestamp</strong>${escapeHtml(crash.timestamp || '—')}</div>
+            <div><strong>User</strong>${escapeHtml(crash.username || '—')}</div>
+            <div><strong>ID</strong>${crash.id}</div>
+          </div>
+          <h3>Message</h3>
+          <pre>${escapeHtml(crash.message || '—')}</pre>
+          <h3>Stack trace</h3>
+          <pre>${escapeHtml(crash.stack || 'No stack trace provided.')}</pre>
+        </div>
+      `;
+    }
+
+    function renderCrashes(data) {
+      totalCrashes = data.total || 0;
+      totalLabel.textContent = `${totalCrashes} report${totalCrashes === 1 ? '' : 's'}`;
+
+      const rows = [];
+      for (const crash of data.crashes || []) {
+        const isExpanded = expandedId === crash.id;
+        rows.push(`
+          <tr data-id="${crash.id}" class="${isExpanded ? 'expanded' : ''}">
+            <td>${formatTime(crash.createdAt)}</td>
+            <td><span class="badge ${crash.source}">${crash.source}</span></td>
+            <td>${escapeHtml(crash.platform || '—')}</td>
+            <td><span class="badge ${crash.fatal ? 'fatal' : 'nonfatal'}">${crash.fatal ? 'fatal' : 'non-fatal'}</span></td>
+            <td>${escapeHtml(crash.appVersion || '—')}</td>
+            <td>${escapeHtml(crash.packageName || '—')}</td>
+            <td class="message" title="${escapeHtml(crash.message)}">${escapeHtml(crash.message || '—')}</td>
+          </tr>
+        `);
+        if (isExpanded) {
+          rows.push(`
+            <tr class="detail-row">
+              <td colspan="7">${renderDetailPanel(crash)}</td>
+            </tr>
+          `);
+        }
+      }
+
+      crashesBody.innerHTML = rows.length
+        ? rows.join('')
+        : '<tr><td colspan="7" class="empty">No crash reports match these filters.</td></tr>';
+
+      const start = totalCrashes ? offset + 1 : 0;
+      const end = Math.min(offset + PAGE_SIZE, totalCrashes);
+      pagerLabel.textContent = totalCrashes ? `${start}–${end} of ${totalCrashes}` : '0 reports';
+      prevBtn.disabled = offset <= 0;
+      nextBtn.disabled = offset + PAGE_SIZE >= totalCrashes;
+    }
+
+    async function loadData() {
+      showStatus('');
+      crashesBody.innerHTML = '<tr><td colspan="7" class="empty">Loading…</td></tr>';
+
+      try {
+        const res = await fetch(`/api/crashes?${queryParams()}`);
+        if (!res.ok) throw new Error('Could not load crash reports.');
+        const data = await res.json();
+        renderCrashes(data);
+      } catch (e) {
+        showStatus(e.message || 'Load failed.', true);
+        crashesBody.innerHTML = '<tr><td colspan="7" class="empty">Could not load crash reports.</td></tr>';
+      }
+    }
+
+    async function clearAll() {
+      if (!confirm('Delete all crash reports? This cannot be undone.')) return;
+      showStatus('');
+      try {
+        const res = await fetch('/api/crashes', { method: 'DELETE' });
+        if (!res.ok) throw new Error('Could not clear crash reports.');
+        expandedId = null;
+        offset = 0;
+        await loadData();
+        showStatus('All crash reports cleared.');
+      } catch (e) {
+        showStatus(e.message || 'Clear failed.', true);
+      }
+    }
+
+    function reload() {
+      offset = 0;
+      expandedId = null;
+      loadData();
+    }
+
+    crashesBody.addEventListener('click', (event) => {
+      const row = event.target.closest('tr[data-id]');
+      if (!row) return;
+      const id = Number(row.dataset.id);
+      expandedId = expandedId === id ? null : id;
+      loadData();
+    });
+
+    document.getElementById('reload-btn').addEventListener('click', reload);
+    document.getElementById('clear-btn').addEventListener('click', clearAll);
+    sourceFilter.addEventListener('change', reload);
+    platformFilter.addEventListener('change', reload);
+    fatalFilter.addEventListener('change', reload);
+    packageFilter.addEventListener('change', reload);
+    prevBtn.addEventListener('click', () => {
+      offset = Math.max(0, offset - PAGE_SIZE);
+      expandedId = null;
+      loadData();
+    });
+    nextBtn.addEventListener('click', () => {
+      offset += PAGE_SIZE;
+      expandedId = null;
+      loadData();
+    });
+
+    reload();
+  </script>
+  <script src="/admin-nav.js"></script>
+</body>
+</html>

@@ -7,6 +7,7 @@
     { href: '/account-config', label: 'Account Profiles', paths: ['/account-config'] },
     { href: '/conversations', label: 'Conversations', paths: ['/conversations'] },
     { href: '/game-plays', label: 'Game Plays', paths: ['/game-plays'] },
+    { href: '/crashes', label: 'Crash Logs', paths: ['/crashes'] },
     { href: '/games/config.html', label: 'Game Assets', paths: ['/games/config.html'] },
   ];
 
