@@ -2579,7 +2579,6 @@ const MIME = {
   '.mp4': 'video/mp4',
   '.webm': 'video/webm',
   '.mov': 'video/quicktime',
-  '.webmanifest': 'application/manifest+json; charset=utf-8',
 };
 
 function videoFileFilter(_req, file, cb) {
@@ -4671,7 +4670,7 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  const rootAsset = url.match(/^\/[^/]+\.(png|jpe?g|webp|fbx|vrm|mp4|webm|mov|css|js|webmanifest)$/i);
+  const rootAsset = url.match(/^\/[^/]+\.(png|jpe?g|webp|fbx|vrm|mp4|webm|mov|css|js)$/i);
   if (rootAsset) {
     serveFile(res, join(ROOT, url.slice(1)));
     return;

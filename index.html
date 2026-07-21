@@ -4,13 +4,6 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="screen-orientation" content="landscape">
-  <meta name="theme-color" content="#65318c">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Lango">
-  <link rel="manifest" href="/site.webmanifest">
-  <link rel="apple-touch-icon" href="/langoLogo.jpeg">
   <title>Uncle Tommy — Voice Agent</title>
   <link rel="stylesheet" href="/assets/page-motion.css">
   <script src="/assets/page-motion.js"></script>
@@ -486,56 +479,6 @@
       font-variant-numeric: tabular-nums;
     }
 
-    .splash-install-btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      margin-top: 2px;
-      padding: .55em 1.1em;
-      border: 3px solid rgba(255,255,255,.92);
-      border-radius: 999px;
-      color: #fff;
-      font-family: inherit;
-      font-size: clamp(13px, 1.7vw, 16px);
-      font-weight: 800;
-      line-height: 1.1;
-      text-shadow: 0 2px 0 rgba(68, 26, 91, .45);
-      background: linear-gradient(180deg, var(--splash-purple), var(--splash-deep-purple));
-      box-shadow: 0 5px 0 rgba(64,29,88,.28);
-      cursor: pointer;
-      touch-action: manipulation;
-    }
-
-    .splash-install-btn:focus-visible {
-      outline: 4px solid var(--splash-yellow);
-      outline-offset: 3px;
-    }
-
-    .splash-install-btn svg {
-      flex: none;
-      width: 1.1em;
-      height: 1.1em;
-      fill: currentColor;
-    }
-
-    .splash-install-hint {
-      width: min(86%, 620px);
-      margin: 0;
-      padding: .65em .85em;
-      border: 2px solid rgba(101, 49, 140, .18);
-      border-radius: 14px;
-      color: rgba(101, 49, 140, .88);
-      font-size: clamp(11px, 1.45vw, 14px);
-      font-weight: 700;
-      line-height: 1.4;
-      text-align: center;
-      background: rgba(255,255,255,.82);
-      box-shadow: 0 8px 24px rgba(78, 38, 105, .08);
-    }
-
-    .splash-install-hint[hidden] { display: none; }
-
     @media (max-height: 520px) {
       #splash-screen { padding: 8px 18px; }
       .splash-content { gap: 6px; width: min(86vw, 680px); }
@@ -543,6 +486,64 @@
       .splash-game-shell { max-height: 58vh; }
       .splash-loading-row { width: 82%; }
       .splash-loading-meta { width: 82%; }
+    }
+
+    .splash-fullscreen-btn {
+      position: absolute;
+      z-index: 4;
+      top: max(12px, env(safe-area-inset-top));
+      right: max(12px, env(safe-area-inset-right));
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4em;
+      margin: 0;
+      padding: 0.45em 0.8em;
+      border: 3px solid rgba(255, 255, 255, 0.92);
+      border-radius: 999px;
+      color: #fff;
+      font-family: inherit;
+      font-size: clamp(12px, 1.6vw, 15px);
+      font-weight: 800;
+      line-height: 1;
+      white-space: nowrap;
+      cursor: pointer;
+      touch-action: manipulation;
+      background: rgba(101, 49, 140, 0.88);
+      box-shadow: 0 4px 0 rgba(64, 29, 88, 0.28);
+    }
+
+    .splash-fullscreen-btn:focus-visible {
+      outline: 5px solid var(--splash-yellow);
+      outline-offset: 3px;
+    }
+
+    .splash-fullscreen-btn[hidden] {
+      display: none;
+    }
+
+    .splash-fullscreen-btn svg {
+      display: block;
+      width: 1.15em;
+      height: 1.15em;
+      flex: none;
+    }
+
+    .splash-fullscreen-btn.is-active {
+      background: rgba(88, 199, 196, 0.92);
+      color: #2f1a44;
+    }
+
+    html.splash-pseudo-fullscreen,
+    html.splash-pseudo-fullscreen body {
+      height: 100%;
+      height: 100dvh;
+      overflow: hidden;
+    }
+
+    html.splash-pseudo-fullscreen body {
+      position: fixed;
+      inset: 0;
+      width: 100%;
     }
 
     body.splash-dismissed #splash-screen {
@@ -3287,6 +3288,21 @@
   <button id="preview-toolbar-show" type="button" hidden aria-label="Show preview bar">Show preview bar</button>
 
   <div id="splash-screen" role="status" aria-live="polite" aria-busy="true" aria-label="Loading">
+    <button
+      type="button"
+      id="splash-fullscreen-btn"
+      class="splash-fullscreen-btn"
+      hidden
+      aria-label="Enter full screen"
+      aria-pressed="false"
+      title="Full screen"
+    >
+      <svg class="splash-fullscreen-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path class="splash-fullscreen-icon-enter" d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+        <path class="splash-fullscreen-icon-exit" hidden d="M4 14h6m0 0v6m0-6L3 21M20 10h-6m0 0V4m0 6l7-7M10 4H4a2 2 0 0 0-2 2v6m18 0v-6a2 2 0 0 0-2-2h-6"/>
+      </svg>
+      <span class="splash-fullscreen-label">Full screen</span>
+    </button>
     <div class="splash-content">
       <div class="splash-brand">
         <img src="/langoLogo.jpeg" alt="Lango" width="420" height="274" decoding="async">
@@ -3313,85 +3329,8 @@
       </div>
       <p class="splash-loading-meta" id="splash-load-status" aria-live="polite"></p>
       <p class="splash-loading-meta splash-load-speed" id="splash-load-speed" aria-live="polite"></p>
-      <button type="button" class="splash-install-btn" id="splash-install-btn" hidden>
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
-        Add to Home Screen
-      </button>
-      <p class="splash-install-hint" id="splash-install-hint" hidden></p>
     </div>
   </div>
-
-  <script>
-    (() => {
-      const installBtn = document.getElementById('splash-install-btn');
-      const installHint = document.getElementById('splash-install-hint');
-      if (!installBtn || !installHint) return;
-
-      const previewMode = new URLSearchParams(location.search).get('preview') === '1';
-      const isStandalone = window.matchMedia('(display-mode: standalone)').matches
-        || window.matchMedia('(display-mode: fullscreen)').matches
-        || window.navigator.standalone === true;
-      const ua = navigator.userAgent || '';
-      const isIOS = /\biPhone\b|\biPod\b/i.test(ua)
-        || (/\biPad\b/i.test(ua) || (/\bMacintosh\b/i.test(ua) && navigator.maxTouchPoints > 1));
-      const isAndroid = /\bAndroid\b/i.test(ua);
-      const isMobile = isIOS || isAndroid || (navigator.maxTouchPoints > 1 && window.innerWidth < 1024);
-
-      let deferredInstallPrompt = null;
-
-      function hideInstallUi() {
-        installBtn.hidden = true;
-        installHint.hidden = true;
-      }
-
-      function showInstallButton() {
-        if (previewMode || isStandalone) return;
-        installBtn.hidden = false;
-      }
-
-      if (!previewMode && !isStandalone && 'serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js').catch(() => {});
-      }
-
-      if (!previewMode && !isStandalone && isMobile) {
-        showInstallButton();
-      }
-
-      window.addEventListener('beforeinstallprompt', (event) => {
-        event.preventDefault();
-        deferredInstallPrompt = event;
-        showInstallButton();
-      });
-
-      window.addEventListener('appinstalled', () => {
-        deferredInstallPrompt = null;
-        hideInstallUi();
-      });
-
-      installBtn.addEventListener('click', async () => {
-        installHint.hidden = true;
-
-        if (deferredInstallPrompt) {
-          deferredInstallPrompt.prompt();
-          const { outcome } = await deferredInstallPrompt.userChoice.catch(() => ({ outcome: 'dismissed' }));
-          deferredInstallPrompt = null;
-          if (outcome === 'accepted') {
-            hideInstallUi();
-          }
-          return;
-        }
-
-        if (isIOS) {
-          installHint.textContent = 'Tap Share, then choose “Add to Home Screen”.';
-        } else if (isAndroid) {
-          installHint.textContent = 'Tap the menu (⋮) in Chrome, then “Install app” or “Add to Home screen”.';
-        } else {
-          installHint.textContent = 'Use your browser menu to install this app or add it to your home screen.';
-        }
-        installHint.hidden = false;
-      });
-    })();
-  </script>
 
   <script>
     (() => {
@@ -3735,6 +3674,94 @@
         lock,
         getState: () => ({ mode, score, birdY, locked }),
       };
+    })();
+  </script>
+
+  <script>
+    (() => {
+      const btn = document.getElementById("splash-fullscreen-btn");
+      if (!btn) return;
+
+      const ua = navigator.userAgent;
+      const IS_IOS_DEVICE = /iPad|iPhone|iPod/.test(ua)
+        || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      const IS_ANDROID_DEVICE = /\bAndroid\b/i.test(ua);
+      const docEl = document.documentElement;
+      const HAS_FULLSCREEN_API = !!(docEl.requestFullscreen || docEl.webkitRequestFullscreen);
+      const enterIcon = btn.querySelector(".splash-fullscreen-icon-enter");
+      const exitIcon = btn.querySelector(".splash-fullscreen-icon-exit");
+      const labelEl = btn.querySelector(".splash-fullscreen-label");
+
+      if (!IS_IOS_DEVICE && !IS_ANDROID_DEVICE && !HAS_FULLSCREEN_API) return;
+
+      function getFullscreenElement() {
+        return document.fullscreenElement
+          || document.webkitFullscreenElement
+          || document.webkitCurrentFullScreenElement
+          || null;
+      }
+
+      function isPseudoFullscreen() {
+        return docEl.classList.contains("splash-pseudo-fullscreen");
+      }
+
+      function isAppFullscreen() {
+        return !!getFullscreenElement() || isPseudoFullscreen();
+      }
+
+      function hideBrowserChrome() {
+        window.scrollTo(0, 1);
+        requestAnimationFrame(() => window.scrollTo(0, 0));
+      }
+
+      async function enterAppFullscreen() {
+        if (HAS_FULLSCREEN_API) {
+          try {
+            if (docEl.requestFullscreen) {
+              await docEl.requestFullscreen();
+            } else {
+              docEl.webkitRequestFullscreen();
+            }
+            return;
+          } catch {}
+        }
+        docEl.classList.add("splash-pseudo-fullscreen");
+        hideBrowserChrome();
+      }
+
+      function exitAppFullscreen() {
+        docEl.classList.remove("splash-pseudo-fullscreen");
+        if (document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        } else if (document.webkitExitFullscreen) {
+          document.webkitExitFullscreen();
+        }
+      }
+
+      function syncFullscreenButton() {
+        const active = isAppFullscreen();
+        btn.classList.toggle("is-active", active);
+        btn.setAttribute("aria-pressed", active ? "true" : "false");
+        btn.setAttribute("aria-label", active ? "Exit full screen" : "Enter full screen");
+        btn.title = active ? "Exit full screen" : "Full screen";
+        if (enterIcon) enterIcon.hidden = active;
+        if (exitIcon) exitIcon.hidden = !active;
+        if (labelEl) labelEl.textContent = active ? "Exit" : "Full screen";
+      }
+
+      btn.hidden = false;
+      btn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        if (isAppFullscreen()) exitAppFullscreen();
+        else enterAppFullscreen();
+      });
+
+      document.addEventListener("fullscreenchange", syncFullscreenButton);
+      document.addEventListener("webkitfullscreenchange", syncFullscreenButton);
+      window.addEventListener("resize", () => {
+        if (isPseudoFullscreen()) hideBrowserChrome();
+      });
+      syncFullscreenButton();
     })();
   </script>
 
