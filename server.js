@@ -19,8 +19,6 @@ const INWORLD_API_ENABLED = !/^(0|false|no|off)$/i.test(
 const INWORLD_API_DISABLED_MESSAGE =
   'Inworld API is disabled. Unset INWORLD_API_ENABLED=0 or set INWORLD_API_ENABLED=1.';
 
-const PEN_API_KEY = process.env.PEN_API_KEY?.trim() || process.env.SMARTPEN_API_KEY?.trim() || '';
-
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY?.trim() || '';
 const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID?.trim() || 'Taae9YSyOLxij6fj32HF';
 const ELEVENLABS_AGENT_ID = process.env.ELEVENLABS_AGENT_ID?.trim() || '';
@@ -898,20 +896,6 @@ function deleteLearnedVocabulary(id) {
   if (!row) return { ok: false, error: 'Not found.' };
   deleteLearnedVocabularyStmt.run(row.id);
   return { ok: true, deleted: rowToLearnedVocabulary(row) };
-}
-
-function isPenApiAuthorized(req) {
-  if (!PEN_API_KEY) return false;
-  const auth = String(req.headers.authorization || '');
-  const match = auth.match(/^Bearer\s+(.+)$/i);
-  if (!match) return false;
-  const token = match[1].trim();
-  if (token.length !== PEN_API_KEY.length) return false;
-  try {
-    return timingSafeEqual(Buffer.from(token), Buffer.from(PEN_API_KEY));
-  } catch {
-    return false;
-  }
 }
 
 function rowToGamePlay(row) {
@@ -2560,10 +2544,8 @@ function isCrashReportPublicApi(url, method) {
   return url === '/api/crashes' && (method || 'GET').toUpperCase() === 'POST';
 }
 
-function isLearnedVocabularyPenApi(url, method, req) {
-  return url === '/api/learned-vocabulary'
-    && (method || 'GET').toUpperCase() === 'POST'
-    && isPenApiAuthorized(req);
+function isLearnedVocabularyPublicApi(url, method) {
+  return url === '/api/learned-vocabulary' && (method || 'GET').toUpperCase() === 'POST';
 }
 
 /** Turn-based test page: REST STT / LLM / TTS without login (Railway-friendly sandbox). */
@@ -4174,7 +4156,7 @@ const server = createServer(async (req, res) => {
     !isPublicPath(url)
     && !isTurnBasedPublicApi(url, req.method)
     && !isCrashReportPublicApi(url, req.method)
-    && !isLearnedVocabularyPenApi(url, req.method, req)
+    && !isLearnedVocabularyPublicApi(url, req.method)
     && !isTurnBasedSafeRequest(req, url)
     && !isPreviewSafeRequest(req, url, rawUrl)
     && !isAuthenticated(req)
@@ -4292,21 +4274,12 @@ const server = createServer(async (req, res) => {
 
   if (url === '/api/learned-vocabulary' && req.method === 'POST') {
     const session = getSession(req);
-    const penAuthorized = isPenApiAuthorized(req);
-    if (!penAuthorized && (!session || session.role !== 'student')) {
-      sendJson(res, 403, { error: 'Student login or pen API key required.' });
-      return;
-    }
     readJsonBody(req, res, (parsed) => {
-      const username = penAuthorized
-        ? String(parsed.username || '').trim()
-        : session.username;
+      const username = session?.role === 'student'
+        ? session.username
+        : String(parsed.username || '').trim();
       if (!username) {
         sendJson(res, 400, { error: 'username is required.' });
-        return;
-      }
-      if (penAuthorized && !STUDENT_USERS[username]) {
-        sendJson(res, 400, { error: 'Invalid user.' });
         return;
       }
       const words = parsed.words ?? parsed.word ?? parsed.vocabulary;
