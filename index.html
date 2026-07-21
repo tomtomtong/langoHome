@@ -4,6 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="screen-orientation" content="landscape">
+  <meta name="theme-color" content="#65318c">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Lango">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="apple-touch-icon" href="/langoLogo.jpeg">
   <title>Uncle Tommy — Voice Agent</title>
   <link rel="stylesheet" href="/assets/page-motion.css">
   <script src="/assets/page-motion.js"></script>
@@ -478,6 +485,56 @@
       color: rgba(101, 49, 140, .55);
       font-variant-numeric: tabular-nums;
     }
+
+    .splash-install-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 2px;
+      padding: .55em 1.1em;
+      border: 3px solid rgba(255,255,255,.92);
+      border-radius: 999px;
+      color: #fff;
+      font-family: inherit;
+      font-size: clamp(13px, 1.7vw, 16px);
+      font-weight: 800;
+      line-height: 1.1;
+      text-shadow: 0 2px 0 rgba(68, 26, 91, .45);
+      background: linear-gradient(180deg, var(--splash-purple), var(--splash-deep-purple));
+      box-shadow: 0 5px 0 rgba(64,29,88,.28);
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .splash-install-btn:focus-visible {
+      outline: 4px solid var(--splash-yellow);
+      outline-offset: 3px;
+    }
+
+    .splash-install-btn svg {
+      flex: none;
+      width: 1.1em;
+      height: 1.1em;
+      fill: currentColor;
+    }
+
+    .splash-install-hint {
+      width: min(86%, 620px);
+      margin: 0;
+      padding: .65em .85em;
+      border: 2px solid rgba(101, 49, 140, .18);
+      border-radius: 14px;
+      color: rgba(101, 49, 140, .88);
+      font-size: clamp(11px, 1.45vw, 14px);
+      font-weight: 700;
+      line-height: 1.4;
+      text-align: center;
+      background: rgba(255,255,255,.82);
+      box-shadow: 0 8px 24px rgba(78, 38, 105, .08);
+    }
+
+    .splash-install-hint[hidden] { display: none; }
 
     @media (max-height: 520px) {
       #splash-screen { padding: 8px 18px; }
@@ -3256,8 +3313,85 @@
       </div>
       <p class="splash-loading-meta" id="splash-load-status" aria-live="polite"></p>
       <p class="splash-loading-meta splash-load-speed" id="splash-load-speed" aria-live="polite"></p>
+      <button type="button" class="splash-install-btn" id="splash-install-btn" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+        Add to Home Screen
+      </button>
+      <p class="splash-install-hint" id="splash-install-hint" hidden></p>
     </div>
   </div>
+
+  <script>
+    (() => {
+      const installBtn = document.getElementById('splash-install-btn');
+      const installHint = document.getElementById('splash-install-hint');
+      if (!installBtn || !installHint) return;
+
+      const previewMode = new URLSearchParams(location.search).get('preview') === '1';
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+        || window.matchMedia('(display-mode: fullscreen)').matches
+        || window.navigator.standalone === true;
+      const ua = navigator.userAgent || '';
+      const isIOS = /\biPhone\b|\biPod\b/i.test(ua)
+        || (/\biPad\b/i.test(ua) || (/\bMacintosh\b/i.test(ua) && navigator.maxTouchPoints > 1));
+      const isAndroid = /\bAndroid\b/i.test(ua);
+      const isMobile = isIOS || isAndroid || (navigator.maxTouchPoints > 1 && window.innerWidth < 1024);
+
+      let deferredInstallPrompt = null;
+
+      function hideInstallUi() {
+        installBtn.hidden = true;
+        installHint.hidden = true;
+      }
+
+      function showInstallButton() {
+        if (previewMode || isStandalone) return;
+        installBtn.hidden = false;
+      }
+
+      if (!previewMode && !isStandalone && 'serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      }
+
+      if (!previewMode && !isStandalone && isMobile) {
+        showInstallButton();
+      }
+
+      window.addEventListener('beforeinstallprompt', (event) => {
+        event.preventDefault();
+        deferredInstallPrompt = event;
+        showInstallButton();
+      });
+
+      window.addEventListener('appinstalled', () => {
+        deferredInstallPrompt = null;
+        hideInstallUi();
+      });
+
+      installBtn.addEventListener('click', async () => {
+        installHint.hidden = true;
+
+        if (deferredInstallPrompt) {
+          deferredInstallPrompt.prompt();
+          const { outcome } = await deferredInstallPrompt.userChoice.catch(() => ({ outcome: 'dismissed' }));
+          deferredInstallPrompt = null;
+          if (outcome === 'accepted') {
+            hideInstallUi();
+          }
+          return;
+        }
+
+        if (isIOS) {
+          installHint.textContent = 'Tap Share, then choose “Add to Home Screen”.';
+        } else if (isAndroid) {
+          installHint.textContent = 'Tap the menu (⋮) in Chrome, then “Install app” or “Add to Home screen”.';
+        } else {
+          installHint.textContent = 'Use your browser menu to install this app or add it to your home screen.';
+        }
+        installHint.hidden = false;
+      });
+    })();
+  </script>
 
   <script>
     (() => {
