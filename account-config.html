@@ -479,8 +479,8 @@
         <section class="section login-meta-section" id="learned-vocab-section">
           <h2>Learned Vocabulary (Smartpen)</h2>
           <p class="field-hint" style="margin: 0 0 0.75rem">
-            Words synced from the Bluetooth smartpen via <code>POST /api/learned-vocabulary</code>.
-            Uncle Tommy also uses the 20 most recent words in voice sessions.
+            Bluetooth pen codes synced via <code>POST /api/learned-vocabulary</code> and mapped to content
+            from <a href="/bluetooth-codes">Bluetooth Codes</a>. Uncle Tommy uses the 20 most recent items in voice sessions.
           </p>
           <div class="actions" style="margin: 0 0 0.75rem">
             <button type="button" id="clear-learned-vocab-btn" class="danger secondary">Clear all learned words</button>
@@ -489,14 +489,15 @@
             <table class="login-meta-table" id="learned-vocab-table">
               <thead>
                 <tr>
-                  <th>Word</th>
+                  <th>Code</th>
+                  <th>Content</th>
                   <th>Learned</th>
                   <th>Source</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody id="learned-vocab-body">
-                <tr><td colspan="4">Select an account to view learned words.</td></tr>
+                <tr><td colspan="5">Select an account to view learned vocabulary.</td></tr>
               </tbody>
             </table>
           </div>
@@ -606,13 +607,14 @@
 
     function renderLearnedVocabulary(items, total) {
       if (!items?.length) {
-        learnedVocabBody.innerHTML = '<tr><td colspan="4">No learned words yet.</td></tr>';
-        learnedVocabSummary.textContent = total ? `Showing 0 of ${total} words.` : "";
+        learnedVocabBody.innerHTML = '<tr><td colspan="5">No learned vocabulary yet.</td></tr>';
+        learnedVocabSummary.textContent = total ? `Showing 0 of ${total} items.` : "";
         return;
       }
       learnedVocabBody.innerHTML = items.map((item) => `
         <tr>
-          <td>${item.word}</td>
+          <td>${item.code || item.word || "—"}</td>
+          <td>${item.content || item.word || "—"}</td>
           <td>${formatLearnedTime(item.learnedAt)}</td>
           <td>${item.source || "smartpen"}</td>
           <td class="learned-vocab-actions">
@@ -620,7 +622,7 @@
           </td>
         </tr>
       `).join("");
-      learnedVocabSummary.textContent = `Showing ${items.length} of ${total} learned words.`;
+      learnedVocabSummary.textContent = `Showing ${items.length} of ${total} learned items.`;
       learnedVocabBody.querySelectorAll("[data-delete-vocab]").forEach((btn) => {
         btn.addEventListener("click", async () => {
           const id = btn.dataset.deleteVocab;

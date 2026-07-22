@@ -76,6 +76,7 @@ const ELEVENLABS_CONFIG_PATH = join(CONFIG_DIR, 'elevenlabs-config.json');
 const USER_PROFILES_PATH = join(CONFIG_DIR, 'user-profiles.json');
 const USER_LOGIN_META_PATH = join(CONFIG_DIR, 'user-login-meta.json');
 const STUDENT_USERS_PATH = join(CONFIG_DIR, 'student-users.json');
+const BLUETOOTH_CODES_PATH = join(CONFIG_DIR, 'bluetooth-codes.json');
 const CHECK_INS_PATH = join(CONFIG_DIR, 'check-ins.json');
 const SESSIONS_PATH = join(CONFIG_DIR, 'sessions.json');
 const DEBUG_LOG_PATH = join(CONFIG_DIR, 'hello-debug-log.json');
@@ -813,54 +814,71 @@ function rowToLearnedVocabulary(row) {
   try {
     if (row.metadata_json) metadata = JSON.parse(row.metadata_json);
   } catch { /* ignore */ }
+  const storedCode = String(metadata?.code || row.word || '').trim();
+  const pair = storedCode ? findBluetoothCodePair(storedCode) : null;
+  const content = pair?.content || metadata?.content || (metadata?.code ? null : row.word) || storedCode;
   return {
     id: row.id,
     username: row.username,
-    word: row.word,
+    code: storedCode || null,
+    word: content,
+    content,
     source: row.source,
     learnedAt: row.learned_at,
     metadata,
   };
 }
 
-function normalizeLearnedWordInput(raw) {
+function normalizeLearnedCodeInput(raw) {
   if (typeof raw === 'string') {
-    const word = raw.trim();
-    if (!word) return null;
-    return { word, source: 'smartpen', learnedAt: Date.now(), metadata: null };
+    const code = raw.trim();
+    if (!code) return null;
+    return { code, source: 'smartpen', learnedAt: Date.now(), metadata: null };
   }
   if (!raw || typeof raw !== 'object') return null;
-  const word = String(raw.word || raw.content || '').trim();
-  if (!word) return null;
+  const code = String(raw.code || raw.bluetoothCode || raw.word || raw.content || '').trim();
+  if (!code) return null;
   const source = String(raw.source || 'smartpen').trim().toLowerCase();
   return {
-    word: word.slice(0, 256),
+    code: code.slice(0, 64),
     source: VALID_LEARNED_VOCAB_SOURCES.has(source) ? source : 'smartpen',
     learnedAt: Math.max(0, Number(raw.learnedAt || raw.learned_at) || Date.now()),
     metadata: raw.metadata && typeof raw.metadata === 'object' ? raw.metadata : null,
   };
 }
 
-function recordLearnedVocabulary(username, wordsInput) {
+function recordLearnedVocabulary(username, codesInput) {
   if (!STUDENT_USERS[username]) return { ok: false, error: 'Invalid user.' };
-  const rawWords = Array.isArray(wordsInput) ? wordsInput : [wordsInput];
+  const rawCodes = Array.isArray(codesInput) ? codesInput : [codesInput];
   const items = [];
+  const unknownCodes = [];
   let added = 0;
   let updated = 0;
   let skipped = 0;
-  for (const raw of rawWords) {
-    const normalized = normalizeLearnedWordInput(raw);
+  for (const raw of rawCodes) {
+    const normalized = normalizeLearnedCodeInput(raw);
     if (!normalized) {
       skipped += 1;
       continue;
     }
+    const pair = findBluetoothCodePair(normalized.code);
+    if (!pair) {
+      skipped += 1;
+      if (!unknownCodes.includes(normalized.code)) unknownCodes.push(normalized.code);
+      continue;
+    }
     const existing = conversationsDb.prepare(`
       SELECT id FROM learned_vocabulary WHERE username = ? AND word = ?
-    `).get(username, normalized.word);
-    const metadataJson = normalized.metadata ? JSON.stringify(normalized.metadata) : null;
+    `).get(username, normalized.code);
+    const metadata = {
+      ...(normalized.metadata || {}),
+      code: normalized.code,
+      content: pair.content,
+    };
+    const metadataJson = JSON.stringify(metadata);
     const result = upsertLearnedVocabularyStmt.run(
       username,
-      normalized.word,
+      normalized.code,
       normalized.source,
       normalized.learnedAt,
       metadataJson,
@@ -874,10 +892,17 @@ function recordLearnedVocabulary(username, wordsInput) {
     else added += 1;
   }
   if (!items.length) {
-    return { ok: false, error: 'No valid words provided.' };
+    return {
+      ok: false,
+      error: unknownCodes.length
+        ? `No matching content found for code(s): ${unknownCodes.join(', ')}.`
+        : 'No valid codes provided.',
+      unknownCodes,
+      skipped,
+    };
   }
-  console.log(`[learned-vocabulary] ${username} added=${added} updated=${updated} skipped=${skipped}`);
-  return { ok: true, added, updated, skipped, items };
+  console.log(`[learned-vocabulary] ${username} added=${added} updated=${updated} skipped=${skipped} unknown=${unknownCodes.length}`);
+  return { ok: true, added, updated, skipped, unknownCodes, items };
 }
 
 function listLearnedVocabulary({
@@ -1371,6 +1396,102 @@ function loadUserProfiles() {
 function saveUserProfiles(profiles) {
   ensureConfigDir();
   writeFileSync(USER_PROFILES_PATH, JSON.stringify(profiles, null, 2) + '\n');
+}
+
+function newBluetoothCodeId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function normalizeBluetoothCodePair(raw) {
+  return {
+    id: String(raw?.id || newBluetoothCodeId()),
+    code: String(raw?.code ?? '').trim(),
+    content: String(raw?.content ?? '').trim(),
+    updatedAt: Number(raw?.updatedAt) || Date.now(),
+  };
+}
+
+function loadBluetoothCodesManifest() {
+  try {
+    if (existsSync(BLUETOOTH_CODES_PATH)) {
+      const data = JSON.parse(readFileSync(BLUETOOTH_CODES_PATH, 'utf8'));
+      if (!Array.isArray(data.pairs)) return { pairs: [] };
+      return {
+        pairs: data.pairs.map(normalizeBluetoothCodePair),
+      };
+    }
+  } catch (e) {
+    console.warn('Could not load bluetooth-codes.json:', e.message);
+  }
+  return { pairs: [] };
+}
+
+function saveBluetoothCodesManifest(manifest) {
+  ensureConfigDir();
+  writeFileSync(BLUETOOTH_CODES_PATH, JSON.stringify(manifest, null, 2) + '\n');
+}
+
+function listBluetoothCodePairs() {
+  const manifest = loadBluetoothCodesManifest();
+  return manifest.pairs
+    .slice()
+    .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' }));
+}
+
+function findBluetoothCodePair(code) {
+  const needle = String(code ?? '').trim();
+  if (!needle) return null;
+  return listBluetoothCodePairs().find((pair) => pair.code === needle) || null;
+}
+
+function createBluetoothCodePair(fields) {
+  const code = String(fields?.code ?? '').trim();
+  const content = String(fields?.content ?? '').trim();
+  if (!code) return { ok: false, error: 'Bluetooth code is required.' };
+  if (!content) return { ok: false, error: 'Content is required.' };
+
+  const manifest = loadBluetoothCodesManifest();
+  if (manifest.pairs.some((pair) => pair.code === code)) {
+    return { ok: false, error: 'This Bluetooth code already exists.' };
+  }
+
+  const pair = normalizeBluetoothCodePair({ code, content, updatedAt: Date.now() });
+  manifest.pairs.push(pair);
+  saveBluetoothCodesManifest(manifest);
+  return { ok: true, pair };
+}
+
+function updateBluetoothCodePair(id, fields) {
+  const manifest = loadBluetoothCodesManifest();
+  const idx = manifest.pairs.findIndex((pair) => pair.id === id);
+  if (idx < 0) return { ok: false, error: 'Pair not found.' };
+
+  const code = String(fields?.code ?? manifest.pairs[idx].code).trim();
+  const content = String(fields?.content ?? manifest.pairs[idx].content).trim();
+  if (!code) return { ok: false, error: 'Bluetooth code is required.' };
+  if (!content) return { ok: false, error: 'Content is required.' };
+  if (manifest.pairs.some((pair, i) => i !== idx && pair.code === code)) {
+    return { ok: false, error: 'This Bluetooth code already exists.' };
+  }
+
+  const pair = normalizeBluetoothCodePair({
+    id,
+    code,
+    content,
+    updatedAt: Date.now(),
+  });
+  manifest.pairs[idx] = pair;
+  saveBluetoothCodesManifest(manifest);
+  return { ok: true, pair };
+}
+
+function deleteBluetoothCodePair(id) {
+  const manifest = loadBluetoothCodesManifest();
+  const idx = manifest.pairs.findIndex((pair) => pair.id === id);
+  if (idx < 0) return { ok: false, error: 'Pair not found.' };
+  manifest.pairs.splice(idx, 1);
+  saveBluetoothCodesManifest(manifest);
+  return { ok: true };
 }
 
 function getUserProfile(username) {
@@ -2588,7 +2709,12 @@ function buildLearnedVocabularyContext(username) {
   if (!learned.length) return '';
   const lines = [
     'Words learned on smartpen recently:',
-    ...learned.map((item) => `- ${item.word}`),
+    ...learned.map((item) => {
+      const label = item.word || item.content || item.code;
+      return item.code && item.word && item.code !== item.word
+        ? `- ${label} (code ${item.code})`
+        : `- ${label}`;
+    }),
   ];
   return lines.join('\n');
 }
@@ -2885,6 +3011,7 @@ const ADMIN_PAGE_PATHS = new Set([
   '/account-config',
   '/avatar-config',
   '/video-pairs',
+  '/bluetooth-codes',
   '/conversations',
   '/game-plays',
   '/crashes',
@@ -2918,6 +3045,8 @@ function requiresAdmin(url, method) {
 
   if (url.startsWith('/api/video-pairs') && m !== 'GET') return true;
   if (url === '/api/video-pairs' && m === 'POST') return true;
+
+  if (url.startsWith('/api/bluetooth-codes')) return true;
 
   if (isGameApiRoute(url)) {
     if (
@@ -4136,6 +4265,7 @@ const pages = {
   '/account-config': 'account-config.html',
   '/avatar-config': 'avatar-config.html',
   '/video-pairs': 'video-pairs.html',
+  '/bluetooth-codes': 'bluetooth-codes.html',
   '/conversations': 'conversations.html',
   '/game-plays': 'game-plays.html',
   '/crashes': 'crashes.html',
@@ -4558,8 +4688,8 @@ const server = createServer(async (req, res) => {
         sendJson(res, 400, { error: 'username is required.' });
         return;
       }
-      const words = parsed.words ?? parsed.word ?? parsed.vocabulary;
-      const result = recordLearnedVocabulary(username, words);
+      const codes = parsed.codes ?? parsed.code ?? parsed.words ?? parsed.word;
+      const result = recordLearnedVocabulary(username, codes);
       if (!result.ok) {
         sendJson(res, 400, { error: result.error || 'Could not record learned vocabulary.' });
         return;
@@ -4614,6 +4744,52 @@ const server = createServer(async (req, res) => {
       return;
     }
     sendJson(res, 200, result);
+    return;
+  }
+
+  if (url === '/api/bluetooth-codes' && req.method === 'GET') {
+    sendJson(res, 200, { pairs: listBluetoothCodePairs() });
+    return;
+  }
+
+  if (url === '/api/bluetooth-codes' && req.method === 'POST') {
+    readJsonBody(req, res, (parsed) => {
+      const result = createBluetoothCodePair(parsed);
+      if (!result.ok) {
+        sendJson(res, 400, { error: result.error || 'Could not create pair.' });
+        return;
+      }
+      sendJson(res, 200, result);
+    });
+    return;
+  }
+
+  const bluetoothCodeMatch = url.match(/^\/api\/bluetooth-codes\/([^/]+)$/);
+  if (bluetoothCodeMatch) {
+    const pairId = decodeURIComponent(bluetoothCodeMatch[1]);
+    if (req.method === 'PUT' || req.method === 'POST') {
+      readJsonBody(req, res, (parsed) => {
+        const result = updateBluetoothCodePair(pairId, parsed);
+        if (!result.ok) {
+          sendJson(res, result.error === 'Pair not found.' ? 404 : 400, {
+            error: result.error || 'Could not update pair.',
+          });
+          return;
+        }
+        sendJson(res, 200, result);
+      });
+      return;
+    }
+    if (req.method === 'DELETE') {
+      const result = deleteBluetoothCodePair(pairId);
+      if (!result.ok) {
+        sendJson(res, 404, { error: result.error || 'Not found.' });
+        return;
+      }
+      sendJson(res, 200, result);
+      return;
+    }
+    sendJson(res, 405, { error: 'Method not allowed.' });
     return;
   }
 

@@ -418,9 +418,11 @@
       for (const item of vocabItems) {
         const chip = document.createElement("div");
         chip.className = "word-chip";
+        const label = item.content || item.word || item.code || "—";
+        const codeLabel = item.code && item.code !== label ? `Code ${item.code}` : "";
         chip.innerHTML = `
-          <strong>${escapeHtml(item.word)}</strong>
-          <span>${escapeHtml(formatDate(item.learnedAt))}</span>
+          <strong>${escapeHtml(label)}</strong>
+          <span>${escapeHtml([codeLabel, formatDate(item.learnedAt)].filter(Boolean).join(" · "))}</span>
         `;
         list.appendChild(chip);
       }

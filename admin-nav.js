@@ -4,6 +4,7 @@
     { href: '/config', label: 'Voice Settings', paths: ['/config', '/config.html'] },
     { href: '/avatar-config', label: 'Avatar', paths: ['/avatar-config'] },
     { href: '/video-pairs', label: 'Video Pairs', paths: ['/video-pairs'] },
+    { href: '/bluetooth-codes', label: 'Bluetooth Codes', paths: ['/bluetooth-codes'] },
     { href: '/account-config', label: 'Account Profiles', paths: ['/account-config'] },
     { href: '/conversations', label: 'Conversations', paths: ['/conversations'] },
     { href: '/game-plays', label: 'Game Plays', paths: ['/game-plays'] },

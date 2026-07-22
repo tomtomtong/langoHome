@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bluetooth Codes — Uncle Tommy</title>
+  <link rel="stylesheet" href="/assets/page-motion.css">
+  <script src="/assets/page-motion.js" defer></script>
+  <link rel="stylesheet" href="/admin-nav.css">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      margin: 0;
+      min-height: 100vh;
+      background: #0f1117;
+      color: #e8eaed;
+      padding: 1.5rem;
+    }
+    .page {
+      width: min(100%, 960px);
+      margin: 0 auto;
+    }
+    .card {
+      padding: 2rem;
+      background: #1a1d27;
+      border-radius: 12px;
+      border: 1px solid #2a2f3a;
+    }
+    h1 { margin: 0 0 0.25rem; font-size: 1.35rem; }
+    .lead {
+      margin: 0 0 1.5rem;
+      color: #9aa0a6;
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+    .actions {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+    button, a.btn {
+      padding: 0.625rem 1rem;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: center;
+      text-decoration: none;
+    }
+    button {
+      border: none;
+      background: #3c4048;
+      color: #fff;
+    }
+    button:hover:not(:disabled) { background: #4a505b; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    a.btn, button.secondary {
+      background: transparent;
+      border: 1px solid #3c4043;
+      color: #9aa0a6;
+    }
+    a.btn:hover, button.secondary:hover {
+      border-color: #5f6368;
+      color: #e8eaed;
+    }
+    button.primary {
+      background: #6c8cff;
+      color: #0f1117;
+    }
+    button.primary:hover:not(:disabled) { background: #8aa3ff; }
+    button.danger {
+      background: transparent;
+      border: 1px solid #8b3a3a;
+      color: #f28b82;
+    }
+    button.danger:hover:not(:disabled) {
+      background: #3a1e1e;
+      border-color: #c5221f;
+    }
+    .table-wrap { overflow-x: auto; }
+    .codes-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8125rem;
+    }
+    .codes-table th,
+    .codes-table td {
+      padding: 0.5rem 0.65rem;
+      border-bottom: 1px solid #2a2f3a;
+      text-align: left;
+      vertical-align: top;
+    }
+    .codes-table th { color: #9aa0a6; font-weight: 500; }
+    .codes-table input,
+    .codes-table textarea {
+      width: 100%;
+      padding: 0.5rem 0.625rem;
+      border: 1px solid #3c4043;
+      border-radius: 8px;
+      background: #0f1117;
+      color: #e8eaed;
+      font-size: 0.8125rem;
+      font-family: inherit;
+    }
+    .codes-table textarea {
+      min-height: 64px;
+      resize: vertical;
+      line-height: 1.45;
+    }
+    .codes-table input:focus,
+    .codes-table textarea:focus {
+      outline: none;
+      border-color: #6c8cff;
+    }
+    .row-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      min-width: 88px;
+    }
+    .row-actions button {
+      padding: 0.35rem 0.55rem;
+      font-size: 0.75rem;
+    }
+    .empty-row td {
+      color: #5f6368;
+      text-align: center;
+      padding: 1.25rem;
+    }
+    .status {
+      margin-top: 1rem;
+      padding: 0.625rem 0.75rem;
+      border-radius: 8px;
+      font-size: 0.8125rem;
+      display: none;
+    }
+    .status.ok { display: block; background: #1e3a2f; color: #81c995; }
+    .status.err { display: block; background: #3a1e1e; color: #f28b82; }
+    .hint {
+      margin-top: 1.25rem;
+      font-size: 0.75rem;
+      color: #5f6368;
+      line-height: 1.5;
+    }
+    .hint code {
+      color: #c4c7c5;
+      font-size: 0.75rem;
+    }
+    .summary {
+      margin: 0 0 0.75rem;
+      font-size: 0.8125rem;
+      color: #5f6368;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="card">
+      <h1>Bluetooth Codes</h1>
+      <p class="lead">
+        Map Bluetooth smartpen codes to content. When the mobile app syncs a pen code via
+        <code>POST /api/learned-vocabulary</code>, the server looks up the matching content here.
+      </p>
+
+      <div class="actions">
+        <button type="button" class="primary" id="add-pair-btn">Add pair</button>
+        <a class="btn" href="/admin">Back to CMS</a>
+      </div>
+
+      <p class="summary" id="pair-summary"></p>
+
+      <div class="table-wrap">
+        <table class="codes-table" id="codes-table">
+          <thead>
+            <tr>
+              <th style="width: 22%">Bluetooth code</th>
+              <th>Content</th>
+              <th style="width: 100px"></th>
+            </tr>
+          </thead>
+          <tbody id="codes-body">
+            <tr class="empty-row"><td colspan="3">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div id="status" class="status" role="status"></div>
+
+      <p class="hint">
+        Each Bluetooth code must be unique. Click <strong>Save</strong> on a row after editing.
+        New rows are created when you save them for the first time.
+      </p>
+    </div>
+  </div>
+
+  <script>
+    const codesBody = document.getElementById("codes-body");
+    const pairSummary = document.getElementById("pair-summary");
+    const statusEl = document.getElementById("status");
+    const addPairBtn = document.getElementById("add-pair-btn");
+
+    let pairs = [];
+    let draftRows = [];
+
+    function showStatus(message, ok) {
+      statusEl.textContent = message;
+      statusEl.className = `status ${ok ? "ok" : "err"}`;
+    }
+
+    function clearStatus() {
+      statusEl.textContent = "";
+      statusEl.className = "status";
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function rowData(rowEl) {
+      return {
+        id: rowEl.dataset.id || "",
+        code: rowEl.querySelector("[data-field='code']")?.value.trim() || "",
+        content: rowEl.querySelector("[data-field='content']")?.value.trim() || "",
+        isDraft: rowEl.dataset.draft === "1",
+      };
+    }
+
+    function renderTable() {
+      const rows = [
+        ...pairs.map((pair) => ({ ...pair, isDraft: false })),
+        ...draftRows.map((draft) => ({ ...draft, isDraft: true })),
+      ];
+
+      if (!rows.length) {
+        codesBody.innerHTML = '<tr class="empty-row"><td colspan="3">No pairs yet. Click “Add pair” to create one.</td></tr>';
+        pairSummary.textContent = "0 pairs";
+        return;
+      }
+
+      codesBody.innerHTML = rows.map((row) => `
+        <tr data-id="${escapeHtml(row.id)}" data-draft="${row.isDraft ? "1" : "0"}">
+          <td>
+            <input type="text" data-field="code" value="${escapeHtml(row.code)}" placeholder="e.g. 12045" autocomplete="off">
+          </td>
+          <td>
+            <textarea data-field="content" placeholder="Word, sentence, or lesson content">${escapeHtml(row.content)}</textarea>
+          </td>
+          <td>
+            <div class="row-actions">
+              <button type="button" class="primary" data-action="save">Save</button>
+              <button type="button" class="danger secondary" data-action="remove">Remove</button>
+            </div>
+          </td>
+        </tr>
+      `).join("");
+
+      pairSummary.textContent = `${pairs.length} saved pair${pairs.length === 1 ? "" : "s"}${draftRows.length ? `, ${draftRows.length} draft${draftRows.length === 1 ? "" : "s"}` : ""}`;
+    }
+
+    async function loadPairs() {
+      clearStatus();
+      const res = await fetch("/api/bluetooth-codes");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Could not load Bluetooth codes.");
+      }
+      const data = await res.json();
+      pairs = Array.isArray(data.pairs) ? data.pairs : [];
+      renderTable();
+    }
+
+    async function saveRow(rowEl) {
+      const { id, code, content, isDraft } = rowData(rowEl);
+      if (!code) {
+        showStatus("Bluetooth code is required.", false);
+        return;
+      }
+      if (!content) {
+        showStatus("Content is required.", false);
+        return;
+      }
+
+      const saveBtn = rowEl.querySelector("[data-action='save']");
+      saveBtn.disabled = true;
+
+      try {
+        const res = await fetch(isDraft ? "/api/bluetooth-codes" : `/api/bluetooth-codes/${encodeURIComponent(id)}`, {
+          method: isDraft ? "POST" : "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code, content }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Save failed.");
+
+        if (isDraft) {
+          draftRows = draftRows.filter((draft) => draft.id !== id);
+        }
+        const savedPair = data.pair;
+        const existingIdx = pairs.findIndex((pair) => pair.id === savedPair.id);
+        if (existingIdx >= 0) {
+          pairs[existingIdx] = savedPair;
+        } else {
+          pairs.push(savedPair);
+        }
+        pairs.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: "base" }));
+        renderTable();
+        showStatus(isDraft ? "Pair added." : "Pair saved.", true);
+      } catch (e) {
+        showStatus(e.message || "Could not save pair.", false);
+      } finally {
+        saveBtn.disabled = false;
+      }
+    }
+
+    async function removeRow(rowEl) {
+      const { id, code, isDraft } = rowData(rowEl);
+      const label = code || "this pair";
+      if (!confirm(`Remove ${label}?`)) return;
+
+      if (isDraft) {
+        draftRows = draftRows.filter((draft) => draft.id !== id);
+        renderTable();
+        showStatus("Draft removed.", true);
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/bluetooth-codes/${encodeURIComponent(id)}`, { method: "DELETE" });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Delete failed.");
+        pairs = pairs.filter((pair) => pair.id !== id);
+        renderTable();
+        showStatus("Pair removed.", true);
+      } catch (e) {
+        showStatus(e.message || "Could not remove pair.", false);
+      }
+    }
+
+    function addDraftRow() {
+      draftRows.push({
+        id: `draft-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        code: "",
+        content: "",
+      });
+      renderTable();
+      const draftRow = codesBody.querySelector('tr[data-draft="1"]:last-child input[data-field="code"]');
+      draftRow?.focus();
+    }
+
+    addPairBtn.addEventListener("click", addDraftRow);
+
+    codesBody.addEventListener("click", (event) => {
+      const btn = event.target.closest("button[data-action]");
+      if (!btn) return;
+      const rowEl = btn.closest("tr");
+      if (!rowEl) return;
+      if (btn.dataset.action === "save") saveRow(rowEl);
+      if (btn.dataset.action === "remove") removeRow(rowEl);
+    });
+
+    loadPairs().catch((e) => {
+      codesBody.innerHTML = `<tr class="empty-row"><td colspan="3">${escapeHtml(e.message || "Load failed.")}</td></tr>`;
+      showStatus(e.message || "Could not load Bluetooth codes.", false);
+    });
+  </script>
+  <script src="/admin-nav.js"></script>
+</body>
+</html>
