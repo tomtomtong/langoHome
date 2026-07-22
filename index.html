@@ -3,7 +3,6 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="screen-orientation" content="landscape">
   <title>Uncle Tommy — Voice Agent</title>
   <link rel="stylesheet" href="/assets/page-motion.css">
   <script src="/assets/page-motion.js"></script>
@@ -42,40 +41,6 @@
       font-family: system-ui, -apple-system, sans-serif;
       background: #0f1117;
       color: #e8eaed;
-    }
-
-    /* ── Portrait blocker ── */
-    #portrait-prompt {
-      display: none;
-      position: fixed;
-      inset: 0;
-      z-index: 100;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 1rem;
-      padding: 2rem;
-      background: #0f1117;
-      text-align: center;
-    }
-
-    #portrait-prompt svg {
-      width: 64px;
-      height: 64px;
-      color: #6c8cff;
-      animation: rotate-hint 2s ease-in-out infinite;
-    }
-
-    @keyframes rotate-hint {
-      0%, 100% { transform: rotate(0deg); }
-      50% { transform: rotate(90deg); }
-    }
-
-    @media (orientation: portrait) and (max-width: 900px) {
-      #portrait-prompt { display: flex; }
-      #app { display: none !important; }
-      html.preview-mode #portrait-prompt { display: none; }
-      html.preview-mode #app { display: block !important; }
     }
 
     #app {
@@ -486,6 +451,64 @@
       .splash-game-shell { max-height: 58vh; }
       .splash-loading-row { width: 82%; }
       .splash-loading-meta { width: 82%; }
+    }
+
+    .splash-fullscreen-btn {
+      position: absolute;
+      z-index: 4;
+      top: max(12px, env(safe-area-inset-top));
+      right: max(12px, env(safe-area-inset-right));
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4em;
+      margin: 0;
+      padding: 0.45em 0.8em;
+      border: 3px solid rgba(255, 255, 255, 0.92);
+      border-radius: 999px;
+      color: #fff;
+      font-family: inherit;
+      font-size: clamp(12px, 1.6vw, 15px);
+      font-weight: 800;
+      line-height: 1;
+      white-space: nowrap;
+      cursor: pointer;
+      touch-action: manipulation;
+      background: rgba(101, 49, 140, 0.88);
+      box-shadow: 0 4px 0 rgba(64, 29, 88, 0.28);
+    }
+
+    .splash-fullscreen-btn:focus-visible {
+      outline: 5px solid var(--splash-yellow);
+      outline-offset: 3px;
+    }
+
+    .splash-fullscreen-btn[hidden] {
+      display: none;
+    }
+
+    .splash-fullscreen-btn svg {
+      display: block;
+      width: 1.15em;
+      height: 1.15em;
+      flex: none;
+    }
+
+    .splash-fullscreen-btn.is-active {
+      background: rgba(88, 199, 196, 0.92);
+      color: #2f1a44;
+    }
+
+    html.splash-pseudo-fullscreen,
+    html.splash-pseudo-fullscreen body {
+      height: 100%;
+      height: 100dvh;
+      overflow: hidden;
+    }
+
+    html.splash-pseudo-fullscreen body {
+      position: fixed;
+      inset: 0;
+      width: 100%;
     }
 
     body.splash-dismissed #splash-screen {
@@ -2630,8 +2653,37 @@
       }
     }
 
+    .lango-home__record.is-reminding img {
+      transform-origin: 50% 78%;
+      animation: vocab-game-reminder-flash 1.25s ease-in-out infinite;
+    }
+
+    .lango-home-toast {
+      position: absolute;
+      z-index: 50;
+      left: 50%;
+      bottom: 5%;
+      max-width: 80%;
+      padding: .55em 1.25em;
+      border: 4px solid #ffd153;
+      border-radius: 999px;
+      transform: translateX(-50%);
+      background: rgba(111, 46, 12, .95);
+      color: #fff7cc;
+      box-shadow: 0 8px 20px rgba(61, 21, 3, .38);
+      font-size: clamp(15px, 1.7cqw, 23px);
+      font-weight: 800;
+      white-space: nowrap;
+      animation: lango-home-toast-in 180ms ease both;
+    }
+
+    @keyframes lango-home-toast-in {
+      from { opacity: 0; transform: translate(-50%, 30%); }
+    }
+
     @media (prefers-reduced-motion: reduce) {
-      .lango-home__box.is-reminding img { animation: none; }
+      .lango-home__box.is-reminding img,
+      .lango-home__record.is-reminding img { animation: none; }
     }
 
     .lango-home__nav {
@@ -3230,6 +3282,21 @@
   <button id="preview-toolbar-show" type="button" hidden aria-label="Show preview bar">Show preview bar</button>
 
   <div id="splash-screen" role="status" aria-live="polite" aria-busy="true" aria-label="Loading">
+    <button
+      type="button"
+      id="splash-fullscreen-btn"
+      class="splash-fullscreen-btn"
+      hidden
+      aria-label="Enter full screen"
+      aria-pressed="false"
+      title="Full screen"
+    >
+      <svg class="splash-fullscreen-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path class="splash-fullscreen-icon-enter" d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+        <path class="splash-fullscreen-icon-exit" hidden d="M4 14h6m0 0v6m0-6L3 21M20 10h-6m0 0V4m0 6l7-7M10 4H4a2 2 0 0 0-2 2v6m18 0v-6a2 2 0 0 0-2-2h-6"/>
+      </svg>
+      <span class="splash-fullscreen-label">Full screen</span>
+    </button>
     <div class="splash-content">
       <div class="splash-brand">
         <img src="/langoLogo.jpeg" alt="Lango" width="420" height="274" decoding="async">
@@ -3604,13 +3671,93 @@
     })();
   </script>
 
-  <div id="portrait-prompt">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-      <rect x="5" y="2" width="14" height="20" rx="2"/>
-      <path d="M12 18v.01"/>
-    </svg>
-    <p>Rotate your device to landscape to use Uncle Tommy</p>
-  </div>
+  <script>
+    (() => {
+      const btn = document.getElementById("splash-fullscreen-btn");
+      if (!btn) return;
+
+      const ua = navigator.userAgent;
+      const IS_IOS_DEVICE = /iPad|iPhone|iPod/.test(ua)
+        || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      const IS_ANDROID_DEVICE = /\bAndroid\b/i.test(ua);
+      const docEl = document.documentElement;
+      const HAS_FULLSCREEN_API = !!(docEl.requestFullscreen || docEl.webkitRequestFullscreen);
+      const enterIcon = btn.querySelector(".splash-fullscreen-icon-enter");
+      const exitIcon = btn.querySelector(".splash-fullscreen-icon-exit");
+      const labelEl = btn.querySelector(".splash-fullscreen-label");
+
+      if (!IS_IOS_DEVICE && !IS_ANDROID_DEVICE && !HAS_FULLSCREEN_API) return;
+
+      function getFullscreenElement() {
+        return document.fullscreenElement
+          || document.webkitFullscreenElement
+          || document.webkitCurrentFullScreenElement
+          || null;
+      }
+
+      function isPseudoFullscreen() {
+        return docEl.classList.contains("splash-pseudo-fullscreen");
+      }
+
+      function isAppFullscreen() {
+        return !!getFullscreenElement() || isPseudoFullscreen();
+      }
+
+      function hideBrowserChrome() {
+        window.scrollTo(0, 1);
+        requestAnimationFrame(() => window.scrollTo(0, 0));
+      }
+
+      async function enterAppFullscreen() {
+        if (HAS_FULLSCREEN_API) {
+          try {
+            if (docEl.requestFullscreen) {
+              await docEl.requestFullscreen();
+            } else {
+              docEl.webkitRequestFullscreen();
+            }
+            return;
+          } catch {}
+        }
+        docEl.classList.add("splash-pseudo-fullscreen");
+        hideBrowserChrome();
+      }
+
+      function exitAppFullscreen() {
+        docEl.classList.remove("splash-pseudo-fullscreen");
+        if (document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        } else if (document.webkitExitFullscreen) {
+          document.webkitExitFullscreen();
+        }
+      }
+
+      function syncFullscreenButton() {
+        const active = isAppFullscreen();
+        btn.classList.toggle("is-active", active);
+        btn.setAttribute("aria-pressed", active ? "true" : "false");
+        btn.setAttribute("aria-label", active ? "Exit full screen" : "Enter full screen");
+        btn.title = active ? "Exit full screen" : "Full screen";
+        if (enterIcon) enterIcon.hidden = active;
+        if (exitIcon) exitIcon.hidden = !active;
+        if (labelEl) labelEl.textContent = active ? "Exit" : "Full screen";
+      }
+
+      btn.hidden = false;
+      btn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        if (isAppFullscreen()) exitAppFullscreen();
+        else enterAppFullscreen();
+      });
+
+      document.addEventListener("fullscreenchange", syncFullscreenButton);
+      document.addEventListener("webkitfullscreenchange", syncFullscreenButton);
+      window.addEventListener("resize", () => {
+        if (isPseudoFullscreen()) hideBrowserChrome();
+      });
+      syncFullscreenButton();
+    })();
+  </script>
 
   <div id="app">
     <div id="lango-home-root"></div>
@@ -4214,6 +4361,10 @@
 
       function LangoHome() {
         const [comingSoonFeature, setComingSoonFeature] = React.useState(null);
+        const [recordReminding, setRecordReminding] = React.useState(false);
+        const [toast, setToast] = React.useState('');
+        const toastTimer = React.useRef(null);
+        const recordRemindTimer = React.useRef(null);
         const [roomScene, setRoomScene] = React.useState(readInitialRoomScene);
         React.useEffect(() => {
           const syncRoomScene = (event) => {
@@ -4244,6 +4395,37 @@
           };
           window.addEventListener('pageshow', syncVocabGameReminder);
           return () => window.removeEventListener('pageshow', syncVocabGameReminder);
+        }, []);
+        const announce = (message) => {
+          setToast(message);
+          clearTimeout(toastTimer.current);
+          toastTimer.current = setTimeout(() => setToast(''), 1800);
+        };
+        React.useEffect(() => {
+          const flashRecord = () => {
+            setRecordReminding(true);
+            clearTimeout(recordRemindTimer.current);
+            recordRemindTimer.current = setTimeout(() => setRecordReminding(false), 8000);
+          };
+          const onPenWordLearned = ({ word, username } = {}) => {
+            flashRecord();
+            window.dispatchEvent(new CustomEvent('lango:pen-word-learned', {
+              detail: { word, username },
+            }));
+          };
+          const onPenConnected = ({ deviceName } = {}) => {
+            const label = deviceName ? `Pen connected: ${deviceName}` : 'Pen connected';
+            announce(label);
+            window.dispatchEvent(new CustomEvent('lango:pen-connected', {
+              detail: { deviceName },
+            }));
+          };
+          window.LangoHost = { onPenWordLearned, onPenConnected };
+          return () => {
+            clearTimeout(toastTimer.current);
+            clearTimeout(recordRemindTimer.current);
+            if (window.LangoHost?.onPenWordLearned === onPenWordLearned) delete window.LangoHost;
+          };
         }, []);
         const transitionBusy = React.useRef(false);
         const openRewards = () => document.getElementById('daily-rewards-btn')?.click();
@@ -4293,7 +4475,17 @@
               )
             )
           ),
-          e(ImageButton, { className: 'lango-home__record', image: 'store', label: 'Record', onClick: () => setComingSoonFeature('Record'), sfx: 'weakness' }),
+          e(ImageButton, {
+            className: `lango-home__record${recordReminding ? ' is-reminding' : ''}`,
+            image: 'store',
+            label: 'Record',
+            onClick: () => {
+              setRecordReminding(false);
+              clearTimeout(recordRemindTimer.current);
+              setComingSoonFeature('Record');
+            },
+            sfx: 'weakness'
+          }),
           e(ImageButton, { className: 'lango-home__map', image: 'reward', label: 'Map', onClick: () => go('map', '/map') }),
           e(ImageButton, { className: 'lango-home__reward', image: 'box', label: 'Reward', onClick: () => reveal('reward', openRewards), sfx: 'powerUp' }),
           e(ImageButton, {
@@ -4317,7 +4509,8 @@
             label: 'Play Word Chop vocab game',
             onClick: () => go('game', '/vocab-game/index.html')
           }),
-          e('div', { className: 'lango-home__frame', 'aria-hidden': true })
+          e('div', { className: 'lango-home__frame', 'aria-hidden': true }),
+          toast && e('div', { className: 'lango-home-toast', role: 'status', 'aria-live': 'polite' }, toast)
         );
       }
 
@@ -5764,8 +5957,6 @@
     }
 
     const mapLocationFromUrl = consumeMapLocationFromUrl();
-    // Set when arriving from Map travel so we cover world/pair loading with Uncle Tommy.
-    let pendingMapWorldTransition = Boolean(mapLocationFromUrl);
     let activeMapLocation = mapLocationFromUrl || readStoredMapLocation();
 
     function getScenesForMapLocation(locationId = activeMapLocation) {
@@ -5787,18 +5978,6 @@
 
     // Seed header immediately for the active map world (School → classroom).
     publishRoomScene(getDefaultSceneForMapLocation());
-
-    async function playUncleTommyWhile(work) {
-      const play = window.LangoPageTransition?.play;
-      if (typeof play !== "function") return work();
-      let result;
-      await play({
-        async onCovered() {
-          result = await work();
-        },
-      });
-      return result;
-    }
 
     function normalizePairTheme(value) {
       const theme = String(value ?? "").trim().toLowerCase();
@@ -7070,9 +7249,6 @@
         console.error(e);
         showErr(`Avatar failed to load: ${e.message}`);
       }
-      try {
-        await screen.orientation?.lock?.("landscape");
-      } catch {}
       avatar?.refreshAfterVisible();
     }
 
@@ -7081,7 +7257,6 @@
       inSession = false;
       setCameraEditMode(false);
       document.body.classList.remove("in-session");
-      try { screen.orientation?.unlock?.(); } catch {}
     }
 
     function releaseMicSync() {
@@ -8340,25 +8515,11 @@
       }
 
       try {
-        let idleVideoReady;
-        if (pendingMapWorldTransition) {
-          pendingMapWorldTransition = false;
-          // Map → world: Uncle Tommy portal covers pair/video switch.
-          // Dismiss splash quietly so page-motion does not queue a second portal.
-          idleVideoReady = await playUncleTommyWhile(async () => {
-            setSplashProgress(100);
-            if (splashScreenEl) splashScreenEl.setAttribute("aria-busy", "false");
-            splashClickGuardUntil = performance.now() + SPLASH_CLICK_GUARD_MS;
-            document.body.classList.add("splash-dismissed");
-            return preloadMediaAssets(cfg);
-          });
+        const idleVideoReady = await preloadMediaAssets(cfg);
+        if (SPLASH_GAME_PREVIEW) {
+          dismissSplash();
         } else {
-          idleVideoReady = await preloadMediaAssets(cfg);
-          if (SPLASH_GAME_PREVIEW) {
-            dismissSplash();
-          } else {
-            await finishSplashHandoff();
-          }
+          await finishSplashHandoff();
         }
 
         if (idleVideoReady) {
@@ -8372,7 +8533,6 @@
         initDailyRewards({ autoShow: false });
       } catch (e) {
         console.error(e);
-        pendingMapWorldTransition = false;
         await finishSplashHandoff().catch(() => dismissSplash());
         showErr(`Failed to load: ${e.message}`);
         setStatus('Tap "Start" to begin a conversation');

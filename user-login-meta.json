@@ -1,0 +1,18 @@
+{
+  "demo": {
+    "deviceLabel": "Unknown",
+    "deviceType": "unknown",
+    "os": "",
+    "browser": "",
+    "userAgent": "",
+    "lastLoginAt": 1784614351989
+  },
+  "user01": {
+    "deviceLabel": "Unknown",
+    "deviceType": "unknown",
+    "os": "",
+    "browser": "",
+    "userAgent": "",
+    "lastLoginAt": 1784624649427
+  }
+}

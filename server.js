@@ -76,6 +76,7 @@ const ELEVENLABS_CONFIG_PATH = join(CONFIG_DIR, 'elevenlabs-config.json');
 const USER_PROFILES_PATH = join(CONFIG_DIR, 'user-profiles.json');
 const USER_LOGIN_META_PATH = join(CONFIG_DIR, 'user-login-meta.json');
 const STUDENT_USERS_PATH = join(CONFIG_DIR, 'student-users.json');
+const BLUETOOTH_CODES_PATH = join(CONFIG_DIR, 'bluetooth-codes.json');
 const CHECK_INS_PATH = join(CONFIG_DIR, 'check-ins.json');
 const SESSIONS_PATH = join(CONFIG_DIR, 'sessions.json');
 const DEBUG_LOG_PATH = join(CONFIG_DIR, 'hello-debug-log.json');
@@ -158,6 +159,33 @@ conversationsDb.exec(`
   CREATE INDEX IF NOT EXISTS idx_game_plays_username_date ON game_plays(username, play_date DESC);
   CREATE INDEX IF NOT EXISTS idx_game_plays_played_at ON game_plays(played_at DESC);
   CREATE INDEX IF NOT EXISTS idx_game_plays_date_game ON game_plays(play_date, game_id);
+  CREATE TABLE IF NOT EXISTS crash_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source TEXT NOT NULL,
+    message TEXT,
+    stack TEXT,
+    fatal INTEGER NOT NULL DEFAULT 0,
+    platform TEXT,
+    app_version TEXT,
+    build_number TEXT,
+    package_name TEXT,
+    client_timestamp TEXT,
+    username TEXT,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_crash_reports_created ON crash_reports(created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_crash_reports_source ON crash_reports(source, created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_crash_reports_platform ON crash_reports(platform, created_at DESC);
+  CREATE TABLE IF NOT EXISTS learned_vocabulary (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL,
+    word TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT 'smartpen',
+    learned_at INTEGER NOT NULL,
+    metadata_json TEXT,
+    UNIQUE(username, word)
+  );
+  CREATE INDEX IF NOT EXISTS idx_learned_vocabulary_user ON learned_vocabulary(username, learned_at DESC);
 `);
 try {
   conversationsDb.exec(`ALTER TABLE conversations ADD COLUMN user_audio_path TEXT`);
@@ -284,23 +312,59 @@ function ensureSessionAudioDir() {
 }
 
 function createSessionAudioRecorder(sampleRate = USER_AUDIO_SAMPLE_RATE) {
-  const startedAt = Date.now();
   const segments = [];
+  let timelineEnd = 0;
+  let userRecordingEnabled = false;
+  let userRunStart = null;
   let userSampleCursor = 0;
-  let userBaseSample = null;
   let currentAgentResponseId = null;
-  let agentResponseStartSample = 0;
-  let agentResponseSampleCursor = 0;
+  let agentRunStart = null;
+  let agentSampleCursor = 0;
+  let agentSpeaking = false;
 
-  const wallClockSample = () => Math.round(((Date.now() - startedAt) / 1000) * sampleRate);
+  const finalizeUserRun = () => {
+    if (userRunStart === null) return;
+    timelineEnd = Math.max(timelineEnd, userRunStart + userSampleCursor);
+    userRunStart = null;
+    userSampleCursor = 0;
+  };
+
+  const finalizeAgentRun = () => {
+    if (agentRunStart === null) return;
+    timelineEnd = Math.max(timelineEnd, agentRunStart + agentSampleCursor);
+    agentRunStart = null;
+    agentSampleCursor = 0;
+    agentSpeaking = false;
+    currentAgentResponseId = null;
+    userRecordingEnabled = true;
+  };
+
+  const beginUserRun = () => {
+    if (userRunStart !== null) return;
+    userRunStart = timelineEnd;
+    userSampleCursor = 0;
+  };
+
+  const beginAgentRun = (responseId) => {
+    if (responseId === currentAgentResponseId) return;
+    finalizeUserRun();
+    if (agentRunStart !== null) {
+      timelineEnd = Math.max(timelineEnd, agentRunStart + agentSampleCursor);
+    }
+    currentAgentResponseId = responseId;
+    agentRunStart = timelineEnd;
+    agentSampleCursor = 0;
+    agentSpeaking = true;
+  };
 
   return {
     appendUserPcm(buf) {
-      if (!buf?.length) return;
-      if (userBaseSample === null) userBaseSample = wallClockSample();
-      const start = userBaseSample + userSampleCursor;
-      segments.push({ start, pcm: buf });
-      userSampleCursor += buf.length / 2;
+      if (!buf?.length || !userRecordingEnabled || agentSpeaking) return;
+      beginUserRun();
+      const sampleCount = buf.length / 2;
+      segments.push({ start: userRunStart + userSampleCursor, pcm: buf });
+      userSampleCursor += sampleCount;
+      timelineEnd = Math.max(timelineEnd, userRunStart + userSampleCursor);
     },
 
     appendUserFromMessage(msg) {
@@ -320,18 +384,21 @@ function createSessionAudioRecorder(sampleRate = USER_AUDIO_SAMPLE_RATE) {
       if (!buf.length) return;
 
       const responseId = parsed.response_id || parsed.item_id || '__default__';
-      if (responseId !== currentAgentResponseId) {
-        currentAgentResponseId = responseId;
-        agentResponseStartSample = wallClockSample();
-        agentResponseSampleCursor = 0;
-      }
+      beginAgentRun(responseId);
 
-      const start = agentResponseStartSample + agentResponseSampleCursor;
-      segments.push({ start, pcm: buf });
-      agentResponseSampleCursor += buf.length / 2;
+      const sampleCount = buf.length / 2;
+      segments.push({ start: agentRunStart + agentSampleCursor, pcm: buf });
+      agentSampleCursor += sampleCount;
+      timelineEnd = Math.max(timelineEnd, agentRunStart + agentSampleCursor);
+    },
+
+    endAgentResponse() {
+      finalizeAgentRun();
     },
 
     buildPcmBuffer() {
+      finalizeUserRun();
+      finalizeAgentRun();
       if (!segments.length) return null;
 
       let maxEnd = 0;
@@ -701,6 +768,20 @@ const GAME_LABELS = {
   wordchop: 'Word Chop',
 };
 
+const VALID_CRASH_SOURCES = new Set(['flutter', 'zone', 'platform', 'webview_console']);
+
+const insertCrashReportStmt = conversationsDb.prepare(`
+  INSERT INTO crash_reports (
+    source, message, stack, fatal, platform, app_version, build_number,
+    package_name, client_timestamp, username, created_at
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+`);
+const getCrashReportStmt = conversationsDb.prepare(`
+  SELECT id, source, message, stack, fatal, platform, app_version, build_number,
+         package_name, client_timestamp, username, created_at
+  FROM crash_reports WHERE id = ?
+`);
+
 const insertGamePlayStmt = conversationsDb.prepare(`
   INSERT INTO game_plays (username, game_id, score, play_date, played_at, details_json)
   VALUES (?, ?, ?, ?, ?, ?)
@@ -709,6 +790,185 @@ const getGamePlayStmt = conversationsDb.prepare(`
   SELECT id, username, game_id, score, play_date, played_at, details_json
   FROM game_plays WHERE id = ?
 `);
+
+const upsertLearnedVocabularyStmt = conversationsDb.prepare(`
+  INSERT INTO learned_vocabulary (username, word, source, learned_at, metadata_json)
+  VALUES (?, ?, ?, ?, ?)
+  ON CONFLICT(username, word) DO UPDATE SET
+    source = excluded.source,
+    learned_at = excluded.learned_at,
+    metadata_json = excluded.metadata_json
+`);
+const getLearnedVocabularyStmt = conversationsDb.prepare(`
+  SELECT id, username, word, source, learned_at, metadata_json
+  FROM learned_vocabulary WHERE id = ?
+`);
+const deleteLearnedVocabularyStmt = conversationsDb.prepare(`
+  DELETE FROM learned_vocabulary WHERE id = ?
+`);
+
+const VALID_LEARNED_VOCAB_SOURCES = new Set(['smartpen', 'bluetooth-pen', 'pen', 'manual']);
+
+function rowToLearnedVocabulary(row) {
+  let metadata = null;
+  try {
+    if (row.metadata_json) metadata = JSON.parse(row.metadata_json);
+  } catch { /* ignore */ }
+  const storedCode = String(metadata?.code || row.word || '').trim();
+  const pair = storedCode ? findBluetoothCodePair(storedCode) : null;
+  const content = pair?.content || metadata?.content || (metadata?.code ? null : row.word) || storedCode;
+  return {
+    id: row.id,
+    username: row.username,
+    code: storedCode || null,
+    word: content,
+    content,
+    source: row.source,
+    learnedAt: row.learned_at,
+    metadata,
+  };
+}
+
+function normalizeLearnedCodeInput(raw) {
+  if (typeof raw === 'string') {
+    const code = raw.trim();
+    if (!code) return null;
+    return { code, source: 'smartpen', learnedAt: Date.now(), metadata: null };
+  }
+  if (!raw || typeof raw !== 'object') return null;
+  const code = String(raw.code || raw.bluetoothCode || raw.word || raw.content || '').trim();
+  if (!code) return null;
+  const source = String(raw.source || 'smartpen').trim().toLowerCase();
+  return {
+    code: code.slice(0, 64),
+    source: VALID_LEARNED_VOCAB_SOURCES.has(source) ? source : 'smartpen',
+    learnedAt: Math.max(0, Number(raw.learnedAt || raw.learned_at) || Date.now()),
+    metadata: raw.metadata && typeof raw.metadata === 'object' ? raw.metadata : null,
+  };
+}
+
+function recordLearnedVocabulary(username, codesInput) {
+  if (!STUDENT_USERS[username]) return { ok: false, error: 'Invalid user.' };
+  const rawCodes = Array.isArray(codesInput) ? codesInput : [codesInput];
+  const items = [];
+  const unknownCodes = [];
+  let added = 0;
+  let updated = 0;
+  let skipped = 0;
+  for (const raw of rawCodes) {
+    const normalized = normalizeLearnedCodeInput(raw);
+    if (!normalized) {
+      skipped += 1;
+      continue;
+    }
+    const pair = findBluetoothCodePair(normalized.code);
+    if (!pair) {
+      skipped += 1;
+      if (!unknownCodes.includes(normalized.code)) unknownCodes.push(normalized.code);
+      continue;
+    }
+    const existing = conversationsDb.prepare(`
+      SELECT id FROM learned_vocabulary WHERE username = ? AND word = ?
+    `).get(username, normalized.code);
+    const metadata = {
+      ...(normalized.metadata || {}),
+      code: normalized.code,
+      content: pair.content,
+    };
+    const metadataJson = JSON.stringify(metadata);
+    const result = upsertLearnedVocabularyStmt.run(
+      username,
+      normalized.code,
+      normalized.source,
+      normalized.learnedAt,
+      metadataJson,
+    );
+    const itemId = existing
+      ? existing.id
+      : Number(result.lastInsertRowid);
+    const item = rowToLearnedVocabulary(getLearnedVocabularyStmt.get(itemId));
+    items.push(item);
+    if (existing) updated += 1;
+    else added += 1;
+  }
+  if (!items.length) {
+    return {
+      ok: false,
+      error: unknownCodes.length
+        ? `No matching content found for code(s): ${unknownCodes.join(', ')}.`
+        : 'No valid codes provided.',
+      unknownCodes,
+      skipped,
+    };
+  }
+  console.log(`[learned-vocabulary] ${username} added=${added} updated=${updated} skipped=${skipped} unknown=${unknownCodes.length}`);
+  return { ok: true, added, updated, skipped, unknownCodes, items };
+}
+
+function listLearnedVocabulary({
+  username = null,
+  source = null,
+  limit = 50,
+  offset = 0,
+} = {}) {
+  const conditions = [];
+  const params = [];
+  if (username) {
+    conditions.push('username = ?');
+    params.push(String(username));
+  }
+  if (source && VALID_LEARNED_VOCAB_SOURCES.has(source)) {
+    conditions.push('source = ?');
+    params.push(String(source));
+  }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 200);
+  const safeOffset = Math.max(Number(offset) || 0, 0);
+  const total = conversationsDb.prepare(
+    `SELECT COUNT(*) AS total FROM learned_vocabulary ${where}`,
+  ).get(...params).total;
+  const rows = conversationsDb.prepare(`
+    SELECT id, username, word, source, learned_at, metadata_json
+    FROM learned_vocabulary
+    ${where}
+    ORDER BY learned_at DESC
+    LIMIT ? OFFSET ?
+  `).all(...params, safeLimit, safeOffset);
+  return {
+    items: rows.map(rowToLearnedVocabulary),
+    total,
+    limit: safeLimit,
+    offset: safeOffset,
+  };
+}
+
+function listRecentLearnedVocabulary(username, limit = 20) {
+  if (!username) return [];
+  const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 50);
+  const rows = conversationsDb.prepare(`
+    SELECT id, username, word, source, learned_at, metadata_json
+    FROM learned_vocabulary
+    WHERE username = ?
+    ORDER BY learned_at DESC
+    LIMIT ?
+  `).all(username, safeLimit);
+  return rows.map(rowToLearnedVocabulary);
+}
+
+function deleteLearnedVocabulary(id) {
+  const row = getLearnedVocabularyStmt.get(Number(id));
+  if (!row) return { ok: false, error: 'Not found.' };
+  deleteLearnedVocabularyStmt.run(row.id);
+  return { ok: true, deleted: rowToLearnedVocabulary(row) };
+}
+
+function clearLearnedVocabulary(username) {
+  if (!STUDENT_USERS[username]) return { ok: false, error: 'Invalid user.' };
+  const result = conversationsDb.prepare(
+    'DELETE FROM learned_vocabulary WHERE username = ?',
+  ).run(username);
+  return { ok: true, deleted: result.changes };
+}
 
 function rowToGamePlay(row) {
   let details = null;
@@ -725,6 +985,109 @@ function rowToGamePlay(row) {
     playedAt: row.played_at,
     details,
   };
+}
+
+function rowToCrashReport(row) {
+  return {
+    id: row.id,
+    source: row.source,
+    message: row.message || '',
+    stack: row.stack || '',
+    fatal: Boolean(row.fatal),
+    platform: row.platform || '',
+    appVersion: row.app_version || '',
+    buildNumber: row.build_number || '',
+    packageName: row.package_name || '',
+    timestamp: row.client_timestamp || '',
+    username: row.username || '',
+    createdAt: row.created_at,
+  };
+}
+
+function recordCrashReport(payload = {}, username = null) {
+  const source = String(payload.source || 'flutter').trim().toLowerCase();
+  if (!VALID_CRASH_SOURCES.has(source)) {
+    return { ok: false, error: 'Invalid source.' };
+  }
+  const message = String(payload.message || '').slice(0, 8000);
+  const stack = String(payload.stack || '').slice(0, 32000);
+  const fatal = payload.fatal === true || payload.fatal === 1 || payload.fatal === 'true';
+  const platform = String(payload.platform || '').slice(0, 64);
+  const appVersion = String(payload.appVersion || payload.app_version || '').slice(0, 64);
+  const buildNumber = String(payload.buildNumber || payload.build_number || '').slice(0, 64);
+  const packageName = String(payload.packageName || payload.package_name || '').slice(0, 256);
+  const clientTimestamp = String(payload.timestamp || '').slice(0, 64);
+  const createdAt = Date.now();
+  const result = insertCrashReportStmt.run(
+    source,
+    message || null,
+    stack || null,
+    fatal ? 1 : 0,
+    platform || null,
+    appVersion || null,
+    buildNumber || null,
+    packageName || null,
+    clientTimestamp || null,
+    username || null,
+    createdAt,
+  );
+  const report = rowToCrashReport(getCrashReportStmt.get(result.lastInsertRowid));
+  console.error('[mobile-crash]', JSON.stringify(report));
+  return { ok: true, report };
+}
+
+function listCrashReports({
+  source = null,
+  platform = null,
+  fatal = null,
+  packageName = null,
+  limit = 50,
+  offset = 0,
+} = {}) {
+  const conditions = [];
+  const params = [];
+  if (source && VALID_CRASH_SOURCES.has(source)) {
+    conditions.push('source = ?');
+    params.push(source);
+  }
+  if (platform) {
+    conditions.push('platform = ?');
+    params.push(String(platform));
+  }
+  if (fatal === true || fatal === 'true' || fatal === '1') {
+    conditions.push('fatal = 1');
+  } else if (fatal === false || fatal === 'false' || fatal === '0') {
+    conditions.push('fatal = 0');
+  }
+  if (packageName) {
+    conditions.push('package_name = ?');
+    params.push(String(packageName));
+  }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 200);
+  const safeOffset = Math.max(Number(offset) || 0, 0);
+  const total = conversationsDb.prepare(
+    `SELECT COUNT(*) AS total FROM crash_reports ${where}`,
+  ).get(...params).total;
+  const rows = conversationsDb.prepare(`
+    SELECT id, source, message, stack, fatal, platform, app_version, build_number,
+           package_name, client_timestamp, username, created_at
+    FROM crash_reports
+    ${where}
+    ORDER BY created_at DESC
+    LIMIT ? OFFSET ?
+  `).all(...params, safeLimit, safeOffset);
+  return {
+    crashes: rows.map(rowToCrashReport),
+    total,
+    limit: safeLimit,
+    offset: safeOffset,
+  };
+}
+
+function clearCrashReports() {
+  const result = conversationsDb.prepare('DELETE FROM crash_reports').run();
+  return { ok: true, deleted: result.changes };
 }
 
 function recordGamePlay(username, { gameId, score, details } = {}) {
@@ -1033,6 +1396,102 @@ function loadUserProfiles() {
 function saveUserProfiles(profiles) {
   ensureConfigDir();
   writeFileSync(USER_PROFILES_PATH, JSON.stringify(profiles, null, 2) + '\n');
+}
+
+function newBluetoothCodeId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function normalizeBluetoothCodePair(raw) {
+  return {
+    id: String(raw?.id || newBluetoothCodeId()),
+    code: String(raw?.code ?? '').trim(),
+    content: String(raw?.content ?? '').trim(),
+    updatedAt: Number(raw?.updatedAt) || Date.now(),
+  };
+}
+
+function loadBluetoothCodesManifest() {
+  try {
+    if (existsSync(BLUETOOTH_CODES_PATH)) {
+      const data = JSON.parse(readFileSync(BLUETOOTH_CODES_PATH, 'utf8'));
+      if (!Array.isArray(data.pairs)) return { pairs: [] };
+      return {
+        pairs: data.pairs.map(normalizeBluetoothCodePair),
+      };
+    }
+  } catch (e) {
+    console.warn('Could not load bluetooth-codes.json:', e.message);
+  }
+  return { pairs: [] };
+}
+
+function saveBluetoothCodesManifest(manifest) {
+  ensureConfigDir();
+  writeFileSync(BLUETOOTH_CODES_PATH, JSON.stringify(manifest, null, 2) + '\n');
+}
+
+function listBluetoothCodePairs() {
+  const manifest = loadBluetoothCodesManifest();
+  return manifest.pairs
+    .slice()
+    .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' }));
+}
+
+function findBluetoothCodePair(code) {
+  const needle = String(code ?? '').trim();
+  if (!needle) return null;
+  return listBluetoothCodePairs().find((pair) => pair.code === needle) || null;
+}
+
+function createBluetoothCodePair(fields) {
+  const code = String(fields?.code ?? '').trim();
+  const content = String(fields?.content ?? '').trim();
+  if (!code) return { ok: false, error: 'Bluetooth code is required.' };
+  if (!content) return { ok: false, error: 'Content is required.' };
+
+  const manifest = loadBluetoothCodesManifest();
+  if (manifest.pairs.some((pair) => pair.code === code)) {
+    return { ok: false, error: 'This Bluetooth code already exists.' };
+  }
+
+  const pair = normalizeBluetoothCodePair({ code, content, updatedAt: Date.now() });
+  manifest.pairs.push(pair);
+  saveBluetoothCodesManifest(manifest);
+  return { ok: true, pair };
+}
+
+function updateBluetoothCodePair(id, fields) {
+  const manifest = loadBluetoothCodesManifest();
+  const idx = manifest.pairs.findIndex((pair) => pair.id === id);
+  if (idx < 0) return { ok: false, error: 'Pair not found.' };
+
+  const code = String(fields?.code ?? manifest.pairs[idx].code).trim();
+  const content = String(fields?.content ?? manifest.pairs[idx].content).trim();
+  if (!code) return { ok: false, error: 'Bluetooth code is required.' };
+  if (!content) return { ok: false, error: 'Content is required.' };
+  if (manifest.pairs.some((pair, i) => i !== idx && pair.code === code)) {
+    return { ok: false, error: 'This Bluetooth code already exists.' };
+  }
+
+  const pair = normalizeBluetoothCodePair({
+    id,
+    code,
+    content,
+    updatedAt: Date.now(),
+  });
+  manifest.pairs[idx] = pair;
+  saveBluetoothCodesManifest(manifest);
+  return { ok: true, pair };
+}
+
+function deleteBluetoothCodePair(id) {
+  const manifest = loadBluetoothCodesManifest();
+  const idx = manifest.pairs.findIndex((pair) => pair.id === id);
+  if (idx < 0) return { ok: false, error: 'Pair not found.' };
+  manifest.pairs.splice(idx, 1);
+  saveBluetoothCodesManifest(manifest);
+  return { ok: true };
 }
 
 function getUserProfile(username) {
@@ -1405,6 +1864,163 @@ function parseProfileSyncJson(content) {
     const end = raw.lastIndexOf('}');
     if (start >= 0 && end > start) return JSON.parse(raw.slice(start, end + 1));
     throw new Error('Invalid JSON');
+  }
+}
+
+function buildParentVocabSuggestionsSystemPrompt() {
+  return `You help parents reinforce English vocabulary their child recently learned with a Bluetooth smart pen.
+Return ONLY valid JSON with this shape:
+{
+  "summary": "1-2 warm sentences for the parent about what the child learned",
+  "generalTips": ["short tip for natural home practice", "another tip"],
+  "wordSuggestions": [
+    {
+      "word": "apple",
+      "questions": ["natural question 1", "natural question 2", "natural question 3"],
+      "activityTip": "one short idea for everyday reinforcement"
+    }
+  ]
+}
+
+Rules:
+1. Questions should feel like casual conversation, not a test or worksheet.
+2. Match the child's grade and language level when profile context is provided.
+3. Use the child's name when available.
+4. Include 2-4 questions per word. Prefer open-ended questions that invite the child to use the word.
+5. Cover every word listed in the user message in wordSuggestions (same spelling).
+6. generalTips should have 2-4 items about timing, tone, and praise.
+7. Keep each question under 120 characters. Use simple English unless home language suggests otherwise.
+8. If no words were provided, return empty wordSuggestions and explain gently in summary.`;
+}
+
+async function generateParentVocabSuggestions(username, { limit = 20 } = {}) {
+  if (!STUDENT_USERS[username]) {
+    return { ok: false, error: 'Invalid user.' };
+  }
+
+  const words = listRecentLearnedVocabulary(username, limit);
+  if (!words.length) {
+    return {
+      ok: true,
+      words: [],
+      suggestions: {
+        summary: 'No smartpen words have been synced yet. Once your child writes vocabulary with the Bluetooth pen, they will appear here with question ideas.',
+        generalTips: [
+          'Make sure the mobile app is connected to the smartpen and logged into this account.',
+          'Short daily chats work better than long review sessions.',
+        ],
+        wordSuggestions: [],
+      },
+      generated: false,
+    };
+  }
+
+  if (!INWORLD_API_ENABLED) {
+    return {
+      ok: false,
+      error: INWORLD_API_DISABLED_MESSAGE,
+      words,
+    };
+  }
+
+  const key = resolveInworldApiKey();
+  if (!key) {
+    return { ok: false, error: 'No Inworld API key configured.', words };
+  }
+
+  const profile = getUserProfile(username);
+  const model = getProfileSyncModel();
+  const wordLines = words.map((item) => {
+    const when = new Date(item.learnedAt).toISOString().slice(0, 10);
+    return `- ${item.word} (learned ${when}, source: ${item.source})`;
+  });
+
+  const profileBits = [
+    profile.childName && `Child name: ${profile.childName}`,
+    profile.nickname && `Nickname: ${profile.nickname}`,
+    profile.grade && `Grade: ${profile.grade}`,
+    profile.schoolGrade && `School grade: ${profile.schoolGrade}`,
+    profile.mainLearningLanguage && `Learning language: ${profile.mainLearningLanguage}`,
+    profile.homeLanguage && `Home language: ${profile.homeLanguage}`,
+    profile.vocabularyLevel && `Vocabulary level: ${profile.vocabularyLevel}`,
+    profile.parentPriority && `Parent priority: ${profile.parentPriority}`,
+  ].filter(Boolean);
+
+  const userPrompt = `Student account: ${username}
+
+${profileBits.length ? `Learner context:\n${profileBits.join('\n')}\n` : ''}
+Recently learned smartpen vocabulary (${words.length} words):
+${wordLines.join('\n')}
+
+Suggest conversation questions parents can ask at home to reinforce these words naturally.`;
+
+  try {
+    const upstream = await fetch(INWORLD_LLM_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: buildParentVocabSuggestionsSystemPrompt() },
+          { role: 'user', content: userPrompt },
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0.4,
+      }),
+    });
+
+    const payload = await upstream.json().catch(() => ({}));
+    if (!upstream.ok) {
+      const message = payload?.error?.message || payload?.error || 'Inworld LLM request failed.';
+      return { ok: false, error: String(message), words };
+    }
+
+    const content = payload?.choices?.[0]?.message?.content;
+    if (!content) {
+      return { ok: false, error: 'Inworld returned empty content.', words };
+    }
+
+    let parsed;
+    try {
+      parsed = parseProfileSyncJson(content);
+    } catch {
+      return { ok: false, error: 'Inworld returned invalid JSON.', words };
+    }
+
+    const wordSuggestions = Array.isArray(parsed?.wordSuggestions)
+      ? parsed.wordSuggestions
+        .filter((entry) => entry && typeof entry.word === 'string')
+        .map((entry) => ({
+          word: String(entry.word).trim(),
+          questions: Array.isArray(entry.questions)
+            ? entry.questions.map((q) => String(q).trim()).filter(Boolean).slice(0, 5)
+            : [],
+          activityTip: String(entry.activityTip || '').trim(),
+        }))
+        .filter((entry) => entry.word)
+      : [];
+
+    const generalTips = Array.isArray(parsed?.generalTips)
+      ? parsed.generalTips.map((tip) => String(tip).trim()).filter(Boolean).slice(0, 6)
+      : [];
+
+    return {
+      ok: true,
+      words,
+      suggestions: {
+        summary: String(parsed?.summary || '').trim()
+          || `Your child recently learned ${words.length} word(s) with the smartpen.`,
+        generalTips,
+        wordSuggestions,
+      },
+      generated: true,
+      model,
+    };
+  } catch (e) {
+    return { ok: false, error: e.message || 'Could not generate suggestions.', words };
   }
 }
 
@@ -2088,11 +2704,27 @@ function buildProfileContext(profile) {
   return lines.join('\n');
 }
 
+function buildLearnedVocabularyContext(username) {
+  const learned = listRecentLearnedVocabulary(username, 20);
+  if (!learned.length) return '';
+  const lines = [
+    'Words learned on smartpen recently:',
+    ...learned.map((item) => {
+      const label = item.word || item.content || item.code;
+      return item.code && item.word && item.code !== item.word
+        ? `- ${label} (code ${item.code})`
+        : `- ${label}`;
+    }),
+  ];
+  return lines.join('\n');
+}
+
 function mergeInstructionsWithProfile(baseInstructions, profile, username) {
   const base = (baseInstructions || DEFAULT_INSTRUCTIONS).trim();
   const profileBlock = buildProfileContext(profile);
+  const learnedVocabBlock = username ? buildLearnedVocabularyContext(username) : '';
   const checkInBlock = username ? buildCheckInContext(username) : '';
-  const blocks = [profileBlock, checkInBlock].filter(Boolean);
+  const blocks = [profileBlock, learnedVocabBlock, checkInBlock].filter(Boolean);
   if (!blocks.length) return base;
   return `${base}\n\n${blocks.join('\n\n')}`;
 }
@@ -2224,9 +2856,25 @@ function redirectToAdminLogin(res, nextUrl) {
   res.end();
 }
 
+function isParentPath(url) {
+  return url === '/parent'
+    || url === '/parent/'
+    || url === '/parent/login'
+    || url.startsWith('/parent/');
+}
+
+function redirectToParentLogin(res, nextUrl) {
+  const loc = nextUrl && nextUrl !== '/parent/login'
+    ? `/parent/login?next=${encodeURIComponent(nextUrl)}`
+    : '/parent/login';
+  res.writeHead(302, { Location: loc, ...SECURITY_HEADERS });
+  res.end();
+}
+
 function isPublicPath(url) {
   return isElevenAgentsPublicPath(url)
     || url === '/login'
+    || url === '/parent/login'
     || url === '/admin/login'
     || url === '/api/login'
     || url === '/api/admin/login'
@@ -2236,6 +2884,14 @@ function isPublicPath(url) {
     || url === '/assets/page-motion.js'
     || /^\/assets\/uncle-tommy-transition\/(?:uncle-tommy-transition\.(?:css|js)|user_uncletommy_[1-4]\.png)$/i.test(url)
     || url === '/langoLogo.jpeg';
+}
+
+function isCrashReportPublicApi(url, method) {
+  return url === '/api/crashes' && (method || 'GET').toUpperCase() === 'POST';
+}
+
+function isLearnedVocabularyPublicApi(url, method) {
+  return url === '/api/learned-vocabulary' && (method || 'GET').toUpperCase() === 'POST';
 }
 
 /** Turn-based test page: REST STT / LLM / TTS without login (Railway-friendly sandbox). */
@@ -2355,8 +3011,10 @@ const ADMIN_PAGE_PATHS = new Set([
   '/account-config',
   '/avatar-config',
   '/video-pairs',
+  '/bluetooth-codes',
   '/conversations',
   '/game-plays',
+  '/crashes',
 ]);
 
 function isGameConfigPage(gamePath) {
@@ -2375,6 +3033,9 @@ function requiresAdmin(url, method) {
   if (url.startsWith('/api/conversations')) return true;
   if (url.startsWith('/api/profile-sync-logs')) return true;
   if (url.startsWith('/api/game-plays') && m !== 'POST') return true;
+  if (url.startsWith('/api/crashes') && m !== 'POST') return true;
+  if (url.match(/^\/api\/learned-vocabulary\/\d+$/) && m === 'DELETE') return true;
+  if (url === '/api/learned-vocabulary' && m === 'DELETE') return true;
   if (url === '/api/inworld/models') return true;
 
   const uploadPaths = ['/api/idle-video', '/api/transition-video', '/api/avatar-background'];
@@ -2384,6 +3045,8 @@ function requiresAdmin(url, method) {
 
   if (url.startsWith('/api/video-pairs') && m !== 'GET') return true;
   if (url === '/api/video-pairs' && m === 'POST') return true;
+
+  if (url.startsWith('/api/bluetooth-codes')) return true;
 
   if (isGameApiRoute(url)) {
     if (
@@ -3621,8 +4284,10 @@ const pages = {
   '/account-config': 'account-config.html',
   '/avatar-config': 'avatar-config.html',
   '/video-pairs': 'video-pairs.html',
+  '/bluetooth-codes': 'bluetooth-codes.html',
   '/conversations': 'conversations.html',
   '/game-plays': 'game-plays.html',
+  '/crashes': 'crashes.html',
   '/visme': 'visme/index.html',
   '/map': 'map/index.html',
   '/map/': 'map/index.html',
@@ -3631,6 +4296,9 @@ const pages = {
   '/session-simple': 'session-simple.html',
   '/turn-based': 'turn-based.html',
   '/agents': 'agents.html',
+  '/parent': 'parent.html',
+  '/parent/': 'parent.html',
+  '/parent/login': 'parent-login.html',
 };
 
 function resolvePage(url) {
@@ -3849,6 +4517,33 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  if (url === '/parent/login' && getSession(req)?.role === 'student') {
+    const next = new URL(rawUrl, 'http://local').searchParams.get('next');
+    const dest = next && next.startsWith('/') ? next : '/parent';
+    res.writeHead(302, { Location: dest, ...SECURITY_HEADERS });
+    res.end();
+    return;
+  }
+
+  if (isParentPath(url) && url !== '/parent/login' && getSession(req)?.role === 'admin') {
+    if (wantsHtml(req)) {
+      res.writeHead(302, { Location: '/admin', ...SECURITY_HEADERS });
+      res.end();
+      return;
+    }
+    sendJson(res, 403, { error: 'Parent portal is for student accounts. Use admin CMS for learner data.' });
+    return;
+  }
+
+  if (isParentPath(url) && url !== '/parent/login' && getSession(req)?.role !== 'student') {
+    if (wantsHtml(req)) {
+      redirectToParentLogin(res, url);
+      return;
+    }
+    sendJson(res, 401, { error: 'Student login required.' });
+    return;
+  }
+
   if (url === '/admin/login' && isAdmin(req)) {
     const next = new URL(rawUrl, 'http://local').searchParams.get('next');
     const dest = next && next.startsWith('/') ? next : '/admin';
@@ -3860,12 +4555,18 @@ const server = createServer(async (req, res) => {
   if (
     !isPublicPath(url)
     && !isTurnBasedPublicApi(url, req.method)
+    && !isCrashReportPublicApi(url, req.method)
+    && !isLearnedVocabularyPublicApi(url, req.method)
     && !isTurnBasedSafeRequest(req, url)
     && !isPreviewSafeRequest(req, url, rawUrl)
     && !isAuthenticated(req)
   ) {
     if (wantsHtml(req)) {
-      redirectToLogin(res, url);
+      if (isParentPath(url)) {
+        redirectToParentLogin(res, url);
+      } else {
+        redirectToLogin(res, url);
+      }
       return;
     }
     sendJson(res, 401, { error: 'Login required.' });
@@ -3882,6 +4583,27 @@ const server = createServer(async (req, res) => {
     sendJson(res, 200, {
       username: session.username,
       profile: getUserProfile(session.username),
+    });
+    return;
+  }
+
+  if (url === '/api/parent/vocab-suggestions' && req.method === 'POST') {
+    const session = getSession(req);
+    if (!session || session.role !== 'student') {
+      sendJson(res, 403, { error: 'Student login required.' });
+      return;
+    }
+    readJsonBody(req, res, async (parsed) => {
+      const limit = Math.min(Math.max(Number(parsed?.limit) || 20, 1), 50);
+      const result = await generateParentVocabSuggestions(session.username, { limit });
+      if (!result.ok) {
+        sendJson(res, result.words ? 503 : 400, {
+          error: result.error || 'Could not generate suggestions.',
+          words: result.words || [],
+        });
+        return;
+      }
+      sendJson(res, 200, result);
     });
     return;
   }
@@ -3972,6 +4694,121 @@ const server = createServer(async (req, res) => {
     const limit = params.get('limit');
     const offset = params.get('offset');
     sendJson(res, 200, listGamePlays({ username, playDate, gameId, limit, offset }));
+    return;
+  }
+
+  if (url === '/api/learned-vocabulary' && req.method === 'POST') {
+    const session = getSession(req);
+    readJsonBody(req, res, (parsed) => {
+      const username = session?.role === 'student'
+        ? session.username
+        : String(parsed.username || '').trim();
+      if (!username) {
+        sendJson(res, 400, { error: 'username is required.' });
+        return;
+      }
+      const codes = parsed.codes ?? parsed.code ?? parsed.words ?? parsed.word;
+      const result = recordLearnedVocabulary(username, codes);
+      if (!result.ok) {
+        sendJson(res, 400, { error: result.error || 'Could not record learned vocabulary.' });
+        return;
+      }
+      sendJson(res, 200, result);
+    });
+    return;
+  }
+
+  if (url === '/api/learned-vocabulary' && req.method === 'GET') {
+    const session = getSession(req);
+    if (!session) {
+      sendJson(res, 401, { error: 'Login required.' });
+      return;
+    }
+    const params = new URL(rawUrl, 'http://local').searchParams;
+    let username = params.get('username')?.trim() || null;
+    if (session.role === 'student') {
+      username = session.username;
+    } else if (username && !STUDENT_USERS[username]) {
+      sendJson(res, 400, { error: 'Invalid username.' });
+      return;
+    }
+    const source = params.get('source')?.trim() || null;
+    const limit = params.get('limit');
+    const offset = params.get('offset');
+    sendJson(res, 200, listLearnedVocabulary({ username, source, limit, offset }));
+    return;
+  }
+
+  if (url === '/api/learned-vocabulary' && req.method === 'DELETE') {
+    const params = new URL(rawUrl, 'http://local').searchParams;
+    const username = params.get('username')?.trim() || '';
+    if (!username) {
+      sendJson(res, 400, { error: 'username is required.' });
+      return;
+    }
+    const result = clearLearnedVocabulary(username);
+    if (!result.ok) {
+      sendJson(res, 400, { error: result.error || 'Could not clear learned vocabulary.' });
+      return;
+    }
+    sendJson(res, 200, result);
+    return;
+  }
+
+  const learnedVocabDeleteMatch = url.match(/^\/api\/learned-vocabulary\/(\d+)$/);
+  if (learnedVocabDeleteMatch && req.method === 'DELETE') {
+    const result = deleteLearnedVocabulary(learnedVocabDeleteMatch[1]);
+    if (!result.ok) {
+      sendJson(res, 404, { error: result.error || 'Not found.' });
+      return;
+    }
+    sendJson(res, 200, result);
+    return;
+  }
+
+  if (url === '/api/bluetooth-codes' && req.method === 'GET') {
+    sendJson(res, 200, { pairs: listBluetoothCodePairs() });
+    return;
+  }
+
+  if (url === '/api/bluetooth-codes' && req.method === 'POST') {
+    readJsonBody(req, res, (parsed) => {
+      const result = createBluetoothCodePair(parsed);
+      if (!result.ok) {
+        sendJson(res, 400, { error: result.error || 'Could not create pair.' });
+        return;
+      }
+      sendJson(res, 200, result);
+    });
+    return;
+  }
+
+  const bluetoothCodeMatch = url.match(/^\/api\/bluetooth-codes\/([^/]+)$/);
+  if (bluetoothCodeMatch) {
+    const pairId = decodeURIComponent(bluetoothCodeMatch[1]);
+    if (req.method === 'PUT' || req.method === 'POST') {
+      readJsonBody(req, res, (parsed) => {
+        const result = updateBluetoothCodePair(pairId, parsed);
+        if (!result.ok) {
+          sendJson(res, result.error === 'Pair not found.' ? 404 : 400, {
+            error: result.error || 'Could not update pair.',
+          });
+          return;
+        }
+        sendJson(res, 200, result);
+      });
+      return;
+    }
+    if (req.method === 'DELETE') {
+      const result = deleteBluetoothCodePair(pairId);
+      if (!result.ok) {
+        sendJson(res, 404, { error: result.error || 'Not found.' });
+        return;
+      }
+      sendJson(res, 200, result);
+      return;
+    }
+    sendJson(res, 405, { error: 'Method not allowed.' });
     return;
   }
 
@@ -4291,6 +5128,46 @@ const server = createServer(async (req, res) => {
         }, parsed));
         sendJson(res, 200, { ok: true });
       });
+      return;
+    }
+    sendJson(res, 405, { error: 'Method not allowed.' });
+    return;
+  }
+
+  if (url === '/api/crashes') {
+    if (req.method === 'GET') {
+      const query = new URL(rawUrl, 'http://localhost').searchParams;
+      const source = query.get('source');
+      const platform = query.get('platform');
+      const fatal = query.get('fatal');
+      const packageName = query.get('packageName');
+      const limit = query.get('limit');
+      const offset = query.get('offset');
+      sendJson(res, 200, listCrashReports({
+        source,
+        platform,
+        fatal,
+        packageName,
+        limit,
+        offset,
+      }));
+      return;
+    }
+    if (req.method === 'POST') {
+      readJsonBody(req, res, (parsed) => {
+        const session = getSession(req);
+        const result = recordCrashReport(parsed, session?.username || null);
+        if (!result.ok) {
+          sendJson(res, 400, { error: result.error });
+          return;
+        }
+        res.writeHead(204, SECURITY_HEADERS);
+        res.end();
+      });
+      return;
+    }
+    if (req.method === 'DELETE') {
+      sendJson(res, 200, clearCrashReports());
       return;
     }
     sendJson(res, 405, { error: 'Method not allowed.' });
@@ -4937,6 +5814,8 @@ function connectToInworld(apiKey, browser, session, userInfo = {}) {
       recordInworldMessage(parsed);
       if (parsed.type === 'response.output_audio.delta') {
         sessionAudio.appendAgentDelta(parsed);
+      } else if (parsed.type === 'response.output_audio.done') {
+        sessionAudio.endAgentResponse();
       }
     }
     const t = parsed?.type;
@@ -5073,6 +5952,7 @@ server.listen(port, '0.0.0.0', () => {
   console.log(`Game database: ${GAME_DB_PATH}`);
   console.log(`Conversation logs: ${CONVERSATIONS_DB_PATH}`);
   console.log(`Session audio: ${SESSION_AUDIO_DIR}`);
+  console.log(`Parent portal: http://0.0.0.0:${port}/parent  (login: /parent/login)`);
   console.log(`Eleven Agents: http://0.0.0.0:${port}/agents.html  (public, no login)`);
   console.log(`ElevenLabs API: ${ELEVENLABS_API_KEY ? 'configured' : 'missing ELEVENLABS_API_KEY'}`);
   if (CONFIG_DIR !== ROOT) console.log(`Config stored at ${CONFIG_PATH}`);

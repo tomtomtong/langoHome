@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Parent Portal — Lango</title>
+  <link rel="stylesheet" href="/assets/page-motion.css">
+  <script src="/assets/page-motion.js"></script>
+  <link rel="preload" href="/langoLogo.jpeg" as="image">
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f1117;
+      color: #e8eaed;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid #252a36;
+      background: rgba(20, 23, 32, 0.95);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      backdrop-filter: blur(8px);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      min-width: 0;
+    }
+
+    .brand img {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      object-fit: cover;
+    }
+
+    .brand-text h1 {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 650;
+    }
+
+    .brand-text p {
+      margin: 0.1rem 0 0;
+      font-size: 0.78rem;
+      color: #9aa0a6;
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-shrink: 0;
+    }
+
+    .btn {
+      appearance: none;
+      border: 1px solid #3c4048;
+      border-radius: 8px;
+      background: #1a1d27;
+      color: #e8eaed;
+      padding: 0.55rem 0.85rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .btn:hover:not(:disabled) {
+      border-color: #6c8cff;
+      background: #202432;
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .btn.primary {
+      border-color: transparent;
+      background: linear-gradient(135deg, #5a7cff, #4664e8);
+    }
+
+    .page {
+      width: min(100%, 920px);
+      margin: 0 auto;
+      padding: 1.25rem;
+    }
+
+    .hero {
+      padding: 1.25rem 1.35rem;
+      border-radius: 16px;
+      background: linear-gradient(135deg, rgba(70, 100, 232, 0.18), rgba(26, 29, 39, 0.9));
+      border: 1px solid #2f3547;
+      margin-bottom: 1.25rem;
+    }
+
+    .hero h2 {
+      margin: 0 0 0.35rem;
+      font-size: 1.35rem;
+    }
+
+    .hero p {
+      margin: 0;
+      color: #b8bcc4;
+      line-height: 1.55;
+      font-size: 0.95rem;
+    }
+
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.85rem;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.28rem 0.65rem;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 0.78rem;
+      color: #c5c9d0;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.25rem;
+    }
+
+    @media (min-width: 860px) {
+      .grid {
+        grid-template-columns: 1.05fr 0.95fr;
+        align-items: start;
+      }
+    }
+
+    .section {
+      padding: 1.15rem 1.2rem;
+      border-radius: 14px;
+      background: #1a1d27;
+      border: 1px solid #2a2f3a;
+    }
+
+    .section h3 {
+      margin: 0 0 0.35rem;
+      font-size: 1rem;
+    }
+
+    .section .lead {
+      margin: 0 0 1rem;
+      font-size: 0.85rem;
+      color: #9aa0a6;
+      line-height: 1.5;
+    }
+
+    .vocab-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .word-chip {
+      display: inline-flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      padding: 0.55rem 0.75rem;
+      border-radius: 10px;
+      background: #12151d;
+      border: 1px solid #303645;
+      min-width: 88px;
+    }
+
+    .word-chip strong {
+      font-size: 0.95rem;
+      color: #f3f4f6;
+    }
+
+    .word-chip span {
+      font-size: 0.72rem;
+      color: #8b919a;
+    }
+
+    .empty {
+      padding: 1rem;
+      border-radius: 10px;
+      background: #12151d;
+      border: 1px dashed #343b4a;
+      color: #9aa0a6;
+      font-size: 0.9rem;
+      line-height: 1.55;
+    }
+
+    .summary-box {
+      padding: 0.95rem 1rem;
+      border-radius: 10px;
+      background: rgba(90, 124, 255, 0.1);
+      border: 1px solid rgba(108, 140, 255, 0.25);
+      color: #dbe4ff;
+      font-size: 0.92rem;
+      line-height: 1.55;
+      margin-bottom: 1rem;
+    }
+
+    .tips-list {
+      margin: 0 0 1rem;
+      padding-left: 1.1rem;
+      color: #c5c9d0;
+      font-size: 0.88rem;
+      line-height: 1.55;
+    }
+
+    .tips-list li + li {
+      margin-top: 0.35rem;
+    }
+
+    .suggestion-card {
+      padding: 0.95rem 1rem;
+      border-radius: 12px;
+      background: #12151d;
+      border: 1px solid #303645;
+      margin-bottom: 0.75rem;
+    }
+
+    .suggestion-card:last-child {
+      margin-bottom: 0;
+    }
+
+    .suggestion-card h4 {
+      margin: 0 0 0.55rem;
+      font-size: 0.98rem;
+      color: #f0f3ff;
+    }
+
+    .question-list {
+      margin: 0;
+      padding-left: 1.1rem;
+      color: #d7dbe3;
+      font-size: 0.88rem;
+      line-height: 1.55;
+    }
+
+    .question-list li + li {
+      margin-top: 0.35rem;
+    }
+
+    .activity-tip {
+      margin-top: 0.65rem;
+      font-size: 0.8rem;
+      color: #9eb0ff;
+      line-height: 1.45;
+    }
+
+    .status {
+      margin-top: 0.75rem;
+      font-size: 0.85rem;
+      color: #9aa0a6;
+    }
+
+    .status.err {
+      color: #f28b82;
+    }
+
+    .loading {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      color: #9aa0a6;
+      font-size: 0.88rem;
+    }
+
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.15);
+      border-top-color: #6c8cff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="/langoLogo.jpeg" alt="Lango" width="40" height="40" decoding="async">
+      <div class="brand-text">
+        <h1>Parent Portal</h1>
+        <p id="account-label">Loading account…</p>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <button type="button" class="btn" id="refresh-btn">Refresh</button>
+      <button type="button" class="btn" id="logout-btn">Sign out</button>
+    </div>
+  </header>
+
+  <main class="page">
+    <section class="hero">
+      <h2 id="hero-title">Smartpen vocabulary at home</h2>
+      <p id="hero-text">Words your child writes with the Bluetooth pen sync here. Use the suggested questions to practice naturally during everyday moments.</p>
+      <div class="meta-row" id="meta-row"></div>
+    </section>
+
+    <div class="grid">
+      <section class="section">
+        <h3>Words from the smartpen</h3>
+        <p class="lead">Recently synced vocabulary for this learner account.</p>
+        <div id="vocab-container">
+          <div class="loading"><span class="spinner"></span> Loading vocabulary…</div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:0.75rem; margin-bottom:0.35rem;">
+          <h3 style="margin:0;">Questions to ask at home</h3>
+          <button type="button" class="btn primary" id="generate-btn">Generate ideas</button>
+        </div>
+        <p class="lead">AI suggestions for casual conversation that reinforces each word.</p>
+        <div id="suggestions-container">
+          <div class="empty">Tap <strong>Generate ideas</strong> to get parent-friendly questions based on your child’s recent words.</div>
+        </div>
+        <p class="status" id="suggestions-status"></p>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const accountLabel = document.getElementById("account-label");
+    const heroTitle = document.getElementById("hero-title");
+    const heroText = document.getElementById("hero-text");
+    const metaRow = document.getElementById("meta-row");
+    const vocabContainer = document.getElementById("vocab-container");
+    const suggestionsContainer = document.getElementById("suggestions-container");
+    const suggestionsStatus = document.getElementById("suggestions-status");
+    const refreshBtn = document.getElementById("refresh-btn");
+    const generateBtn = document.getElementById("generate-btn");
+    const logoutBtn = document.getElementById("logout-btn");
+
+    let currentUser = null;
+    let currentProfile = {};
+    let vocabItems = [];
+
+    function formatDate(ts) {
+      if (!ts) return "—";
+      try {
+        return new Date(ts).toLocaleString(undefined, {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        });
+      } catch {
+        return "—";
+      }
+    }
+
+    function displayName() {
+      return currentProfile.childName?.trim()
+        || currentProfile.nickname?.trim()
+        || currentUser
+        || "your child";
+    }
+
+    function renderMeta() {
+      metaRow.innerHTML = "";
+      const pills = [
+        currentUser && `Account: ${currentUser}`,
+        currentProfile.grade && `Grade: ${currentProfile.grade}`,
+        currentProfile.mainLearningLanguage && `Learning: ${currentProfile.mainLearningLanguage}`,
+        vocabItems.length && `${vocabItems.length} word${vocabItems.length === 1 ? "" : "s"}`,
+      ].filter(Boolean);
+
+      for (const text of pills) {
+        const el = document.createElement("span");
+        el.className = "pill";
+        el.textContent = text;
+        metaRow.appendChild(el);
+      }
+    }
+
+    function renderVocabulary(items) {
+      vocabItems = items || [];
+      renderMeta();
+
+      if (!vocabItems.length) {
+        vocabContainer.innerHTML = `
+          <div class="empty">
+            No smartpen words yet. When your child writes vocabulary with the Bluetooth pen and the app syncs,
+            the words will show up here automatically.
+          </div>`;
+        return;
+      }
+
+      const list = document.createElement("div");
+      list.className = "vocab-list";
+      for (const item of vocabItems) {
+        const chip = document.createElement("div");
+        chip.className = "word-chip";
+        const label = item.content || item.word || item.code || "—";
+        const codeLabel = item.code && item.code !== label ? `Code ${item.code}` : "";
+        chip.innerHTML = `
+          <strong>${escapeHtml(label)}</strong>
+          <span>${escapeHtml([codeLabel, formatDate(item.learnedAt)].filter(Boolean).join(" · "))}</span>
+        `;
+        list.appendChild(chip);
+      }
+      vocabContainer.innerHTML = "";
+      vocabContainer.appendChild(list);
+    }
+
+    function renderSuggestions(data) {
+      const suggestions = data?.suggestions;
+      if (!suggestions) {
+        suggestionsContainer.innerHTML = `<div class="empty">No suggestions yet.</div>`;
+        return;
+      }
+
+      const parts = [];
+      if (suggestions.summary) {
+        parts.push(`<div class="summary-box">${escapeHtml(suggestions.summary)}</div>`);
+      }
+
+      if (Array.isArray(suggestions.generalTips) && suggestions.generalTips.length) {
+        parts.push(`<ul class="tips-list">${suggestions.generalTips.map((tip) => `<li>${escapeHtml(tip)}</li>`).join("")}</ul>`);
+      }
+
+      const wordSuggestions = Array.isArray(suggestions.wordSuggestions) ? suggestions.wordSuggestions : [];
+      if (wordSuggestions.length) {
+        parts.push(wordSuggestions.map((entry) => {
+          const questions = Array.isArray(entry.questions) ? entry.questions : [];
+          const questionHtml = questions.length
+            ? `<ul class="question-list">${questions.map((q) => `<li>${escapeHtml(q)}</li>`).join("")}</ul>`
+            : `<p class="activity-tip">No questions generated for this word.</p>`;
+          const tip = entry.activityTip
+            ? `<p class="activity-tip">${escapeHtml(entry.activityTip)}</p>`
+            : "";
+          return `
+            <article class="suggestion-card">
+              <h4>${escapeHtml(entry.word)}</h4>
+              ${questionHtml}
+              ${tip}
+            </article>`;
+        }).join(""));
+      } else if (!suggestions.summary) {
+        parts.push(`<div class="empty">No word-specific suggestions yet. Try again after more smartpen words sync.</div>`);
+      }
+
+      suggestionsContainer.innerHTML = parts.join("");
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function setSuggestionsStatus(message, isError = false) {
+      suggestionsStatus.textContent = message || "";
+      suggestionsStatus.className = `status${isError ? " err" : ""}`;
+    }
+
+    async function requireAuth() {
+      const res = await fetch("/api/me");
+      if (!res.ok) {
+        location.href = "/parent/login?next=" + encodeURIComponent("/parent");
+        throw new Error("Not signed in.");
+      }
+      const data = await res.json();
+      if (data.role !== "student") {
+        location.href = "/parent/login";
+        throw new Error("Student account required.");
+      }
+      currentUser = data.username;
+      accountLabel.textContent = `Signed in as ${currentUser}`;
+    }
+
+    async function loadProfile() {
+      const res = await fetch("/api/me/profile");
+      if (!res.ok) throw new Error("Could not load profile.");
+      const data = await res.json();
+      currentProfile = data.profile || {};
+      heroTitle.textContent = `${displayName()}'s smartpen vocabulary`;
+      heroText.textContent = "See what your child recently wrote with the Bluetooth pen, then use the conversation ideas to reinforce those words at home.";
+      accountLabel.textContent = `${displayName()} · ${currentUser}`;
+      renderMeta();
+    }
+
+    async function loadVocabulary() {
+      vocabContainer.innerHTML = `<div class="loading"><span class="spinner"></span> Loading vocabulary…</div>`;
+      const res = await fetch("/api/learned-vocabulary?limit=50");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Could not load vocabulary.");
+      }
+      const data = await res.json();
+      renderVocabulary(data.items || []);
+    }
+
+    async function generateSuggestions() {
+      generateBtn.disabled = true;
+      refreshBtn.disabled = true;
+      generateBtn.textContent = "Generating…";
+      setSuggestionsStatus("");
+      suggestionsContainer.innerHTML = `<div class="loading"><span class="spinner"></span> Preparing conversation ideas…</div>`;
+
+      try {
+        const res = await fetch("/api/parent/vocab-suggestions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ limit: 20 }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error || "Could not generate suggestions.");
+        }
+        renderSuggestions(data);
+        if (Array.isArray(data.words)) {
+          renderVocabulary(data.words);
+        }
+        if (data.generated) {
+          setSuggestionsStatus("Suggestions refreshed with AI based on recent smartpen words.");
+        } else {
+          setSuggestionsStatus("No words to analyze yet.");
+        }
+      } catch (err) {
+        suggestionsContainer.innerHTML = `<div class="empty">${escapeHtml(err.message || "Could not generate suggestions.")}</div>`;
+        setSuggestionsStatus(err.message || "Generation failed.", true);
+      } finally {
+        generateBtn.disabled = false;
+        refreshBtn.disabled = false;
+        generateBtn.textContent = "Generate ideas";
+      }
+    }
+
+    async function loadAll({ autoGenerate = false } = {}) {
+      refreshBtn.disabled = true;
+      try {
+        await requireAuth();
+        await loadProfile();
+        await loadVocabulary();
+        if (autoGenerate && vocabItems.length) {
+          await generateSuggestions();
+        }
+      } catch (err) {
+        vocabContainer.innerHTML = `<div class="empty">${escapeHtml(err.message || "Could not load portal.")}</div>`;
+      } finally {
+        refreshBtn.disabled = false;
+      }
+    }
+
+    refreshBtn.addEventListener("click", () => {
+      loadAll({ autoGenerate: false }).catch(() => {});
+    });
+
+    generateBtn.addEventListener("click", () => {
+      generateSuggestions().catch(() => {});
+    });
+
+    logoutBtn.addEventListener("click", async () => {
+      await fetch("/api/logout", { method: "POST" });
+      location.href = "/parent/login";
+    });
+
+    loadAll({ autoGenerate: true }).catch(() => {});
+  </script>
+</body>
+</html>
