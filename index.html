@@ -18,7 +18,7 @@
   <link rel="preload" href="/visme/Tommyv4.vrm" as="fetch" crossorigin>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Jomhuria&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Jomhuria&family=Lilita+One&display=swap" rel="stylesheet">
   <script type="importmap">
     {
       "imports": {
@@ -259,12 +259,14 @@
     }
 
     html.preview-mode body.preview-screen-collection-locked #app,
-    html.preview-mode body.preview-screen-collection-unlocked #app {
+    html.preview-mode body.preview-screen-collection-unlocked #app,
+    html.preview-mode body.preview-screen-record #app {
       pointer-events: auto;
     }
 
     body.preview-screen-collection-locked #splash-screen,
-    body.preview-screen-collection-unlocked #splash-screen {
+    body.preview-screen-collection-unlocked #splash-screen,
+    body.preview-screen-record #splash-screen {
       display: none !important;
     }
 
@@ -3251,6 +3253,323 @@
     }
 
     body.in-session #settings-overlay.visible { display: none; }
+
+    /* Figma frame 12:886 — Record */
+    #record-root {
+      position: absolute;
+      inset: 0;
+      z-index: 194;
+      overflow: hidden;
+      container-type: size;
+      pointer-events: none;
+    }
+
+    .record-page {
+      --record-brown: #833b08;
+      --record-text: #562606;
+      --record-cream: #f6f4ea;
+      display: none;
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      container-type: size;
+      isolation: isolate;
+      pointer-events: auto;
+      font-family: "Lilita One", "Baloo 2", system-ui, sans-serif;
+      background: #e9a442;
+    }
+
+    .record-page.is-visible {
+      display: block;
+      animation: next-surface-in 520ms cubic-bezier(.16, 1, .3, 1) both;
+    }
+
+    .record-page__background {
+      position: absolute;
+      inset: -1.5%;
+      z-index: 0;
+      width: 103%;
+      height: 103%;
+      object-fit: cover;
+      filter: blur(8.7px);
+      user-select: none;
+      pointer-events: none;
+    }
+
+    .record-page__title {
+      position: absolute;
+      z-index: 4;
+      top: 0;
+      left: 29.1%;
+      width: 41.6%;
+      height: 18.4%;
+      object-fit: contain;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    .record-page__return {
+      position: absolute;
+      z-index: 5;
+      top: 8.1%;
+      left: 5.8%;
+      width: 16.5%;
+      height: 7.2%;
+      padding: 0;
+      border: 0;
+      border-radius: 18px;
+      overflow: hidden;
+      appearance: none;
+      background: transparent;
+      cursor: pointer;
+      filter: drop-shadow(0 4px 2px rgba(75, 31, 4, .25));
+      transition: transform 120ms ease, filter 120ms ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .record-page__return img {
+      position: absolute;
+      top: -35.84%;
+      left: 0;
+      width: 100%;
+      height: 172.04%;
+      object-fit: fill;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .record-page__return:hover { transform: scale(1.035); filter: drop-shadow(0 6px 3px rgba(75, 31, 4, .34)); }
+    .record-page__return:active { transform: translateY(2px) scale(.97); }
+    .record-page__return:focus-visible { outline: 4px solid #fff5b2; outline-offset: 4px; }
+
+    .record-page__board {
+      position: absolute;
+      z-index: 2;
+      top: 22.2%;
+      left: 2.83%;
+      width: 94.5%;
+      height: 73.8%;
+      isolation: isolate;
+    }
+
+    .record-page__frame {
+      position: absolute;
+      top: -8.6%;
+      left: -6.1%;
+      z-index: 1;
+      width: 112.2%;
+      height: 117.2%;
+      object-fit: fill;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .record-page__tabs {
+      position: absolute;
+      z-index: 2;
+      top: 5.7%;
+      left: 4.05%;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      width: 91.9%;
+      height: 14.6%;
+      padding: .7%;
+      border-radius: 22px;
+      overflow: hidden;
+      background: var(--record-brown);
+      box-shadow: inset 0 5px 4px rgba(0, 0, 0, .25);
+    }
+
+    .record-page__tab {
+      position: relative;
+      min-width: 0;
+      padding: 0;
+      border: 0;
+      border-radius: 18px;
+      appearance: none;
+      background: transparent;
+      color: var(--record-cream);
+      cursor: pointer;
+      font: inherit;
+      font-size: clamp(25px, 4.12cqw, 56.224px);
+      font-weight: 400;
+      line-height: normal;
+      text-align: center;
+      text-shadow: 0 3px 0 #542007;
+      -webkit-text-stroke: 1px #542007;
+      transition: filter 120ms ease, transform 120ms ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .record-page__tab-image {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: fill;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .record-page__tab-label {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      height: 100%;
+      place-items: center;
+    }
+
+    .record-page__tab:not(.is-active) { opacity: .94; }
+    .record-page__tab:hover { filter: brightness(1.07); }
+    .record-page__tab:active { transform: scale(.985); }
+    .record-page__tab:focus-visible { outline: 4px solid #fff5b2; outline-offset: -4px; }
+
+    .record-page__list-panel {
+      position: absolute;
+      z-index: 2;
+      top: 22.55%;
+      left: 4.05%;
+      width: 91.9%;
+      height: 69.9%;
+      border-radius: 21px;
+      overflow: hidden;
+      background: var(--record-brown);
+      box-shadow: inset 0 11px 4px rgba(0, 0, 0, .25);
+    }
+
+    .record-page__list {
+      position: absolute;
+      top: 4.6%;
+      right: 2.35%;
+      bottom: 0;
+      left: 4.72%;
+      display: flex;
+      flex-direction: column;
+      gap: 1.32cqw;
+      margin: 0;
+      padding: 0 0 1.32cqw;
+      overflow-x: hidden;
+      overflow-y: auto;
+      list-style: none;
+      scrollbar-width: none;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .record-page__list::-webkit-scrollbar { display: none; }
+
+    .record-page__row {
+      position: relative;
+      flex: 0 0 auto;
+      width: 100%;
+      height: 9.81cqw;
+      max-height: 134px;
+      overflow: hidden;
+      border-radius: clamp(18px, 2.49cqw, 34px);
+      box-shadow: inset 0 -6px 4px rgba(139, 97, 45, .25);
+    }
+
+    .record-page__row-background {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: fill;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .record-page__row-content {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      /* Figma: 25px 77px 26px 87px on the 1101 × 134 row. */
+      padding: 1.83cqw 5.64cqw 1.9cqw 6.37cqw;
+    }
+
+    .record-page__date {
+      margin: 0;
+      color: var(--record-text);
+      font: inherit;
+      font-size: clamp(24px, 3.51cqw, 48px);
+      font-weight: 400;
+      line-height: normal;
+      white-space: nowrap;
+    }
+
+    .record-page__stars {
+      display: block;
+      width: 19.72cqw;
+      height: 6.09cqw;
+      max-width: 269.435px;
+      max-height: 83.173px;
+      object-fit: contain;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .record-page__scrollbar {
+      position: absolute;
+      z-index: 3;
+      top: 2.7%;
+      bottom: 0;
+      left: 1.18%;
+      width: 1.9%;
+      border-radius: 70px;
+      background: #f5be86;
+      cursor: pointer;
+      touch-action: none;
+      user-select: none;
+    }
+
+    .record-page__scrollbar-thumb {
+      position: absolute;
+      top: var(--record-scroll-top, 0%);
+      right: 12%;
+      left: 12%;
+      height: 16%;
+      border-radius: 70px;
+      background: #b45919;
+      cursor: grab;
+    }
+
+    .record-page__scrollbar:active .record-page__scrollbar-thumb { cursor: grabbing; }
+    .record-page__scrollbar:focus-visible { outline: 4px solid #fff5b2; outline-offset: 3px; }
+
+    .record-page__empty {
+      display: grid;
+      min-height: 60%;
+      padding: 2rem;
+      place-items: center;
+      color: var(--record-cream);
+      font-family: "Baloo 2", system-ui, sans-serif;
+      font-size: clamp(18px, 2.2cqw, 30px);
+      font-weight: 800;
+      text-align: center;
+      text-shadow: 0 2px 0 #542007;
+    }
+
+    .record-page__sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    body.in-session .record-page.is-visible { display: none; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .record-page.is-visible { animation: none; }
+    }
   </style>
 </head>
 <body>
@@ -3269,6 +3588,7 @@
       <option value="rewards">Daily rewards — preview</option>
       <option value="collection-locked">Collection — locked preview</option>
       <option value="collection-unlocked">Collection — unlocked preview</option>
+      <option value="record">Record — preview</option>
       <option value="map">Map — preview</option>
       <option value="game">Game transition — preview</option>
       <option value="game-wordchop">Game — Word Chop</option>
@@ -3764,6 +4084,7 @@
     <div id="daily-rewards-root"></div>
     <div id="collection-root"></div>
     <div id="settings-root"></div>
+    <div id="record-root"></div>
     <iframe id="map-preview-frame" title="Map preview" src="/map/index.html?preview=1&amp;embedded=1"></iframe>
     <iframe id="game-preview-frame" title="Game preview"></iframe>
     <div id="idle-video-screen" aria-label="Tap to start conversation">
@@ -4271,6 +4592,344 @@
         );
       }
 
+      const RECORD_PREVIEW_ROWS = Object.freeze([
+        { date: '2026-07-04', stars: 3 },
+        { date: '2026-07-03', stars: 1 },
+        { date: '2026-07-02', stars: 1 },
+        { date: '2026-07-01', stars: 3 },
+      ]);
+
+      function formatRecordDate(value) {
+        const [year, month, day] = String(value || '').slice(0, 10).split('-').map(Number);
+        if (!year || !month || !day) return String(value || 'Unknown date');
+        const date = new Date(year, month - 1, day);
+        return `${day} ${date.toLocaleString('en-GB', { month: 'long' })} ${year}`;
+      }
+
+      function groupExerciseRecords(plays = []) {
+        const records = new Map();
+        plays.forEach((play) => {
+          const date = String(play.playDate || play.playedAt || '').slice(0, 10);
+          if (!date) return;
+          const stars = Math.max(1, Math.min(3, Math.round(Number(play.details?.stars) || 1)));
+          records.set(date, Math.max(records.get(date) || 0, stars));
+        });
+        return [...records.entries()]
+          .map(([date, stars]) => ({ date, stars }))
+          .sort((a, b) => b.date.localeCompare(a.date));
+      }
+
+      function groupPubRecords(conversations = []) {
+        const records = new Map();
+        conversations.forEach((conversation) => {
+          const date = String(conversation.startedAt || '').slice(0, 10);
+          if (!date) return;
+          const turns = Math.max(0, Number(conversation.turnCount) || 0);
+          const stars = turns >= 8 ? 3 : 1;
+          records.set(date, Math.max(records.get(date) || 0, stars));
+        });
+        return [...records.entries()]
+          .map(([date, stars]) => ({ date, stars }))
+          .sort((a, b) => b.date.localeCompare(a.date));
+      }
+
+      function RecordPage() {
+        const [visible, setVisible] = React.useState(false);
+        const [activeTab, setActiveTab] = React.useState('exercise');
+        const [exerciseRecords, setExerciseRecords] = React.useState([]);
+        const [pubRecords, setPubRecords] = React.useState([]);
+        const [loading, setLoading] = React.useState(false);
+        const [scrollProgress, setScrollProgress] = React.useState(0);
+        const listRef = React.useRef(null);
+        const scrollbarRef = React.useRef(null);
+        const dragRef = React.useRef({ pointerId: null, offset: 0 });
+        const recordAsset = (name) => `/assets/record/${name}.png?v=20260723c`;
+
+        const resetScroll = () => {
+          setScrollProgress(0);
+          requestAnimationFrame(() => {
+            if (listRef.current) listRef.current.scrollTop = 0;
+          });
+        };
+
+        const loadRecords = async () => {
+          if (new URLSearchParams(location.search).get('preview') === '1') {
+            setExerciseRecords(RECORD_PREVIEW_ROWS);
+            setPubRecords(RECORD_PREVIEW_ROWS.slice(0, 3));
+            return;
+          }
+          setLoading(true);
+          try {
+            const [playsResponse, meResponse] = await Promise.all([
+              fetch('/api/game-plays?limit=200'),
+              fetch('/api/me'),
+            ]);
+            const playsData = playsResponse.ok ? await playsResponse.json() : { plays: [] };
+            setExerciseRecords(groupExerciseRecords(playsData.plays));
+
+            if (meResponse.ok) {
+              const me = await meResponse.json();
+              const username = String(me.username || '').trim();
+              if (username) {
+                const conversationsResponse = await fetch(
+                  `/api/conversations?username=${encodeURIComponent(username)}&limit=200`,
+                );
+                const conversationsData = conversationsResponse.ok
+                  ? await conversationsResponse.json()
+                  : { conversations: [] };
+                setPubRecords(groupPubRecords(conversationsData.conversations));
+              } else {
+                setPubRecords([]);
+              }
+            } else {
+              setPubRecords([]);
+            }
+          } catch {
+            setExerciseRecords([]);
+            setPubRecords([]);
+          } finally {
+            setLoading(false);
+          }
+        };
+
+        React.useEffect(() => {
+          const close = () => setVisible(false);
+          const open = () => {
+            setActiveTab('exercise');
+            setVisible(true);
+            resetScroll();
+            loadRecords();
+          };
+          const onOpen = () => open();
+          window.LangoRecord = { open, close };
+          window.addEventListener('lango:open-record', onOpen);
+          return () => {
+            window.removeEventListener('lango:open-record', onOpen);
+            if (window.LangoRecord?.open === open) delete window.LangoRecord;
+          };
+        }, []);
+
+        React.useEffect(() => {
+          if (!visible) return undefined;
+          const onKeyDown = (event) => {
+            if (event.key === 'Escape') {
+              window.LangoSfx?.play('back');
+              setVisible(false);
+              document.querySelector('.lango-home__record')?.focus();
+            }
+          };
+          window.addEventListener('keydown', onKeyDown);
+          return () => window.removeEventListener('keydown', onKeyDown);
+        }, [visible]);
+
+        const closeRecord = () => {
+          window.LangoSfx?.play('back');
+          setVisible(false);
+          document.querySelector('.lango-home__record')?.focus();
+        };
+
+        const setTab = (tab) => {
+          if (tab === activeTab) return;
+          window.LangoSfx?.play('next');
+          setActiveTab(tab);
+          resetScroll();
+        };
+
+        const updateScrollProgress = (list) => {
+          const maxScroll = Math.max(0, list.scrollHeight - list.clientHeight);
+          setScrollProgress(maxScroll ? list.scrollTop / maxScroll : 0);
+        };
+
+        const scrollToPointer = (clientY) => {
+          const list = listRef.current;
+          const track = scrollbarRef.current;
+          if (!list || !track) return;
+          const trackRect = track.getBoundingClientRect();
+          const thumbHeight = trackRect.height * .16;
+          const maxThumbTop = Math.max(0, trackRect.height - thumbHeight);
+          const nextTop = Math.max(
+            0,
+            Math.min(maxThumbTop, clientY - trackRect.top - dragRef.current.offset),
+          );
+          const progress = maxThumbTop ? nextTop / maxThumbTop : 0;
+          list.scrollTop = progress * Math.max(0, list.scrollHeight - list.clientHeight);
+        };
+
+        const startScrollbarDrag = (event) => {
+          const thumb = event.currentTarget.querySelector('.record-page__scrollbar-thumb');
+          const thumbRect = thumb?.getBoundingClientRect();
+          dragRef.current = {
+            pointerId: event.pointerId,
+            offset: event.target === thumb && thumbRect
+              ? event.clientY - thumbRect.top
+              : (thumbRect?.height || 0) / 2,
+          };
+          event.currentTarget.setPointerCapture(event.pointerId);
+          scrollToPointer(event.clientY);
+          event.preventDefault();
+        };
+
+        const moveScrollbar = (event) => {
+          if (dragRef.current.pointerId === event.pointerId) scrollToPointer(event.clientY);
+        };
+
+        const stopScrollbarDrag = (event) => {
+          if (dragRef.current.pointerId !== event.pointerId) return;
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+          }
+          dragRef.current = { pointerId: null, offset: 0 };
+        };
+
+        const onScrollbarKeyDown = (event) => {
+          const list = listRef.current;
+          if (!list) return;
+          const page = Math.max(40, list.clientHeight * .8);
+          if (event.key === 'ArrowUp') list.scrollTop -= 40;
+          else if (event.key === 'ArrowDown') list.scrollTop += 40;
+          else if (event.key === 'PageUp') list.scrollTop -= page;
+          else if (event.key === 'PageDown') list.scrollTop += page;
+          else if (event.key === 'Home') list.scrollTop = 0;
+          else if (event.key === 'End') list.scrollTop = list.scrollHeight;
+          else return;
+          event.preventDefault();
+        };
+
+        const rows = activeTab === 'exercise' ? exerciseRecords : pubRecords;
+        const emptyMessage = activeTab === 'exercise'
+          ? 'No exercise records yet. Play a game to begin!'
+          : 'No Lango Pub records yet. Talk with Uncle Tommy to begin!';
+
+        return e('section', {
+          className: `record-page${visible ? ' is-visible' : ''}`,
+          role: 'dialog',
+          'aria-modal': 'true',
+          'aria-hidden': visible ? 'false' : 'true',
+          'aria-labelledby': 'record-page-title',
+          'data-node-id': '12:886',
+        },
+          e('h1', { id: 'record-page-title', className: 'record-page__sr-only' }, 'Record'),
+          e('img', {
+            className: 'record-page__background',
+            src: recordAsset('background'),
+            alt: '',
+            draggable: false,
+          }),
+          e('img', {
+            className: 'record-page__title',
+            src: recordAsset('title'),
+            alt: 'Record',
+            draggable: false,
+          }),
+          e('button', {
+            type: 'button',
+            className: 'record-page__return',
+            onClick: closeRecord,
+            'aria-label': 'Return home',
+            'data-node-id': '12:890',
+          },
+            e('img', { src: recordAsset('return'), alt: '', draggable: false }),
+          ),
+          e('div', { className: 'record-page__board', 'data-node-id': '12:891' },
+            e('img', {
+              className: 'record-page__frame',
+              src: recordAsset('frame'),
+              alt: '',
+              draggable: false,
+            }),
+            e('div', {
+              className: 'record-page__tabs',
+              role: 'tablist',
+              'aria-label': 'Record categories',
+              'data-node-id': '12:914',
+            },
+              e('button', {
+                type: 'button',
+                className: `record-page__tab${activeTab === 'exercise' ? ' is-active' : ''}`,
+                role: 'tab',
+                'aria-selected': activeTab === 'exercise',
+                onClick: () => setTab('exercise'),
+              },
+                activeTab === 'exercise' && e('img', {
+                  className: 'record-page__tab-image',
+                  src: recordAsset('tab-exercise-active'),
+                  alt: '',
+                  draggable: false,
+                }),
+                e('span', { className: 'record-page__tab-label' }, 'Exercise'),
+              ),
+              e('button', {
+                type: 'button',
+                className: `record-page__tab${activeTab === 'pub' ? ' is-active' : ''}`,
+                role: 'tab',
+                'aria-selected': activeTab === 'pub',
+                onClick: () => setTab('pub'),
+              },
+                activeTab === 'pub' && e('img', {
+                  className: 'record-page__tab-image',
+                  src: recordAsset('tab-exercise-active'),
+                  alt: '',
+                  draggable: false,
+                }),
+                e('span', { className: 'record-page__tab-label' }, 'Lango Pub'),
+              ),
+            ),
+            e('div', { className: 'record-page__list-panel' },
+              e('ol', {
+                id: 'record-page-list',
+                ref: listRef,
+                className: 'record-page__list',
+                'aria-label': `${activeTab === 'exercise' ? 'Exercise' : 'Lango Pub'} records`,
+                onScroll: (event) => updateScrollProgress(event.currentTarget),
+              },
+                loading && e('li', { className: 'record-page__empty' }, 'Loading records…'),
+                !loading && !rows.length && e('li', { className: 'record-page__empty' }, emptyMessage),
+                !loading && rows.map((row) => e('li', {
+                  key: `${activeTab}-${row.date}`,
+                  className: 'record-page__row',
+                },
+                  e('img', {
+                    className: 'record-page__row-background',
+                    src: recordAsset('row-bg'),
+                    alt: '',
+                    draggable: false,
+                  }),
+                  e('div', { className: 'record-page__row-content' },
+                    e('p', { className: 'record-page__date' }, formatRecordDate(row.date)),
+                    e('img', {
+                      className: 'record-page__stars',
+                      src: recordAsset(row.stars >= 3 ? 'stars-3' : 'stars-1'),
+                      alt: `${row.stars} out of 3 stars`,
+                      draggable: false,
+                    }),
+                  ),
+                )),
+              ),
+              !loading && rows.length > 0 && e('div', {
+                ref: scrollbarRef,
+                className: 'record-page__scrollbar',
+                role: 'scrollbar',
+                tabIndex: 0,
+                'aria-label': 'Scroll records',
+                'aria-controls': 'record-page-list',
+                'aria-orientation': 'vertical',
+                'aria-valuemin': 0,
+                'aria-valuemax': 100,
+                'aria-valuenow': Math.round(scrollProgress * 100),
+                style: { '--record-scroll-top': `${scrollProgress * 84}%` },
+                onPointerDown: startScrollbarDrag,
+                onPointerMove: moveScrollbar,
+                onPointerUp: stopScrollbarDrag,
+                onPointerCancel: stopScrollbarDrag,
+                onKeyDown: onScrollbarKeyDown,
+              },
+                e('span', { className: 'record-page__scrollbar-thumb' }),
+              ),
+            ),
+          ),
+        );
+      }
+
       function Settings() {
         const [visible, setVisible] = React.useState(false);
         const [loggingOut, setLoggingOut] = React.useState(false);
@@ -4477,12 +5136,12 @@
           ),
           e(ImageButton, {
             className: `lango-home__record${recordReminding ? ' is-reminding' : ''}`,
-            image: 'store',
+            image: 'record',
             label: 'Record',
             onClick: () => {
               setRecordReminding(false);
               clearTimeout(recordRemindTimer.current);
-              setComingSoonFeature('Record');
+              reveal('record', () => window.dispatchEvent(new CustomEvent('lango:open-record')));
             },
             sfx: 'weakness'
           }),
@@ -4518,6 +5177,7 @@
       ReactDOM.createRoot(document.getElementById('daily-rewards-root')).render(e(DailyRewards));
       ReactDOM.createRoot(document.getElementById('collection-root')).render(e(Collection));
       ReactDOM.createRoot(document.getElementById('settings-root')).render(e(Settings));
+      ReactDOM.createRoot(document.getElementById('record-root')).render(e(RecordPage));
 
       /* Collection previews do not need to wait for the heavier avatar/video
          module graph. This keeps both Figma states directly inspectable even
@@ -8567,6 +9227,7 @@
       "rewards",
       "collection-locked",
       "collection-unlocked",
+      "record",
       "map",
       "game",
       ...PREVIEW_GAMES.keys(),
@@ -8598,6 +9259,7 @@
       setPreviewVideo(transitionVideoEl, false);
       hideDailyRewardsOverlay();
       window.LangoCollection?.close?.();
+      window.LangoRecord?.close?.();
       gameLaunchOverlay.classList.remove("visible");
       gameLaunchOverlay.setAttribute("aria-hidden", "true");
       captionUserEl.hidden = true;
@@ -8675,6 +9337,11 @@
 
       if (screen === "collection-locked" || screen === "collection-unlocked") {
         await window.LangoCollection?.open?.({ unlocked: screen === "collection-unlocked" });
+        return;
+      }
+
+      if (screen === "record") {
+        await window.LangoRecord?.open?.();
         return;
       }
 

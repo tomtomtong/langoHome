@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="preload" href="/langoLogo.jpeg" as="image">
+  <link rel="preload" href="/assets/parent-logo.png" as="image">
   <style>
     :root {
       --canvas: #F2E2C8;
@@ -79,14 +79,12 @@
       padding: calc(0.85rem + var(--safe-top)) 0 1rem;
     }
 
-    .avatar {
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      object-fit: cover;
-      background: var(--lavender-soft);
-      box-shadow: var(--shadow-sm);
+    .brand-logo {
+      height: 48px;
+      width: auto;
+      object-fit: contain;
       flex-shrink: 0;
+      filter: drop-shadow(0 2px 8px rgba(27, 27, 38, 0.12));
     }
 
     .greeting { flex: 1; min-width: 0; }
@@ -146,6 +144,24 @@
     /* ——— Views ——— */
     .view { display: none; }
     .view.is-active { display: block; }
+
+    .view.view-enter-forward {
+      animation: view-slide-forward 300ms var(--ease-out) both;
+    }
+
+    .view.view-enter-back {
+      animation: view-slide-back 300ms var(--ease-out) both;
+    }
+
+    @keyframes view-slide-forward {
+      from { opacity: 0; transform: translateX(16px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    @keyframes view-slide-back {
+      from { opacity: 0; transform: translateX(-16px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
 
     .section-gap > * + * { margin-top: 1rem; }
 
@@ -761,10 +777,14 @@
       transition: transform 360ms var(--ease-out), opacity 240ms;
       opacity: 0;
       pointer-events: none;
+      will-change: transform;
+    }
+
+    .practice-dock.is-open:not(.is-dragging) {
+      transform: translateX(-50%) translateY(0);
     }
 
     .practice-dock.is-open {
-      transform: translateX(-50%) translateY(0);
       opacity: 1;
       pointer-events: auto;
     }
@@ -849,12 +869,36 @@
       color: rgba(255, 255, 255, 0.45);
       font-size: 1.15rem;
       cursor: pointer;
-      transition: transform 140ms var(--ease-press), color 160ms, background 160ms;
+      transition:
+        transform 200ms var(--ease-out),
+        color 160ms,
+        background 160ms,
+        box-shadow 200ms var(--ease-out);
       -webkit-tap-highlight-color: transparent;
       position: relative;
     }
 
-    .nav-item:active { transform: scale(0.92); }
+    .nav-item.nav-tap {
+      animation: nav-pop 220ms var(--ease-out);
+    }
+
+    @keyframes nav-pop {
+      0% { transform: scale(1); }
+      40% { transform: scale(0.9); }
+      100% { transform: translateY(-6px) scale(1); }
+    }
+
+    .nav-item:active:not(.is-active) { transform: scale(0.92); }
+
+    .nav-icon { line-height: 1; }
+
+    .nav-label {
+      display: none;
+      font-family: "Nunito", sans-serif;
+      font-size: 0.84rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
 
     .nav-item.is-active {
       background: var(--purple);
@@ -1369,17 +1413,36 @@
       flex-direction: column;
       transition: transform 380ms cubic-bezier(0.32, 0.72, 0, 1);
       padding-bottom: calc(0.5rem + var(--safe-bottom));
+      will-change: transform;
     }
 
-    .sheet.is-open { transform: translateX(-50%) translateY(0); }
+    .sheet.is-open:not(.is-dragging) { transform: translateX(-50%) translateY(0); }
+    .sheet.is-dragging { transition: none; cursor: grabbing; }
+
+    .sheet-grabber {
+      flex-shrink: 0;
+      touch-action: none;
+      cursor: grab;
+      user-select: none;
+      padding-top: 0.65rem;
+    }
+
+    .sheet-grabber:active { cursor: grabbing; }
+
+    .sheet-head.sheet-drag-zone {
+      touch-action: none;
+      cursor: grab;
+      user-select: none;
+    }
+
+    .sheet-head.sheet-drag-zone:active { cursor: grabbing; }
 
     .sheet-handle {
       width: 36px;
       height: 4px;
       border-radius: 999px;
       background: var(--bar-muted);
-      margin: 0.65rem auto 0;
-      flex-shrink: 0;
+      margin: 0 auto;
     }
 
     .sheet-head {
@@ -1516,13 +1579,22 @@
 
     .sheet-actions .btn { width: 100%; min-height: 44px; }
 
-    .view.is-active {
-      animation: view-in 320ms var(--ease-out) both;
+    .practice-dock.is-dragging { transition: none; cursor: grabbing; }
+    .practice-dock .dock-grabber {
+      touch-action: none;
+      cursor: grab;
+      padding: 0.35rem 0 0.5rem;
+      margin: -0.35rem 0 0;
     }
 
-    @keyframes view-in {
-      from { opacity: 0; transform: translateY(6px); }
-      to { opacity: 1; transform: translateY(0); }
+    .practice-dock .dock-grabber::before {
+      content: "";
+      display: block;
+      width: 36px;
+      height: 4px;
+      margin: 0 auto;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.28);
     }
 
     .bar.is-animating {
@@ -1535,13 +1607,241 @@
       to { transform: scaleY(1); opacity: 1; }
     }
 
+    /* ——— Desktop layout ——— */
+    @media (min-width: 900px) {
+      :root {
+        --sidebar-w: 248px;
+        --content-max: 960px;
+      }
+
+      body {
+        padding-bottom: 0;
+      }
+
+      .app {
+        width: calc(100% - var(--sidebar-w));
+        max-width: none;
+        margin: 0 0 0 var(--sidebar-w);
+        padding: 1.35rem 2rem 2.5rem;
+      }
+
+      .global-header {
+        max-width: var(--content-max);
+        margin: 0 auto;
+        padding-top: 0.35rem;
+      }
+
+      .greeting .hello {
+        font-size: 1.35rem;
+      }
+
+      main {
+        max-width: var(--content-max);
+        margin: 0 auto;
+      }
+
+      .bottom-nav {
+        left: 0;
+        top: 0;
+        bottom: 0;
+        z-index: 40;
+        transform: none;
+        width: var(--sidebar-w);
+        flex-direction: column;
+        align-items: stretch;
+        justify-content: flex-start;
+        gap: 0.3rem;
+        padding: calc(1.1rem + var(--safe-top)) 0.85rem 1.5rem;
+        border-radius: 0;
+      }
+
+      .bottom-nav::before {
+        content: "Lango";
+        display: block;
+        font-family: "Fredoka", sans-serif;
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: #fff;
+        letter-spacing: -0.02em;
+        padding: 0.35rem 0.85rem 1.1rem;
+      }
+
+      .nav-item {
+        width: 100%;
+        height: auto;
+        min-height: 46px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+        padding: 0.6rem 0.85rem;
+        justify-content: flex-start;
+        transform: none !important;
+        box-shadow: none !important;
+      }
+
+      .nav-item.is-active {
+        background: var(--purple);
+        color: #fff;
+      }
+
+      .nav-label {
+        display: block;
+      }
+
+      /* Home: single clean column — avoid broken nth-child grid */
+      #view-home.view.is-active.section-gap {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      .view.is-active.section-gap > * + * {
+        margin-top: 0;
+      }
+
+      /* Practice: two panels side by side */
+      #view-practice.view.is-active.section-gap {
+        display: grid;
+        grid-template-columns: 1.15fr 0.85fr;
+        gap: 1.15rem;
+        align-items: start;
+      }
+
+      #view-practice.view.is-active > .panel:last-child {
+        position: sticky;
+        top: 1rem;
+      }
+
+      /* Progress: single column */
+      #view-progress.view.is-active.section-gap {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      #view-progress.view.is-active > #logout-btn {
+        align-self: flex-start;
+        width: auto;
+        min-width: 10rem;
+      }
+
+      .vocab-list {
+        grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+      }
+
+      #view-words .vocab-list {
+        grid-template-columns: repeat(auto-fill, minmax(156px, 1fr));
+      }
+
+      .chart-wrap {
+        height: 160px;
+      }
+
+      .hero-promo h2 {
+        font-size: 1.65rem;
+        max-width: 22rem;
+      }
+
+      .hero-promo p {
+        max-width: 24rem;
+      }
+
+      .practice-dock {
+        left: calc(50% + (var(--sidebar-w) / 2));
+        bottom: 1.5rem;
+        width: min(calc(100% - var(--sidebar-w) - 3rem), 460px);
+      }
+
+      .sheet {
+        left: 50%;
+        bottom: auto;
+        top: 50%;
+        max-height: min(85vh, 620px);
+        border-radius: var(--r-lg);
+        transform: translate(-50%, -50%) scale(0.96);
+        opacity: 0;
+        pointer-events: none;
+        transition:
+          transform 320ms cubic-bezier(0.32, 0.72, 0, 1),
+          opacity 220ms var(--ease-out);
+      }
+
+      .sheet.is-open:not(.is-dragging) {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .sheet.is-dragging {
+        transition: none;
+      }
+
+      .sheet-handle {
+        display: none;
+      }
+    }
+
+    @media (min-width: 1200px) {
+      :root {
+        --content-max: 1040px;
+      }
+
+      .vocab-list {
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      }
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      .icon-btn:hover {
+        transform: scale(1.05);
+        box-shadow: 0 6px 20px rgba(27, 27, 38, 0.1);
+      }
+
+      .word-chip:hover {
+        background: var(--lavender-soft);
+        transform: translateY(-2px);
+      }
+
+      .nav-item:not(.is-active):hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 0.85);
+      }
+
+      .btn:hover:not(:disabled) {
+        filter: brightness(1.04);
+      }
+
+      .circle-cta:hover {
+        transform: scale(1.06);
+      }
+
+      .suggestion-card .card-head:hover {
+        background: rgba(108, 92, 224, 0.06);
+      }
+
+      .question-btn:hover {
+        background: var(--lavender-soft);
+        color: var(--text);
+      }
+
+      .chip:hover:not(.is-active) {
+        background: var(--lavender-soft);
+      }
+
+      .notif-item:hover {
+        background: var(--lavender-soft);
+      }
+    }
+
     @media (prefers-reduced-motion: reduce) {
-      .empty-illus .illus, .notif-item, .view.is-active, .bar.is-animating {
+      .empty-illus .illus, .notif-item, .view.view-enter-forward, .view.view-enter-back, .bar.is-animating, .nav-item.nav-tap {
         animation: none !important;
       }
-      .sheet { transition: opacity 200ms; }
-      .sheet:not(.is-open) { opacity: 0; }
+      .sheet, .practice-dock { transition: opacity 200ms; }
+      .sheet:not(.is-open), .practice-dock:not(.is-open) { opacity: 0; }
       .segmented button:active { transform: none; }
+      .nav-item.is-active { transform: none; }
     }
 
     @media (prefers-reduced-transparency: reduce) {
@@ -2159,10 +2459,10 @@
 
 </script>
 </head>
-<body>
+<body class="parent-portal">
   <div class="app">
     <header class="global-header">
-      <img class="avatar" src="/langoLogo.jpeg" alt="" width="44" height="44" decoding="async">
+      <img class="brand-logo" src="/assets/parent-logo.png" alt="Lango Parent" width="955" height="904" decoding="async">
       <div class="greeting">
         <p class="hello" id="greeting">Hello, parent</p>
         <p class="sub" id="greeting-sub">
@@ -2392,13 +2692,26 @@
   </div>
 
   <nav class="bottom-nav" aria-label="Parent portal">
-    <button type="button" class="nav-item is-active" data-view="home" data-i18n-aria="navHome">🏠</button>
-    <button type="button" class="nav-item" data-view="words" data-i18n-aria="navWords">📚</button>
-    <button type="button" class="nav-item" data-view="practice" data-i18n-aria="navPractice">💬</button>
-    <button type="button" class="nav-item" data-view="progress" data-i18n-aria="navProgress">📊</button>
+    <button type="button" class="nav-item is-active" data-view="home" data-i18n-aria="navHome">
+      <span class="nav-icon" aria-hidden="true">🏠</span>
+      <span class="nav-label" data-i18n="navHome">Home</span>
+    </button>
+    <button type="button" class="nav-item" data-view="words" data-i18n-aria="navWords">
+      <span class="nav-icon" aria-hidden="true">📚</span>
+      <span class="nav-label" data-i18n="navWords">Words</span>
+    </button>
+    <button type="button" class="nav-item" data-view="practice" data-i18n-aria="navPractice">
+      <span class="nav-icon" aria-hidden="true">💬</span>
+      <span class="nav-label" data-i18n="navPractice">Practice</span>
+    </button>
+    <button type="button" class="nav-item" data-view="progress" data-i18n-aria="navProgress">
+      <span class="nav-icon" aria-hidden="true">📊</span>
+      <span class="nav-label" data-i18n="navProgress">Progress</span>
+    </button>
   </nav>
 
   <div class="practice-dock" id="practice-dock" hidden>
+    <div class="dock-grabber" aria-hidden="true"></div>
     <p style="margin:0;font-size:0.72rem;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;opacity:0.55" id="dock-word">Word</p>
     <p class="dock-question" id="dock-question"></p>
     <div class="dock-progress" id="dock-progress"></div>
@@ -2415,8 +2728,8 @@
   <div class="sheet-backdrop" id="sheet-backdrop" hidden></div>
 
   <div class="sheet" id="notif-sheet" role="dialog" aria-modal="true" aria-labelledby="notif-sheet-title" hidden>
-    <div class="sheet-handle" aria-hidden="true"></div>
-    <div class="sheet-head">
+    <div class="sheet-grabber" aria-hidden="true"><div class="sheet-handle"></div></div>
+    <div class="sheet-head sheet-drag-zone">
       <h3 id="notif-sheet-title" data-i18n="notifTitle">Notifications</h3>
       <button type="button" class="sheet-close" id="notif-close" data-i18n-aria="wordSheetClose">×</button>
     </div>
@@ -2424,8 +2737,8 @@
   </div>
 
   <div class="sheet" id="word-sheet" role="dialog" aria-modal="true" aria-labelledby="word-sheet-title" hidden>
-    <div class="sheet-handle" aria-hidden="true"></div>
-    <div class="sheet-head">
+    <div class="sheet-grabber" aria-hidden="true"><div class="sheet-handle"></div></div>
+    <div class="sheet-head sheet-drag-zone">
       <h3 id="word-sheet-title" class="word-sheet-word">—</h3>
       <button type="button" class="sheet-close" id="word-close" data-i18n-aria="wordSheetClose">×</button>
     </div>
@@ -2472,7 +2785,10 @@
     let chartRangeDays = 7;
     let activeWordItem = null;
     let openSheet = null;
+    let activeView = "home";
     const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const VIEW_ORDER = ["home", "words", "practice", "progress"];
+    const isMobileSheet = () => matchMedia("(max-width: 899px)").matches;
 
     function refreshStaticI18n() {
       ParentI18n.applyParentI18n();
@@ -2776,13 +3092,126 @@
     }
 
     function switchView(name) {
+      if (name === activeView) {
+        window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
+        return;
+      }
+
       closeSheetUI();
+      const prevIdx = VIEW_ORDER.indexOf(activeView);
+      const nextIdx = VIEW_ORDER.indexOf(name);
+      const forward = nextIdx > prevIdx;
+
       Object.entries(views).forEach(([key, el]) => {
-        el.classList.toggle("is-active", key === name);
+        const isNext = key === name;
+        el.classList.remove("view-enter-forward", "view-enter-back");
+        el.classList.toggle("is-active", isNext);
+        if (isNext && !reduceMotion && prevIdx !== -1 && nextIdx !== -1) {
+          el.classList.add(forward ? "view-enter-forward" : "view-enter-back");
+          el.addEventListener("animationend", () => {
+            el.classList.remove("view-enter-forward", "view-enter-back");
+          }, { once: true });
+        }
       });
+
       document.querySelectorAll(".nav-item").forEach((btn) => {
-        btn.classList.toggle("is-active", btn.dataset.view === name);
+        const isActive = btn.dataset.view === name;
+        btn.classList.toggle("is-active", isActive);
+        if (isActive) {
+          btn.classList.remove("nav-tap");
+          void btn.offsetWidth;
+          btn.classList.add("nav-tap");
+          btn.addEventListener("animationend", () => btn.classList.remove("nav-tap"), { once: true });
+        }
       });
+
+      activeView = name;
+      window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
+    }
+
+    function resetSheetDrag(el) {
+      if (!el) return;
+      el.classList.remove("is-dragging");
+      el.style.transform = "";
+    }
+
+    function bindSwipeDismiss(el, { isOpen, onDismiss, dragSelectors }) {
+      let startY = 0;
+      let startX = 0;
+      let dragY = 0;
+      let dragging = false;
+      let pointerId = null;
+      let lastY = 0;
+      let lastT = 0;
+      let velocityY = 0;
+
+      const rubberBand = (y) => (y < 0 ? y * 0.22 : y);
+
+      const applyDrag = (y) => {
+        el.style.transform = `translateX(-50%) translateY(${rubberBand(y)}px)`;
+      };
+
+      const endDrag = () => {
+        if (!dragging) return;
+        dragging = false;
+        el.classList.remove("is-dragging");
+        try { el.releasePointerCapture(pointerId); } catch { /* noop */ }
+        pointerId = null;
+
+        const shouldDismiss = dragY > 72 || (velocityY > 0.55 && dragY > 20);
+        if (shouldDismiss && isOpen()) {
+          el.style.transform = "";
+          onDismiss();
+          return;
+        }
+
+        el.style.transform = "";
+      };
+
+      const onPointerDown = (e) => {
+        if (!isOpen() || e.button !== 0) return;
+        if (e.target.closest(".sheet-close, .btn, button, a, input, textarea, select")) return;
+
+        pointerId = e.pointerId;
+        startY = e.clientY;
+        startX = e.clientX;
+        dragY = 0;
+        velocityY = 0;
+        lastY = startY;
+        lastT = performance.now();
+        dragging = true;
+        el.classList.add("is-dragging");
+        el.setPointerCapture(pointerId);
+      };
+
+      const onPointerMove = (e) => {
+        if (!dragging || e.pointerId !== pointerId) return;
+        const dy = e.clientY - startY;
+        const dx = e.clientX - startX;
+        if (!dragY && Math.abs(dx) > Math.abs(dy) && Math.abs(dy) < 8) return;
+
+        dragY = dy;
+        e.preventDefault();
+        applyDrag(dragY);
+
+        const now = performance.now();
+        const dt = now - lastT || 16;
+        velocityY = (e.clientY - lastY) / dt;
+        lastY = e.clientY;
+        lastT = now;
+      };
+
+      const onPointerUp = (e) => {
+        if (e.pointerId !== pointerId) return;
+        endDrag();
+      };
+
+      el.querySelectorAll(dragSelectors).forEach((zone) => {
+        zone.addEventListener("pointerdown", onPointerDown);
+      });
+      el.addEventListener("pointermove", onPointerMove);
+      el.addEventListener("pointerup", onPointerUp);
+      el.addEventListener("pointercancel", onPointerUp);
     }
 
     function animateCount(el, to) {
@@ -2854,6 +3283,7 @@
       openSheet = sheetId;
       const backdrop = $("sheet-backdrop");
       const sheet = $(sheetId);
+      resetSheetDrag(sheet);
       backdrop.hidden = false;
       sheet.hidden = false;
       requestAnimationFrame(() => {
@@ -2866,7 +3296,10 @@
     function closeSheetUI() {
       const backdrop = $("sheet-backdrop");
       backdrop.classList.remove("is-open");
-      document.querySelectorAll(".sheet.is-open").forEach((el) => el.classList.remove("is-open"));
+      document.querySelectorAll(".sheet.is-open").forEach((el) => {
+        el.classList.remove("is-open");
+        resetSheetDrag(el);
+      });
       document.body.style.overflow = "";
       setTimeout(() => {
         if (!backdrop.classList.contains("is-open")) {
@@ -3243,14 +3676,19 @@
       if (!list.length) return showToast(t("noQuestions"));
       practice = { word, questions: list, index: 0 };
       const dock = $("practice-dock");
+      resetSheetDrag(dock);
       dock.hidden = false;
       requestAnimationFrame(() => dock.classList.add("is-open"));
       renderDock();
     }
 
     function closePractice() {
-      $("practice-dock").classList.remove("is-open");
-      setTimeout(() => { if (!$("practice-dock").classList.contains("is-open")) $("practice-dock").hidden = true; }, 360);
+      const dock = $("practice-dock");
+      dock.classList.remove("is-open");
+      resetSheetDrag(dock);
+      setTimeout(() => {
+        if (!dock.classList.contains("is-open")) dock.hidden = true;
+      }, 360);
     }
 
     function renderDock() {
@@ -3362,6 +3800,24 @@
 
     document.querySelectorAll(".nav-item").forEach((btn) => {
       btn.addEventListener("click", () => switchView(btn.dataset.view));
+    });
+
+    bindSwipeDismiss($("notif-sheet"), {
+      isOpen: () => isMobileSheet() && $("notif-sheet").classList.contains("is-open"),
+      onDismiss: closeSheetUI,
+      dragSelectors: ".sheet-grabber, .sheet-head",
+    });
+
+    bindSwipeDismiss($("word-sheet"), {
+      isOpen: () => isMobileSheet() && $("word-sheet").classList.contains("is-open"),
+      onDismiss: closeSheetUI,
+      dragSelectors: ".sheet-grabber, .sheet-head",
+    });
+
+    bindSwipeDismiss($("practice-dock"), {
+      isOpen: () => $("practice-dock").classList.contains("is-open"),
+      onDismiss: closePractice,
+      dragSelectors: ".dock-grabber",
     });
 
     document.querySelectorAll("#source-chips .chip").forEach((chip) => {

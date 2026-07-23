@@ -3117,6 +3117,7 @@ function isPublicPath(url) {
     || url === '/assets/page-motion.css'
     || url === '/assets/page-motion.js'
     || url === '/assets/parent-i18n.js'
+    || url === '/assets/parent-logo.png'
     || /^\/assets\/uncle-tommy-transition\/(?:uncle-tommy-transition\.(?:css|js)|user_uncletommy_[1-4]\.png)$/i.test(url)
     || url === '/langoLogo.jpeg';
 }
@@ -3161,7 +3162,7 @@ function isTurnBasedSafeRequest(req, url) {
 function isPreviewStaticAsset(url) {
   return /^\/visme\/.+\.(?:js|mjs|vrm|fbx|wasm|json)$/i.test(url)
     || /^\/Animation\/.+\.fbx$/i.test(url)
-    || /^\/assets\/(?:lango-home|daily-rewards|collections|map|sfx|bgm)\/.+\.(?:png|jpe?g|webp|svg|json|mp3|wav)$/i.test(url)
+    || /^\/assets\/(?:lango-home|daily-rewards|collections|record|map|sfx|bgm)\/.+\.(?:png|jpe?g|webp|svg|json|mp3|wav)$/i.test(url)
     || url === '/assets/page-motion.css'
     || url === '/assets/page-motion.js'
     || url === '/assets/parent-i18n.js'
@@ -3227,6 +3228,7 @@ function isPreviewSafeRequest(req, url, rawUrl) {
     || url.startsWith('/assets/lango-home/')
     || url.startsWith('/assets/daily-rewards/')
     || url.startsWith('/assets/collections/')
+    || url.startsWith('/assets/record/')
     || url.startsWith('/assets/map/')
     || url.startsWith('/assets/sfx/')
     || url.startsWith('/assets/bgm/')
@@ -4697,9 +4699,13 @@ const server = createServer(async (req, res) => {
   const url = qIndex === -1 ? rawUrl : rawUrl.slice(0, qIndex);
   const query = qIndex === -1 ? '' : rawUrl.slice(qIndex);
 
-  // Parent portal i18n must load on /parent/login without a session.
+  // Parent portal assets must load on /parent/login without a session.
   if (url === '/assets/parent-i18n.js') {
     serveFile(res, join(ROOT, 'assets', 'parent-i18n.js'));
+    return;
+  }
+  if (url === '/assets/parent-logo.png') {
+    serveFile(res, join(ROOT, 'assets', 'parent-logo.png'));
     return;
   }
 
@@ -5623,6 +5629,12 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  const recordAsset = url.match(/^\/assets\/record\/([a-z0-9-]+\.png)$/i);
+  if (recordAsset) {
+    serveFile(res, join(ROOT, 'assets', 'record', recordAsset[1]));
+    return;
+  }
+
   const mapAsset = url.match(/^\/assets\/map\/([a-z0-9-]+\.png)$/i);
   if (mapAsset) {
     serveFile(res, join(ROOT, 'assets', 'map', mapAsset[1]));
@@ -5646,7 +5658,7 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  const sharedMotionAsset = url.match(/^\/assets\/(page-motion\.(?:css|js)|parent-i18n\.js)$/i);
+  const sharedMotionAsset = url.match(/^\/assets\/(page-motion\.(?:css|js)|parent-i18n\.js|parent-logo\.png)$/i);
   if (sharedMotionAsset) {
     serveFile(res, join(ROOT, 'assets', sharedMotionAsset[1]));
     return;
