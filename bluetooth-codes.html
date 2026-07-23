@@ -153,6 +153,62 @@
       font-size: 0.8125rem;
       color: #5f6368;
     }
+    .import-panel {
+      margin: 0 0 1.25rem;
+      padding: 1rem 1.1rem;
+      border: 1px solid #2a2f3a;
+      border-radius: 10px;
+      background: #141821;
+    }
+    .import-panel h2 {
+      margin: 0 0 0.35rem;
+      font-size: 0.95rem;
+    }
+    .import-panel p {
+      margin: 0 0 0.75rem;
+      color: #9aa0a6;
+      font-size: 0.8125rem;
+      line-height: 1.45;
+    }
+    .import-actions {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    input[type="file"].csv-file-input {
+      display: none;
+    }
+    input[type="file"].audio-file-input {
+      display: none;
+    }
+    .audio-cell {
+      min-width: 180px;
+    }
+    .audio-upload-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+    }
+    .audio-preview {
+      width: 100%;
+      height: 32px;
+    }
+    .audio-status {
+      margin: 0;
+      font-size: 0.6875rem;
+      color: #5f6368;
+      line-height: 1.35;
+    }
+    .audio-actions {
+      display: flex;
+      gap: 0.35rem;
+      flex-wrap: wrap;
+    }
+    .audio-actions button {
+      padding: 0.3rem 0.5rem;
+      font-size: 0.6875rem;
+    }
   </style>
 </head>
 <body>
@@ -169,19 +225,33 @@
         <a class="btn" href="/admin">Back to CMS</a>
       </div>
 
+      <div class="import-panel">
+        <h2>Bulk upload</h2>
+        <p>
+          Upload a CSV with <code>code</code> and <code>content</code> columns. Existing codes are updated;
+          new codes are added. Use <code>replace: true</code> in the API to clear all pairs first.
+        </p>
+        <div class="import-actions">
+          <button type="button" class="secondary" id="btn-import-csv">Import CSV</button>
+          <button type="button" class="secondary" id="btn-download-csv-template">Download template</button>
+          <input type="file" class="csv-file-input" id="csv-file-input" accept=".csv,text/csv">
+        </div>
+      </div>
+
       <p class="summary" id="pair-summary"></p>
 
       <div class="table-wrap">
         <table class="codes-table" id="codes-table">
           <thead>
             <tr>
-              <th style="width: 22%">Bluetooth code</th>
+              <th style="width: 18%">Bluetooth code</th>
               <th>Content</th>
+              <th style="width: 22%">Audio</th>
               <th style="width: 100px"></th>
             </tr>
           </thead>
           <tbody id="codes-body">
-            <tr class="empty-row"><td colspan="3">Loading…</td></tr>
+            <tr class="empty-row"><td colspan="4">Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -190,7 +260,7 @@
 
       <p class="hint">
         Each Bluetooth code must be unique. Click <strong>Save</strong> on a row after editing.
-        New rows are created when you save them for the first time.
+        New rows are created when you save them for the first time. Upload audio after saving a pair.
       </p>
     </div>
   </div>
@@ -200,6 +270,11 @@
     const pairSummary = document.getElementById("pair-summary");
     const statusEl = document.getElementById("status");
     const addPairBtn = document.getElementById("add-pair-btn");
+    const btnImportCsv = document.getElementById("btn-import-csv");
+    const btnDownloadCsvTemplate = document.getElementById("btn-download-csv-template");
+    const csvFileInput = document.getElementById("csv-file-input");
+
+    const CSV_TEMPLATE = "code,content\n12045,apple\n12046,I like apples.";
 
     let pairs = [];
     let draftRows = [];
@@ -228,7 +303,33 @@
         code: rowEl.querySelector("[data-field='code']")?.value.trim() || "",
         content: rowEl.querySelector("[data-field='content']")?.value.trim() || "",
         isDraft: rowEl.dataset.draft === "1",
+        audioUrl: rowEl.dataset.audioUrl || "",
       };
+    }
+
+    function renderAudioCell(row) {
+      if (row.isDraft) {
+        return `
+          <div class="audio-upload-wrap">
+            <p class="audio-status">Save the pair first, then upload audio.</p>
+          </div>
+        `;
+      }
+
+      const audioUrl = row.audio?.url || "";
+      const hasAudio = Boolean(audioUrl);
+      return `
+        <div class="audio-upload-wrap">
+          ${hasAudio ? `<audio class="audio-preview" controls preload="metadata" src="${escapeHtml(audioUrl)}"></audio>` : ""}
+          <p class="audio-status">${hasAudio ? escapeHtml(row.audio.filename || "Audio uploaded") : "No audio uploaded."}</p>
+          <input type="file" class="audio-file-input" data-field="audio-file" accept="audio/*,.mp3,.wav,.ogg,.m4a,.webm">
+          <div class="audio-actions">
+            <button type="button" class="secondary" data-action="pick-audio">Choose file</button>
+            <button type="button" class="secondary" data-action="upload-audio">Upload</button>
+            ${hasAudio ? '<button type="button" class="danger secondary" data-action="remove-audio">Remove</button>' : ""}
+          </div>
+        </div>
+      `;
     }
 
     function renderTable() {
@@ -238,18 +339,21 @@
       ];
 
       if (!rows.length) {
-        codesBody.innerHTML = '<tr class="empty-row"><td colspan="3">No pairs yet. Click “Add pair” to create one.</td></tr>';
+        codesBody.innerHTML = '<tr class="empty-row"><td colspan="4">No pairs yet. Click “Add pair” to create one.</td></tr>';
         pairSummary.textContent = "0 pairs";
         return;
       }
 
       codesBody.innerHTML = rows.map((row) => `
-        <tr data-id="${escapeHtml(row.id)}" data-draft="${row.isDraft ? "1" : "0"}">
+        <tr data-id="${escapeHtml(row.id)}" data-draft="${row.isDraft ? "1" : "0"}" data-audio-url="${escapeHtml(row.audio?.url || "")}">
           <td>
             <input type="text" data-field="code" value="${escapeHtml(row.code)}" placeholder="e.g. 12045" autocomplete="off">
           </td>
           <td>
             <textarea data-field="content" placeholder="Word, sentence, or lesson content">${escapeHtml(row.content)}</textarea>
+          </td>
+          <td class="audio-cell">
+            ${renderAudioCell(row)}
           </td>
           <td>
             <div class="row-actions">
@@ -263,6 +367,33 @@
       pairSummary.textContent = `${pairs.length} saved pair${pairs.length === 1 ? "" : "s"}${draftRows.length ? `, ${draftRows.length} draft${draftRows.length === 1 ? "" : "s"}` : ""}`;
     }
 
+    async function uploadPairAudio(pairId, file) {
+      const form = new FormData();
+      form.append("audio", file);
+      const res = await fetch(`/api/bluetooth-codes/${encodeURIComponent(pairId)}/audio`, {
+        method: "POST",
+        body: form,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Audio upload failed.");
+      return data.audio;
+    }
+
+    async function removePairAudio(pairId) {
+      const res = await fetch(`/api/bluetooth-codes/${encodeURIComponent(pairId)}/audio`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Could not remove audio.");
+    }
+
+    function updatePairAudio(pairId, audio) {
+      const idx = pairs.findIndex((pair) => pair.id === pairId);
+      if (idx >= 0) {
+        pairs[idx] = { ...pairs[idx], audio: audio || null };
+      }
+    }
+
     async function loadPairs() {
       clearStatus();
       const res = await fetch("/api/bluetooth-codes");
@@ -273,6 +404,55 @@
       const data = await res.json();
       pairs = Array.isArray(data.pairs) ? data.pairs : [];
       renderTable();
+    }
+
+    async function importPairsFromCsv(csvText) {
+      const res = await fetch("/api/bluetooth-codes/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ csv: csvText }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "CSV import failed.");
+      return data;
+    }
+
+    function downloadCsvTemplate() {
+      const blob = new Blob([`${CSV_TEMPLATE}\n`], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "bluetooth-codes-template.csv";
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+
+    async function handleCsvFileSelected(file) {
+      if (!file) return;
+      btnImportCsv.disabled = true;
+      showStatus("Importing CSV…", true);
+      try {
+        const csvText = await file.text();
+        const result = await importPairsFromCsv(csvText);
+        pairs = Array.isArray(result.pairs) ? result.pairs : pairs;
+        draftRows = [];
+        renderTable();
+        const skipped = Array.isArray(result.errors) ? result.errors.length : 0;
+        const parts = [
+          `Imported ${result.imported} pair(s): ${result.added} added, ${result.updated} updated.`,
+        ];
+        if (skipped) {
+          parts.push(
+            `Skipped ${skipped} row(s): ${result.errors.map((e) => `row ${e.row}: ${e.error}`).join("; ")}`,
+          );
+        }
+        showStatus(parts.join(" "), !skipped);
+      } catch (e) {
+        showStatus(e.message || "Could not import CSV.", false);
+      } finally {
+        btnImportCsv.disabled = false;
+        csvFileInput.value = "";
+      }
     }
 
     async function saveRow(rowEl) {
@@ -318,6 +498,50 @@
       }
     }
 
+    async function uploadRowAudio(rowEl) {
+      const { id, isDraft } = rowData(rowEl);
+      if (isDraft) {
+        showStatus("Save the pair before uploading audio.", false);
+        return;
+      }
+      const fileInput = rowEl.querySelector("[data-field='audio-file']");
+      const file = fileInput?.files?.[0];
+      if (!file) {
+        showStatus("Choose an audio file first.", false);
+        return;
+      }
+      const uploadBtn = rowEl.querySelector("[data-action='upload-audio']");
+      uploadBtn.disabled = true;
+      try {
+        const audio = await uploadPairAudio(id, file);
+        updatePairAudio(id, audio);
+        renderTable();
+        showStatus("Audio uploaded.", true);
+      } catch (e) {
+        showStatus(e.message || "Could not upload audio.", false);
+      } finally {
+        uploadBtn.disabled = false;
+      }
+    }
+
+    async function removeRowAudio(rowEl) {
+      const { id, isDraft } = rowData(rowEl);
+      if (isDraft) return;
+      if (!confirm("Remove audio for this pair?")) return;
+      const removeBtn = rowEl.querySelector("[data-action='remove-audio']");
+      removeBtn.disabled = true;
+      try {
+        await removePairAudio(id);
+        updatePairAudio(id, null);
+        renderTable();
+        showStatus("Audio removed.", true);
+      } catch (e) {
+        showStatus(e.message || "Could not remove audio.", false);
+      } finally {
+        removeBtn.disabled = false;
+      }
+    }
+
     async function removeRow(rowEl) {
       const { id, code, isDraft } = rowData(rowEl);
       const label = code || "this pair";
@@ -354,6 +578,11 @@
     }
 
     addPairBtn.addEventListener("click", addDraftRow);
+    btnImportCsv.addEventListener("click", () => csvFileInput.click());
+    btnDownloadCsvTemplate.addEventListener("click", downloadCsvTemplate);
+    csvFileInput.addEventListener("change", () => {
+      handleCsvFileSelected(csvFileInput.files?.[0]);
+    });
 
     codesBody.addEventListener("click", (event) => {
       const btn = event.target.closest("button[data-action]");
@@ -362,10 +591,15 @@
       if (!rowEl) return;
       if (btn.dataset.action === "save") saveRow(rowEl);
       if (btn.dataset.action === "remove") removeRow(rowEl);
+      if (btn.dataset.action === "pick-audio") {
+        rowEl.querySelector("[data-field='audio-file']")?.click();
+      }
+      if (btn.dataset.action === "upload-audio") uploadRowAudio(rowEl);
+      if (btn.dataset.action === "remove-audio") removeRowAudio(rowEl);
     });
 
     loadPairs().catch((e) => {
-      codesBody.innerHTML = `<tr class="empty-row"><td colspan="3">${escapeHtml(e.message || "Load failed.")}</td></tr>`;
+      codesBody.innerHTML = `<tr class="empty-row"><td colspan="4">${escapeHtml(e.message || "Load failed.")}</td></tr>`;
       showStatus(e.message || "Could not load Bluetooth codes.", false);
     });
   </script>

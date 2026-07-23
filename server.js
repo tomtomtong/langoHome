@@ -77,6 +77,7 @@ const USER_PROFILES_PATH = join(CONFIG_DIR, 'user-profiles.json');
 const USER_LOGIN_META_PATH = join(CONFIG_DIR, 'user-login-meta.json');
 const STUDENT_USERS_PATH = join(CONFIG_DIR, 'student-users.json');
 const BLUETOOTH_CODES_PATH = join(CONFIG_DIR, 'bluetooth-codes.json');
+const BLUETOOTH_CODES_AUDIO_DIR = join(CONFIG_DIR, 'bluetooth-codes-audio');
 const CHECK_INS_PATH = join(CONFIG_DIR, 'check-ins.json');
 const SESSIONS_PATH = join(CONFIG_DIR, 'sessions.json');
 const DEBUG_LOG_PATH = join(CONFIG_DIR, 'hello-debug-log.json');
@@ -97,6 +98,7 @@ const DEFAULT_ROOM_SCENE = 'livingroom';
 const DEFAULT_VIDEO_PAIRS_TIMEZONE = 'Asia/Hong_Kong';
 const VIDEO_MAX_BYTES = 100 * 1024 * 1024;
 const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+const AUDIO_MAX_BYTES = 10 * 1024 * 1024;
 
 if (!process.env.GAME_DATA_DIR) {
   process.env.GAME_DATA_DIR =
@@ -823,6 +825,7 @@ function rowToLearnedVocabulary(row) {
     code: storedCode || null,
     word: content,
     content,
+    audioUrl: pair?.audio?.url || null,
     source: row.source,
     learnedAt: row.learned_at,
     metadata,
@@ -1431,11 +1434,134 @@ function saveBluetoothCodesManifest(manifest) {
   writeFileSync(BLUETOOTH_CODES_PATH, JSON.stringify(manifest, null, 2) + '\n');
 }
 
+function ensureBluetoothCodesAudioDir() {
+  if (!existsSync(BLUETOOTH_CODES_AUDIO_DIR)) {
+    mkdirSync(BLUETOOTH_CODES_AUDIO_DIR, { recursive: true });
+  }
+}
+
+function getBluetoothCodeAudioFilename(pairId) {
+  const pairDir = join(BLUETOOTH_CODES_AUDIO_DIR, pairId);
+  if (!existsSync(pairDir)) return null;
+  const files = readdirSync(pairDir).filter((name) => name.startsWith('audio.'));
+  return files.length ? files[0] : null;
+}
+
+function getBluetoothCodeAudioInfo(pairId) {
+  const filename = getBluetoothCodeAudioFilename(pairId);
+  if (!filename) return null;
+  const filePath = join(BLUETOOTH_CODES_AUDIO_DIR, pairId, filename);
+  const updatedAt = statSync(filePath).mtimeMs || Date.now();
+  const apiPath = `/api/bluetooth-codes/${encodeURIComponent(pairId)}/audio`;
+  return {
+    filename,
+    url: `${apiPath}?v=${updatedAt}`,
+    updatedAt,
+  };
+}
+
+function buildBluetoothCodePairInfo(meta) {
+  return {
+    ...meta,
+    audio: getBluetoothCodeAudioInfo(meta.id),
+  };
+}
+
+function clearBluetoothCodeAudio(pairId) {
+  const pairDir = join(BLUETOOTH_CODES_AUDIO_DIR, pairId);
+  if (!existsSync(pairDir)) return;
+  for (const name of readdirSync(pairDir)) {
+    if (name.startsWith('audio.')) {
+      try { unlinkSync(join(pairDir, name)); } catch {}
+    }
+  }
+}
+
+function deleteBluetoothCodePairDir(pairId) {
+  const pairDir = join(BLUETOOTH_CODES_AUDIO_DIR, pairId);
+  if (!existsSync(pairDir)) return;
+  for (const name of readdirSync(pairDir)) {
+    try { unlinkSync(join(pairDir, name)); } catch {}
+  }
+  try { unlinkSync(pairDir); } catch {}
+}
+
+function createBluetoothCodeAudioUpload(pairId) {
+  const pairDir = join(BLUETOOTH_CODES_AUDIO_DIR, pairId);
+  return multer({
+    storage: multer.diskStorage({
+      destination: (_req, _file, cb) => {
+        ensureBluetoothCodesAudioDir();
+        if (!existsSync(pairDir)) mkdirSync(pairDir, { recursive: true });
+        cb(null, pairDir);
+      },
+      filename: (_req, file, cb) => {
+        const ext = extname(file.originalname || '').toLowerCase() || '.mp3';
+        cb(null, `audio${ext}`);
+      },
+    }),
+    limits: { fileSize: AUDIO_MAX_BYTES },
+    fileFilter: audioFileFilter,
+  }).single('audio');
+}
+
+function handleBluetoothCodeAudioUpload(pairId, req, res) {
+  if (req.method === 'GET') {
+    const info = getBluetoothCodeAudioInfo(pairId);
+    if (!info) {
+      sendJson(res, 404, { error: 'No audio uploaded for this pair.' });
+      return;
+    }
+    serveFile(res, join(BLUETOOTH_CODES_AUDIO_DIR, pairId, info.filename));
+    return;
+  }
+  if (req.method === 'PUT' || req.method === 'POST') {
+    if (!findBluetoothCodePairById(pairId)) {
+      sendJson(res, 404, { error: 'Pair not found.' });
+      return;
+    }
+    clearBluetoothCodeAudio(pairId);
+    const upload = createBluetoothCodeAudioUpload(pairId);
+    upload(req, res, (err) => {
+      if (err) {
+        const message = err.code === 'LIMIT_FILE_SIZE'
+          ? `File must be under ${Math.round(AUDIO_MAX_BYTES / (1024 * 1024))} MB.`
+          : (err.message || 'Upload failed.');
+        sendJson(res, 400, { error: message });
+        return;
+      }
+      if (!req.file) {
+        sendJson(res, 400, { error: 'No file provided.' });
+        return;
+      }
+      sendJson(res, 200, { ok: true, audio: getBluetoothCodeAudioInfo(pairId) });
+    });
+    return;
+  }
+  if (req.method === 'DELETE') {
+    if (!findBluetoothCodePairById(pairId)) {
+      sendJson(res, 404, { error: 'Pair not found.' });
+      return;
+    }
+    clearBluetoothCodeAudio(pairId);
+    sendJson(res, 200, { ok: true });
+    return;
+  }
+  sendJson(res, 405, { error: 'Method not allowed.' });
+}
+
 function listBluetoothCodePairs() {
   const manifest = loadBluetoothCodesManifest();
   return manifest.pairs
     .slice()
-    .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' }));
+    .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' }))
+    .map(buildBluetoothCodePairInfo);
+}
+
+function findBluetoothCodePairById(id) {
+  const manifest = loadBluetoothCodesManifest();
+  const pair = manifest.pairs.find((item) => item.id === id);
+  return pair ? buildBluetoothCodePairInfo(normalizeBluetoothCodePair(pair)) : null;
 }
 
 function findBluetoothCodePair(code) {
@@ -1458,7 +1584,7 @@ function createBluetoothCodePair(fields) {
   const pair = normalizeBluetoothCodePair({ code, content, updatedAt: Date.now() });
   manifest.pairs.push(pair);
   saveBluetoothCodesManifest(manifest);
-  return { ok: true, pair };
+  return { ok: true, pair: buildBluetoothCodePairInfo(pair) };
 }
 
 function updateBluetoothCodePair(id, fields) {
@@ -1482,7 +1608,7 @@ function updateBluetoothCodePair(id, fields) {
   });
   manifest.pairs[idx] = pair;
   saveBluetoothCodesManifest(manifest);
-  return { ok: true, pair };
+  return { ok: true, pair: buildBluetoothCodePairInfo(pair) };
 }
 
 function deleteBluetoothCodePair(id) {
@@ -1491,7 +1617,115 @@ function deleteBluetoothCodePair(id) {
   if (idx < 0) return { ok: false, error: 'Pair not found.' };
   manifest.pairs.splice(idx, 1);
   saveBluetoothCodesManifest(manifest);
+  deleteBluetoothCodePairDir(id);
   return { ok: true };
+}
+
+function normalizeBluetoothImportRow(raw) {
+  const code = String(raw?.code ?? raw?.bluetooth_code ?? raw?.bluetooth ?? '').trim();
+  const content = String(raw?.content ?? raw?.word ?? raw?.text ?? '').trim();
+  return { code, content };
+}
+
+function parseBluetoothImportRowsFromCsv(csvText) {
+  const table = parseCsv(csvText);
+  if (!table.length) return { rows: [], rowOffset: 1 };
+
+  const headers = table[0].map(normalizeCsvHeader);
+  const hasKnownHeader = headers.some((h) => (
+    ['code', 'bluetooth_code', 'bluetooth', 'content', 'word', 'text'].includes(h)
+  ));
+  const dataRows = hasKnownHeader ? table.slice(1) : table;
+  const rowOffset = hasKnownHeader ? 2 : 1;
+
+  const rows = dataRows.map((row) => ({
+    code: getCsvField(headers, row, 'code', 'bluetooth_code', 'bluetooth'),
+    content: getCsvField(headers, row, 'content', 'word', 'text'),
+  }));
+
+  return { rows, rowOffset };
+}
+
+function importBluetoothCodePairs(input) {
+  const replace = Boolean(input?.replace);
+  const errors = [];
+  let rows = [];
+  let rowOffset = 1;
+
+  if (Array.isArray(input?.pairs)) {
+    rows = input.pairs.map(normalizeBluetoothImportRow);
+  } else if (typeof input?.csv === 'string' && input.csv.trim()) {
+    const parsed = parseBluetoothImportRowsFromCsv(input.csv);
+    rows = parsed.rows;
+    rowOffset = parsed.rowOffset;
+  } else {
+    return { ok: false, error: 'Provide "pairs" (array) or "csv" (string).' };
+  }
+
+  const manifest = loadBluetoothCodesManifest();
+  const seenCodes = new Set();
+  const toImport = [];
+
+  for (let i = 0; i < rows.length; i++) {
+    const { code, content } = rows[i];
+    const rowNum = i + rowOffset;
+    if (!code && !content) continue;
+    if (!code) {
+      errors.push({ row: rowNum, error: 'Bluetooth code is required.' });
+      continue;
+    }
+    if (!content) {
+      errors.push({ row: rowNum, error: 'Content is required.' });
+      continue;
+    }
+    if (seenCodes.has(code)) {
+      errors.push({ row: rowNum, error: `Duplicate code "${code}" in import.` });
+      continue;
+    }
+    seenCodes.add(code);
+    toImport.push({ code, content });
+  }
+
+  if (!toImport.length) {
+    return {
+      ok: false,
+      imported: 0,
+      added: 0,
+      updated: 0,
+      errors,
+      pairs: listBluetoothCodePairs(),
+    };
+  }
+
+  if (replace) manifest.pairs = [];
+
+  let added = 0;
+  let updated = 0;
+  for (const { code, content } of toImport) {
+    const existingIdx = manifest.pairs.findIndex((pair) => pair.code === code);
+    if (existingIdx >= 0) {
+      manifest.pairs[existingIdx] = normalizeBluetoothCodePair({
+        ...manifest.pairs[existingIdx],
+        code,
+        content,
+        updatedAt: Date.now(),
+      });
+      updated++;
+    } else {
+      manifest.pairs.push(normalizeBluetoothCodePair({ code, content, updatedAt: Date.now() }));
+      added++;
+    }
+  }
+
+  saveBluetoothCodesManifest(manifest);
+  return {
+    ok: true,
+    imported: toImport.length,
+    added,
+    updated,
+    errors,
+    pairs: listBluetoothCodePairs(),
+  };
 }
 
 function getUserProfile(username) {
@@ -3049,7 +3283,10 @@ function requiresAdmin(url, method) {
   if (url.startsWith('/api/video-pairs') && m !== 'GET') return true;
   if (url === '/api/video-pairs' && m === 'POST') return true;
 
-  if (url.startsWith('/api/bluetooth-codes')) return true;
+  if (url.startsWith('/api/bluetooth-codes')) {
+    if (url.match(/^\/api\/bluetooth-codes\/[^/]+\/audio$/) && m === 'GET') return false;
+    return true;
+  }
 
   if (isGameApiRoute(url)) {
     if (
@@ -3101,6 +3338,9 @@ const MIME = {
   '.webp': 'image/webp',
   '.mp3': 'audio/mpeg',
   '.wav': 'audio/wav',
+  '.ogg': 'audio/ogg',
+  '.m4a': 'audio/mp4',
+  '.webm': 'audio/webm',
   '.zip': 'application/zip',
   '.mp4': 'video/mp4',
   '.webm': 'video/webm',
@@ -3121,6 +3361,14 @@ function imageFileFilter(_req, file, cb) {
   const okMime = /^image\/(png|jpe?g|webp)$/i.test(file.mimetype || '');
   if (okExt || okMime) cb(null, true);
   else cb(new Error('Only PNG, JPG, or WebP images are allowed.'));
+}
+
+function audioFileFilter(_req, file, cb) {
+  const ext = extname(file.originalname || '').toLowerCase();
+  const okExt = ['.mp3', '.wav', '.ogg', '.m4a', '.webm'].includes(ext);
+  const okMime = /^audio\//i.test(file.mimetype || '');
+  if (okExt || okMime) cb(null, true);
+  else cb(new Error('Only MP3, WAV, OGG, M4A, or WebM audio files are allowed.'));
 }
 
 function createUploadStore({ dir, basename, apiPath, fieldName, maxBytes, fileFilter, defaultExt }) {
@@ -4789,6 +5037,34 @@ const server = createServer(async (req, res) => {
       }
       sendJson(res, 200, result);
     });
+    return;
+  }
+
+  if (url === '/api/bluetooth-codes/import' && req.method === 'POST') {
+    readJsonBody(req, res, (parsed) => {
+      const result = importBluetoothCodePairs(parsed);
+      if (!result.ok) {
+        sendJson(res, 400, {
+          error: result.error || 'Import failed.',
+          errors: result.errors || [],
+        });
+        return;
+      }
+      if (!result.imported) {
+        sendJson(res, 400, {
+          error: result.errors[0]?.error || 'Could not import any rows.',
+          errors: result.errors,
+        });
+        return;
+      }
+      sendJson(res, 200, { ok: true, ...result });
+    });
+    return;
+  }
+
+  const bluetoothCodeAudioMatch = url.match(/^\/api\/bluetooth-codes\/([^/]+)\/audio$/);
+  if (bluetoothCodeAudioMatch) {
+    handleBluetoothCodeAudioUpload(decodeURIComponent(bluetoothCodeAudioMatch[1]), req, res);
     return;
   }
 
