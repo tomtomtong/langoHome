@@ -3220,25 +3220,48 @@
       text-shadow: 0 .18cqw 0 #6e2b0b;
     }
 
+    .settings-actions {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: .75em;
+    }
+
+    .settings-refresh,
     .settings-logout {
       min-width: 48%;
       padding: .55em 1.2em;
       border: 4px solid #6f2a09;
       border-radius: 999px;
-      color: #fff8d8;
       font-family: inherit;
       font-size: clamp(17px, 1.9cqw, 26px);
       font-weight: 800;
       cursor: pointer;
+    }
+
+    .settings-refresh {
+      color: #6f2a09;
+      background: #ffca3d;
+      box-shadow: inset 0 0 0 3px rgba(255, 255, 255, .35), 0 5px 0 #a85500;
+    }
+
+    .settings-logout {
+      color: #fff8d8;
       background: #91501f;
       box-shadow: inset 0 0 0 3px rgba(255, 255, 255, .22), 0 5px 0 #692707;
     }
 
+    .settings-refresh:hover,
     .settings-logout:hover { filter: brightness(1.06); }
+    .settings-refresh:active {
+      transform: translateY(3px);
+      box-shadow: inset 0 0 0 3px rgba(255, 255, 255, .28), 0 2px 0 #a85500;
+    }
     .settings-logout:active {
       transform: translateY(3px);
       box-shadow: inset 0 0 0 3px rgba(255,255,255,.18), 0 2px 0 #692707;
     }
+    .settings-refresh:focus-visible,
     .settings-logout:focus-visible { outline: 4px solid #fff7a8; outline-offset: 3px; }
     .settings-logout:disabled {
       opacity: .7;
@@ -4966,6 +4989,11 @@
           document.querySelector('.lango-home__settings')?.focus();
         };
 
+        const refreshPage = () => {
+          window.LangoSfx?.play('back');
+          window.location.reload();
+        };
+
         const logout = async () => {
           if (loggingOut) return;
           setLoggingOut(true);
@@ -5006,13 +5034,21 @@
           ),
           e('div', { className: 'settings-panel' },
             e('h1', { id: 'settings-title' }, 'Settings'),
-            e('button', {
-              type: 'button',
-              className: 'settings-logout',
-              onClick: logout,
-              disabled: loggingOut,
-              autoFocus: visible
-            }, loggingOut ? 'Logging out…' : 'Log out'),
+            e('div', { className: 'settings-actions' },
+              e('button', {
+                type: 'button',
+                className: 'settings-refresh',
+                onClick: refreshPage,
+                disabled: loggingOut,
+                autoFocus: visible
+              }, 'Refresh page'),
+              e('button', {
+                type: 'button',
+                className: 'settings-logout',
+                onClick: logout,
+                disabled: loggingOut
+              }, loggingOut ? 'Logging out…' : 'Log out')
+            ),
             error && e('p', { className: 'settings-error', role: 'alert' }, error)
           )
         );
@@ -5136,7 +5172,7 @@
           ),
           e(ImageButton, {
             className: `lango-home__record${recordReminding ? ' is-reminding' : ''}`,
-            image: 'record',
+            image: 'store',
             label: 'Record',
             onClick: () => {
               setRecordReminding(false);
