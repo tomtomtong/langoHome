@@ -548,21 +548,27 @@
 })(window);
 
 </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="preload" href="/langoLogo.jpeg" as="image">
   <style>
     :root {
-      --bg: #f2f2f7;
-      --bg-solid: #ffffff;
+      --canvas: #F2E2C8;
+      --canvas-to: #EAD5B0;
+      --card: #FFFFFF;
+      --card-alt: #FDFBF6;
+      --purple: #6C5CE0;
+      --purple-to: #8B7EF0;
+      --lavender-soft: #E4DEFB;
+      --text: #1B1B26;
+      --text-2: #8A8A94;
+      --text-muted: #B5B0C4;
       --bg-fill: rgba(120, 120, 128, 0.12);
-      --bg-fill-strong: rgba(120, 120, 128, 0.2);
-      --label: #1c1c1e;
-      --label-secondary: rgba(60, 60, 67, 0.72);
-      --label-tertiary: rgba(60, 60, 67, 0.48);
-      --tint: #6C5CE0;
-      --tint-pressed: #5a4ac8;
-      --danger: #ff3b30;
-      --danger-soft: rgba(255, 59, 48, 0.1);
-      --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 12px 40px rgba(0, 0, 0, 0.08);
+      --danger: #E14F4F;
+      --danger-soft: rgba(225, 79, 79, 0.12);
+      --shadow: 0 8px 28px rgba(27, 27, 38, 0.1);
+      --r-lg: 28px;
       --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
       --ease-press: cubic-bezier(0.2, 0.8, 0.2, 1);
       color-scheme: light;
@@ -574,9 +580,9 @@
       margin: 0;
       min-height: 100%;
       min-height: 100dvh;
-      font: 100%/1.47 -apple-system, BlinkMacSystemFont, "PingFang TC", "PingFang SC", "Helvetica Neue", sans-serif;
-      background: linear-gradient(165deg, #F2E2C8 0%, #EAD5B0 100%);
-      color: var(--label);
+      font-family: "Nunito", system-ui, "PingFang TC", "PingFang SC", sans-serif;
+      background: linear-gradient(165deg, var(--canvas) 0%, var(--canvas-to) 100%);
+      color: var(--text);
       -webkit-font-smoothing: antialiased;
     }
 
@@ -587,6 +593,26 @@
       justify-content: center;
       gap: 0.85rem;
       padding: max(1.5rem, env(safe-area-inset-top)) 1.25rem max(1.5rem, env(safe-area-inset-bottom));
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    body::before,
+    body::after {
+      content: "✦";
+      position: fixed;
+      color: rgba(108, 92, 224, 0.15);
+      font-size: 1.4rem;
+      pointer-events: none;
+      animation: float-spark 6s ease-in-out infinite;
+    }
+
+    body::before { top: 12%; left: 8%; }
+    body::after { bottom: 18%; right: 10%; font-size: 0.9rem; animation-delay: -2s; }
+
+    @keyframes float-spark {
+      0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0.5; }
+      50% { transform: translateY(-8px) rotate(12deg); opacity: 1; }
     }
 
     .lang-select-wrap {
@@ -633,89 +659,128 @@
 
     .login-card {
       width: min(100%, 400px);
-      padding: 2.1rem 1.65rem 1.75rem;
-      border-radius: 24px;
-      background: rgba(255, 255, 255, 0.92);
+      border-radius: var(--r-lg);
+      background: var(--card);
       box-shadow: var(--shadow);
+      overflow: clip;
       animation: card-in 520ms var(--ease-out) both;
     }
 
     @keyframes card-in {
-      from { opacity: 0; transform: translateY(12px) scale(0.985); }
+      from { opacity: 0; transform: translateY(14px) scale(0.98); }
       to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .login-hero {
+      position: relative;
+      padding: 1.5rem 1.35rem 1.65rem;
+      background: linear-gradient(135deg, var(--purple) 0%, var(--purple-to) 100%);
+      color: #fff;
+      text-align: center;
+    }
+
+    .login-hero::after {
+      content: "✦";
+      position: absolute;
+      top: 0.85rem;
+      right: 1rem;
+      opacity: 0.35;
+      font-size: 0.85rem;
     }
 
     .logo-wrap {
       display: flex;
       justify-content: center;
-      margin-bottom: 1.15rem;
+      margin-bottom: 0.85rem;
     }
 
     .logo-wrap img {
-      width: 72px;
-      height: 72px;
-      border-radius: 18px;
+      width: 64px;
+      height: 64px;
+      border-radius: 16px;
       object-fit: cover;
-      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+      border: 3px solid rgba(255, 255, 255, 0.35);
+      animation: logo-pop 600ms var(--ease-out) 120ms both;
     }
 
-    .title-wrap {
-      text-align: center;
-      margin-bottom: 1.6rem;
+    @keyframes logo-pop {
+      from { opacity: 0; transform: scale(0.92); }
+      to { opacity: 1; transform: scale(1); }
     }
 
-    .eyebrow {
-      margin: 0 0 0.45rem;
-      font-size: 0.72rem;
-      font-weight: 650;
-      letter-spacing: 0.05em;
+    .login-hero .eyebrow {
+      margin: 0 0 0.35rem;
+      font-size: 0.68rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
-      color: var(--tint);
+      color: rgba(255, 255, 255, 0.75);
     }
 
-    h1 {
+    .login-hero h1 {
       margin: 0;
-      font-size: clamp(1.55rem, 5vw, 1.85rem);
+      font-family: "Fredoka", "Nunito", sans-serif;
+      font-size: clamp(1.45rem, 5vw, 1.75rem);
       font-weight: 700;
-      letter-spacing: -0.03em;
       line-height: 1.12;
+      letter-spacing: -0.02em;
+    }
+
+    .login-body {
+      padding: 1.35rem 1.5rem 1.5rem;
     }
 
     .subtitle {
-      margin: 0.55rem 0 0;
-      font-size: 0.95rem;
+      margin: 0 0 1.25rem;
+      font-size: 0.88rem;
       line-height: 1.45;
-      color: var(--label-secondary);
+      font-weight: 600;
+      color: var(--text-2);
+      text-align: center;
+      animation: fade-up 480ms var(--ease-out) 180ms both;
     }
 
-    .field { margin-bottom: 0.85rem; }
+    @keyframes fade-up {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .field {
+      margin-bottom: 0.85rem;
+      animation: fade-up 480ms var(--ease-out) both;
+    }
+
+    .field:nth-child(1) { animation-delay: 220ms; }
+    .field:nth-child(2) { animation-delay: 280ms; }
 
     label {
       display: block;
       margin-bottom: 0.35rem;
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: var(--label-secondary);
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--text-2);
     }
 
     input {
       width: 100%;
       min-height: 48px;
       padding: 0.8rem 0.95rem;
-      border: 1px solid transparent;
+      border: 2px solid transparent;
       border-radius: 14px;
-      background: var(--bg-fill);
-      color: var(--label);
+      background: var(--card-alt);
+      color: var(--text);
       font: inherit;
-      font-size: 1.02rem;
+      font-size: 1rem;
+      font-weight: 600;
       outline: none;
-      transition: background 180ms, border-color 180ms, box-shadow 180ms;
+      transition: background 180ms var(--ease-out), border-color 180ms, box-shadow 180ms, transform 120ms var(--ease-press);
     }
 
     input:focus {
-      background: var(--bg-solid);
+      background: var(--card);
       border-color: rgba(108, 92, 224, 0.45);
-      box-shadow: 0 0 0 4px rgba(108, 92, 224, 0.15);
+      box-shadow: 0 0 0 4px rgba(108, 92, 224, 0.12);
     }
 
     button[type="submit"] {
@@ -724,15 +789,18 @@
       margin-top: 0.45rem;
       border: none;
       border-radius: 980px;
-      background: var(--tint);
+      background: var(--purple);
       color: #fff;
-      font: inherit;
+      font-family: "Fredoka", "Nunito", sans-serif;
       font-size: 1.02rem;
-      font-weight: 620;
+      font-weight: 600;
       cursor: pointer;
+      animation: fade-up 480ms var(--ease-out) 340ms both;
       transition: transform 120ms var(--ease-press), background 180ms, opacity 180ms;
+      -webkit-tap-highlight-color: transparent;
     }
 
+    button[type="submit"]:hover:not(:disabled) { background: #5a4ac8; }
     button[type="submit"]:active:not(:disabled) { transform: scale(0.97); }
     button[type="submit"]:disabled { opacity: 0.55; cursor: not-allowed; }
 
@@ -743,24 +811,44 @@
       border-radius: 14px;
       background: var(--danger-soft);
       color: var(--danger);
-      font-size: 0.9rem;
+      font-size: 0.88rem;
+      font-weight: 700;
       text-align: center;
     }
 
-    .error.visible { display: block; }
+    .error.visible {
+      display: block;
+      animation: shake 320ms var(--ease-out);
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-5px); }
+      75% { transform: translateX(5px); }
+    }
 
     .hint {
-      margin: 1.35rem 0 0;
-      font-size: 0.82rem;
+      margin: 1.25rem 0 0;
+      font-size: 0.8rem;
       line-height: 1.5;
-      color: var(--label-tertiary);
+      font-weight: 600;
+      color: var(--text-muted);
       text-align: center;
+      animation: fade-up 480ms var(--ease-out) 400ms both;
     }
 
     .hint a {
-      color: var(--tint);
+      color: var(--purple);
       text-decoration: none;
-      font-weight: 600;
+      font-weight: 700;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      body::before, body::after,
+      .login-card, .logo-wrap img, .subtitle, .field, button[type="submit"], .hint, .error.visible {
+        animation: none !important;
+      }
+      button[type="submit"]:active:not(:disabled) { transform: none; }
     }
   </style>
 </head>
@@ -775,18 +863,19 @@
   </div>
 
   <div class="login-card">
-    <div class="logo-wrap">
-      <img src="/langoLogo.jpeg" alt="Lango" width="72" height="72" decoding="async">
-    </div>
-    <div class="title-wrap">
+    <div class="login-hero">
+      <div class="logo-wrap">
+        <img src="/langoLogo.jpeg" alt="Lango" width="64" height="64" decoding="async">
+      </div>
       <p class="eyebrow" data-i18n="loginEyebrow">Parent Portal</p>
       <h1 data-i18n="loginHeading">See what they learned</h1>
-      <p class="subtitle" data-i18n="loginSub">Sign in with your child's learner account to view smartpen vocabulary and get practice ideas.</p>
     </div>
+    <div class="login-body">
+      <p class="subtitle" data-i18n="loginSub">Sign in with your child's learner account to view smartpen vocabulary and get practice ideas.</p>
 
-    <div id="error" class="error" role="alert"></div>
+      <div id="error" class="error" role="alert"></div>
 
-    <form id="login-form">
+      <form id="login-form">
       <div class="field">
         <label for="username" data-i18n="loginUsername">Learner username</label>
         <input id="username" name="username" type="text" autocomplete="username" required autofocus data-i18n-placeholder="loginPlaceholder">
@@ -800,10 +889,11 @@
       <button type="submit" id="submit-btn" data-i18n="loginContinue">Continue</button>
     </form>
 
-    <p class="hint">
-      <span data-i18n="loginHint">Looking for Uncle Tommy voice practice?</span>
-      <a href="/login" data-i18n="loginStudent">Student sign in</a>
-    </p>
+      <p class="hint">
+        <span data-i18n="loginHint">Looking for Uncle Tommy voice practice?</span>
+        <a href="/login" data-i18n="loginStudent">Student sign in</a>
+      </p>
+    </div>
   </div>
 
   <script>

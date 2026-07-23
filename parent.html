@@ -1254,6 +1254,300 @@
       border: 0;
     }
 
+    /* ——— Segmented control ——— */
+    .segmented {
+      display: inline-flex;
+      padding: 3px;
+      border-radius: 999px;
+      background: var(--card-alt);
+      gap: 2px;
+    }
+
+    .segmented button {
+      appearance: none;
+      border: none;
+      border-radius: 999px;
+      padding: 0.35rem 0.65rem;
+      background: transparent;
+      color: var(--text-2);
+      font: inherit;
+      font-size: 0.68rem;
+      font-weight: 800;
+      cursor: pointer;
+      transition: background 200ms var(--ease-out), color 200ms, transform 120ms var(--ease-press);
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .segmented button:active { transform: scale(0.96); }
+    .segmented button.is-active {
+      background: var(--card-dark);
+      color: #fff;
+    }
+
+    /* ——— Empty illustration ——— */
+    .empty-illus {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding: 1.5rem 1rem;
+      gap: 0.65rem;
+    }
+
+    .empty-illus .illus {
+      width: 88px;
+      height: 88px;
+      border-radius: 50%;
+      background: var(--lavender-soft);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.2rem;
+      position: relative;
+      animation: empty-float 3s ease-in-out infinite;
+    }
+
+    .empty-illus .illus::after {
+      content: "✦";
+      position: absolute;
+      top: -4px;
+      right: -2px;
+      font-size: 0.75rem;
+      color: var(--purple);
+      opacity: 0.6;
+    }
+
+    @keyframes empty-float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-5px); }
+    }
+
+    .empty-illus strong {
+      font-family: "Fredoka", sans-serif;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .empty-illus span {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-2);
+      line-height: 1.45;
+      max-width: 16rem;
+    }
+
+    /* ——— Sheets ——— */
+    .sheet-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 45;
+      background: rgba(27, 27, 38, 0.35);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 280ms var(--ease-out);
+      -webkit-backdrop-filter: blur(2px);
+      backdrop-filter: blur(2px);
+    }
+
+    .sheet-backdrop.is-open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .sheet {
+      position: fixed;
+      left: 50%;
+      bottom: 0;
+      z-index: 46;
+      width: min(100%, 480px);
+      max-height: min(78dvh, 560px);
+      transform: translateX(-50%) translateY(105%);
+      border-radius: var(--r-lg) var(--r-lg) 0 0;
+      background: var(--card);
+      box-shadow: 0 -12px 40px rgba(27, 27, 38, 0.15);
+      display: flex;
+      flex-direction: column;
+      transition: transform 380ms cubic-bezier(0.32, 0.72, 0, 1);
+      padding-bottom: calc(0.5rem + var(--safe-bottom));
+    }
+
+    .sheet.is-open { transform: translateX(-50%) translateY(0); }
+
+    .sheet-handle {
+      width: 36px;
+      height: 4px;
+      border-radius: 999px;
+      background: var(--bar-muted);
+      margin: 0.65rem auto 0;
+      flex-shrink: 0;
+    }
+
+    .sheet-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding: 0.85rem 1.15rem 0.65rem;
+      flex-shrink: 0;
+    }
+
+    .sheet-head h3 {
+      margin: 0;
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+
+    .sheet-close {
+      appearance: none;
+      width: 32px;
+      height: 32px;
+      border: none;
+      border-radius: 50%;
+      background: var(--card-alt);
+      color: var(--text-2);
+      font-size: 1.1rem;
+      cursor: pointer;
+      transition: transform 120ms var(--ease-press);
+    }
+
+    .sheet-close:active { transform: scale(0.92); }
+
+    .sheet-body {
+      overflow-y: auto;
+      padding: 0 1.15rem 1rem;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .notif-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.7rem;
+      padding: 0.85rem 0.75rem;
+      border-radius: var(--r-sm);
+      background: var(--card-alt);
+      margin-bottom: 0.45rem;
+      cursor: pointer;
+      transition: transform 120ms var(--ease-press), background 160ms;
+      animation: notif-in 360ms var(--ease-out) both;
+      animation-delay: var(--d, 0ms);
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    @keyframes notif-in {
+      from { opacity: 0; transform: translateX(-8px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    .notif-item:active { transform: scale(0.985); }
+    .notif-item.is-unread { background: var(--lavender-soft); }
+
+    .notif-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      flex-shrink: 0;
+      background: #fff;
+    }
+
+    .notif-item strong {
+      display: block;
+      font-size: 0.86rem;
+      font-weight: 800;
+      line-height: 1.3;
+    }
+
+    .notif-item span {
+      display: block;
+      margin-top: 0.15rem;
+      font-size: 0.74rem;
+      font-weight: 600;
+      color: var(--text-2);
+      line-height: 1.35;
+    }
+
+    .word-sheet-word {
+      margin: 0;
+      font-family: "Fredoka", sans-serif;
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+    }
+
+    .word-meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+      margin: 1rem 0;
+    }
+
+    .word-meta {
+      padding: 0.7rem 0.75rem;
+      border-radius: var(--r-sm);
+      background: var(--card-alt);
+    }
+
+    .word-meta .lbl {
+      display: block;
+      font-size: 0.65rem;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .word-meta .val {
+      display: block;
+      margin-top: 0.2rem;
+      font-size: 0.88rem;
+      font-weight: 800;
+    }
+
+    .sheet-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      margin-top: 0.5rem;
+    }
+
+    .sheet-actions .btn { width: 100%; min-height: 44px; }
+
+    .view.is-active {
+      animation: view-in 320ms var(--ease-out) both;
+    }
+
+    @keyframes view-in {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .bar.is-animating {
+      animation: bar-grow 480ms var(--ease-out) both;
+      animation-delay: var(--bar-delay, 0ms);
+    }
+
+    @keyframes bar-grow {
+      from { transform: scaleY(0); transform-origin: bottom; opacity: 0.5; }
+      to { transform: scaleY(1); opacity: 1; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .empty-illus .illus, .notif-item, .view.is-active, .bar.is-animating {
+        animation: none !important;
+      }
+      .sheet { transition: opacity 200ms; }
+      .sheet:not(.is-open) { opacity: 0; }
+      .segmented button:active { transform: none; }
+    }
+
+    @media (prefers-reduced-transparency: reduce) {
+      .sheet-backdrop { backdrop-filter: none; background: rgba(27, 27, 38, 0.55); }
+    }
+
   </style>
   <script>
 (function (global) {
@@ -1325,6 +1619,28 @@
       weeklyActivity: "Weekly activity",
       weeklyActivitySub: "Games played each day",
       chartRange: "7 days ▾",
+      chart7: "7 days",
+      chart30: "30 days",
+      notifTitle: "Notifications",
+      notifEmpty: "You're all caught up!",
+      notifNewWords: "{n} new word synced today",
+      notifNewWordsPlural: "{n} new words synced today",
+      notifStreak: "{n}-day streak — keep it going!",
+      notifGame: "Played {n} game today",
+      notifGames: "Played {n} games today",
+      notifSync: "Smartpen: {word}",
+      wordSheetSource: "Source",
+      wordSheetLearned: "Learned",
+      wordSheetFocus: "Focus this word",
+      wordSheetPractice: "Get practice ideas",
+      wordSheetMarkDone: "Mark practiced",
+      wordSheetClose: "Close",
+      emptyWordsTitle: "No words yet",
+      emptyWordsSub: "Words appear when the smartpen syncs or games record vocabulary.",
+      emptyChartTitle: "No activity yet",
+      emptyChartSub: "Games will show here once your child starts playing.",
+      sourceSmartpen: "Smartpen",
+      sourceGame: "Game",
       tonightEyebrowDark: "Tonight",
       featureProgress: "{done}/{total} tonight's words practiced",
       featureWaiting: "Words will appear after smartpen sync",
@@ -1474,6 +1790,28 @@
       weeklyActivity: "每週活動",
       weeklyActivitySub: "每日遊戲次數",
       chartRange: "7 天 ▾",
+      chart7: "7 天",
+      chart30: "30 天",
+      notifTitle: "通知",
+      notifEmpty: "暫時沒有新通知",
+      notifNewWords: "今日同步了 {n} 個新詞",
+      notifNewWordsPlural: "今日同步了 {n} 個新詞",
+      notifStreak: "連續 {n} 天 — 繼續加油！",
+      notifGame: "今日玩了 {n} 場遊戲",
+      notifGames: "今日玩了 {n} 場遊戲",
+      notifSync: "智能筆：{word}",
+      wordSheetSource: "來源",
+      wordSheetLearned: "學習時間",
+      wordSheetFocus: "聚焦此詞",
+      wordSheetPractice: "取得練習建議",
+      wordSheetMarkDone: "標記已練習",
+      wordSheetClose: "關閉",
+      emptyWordsTitle: "暫無詞彙",
+      emptyWordsSub: "智能筆同步或遊戲記錄後會顯示在這裡。",
+      emptyChartTitle: "暫無活動",
+      emptyChartSub: "孩子開始玩遊戲後會顯示圖表。",
+      sourceSmartpen: "智能筆",
+      sourceGame: "遊戲",
       tonightEyebrowDark: "今晚",
       featureProgress: "今晚已練 {done}/{total} 個詞",
       featureWaiting: "智能筆同步後會顯示詞彙",
@@ -1623,6 +1961,28 @@
       weeklyActivity: "每周活动",
       weeklyActivitySub: "每日游戏次数",
       chartRange: "7 天 ▾",
+      chart7: "7 天",
+      chart30: "30 天",
+      notifTitle: "通知",
+      notifEmpty: "暂时没有新通知",
+      notifNewWords: "今日同步了 {n} 个新词",
+      notifNewWordsPlural: "今日同步了 {n} 个新词",
+      notifStreak: "连续 {n} 天 — 继续加油！",
+      notifGame: "今日玩了 {n} 场游戏",
+      notifGames: "今日玩了 {n} 场游戏",
+      notifSync: "智能笔：{word}",
+      wordSheetSource: "来源",
+      wordSheetLearned: "学习时间",
+      wordSheetFocus: "聚焦此词",
+      wordSheetPractice: "获取练习建议",
+      wordSheetMarkDone: "标记已练习",
+      wordSheetClose: "关闭",
+      emptyWordsTitle: "暂无词汇",
+      emptyWordsSub: "智能笔同步或游戏记录后会显示在这里。",
+      emptyChartTitle: "暂无活动",
+      emptyChartSub: "孩子开始玩游戏后会显示图表。",
+      sourceSmartpen: "智能笔",
+      sourceGame: "游戏",
       tonightEyebrowDark: "今晚",
       featureProgress: "今晚已练 {done}/{total} 个词",
       featureWaiting: "智能笔同步后会显示词汇",
@@ -1903,7 +2263,10 @@
               <h3 data-i18n="weeklyActivity">Weekly activity</h3>
               <p data-i18n="weeklyActivitySub">Games played each day</p>
             </div>
-            <button type="button" class="pill-filter" id="chart-range-btn" data-i18n="chartRange">7 days ▾</button>
+            <div class="segmented" role="tablist" aria-label="Chart range">
+              <button type="button" class="is-active" data-chart-days="7" data-i18n="chart7">7 days</button>
+              <button type="button" data-chart-days="30" data-i18n="chart30">30 days</button>
+            </div>
           </div>
           <div class="chart-wrap" id="activity-chart"></div>
           <div class="seg-bar" id="activity-seg" hidden></div>
@@ -2049,6 +2412,42 @@
 
   <div class="toast" id="toast" role="status"></div>
 
+  <div class="sheet-backdrop" id="sheet-backdrop" hidden></div>
+
+  <div class="sheet" id="notif-sheet" role="dialog" aria-modal="true" aria-labelledby="notif-sheet-title" hidden>
+    <div class="sheet-handle" aria-hidden="true"></div>
+    <div class="sheet-head">
+      <h3 id="notif-sheet-title" data-i18n="notifTitle">Notifications</h3>
+      <button type="button" class="sheet-close" id="notif-close" data-i18n-aria="wordSheetClose">×</button>
+    </div>
+    <div class="sheet-body" id="notif-list"></div>
+  </div>
+
+  <div class="sheet" id="word-sheet" role="dialog" aria-modal="true" aria-labelledby="word-sheet-title" hidden>
+    <div class="sheet-handle" aria-hidden="true"></div>
+    <div class="sheet-head">
+      <h3 id="word-sheet-title" class="word-sheet-word">—</h3>
+      <button type="button" class="sheet-close" id="word-close" data-i18n-aria="wordSheetClose">×</button>
+    </div>
+    <div class="sheet-body">
+      <div class="word-meta-grid">
+        <div class="word-meta">
+          <span class="lbl" data-i18n="wordSheetSource">Source</span>
+          <span class="val" id="word-sheet-source">—</span>
+        </div>
+        <div class="word-meta">
+          <span class="lbl" data-i18n="wordSheetLearned">Learned</span>
+          <span class="val" id="word-sheet-learned">—</span>
+        </div>
+      </div>
+      <div class="sheet-actions">
+        <button type="button" class="btn primary" id="word-sheet-practice" data-i18n="wordSheetPractice">Get practice ideas</button>
+        <button type="button" class="btn" id="word-sheet-focus" data-i18n="wordSheetFocus">Focus this word</button>
+        <button type="button" class="btn" id="word-sheet-done" data-i18n="wordSheetMarkDone">Mark practiced</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const $ = (id) => document.getElementById(id);
     const t = (...args) => ParentI18n.t(...args);
@@ -2069,6 +2468,10 @@
     let toastTimer = null;
     let practice = { word: null, questions: [], index: 0 };
     let gameSummary14 = null;
+    let gameSummary30 = null;
+    let chartRangeDays = 7;
+    let activeWordItem = null;
+    let openSheet = null;
     const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     function refreshStaticI18n() {
@@ -2256,13 +2659,8 @@
       }).join("");
       wrap.querySelectorAll(".tonight-word").forEach((btn) => {
         btn.addEventListener("click", () => {
-          const key = wordKey(btn.dataset.word);
-          if (homeCheckedWords.has(key)) homeCheckedWords.delete(key);
-          else homeCheckedWords.add(key);
-          saveChecklist();
-          renderTonightWords();
-          renderPracticeChecklist();
-          renderVocabulary(vocabItems, { preserve: true });
+          const item = vocabItems.find((i) => wordKey(i.content || i.word) === wordKey(btn.dataset.word));
+          if (item) openWordDetail(item);
         });
       });
     }
@@ -2378,6 +2776,7 @@
     }
 
     function switchView(name) {
+      closeSheetUI();
       Object.entries(views).forEach(([key, el]) => {
         el.classList.toggle("is-active", key === name);
       });
@@ -2431,49 +2830,200 @@
         : `<div class="empty">${escapeHtml(t("profileEmpty"))}</div>`;
     }
 
+    function renderEmptyIllus(kind) {
+      const map = {
+        words: { icon: "📚", title: t("emptyWordsTitle"), sub: t("emptyWordsSub") },
+        chart: { icon: "📊", title: t("emptyChartTitle"), sub: t("emptyChartSub") },
+        notif: { icon: "🔔", title: t("notifTitle"), sub: t("notifEmpty") },
+      };
+      const d = map[kind] || map.words;
+      return `<div class="empty-illus">
+        <div class="illus" aria-hidden="true">${d.icon}</div>
+        <strong>${escapeHtml(d.title)}</strong>
+        <span>${escapeHtml(d.sub)}</span>
+      </div>`;
+    }
+
+    function sourceLabel(source) {
+      if (source === "smartpen") return t("sourceSmartpen");
+      if (source === "game") return t("sourceGame");
+      return source || "—";
+    }
+
+    function openSheetUI(sheetId) {
+      openSheet = sheetId;
+      const backdrop = $("sheet-backdrop");
+      const sheet = $(sheetId);
+      backdrop.hidden = false;
+      sheet.hidden = false;
+      requestAnimationFrame(() => {
+        backdrop.classList.add("is-open");
+        sheet.classList.add("is-open");
+      });
+      document.body.style.overflow = "hidden";
+    }
+
+    function closeSheetUI() {
+      const backdrop = $("sheet-backdrop");
+      backdrop.classList.remove("is-open");
+      document.querySelectorAll(".sheet.is-open").forEach((el) => el.classList.remove("is-open"));
+      document.body.style.overflow = "";
+      setTimeout(() => {
+        if (!backdrop.classList.contains("is-open")) {
+          backdrop.hidden = true;
+          document.querySelectorAll(".sheet").forEach((el) => { el.hidden = true; });
+        }
+      }, 380);
+      openSheet = null;
+    }
+
+    function buildNotifications() {
+      const items = [];
+      const todayWords = vocabItems.filter((i) => daysAgo(i.learnedAt, 1));
+      if (todayWords.length) {
+        items.push({
+          icon: "📚",
+          title: todayWords.length === 1 ? t("notifNewWords", { n: todayWords.length }) : t("notifNewWordsPlural", { n: todayWords.length }),
+          sub: todayWords.slice(0, 3).map((w) => w.content || w.word).join(", "),
+          unread: true,
+          action: () => { switchView("words"); closeSheetUI(); },
+        });
+      }
+      const streak = checkInData?.currentStreak ?? 0;
+      if (streak >= 2) {
+        items.push({
+          icon: "🔥",
+          title: t("notifStreak", { n: streak }),
+          sub: displayName(),
+          unread: false,
+          action: () => { switchView("progress"); closeSheetUI(); },
+        });
+      }
+      let gamesToday = 0;
+      if (gameSummary?.days && checkInData?.today) {
+        const day = gameSummary.days.find((d) => d.date === checkInData.today);
+        gamesToday = day?.users?.find((u) => u.username === currentUser)?.totalPlays || 0;
+      }
+      if (gamesToday > 0) {
+        items.push({
+          icon: "🎮",
+          title: gamesToday === 1 ? t("notifGame", { n: gamesToday }) : t("notifGames", { n: gamesToday }),
+          sub: displayName(),
+          unread: false,
+          action: () => { switchView("home"); closeSheetUI(); },
+        });
+      }
+      const latestPen = vocabItems.filter((i) => i.source === "smartpen")[0];
+      if (latestPen && daysBetween(latestPen.learnedAt) === 0) {
+        items.push({
+          icon: "✏️",
+          title: t("notifSync", { word: latestPen.content || latestPen.word }),
+          sub: formatDate(latestPen.learnedAt),
+          unread: true,
+          action: () => {
+            closeSheetUI();
+            setTimeout(() => openWordDetail(latestPen), 80);
+          },
+        });
+      }
+      return items;
+    }
+
+    function renderNotifications() {
+      const list = $("notif-list");
+      const items = buildNotifications();
+      if (!items.length) {
+        list.innerHTML = renderEmptyIllus("notif");
+        return;
+      }
+      list.innerHTML = items.map((item, i) => `
+        <div class="notif-item${item.unread ? " is-unread" : ""}" style="--d:${i * 45}ms" data-idx="${i}">
+          <span class="notif-icon">${item.icon}</span>
+          <div>
+            <strong>${escapeHtml(item.title)}</strong>
+            <span>${escapeHtml(item.sub)}</span>
+          </div>
+        </div>`).join("");
+      list.querySelectorAll(".notif-item").forEach((el, i) => {
+        el.addEventListener("click", () => items[i].action?.());
+      });
+    }
+
+    function openNotifSheet() {
+      renderNotifications();
+      $("notif-btn").classList.remove("has-badge");
+      openSheetUI("notif-sheet");
+    }
+
+    function openWordDetail(item) {
+      if (!item) return;
+      activeWordItem = item;
+      const label = item.content || item.word || item.code || "—";
+      $("word-sheet-title").textContent = label;
+      $("word-sheet-source").textContent = sourceLabel(item.source);
+      $("word-sheet-learned").textContent = formatDate(item.learnedAt);
+      const done = homeCheckedWords.has(wordKey(label));
+      $("word-sheet-done").textContent = done ? t("checklistDone") : t("wordSheetMarkDone");
+      $("word-sheet-done").classList.toggle("primary", !done);
+      openSheetUI("word-sheet");
+    }
+
     function buildWeekChart() {
       const chart = $("activity-chart");
       const seg = $("activity-seg");
       const legend = $("activity-legend");
-      if (!gameSummary?.days) {
-        chart.innerHTML = `<div class="empty" style="width:100%">${escapeHtml(t("chartEmpty"))}</div>`;
+      const summary = chartRangeDays <= 7 ? gameSummary : gameSummary30;
+      if (!summary?.days) {
+        chart.innerHTML = renderEmptyIllus("chart");
+        seg.hidden = true;
+        legend.innerHTML = "";
         return;
       }
 
       const dayMap = new Map();
-      for (const day of gameSummary.days) {
+      for (const day of summary.days) {
         const user = day.users?.find((u) => u.username === currentUser);
         dayMap.set(day.date, user?.totalPlays || 0);
       }
 
       const labels = ParentI18n.dayLabels();
-      const cols = [];
       const today = checkInData?.today || new Date().toISOString().slice(0, 10);
+      const span = chartRangeDays - 1;
       let max = 1;
       const weekData = [];
 
-      for (let i = 6; i >= 0; i--) {
+      for (let i = span; i >= 0; i--) {
         const d = new Date(today + "T12:00:00");
         d.setDate(d.getDate() - i);
         const iso = d.toISOString().slice(0, 10);
         const plays = dayMap.get(iso) || 0;
-        weekData.push({ iso, plays, label: labels[d.getDay()], isToday: iso === today });
+        const showLabel = chartRangeDays <= 7 || i % 5 === 0 || i === 0;
+        weekData.push({
+          iso,
+          plays,
+          label: showLabel ? (chartRangeDays <= 7 ? labels[d.getDay()] : String(d.getDate())) : "",
+          isToday: iso === today,
+        });
         max = Math.max(max, plays);
       }
 
-      chart.innerHTML = weekData.map((d) => {
+      chart.innerHTML = weekData.map((d, i) => {
         const h = d.plays ? Math.max(12, Math.round((d.plays / max) * 100)) : 4;
         return `
           <div class="bar-col">
             <span class="bar-val">${d.plays || ""}</span>
-            <div class="bar ${d.isToday ? "is-today" : ""} ${d.plays ? "" : "is-empty"}" style="height:${h}px"></div>
+            <div class="bar is-animating ${d.isToday ? "is-today" : ""} ${d.plays ? "" : "is-empty"}" style="height:${h}px;--bar-delay:${Math.min(i, 14) * 25}ms"></div>
             <span class="bar-lbl">${d.label}</span>
           </div>`;
       }).join("");
 
+      const rangeStart = new Date(today + "T12:00:00");
+      rangeStart.setDate(rangeStart.getDate() - span);
+      const rangeDates = weekData.map((d) => d.iso);
       const totalWeek = weekData.reduce((s, d) => s + d.plays, 0);
       const gameTotals = new Map();
-      for (const day of gameSummary.days) {
+      for (const day of summary.days) {
+        if (!rangeDates.includes(day.date)) continue;
         const user = day.users?.find((u) => u.username === currentUser);
         for (const g of user?.games || []) {
           gameTotals.set(g.gameLabel, (gameTotals.get(g.gameLabel) || 0) + g.plays);
@@ -2550,7 +3100,7 @@
 
       const list = filteredVocab();
       if (!list.length) {
-        $("vocab-container").innerHTML = `<div class="empty">${escapeHtml(t("vocabEmpty"))}</div>`;
+        $("vocab-container").innerHTML = renderEmptyIllus("words");
         return;
       }
 
@@ -2568,13 +3118,7 @@
           <strong>${escapeHtml(label)}</strong>
           <span>${escapeHtml(formatDate(item.learnedAt))}</span>
           ${practiceFlag ? `<span class="badge-practice">${escapeHtml(t("badgePractice"))}</span>` : ""}`;
-        btn.addEventListener("click", () => {
-          if (selectedWord && wordKey(selectedWord) === wordKey(label)) selectedWord = null;
-          else selectedWord = label;
-          updateFocusHint();
-          renderVocabulary(vocabItems, { preserve: true });
-          applySuggestionFilter({ scroll: true });
-        });
+        btn.addEventListener("click", () => openWordDetail(item));
         grid.appendChild(btn);
       });
       $("vocab-container").innerHTML = "";
@@ -2753,12 +3297,14 @@
 
     async function loadGameSummary() {
       try {
-        const [res7, res14] = await Promise.all([
+        const [res7, res14, res30] = await Promise.all([
           fetch("/api/game-plays/daily-summary?days=7"),
           fetch("/api/game-plays/daily-summary?days=14"),
+          fetch("/api/game-plays/daily-summary?days=30"),
         ]);
         if (res7.ok) gameSummary = await res7.json();
         if (res14.ok) gameSummary14 = await res14.json();
+        if (res30.ok) gameSummary30 = await res30.json();
       } catch { /* optional */ }
       buildWeekChart();
       updateHomeStats();
@@ -2831,7 +3377,55 @@
     $("generate-btn").addEventListener("click", () => generateSuggestions());
     $("refresh-btn").addEventListener("click", () => loadAll());
     $("clear-focus-btn").addEventListener("click", () => { selectedWord = null; updateFocusHint(); renderVocabulary(vocabItems, { preserve: true }); applySuggestionFilter(); });
-    $("notif-btn").addEventListener("click", () => { switchView("words"); $("notif-btn").classList.remove("has-badge"); });
+    $("notif-btn").addEventListener("click", openNotifSheet);
+    $("notif-close").addEventListener("click", closeSheetUI);
+    $("word-close").addEventListener("click", closeSheetUI);
+    $("sheet-backdrop").addEventListener("click", closeSheetUI);
+
+    $("word-sheet-focus").addEventListener("click", () => {
+      if (!activeWordItem) return;
+      selectedWord = activeWordItem.content || activeWordItem.word;
+      updateFocusHint();
+      renderVocabulary(vocabItems, { preserve: true });
+      applySuggestionFilter({ scroll: true });
+      closeSheetUI();
+      switchView("words");
+    });
+
+    $("word-sheet-practice").addEventListener("click", () => {
+      closeSheetUI();
+      switchView("practice");
+      if (!suggestionData) generateSuggestions();
+      else applySuggestionFilter({ scroll: true });
+    });
+
+    $("word-sheet-done").addEventListener("click", () => {
+      if (!activeWordItem) return;
+      const label = activeWordItem.content || activeWordItem.word || "";
+      const key = wordKey(label);
+      if (homeCheckedWords.has(key)) homeCheckedWords.delete(key);
+      else homeCheckedWords.add(key);
+      saveChecklist();
+      renderTonightWords();
+      renderPracticeChecklist();
+      renderAllParentUI();
+      openWordDetail(activeWordItem);
+      showToast(t("checklistDone"));
+    });
+
+    document.querySelectorAll(".segmented button").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        chartRangeDays = Number(btn.dataset.chartDays) || 7;
+        document.querySelectorAll(".segmented button").forEach((b) => {
+          b.classList.toggle("is-active", b === btn);
+        });
+        buildWeekChart();
+      });
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && openSheet) closeSheetUI();
+    });
     $("logout-btn").addEventListener("click", async () => { await fetch("/api/logout", { method: "POST" }); location.href = "/parent/login"; });
     $("dock-prev").addEventListener("click", () => { if (practice.index > 0) { practice.index--; renderDock(); } });
     $("dock-next").addEventListener("click", () => {
