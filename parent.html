@@ -5,127 +5,531 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="color-scheme" content="light">
   <title>Parent Portal — Lango</title>
-  <link rel="stylesheet" href="/assets/page-motion.css">
-  <script src="/assets/page-motion.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="preload" href="/langoLogo.jpeg" as="image">
   <style>
     :root {
-      --bg: #f2f2f7;
-      --bg-solid: #ffffff;
-      --bg-grouped: #ffffff;
-      --bg-fill: rgba(120, 120, 128, 0.12);
-      --bg-fill-strong: rgba(120, 120, 128, 0.2);
-      --label: #1c1c1e;
-      --label-secondary: rgba(60, 60, 67, 0.72);
-      --label-tertiary: rgba(60, 60, 67, 0.48);
-      --separator: rgba(60, 60, 67, 0.12);
-      --tint: #007aff;
-      --tint-pressed: #0066d6;
-      --tint-soft: rgba(0, 122, 255, 0.12);
-      --tint-strong: rgba(0, 122, 255, 0.22);
-      --success: #34c759;
-      --success-soft: rgba(52, 199, 89, 0.14);
-      --danger: #ff3b30;
-      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 16px rgba(0, 0, 0, 0.06);
-      --shadow-md: 0 10px 32px rgba(0, 0, 0, 0.1);
-      --radius-lg: 20px;
-      --radius-md: 14px;
-      --radius-sm: 10px;
+      --canvas: #F2E2C8;
+      --canvas-to: #EAD5B0;
+      --card: #FFFFFF;
+      --card-alt: #FDFBF6;
+      --card-dark: #1D1D24;
+      --purple: #6C5CE0;
+      --purple-to: #8B7EF0;
+      --orange: #EE9B5C;
+      --orange-to: #F3B27E;
+      --lavender: #CFC6FA;
+      --lavender-soft: #E4DEFB;
+      --text: #1B1B26;
+      --text-2: #8A8A94;
+      --text-muted: #B5B0C4;
+      --text-on-dark: #FFFFFF;
+      --success: #5CB88A;
+      --danger: #E14F4F;
+      --bar-top: #8A5A2B;
+      --bar-bottom: #E8C9A0;
+      --bar-today: #F0913E;
+      --bar-muted: #E9DCC8;
+      --shadow: 0 8px 28px rgba(27, 27, 38, 0.08);
+      --shadow-sm: 0 4px 16px rgba(27, 27, 38, 0.06);
+      --r-lg: 28px;
+      --r-md: 20px;
+      --r-sm: 14px;
       --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
       --ease-press: cubic-bezier(0.2, 0.8, 0.2, 1);
-      --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
       --safe-top: env(safe-area-inset-top, 0px);
       --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --nav-h: 72px;
       color-scheme: light;
     }
 
     * { box-sizing: border-box; }
 
-    html { scroll-behavior: smooth; }
-
     body {
       margin: 0;
-      min-height: 100vh;
       min-height: 100dvh;
-      font: 100%/1.47 -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
-        "Helvetica Neue", Helvetica, Arial, sans-serif;
-      font-optical-sizing: auto;
-      background:
-        radial-gradient(120% 80% at 50% -10%, rgba(0, 122, 255, 0.08), transparent 55%),
-        var(--bg);
-      color: var(--label);
+      font-family: "Nunito", system-ui, sans-serif;
+      font-size: 15px;
+      line-height: 1.45;
+      color: var(--text);
+      background: linear-gradient(165deg, var(--canvas) 0%, var(--canvas-to) 100%);
       -webkit-font-smoothing: antialiased;
-      padding-bottom: calc(5.5rem + var(--safe-bottom));
+      padding-bottom: calc(var(--nav-h) + var(--safe-bottom) + 1rem);
     }
 
-    /* ——— Topbar ——— */
-    .topbar {
-      position: sticky;
-      top: 0;
-      z-index: 30;
+    h1, h2, h3, h4, .display {
+      font-family: "Fredoka", "Nunito", sans-serif;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .app {
+      width: min(100%, 480px);
+      margin: 0 auto;
+      padding: 0 1.25rem;
+    }
+
+    /* ——— Header ——— */
+    .global-header {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 1rem;
-      padding: calc(0.75rem + var(--safe-top)) 1.25rem 0.75rem;
-      background: rgba(242, 242, 247, 0.72);
-      backdrop-filter: blur(24px) saturate(180%);
-      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      gap: 0.75rem;
+      padding: calc(0.85rem + var(--safe-top)) 0 1rem;
     }
 
-    .topbar::after {
-      content: "";
+    .avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      object-fit: cover;
+      background: var(--lavender-soft);
+      box-shadow: var(--shadow-sm);
+      flex-shrink: 0;
+    }
+
+    .greeting { flex: 1; min-width: 0; }
+
+    .greeting .hello {
+      margin: 0;
+      font-family: "Fredoka", sans-serif;
+      font-size: 1.15rem;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .greeting .sub {
+      margin: 0.15rem 0 0;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-2);
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .streak-dot { color: var(--orange); }
+
+    .icon-btn {
+      appearance: none;
+      width: 40px;
+      height: 40px;
+      border: none;
+      border-radius: 50%;
+      background: var(--card);
+      box-shadow: var(--shadow-sm);
+      color: var(--text);
+      font-size: 1.1rem;
+      cursor: pointer;
+      position: relative;
+      transition: transform 120ms var(--ease-press);
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .icon-btn:active { transform: scale(0.94); }
+
+    .icon-btn .badge {
       position: absolute;
-      inset: auto 0 0;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, var(--separator), transparent);
-      opacity: 0;
-      transition: opacity 180ms var(--ease-out);
+      top: 8px;
+      right: 8px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--danger);
+      border: 2px solid var(--card);
+      display: none;
+    }
+
+    .icon-btn.has-badge .badge { display: block; }
+
+    /* ——— Views ——— */
+    .view { display: none; }
+    .view.is-active { display: block; }
+
+    .section-gap > * + * { margin-top: 1rem; }
+
+    /* ——— Hero ——— */
+    .hero-promo {
+      position: relative;
+      overflow: hidden;
+      padding: 1.35rem 1.25rem 1.5rem;
+      border-radius: var(--r-lg);
+      background: linear-gradient(135deg, var(--purple) 0%, var(--purple-to) 100%);
+      color: var(--text-on-dark);
+      box-shadow: var(--shadow);
+    }
+
+    .hero-promo::before,
+    .hero-promo::after {
+      content: "✦";
+      position: absolute;
+      color: rgba(255, 255, 255, 0.25);
+      font-size: 1.1rem;
       pointer-events: none;
     }
 
-    .topbar.is-scrolled::after { opacity: 1; }
+    .hero-promo::before { top: 1rem; right: 1.2rem; }
+    .hero-promo::after { bottom: 2.5rem; right: 2.8rem; font-size: 0.75rem; }
 
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 0.7rem;
-      min-width: 0;
+    .hero-promo h2 {
+      margin: 0;
+      font-size: 1.45rem;
+      font-weight: 800;
+      line-height: 1.15;
+      max-width: 14rem;
     }
 
-    .brand img {
-      width: 36px;
-      height: 36px;
-      border-radius: 9px;
-      object-fit: cover;
+    .hero-promo p {
+      margin: 0.55rem 0 0;
+      font-size: 0.88rem;
+      line-height: 1.45;
+      opacity: 0.9;
+      max-width: 15rem;
+    }
+
+    .hero-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      margin-top: 1.1rem;
+    }
+
+    .circle-cta {
+      appearance: none;
+      width: 48px;
+      height: 48px;
+      border: 3px solid rgba(255, 255, 255, 0.35);
+      border-radius: 50%;
+      background: #fff;
+      color: var(--purple);
+      font-size: 1.25rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 140ms var(--ease-press);
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .circle-cta:active { transform: scale(0.94); }
+
+    .hero-cta-label {
+      font-size: 0.82rem;
+      font-weight: 700;
+      opacity: 0.92;
+    }
+
+    /* ——— Stat cards ——— */
+    .stat-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.65rem;
+    }
+
+    .stat-card {
+      padding: 1rem 0.95rem;
+      border-radius: var(--r-md);
+      background: var(--card);
       box-shadow: var(--shadow-sm);
     }
 
-    .brand-text .eyebrow {
-      margin: 0;
-      font-size: 0.68rem;
+    .icon-chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      margin-bottom: 0.55rem;
+    }
+
+    .icon-chip.purple { background: var(--lavender-soft); }
+    .icon-chip.orange { background: rgba(238, 155, 92, 0.22); }
+
+    .stat-card .num {
+      display: block;
+      font-family: "Fredoka", sans-serif;
+      font-size: 1.75rem;
+      font-weight: 800;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stat-card .lbl {
+      display: block;
+      margin-top: 0.3rem;
+      font-size: 0.78rem;
       font-weight: 600;
-      letter-spacing: 0.04em;
+      color: var(--text-2);
+    }
+
+    /* ——— Panels ——— */
+    .panel {
+      padding: 1.1rem 1.15rem 1.15rem;
+      border-radius: var(--r-lg);
+      background: var(--card);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-bottom: 0.85rem;
+    }
+
+    .panel-head h3 {
+      margin: 0;
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+
+    .panel-head p {
+      margin: 0.2rem 0 0;
+      font-size: 0.82rem;
+      color: var(--text-2);
+      font-weight: 500;
+    }
+
+    .pill-filter {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.35rem 0.7rem;
+      border-radius: 999px;
+      background: var(--card-alt);
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-2);
+      border: none;
+      cursor: pointer;
+    }
+
+    /* ——— Priority card ——— */
+    .priority-card {
+      padding: 1rem 1.1rem;
+      border-radius: var(--r-md);
+      background: var(--lavender-soft);
+    }
+
+    .priority-card .eyebrow {
+      margin: 0 0 0.35rem;
+      font-size: 0.65rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
-      color: var(--label-tertiary);
+      color: var(--purple);
     }
 
-    .brand-text h1 {
-      margin: 0.05rem 0 0;
-      font-size: 1.05rem;
-      font-weight: 650;
-      letter-spacing: -0.015em;
-      line-height: 1.2;
-      white-space: nowrap;
+    .priority-card p {
+      margin: 0;
+      font-size: 0.92rem;
+      font-weight: 600;
+      line-height: 1.45;
+      color: var(--text);
+    }
+
+    /* ——— Bar chart ——— */
+    .chart-wrap {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 0.35rem;
+      height: 130px;
+      padding-top: 0.5rem;
+    }
+
+    .bar-col {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.35rem;
+      min-width: 0;
+    }
+
+    .bar-val {
+      font-size: 0.65rem;
+      font-weight: 800;
+      color: var(--text-2);
+      min-height: 1em;
+    }
+
+    .bar {
+      width: 100%;
+      max-width: 36px;
+      border-radius: 10px 10px 4px 4px;
+      background: linear-gradient(180deg, var(--bar-bottom), var(--bar-top));
+      min-height: 4px;
+      transition: height 400ms var(--ease-out);
+    }
+
+    .bar.is-today {
+      background: linear-gradient(180deg, #F3B27E, var(--bar-today));
+    }
+
+    .bar.is-empty {
+      background: var(--bar-muted);
+      opacity: 0.6;
+    }
+
+    .bar-lbl {
+      font-size: 0.62rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    .seg-bar {
+      display: flex;
+      height: 10px;
+      border-radius: 999px;
       overflow: hidden;
-      text-overflow: ellipsis;
+      background: var(--bar-muted);
+      margin-bottom: 0.65rem;
     }
 
-    .topbar-actions {
+    .seg-bar span { display: block; height: 100%; }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 0.85rem;
+    }
+
+    .legend-item {
       display: flex;
       align-items: center;
-      gap: 0.4rem;
+      gap: 0.35rem;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text-2);
+    }
+
+    .legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    /* ——— Feature card (dark) ——— */
+    .feature-card {
+      position: relative;
+      padding: 1.1rem 1.15rem;
+      border-radius: var(--r-md);
+      background: var(--card-dark);
+      color: var(--text-on-dark);
+      box-shadow: var(--shadow);
+    }
+
+    .feature-card .eyebrow {
+      margin: 0 0 0.4rem;
+      font-size: 0.62rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.55);
+    }
+
+    .feature-card h4 {
+      margin: 0;
+      font-size: 1.05rem;
+      font-weight: 700;
+      line-height: 1.25;
+      max-width: 75%;
+    }
+
+    .feature-card .circle-cta {
+      position: absolute;
+      right: 1rem;
+      bottom: 1rem;
+      width: 42px;
+      height: 42px;
+      font-size: 1.1rem;
+    }
+
+    /* ——— Chips & vocab ——— */
+    .chip-row {
+      display: flex;
+      gap: 0.45rem;
+      overflow-x: auto;
+      padding-bottom: 0.25rem;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+
+    .chip-row::-webkit-scrollbar { display: none; }
+
+    .chip {
+      appearance: none;
       flex-shrink: 0;
+      padding: 0.45rem 0.8rem;
+      border: none;
+      border-radius: 999px;
+      background: var(--card-alt);
+      color: var(--text-2);
+      font: inherit;
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 160ms, color 160ms, transform 120ms var(--ease-press);
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .chip:active { transform: scale(0.96); }
+    .chip.is-active { background: var(--card-dark); color: #fff; }
+
+    .vocab-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+    }
+
+    .word-chip {
+      appearance: none;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.15rem;
+      width: 100%;
+      padding: 0.8rem 0.85rem;
+      border: 2px solid transparent;
+      border-radius: var(--r-sm);
+      background: var(--card-alt);
+      color: inherit;
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+      transition: transform 120ms var(--ease-press), border-color 160ms, background 160ms;
+      animation: chip-in 380ms var(--ease-out) both;
+      animation-delay: var(--d, 0ms);
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    @keyframes chip-in {
+      from { opacity: 0; transform: translateY(6px) scale(0.97); }
+      to { opacity: 1; transform: none; }
+    }
+
+    .word-chip:active { transform: scale(0.97); }
+    .word-chip.is-selected {
+      border-color: var(--purple);
+      background: var(--lavender-soft);
+    }
+    .word-chip.is-dimmed { opacity: 0.4; }
+
+    .word-chip strong {
+      font-family: "Fredoka", sans-serif;
+      font-size: 0.98rem;
+      font-weight: 600;
+    }
+
+    .word-chip span {
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: var(--text-muted);
     }
 
     /* ——— Buttons ——— */
@@ -134,609 +538,227 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 0.4rem;
-      min-height: 36px;
-      padding: 0.45rem 0.85rem;
+      gap: 0.35rem;
+      min-height: 38px;
+      padding: 0.45rem 0.9rem;
       border: none;
-      border-radius: 980px;
-      background: var(--bg-fill);
-      color: var(--label);
+      border-radius: 999px;
+      background: var(--card-alt);
+      color: var(--text);
       font: inherit;
-      font-size: 0.875rem;
-      font-weight: 590;
-      letter-spacing: -0.01em;
+      font-size: 0.82rem;
+      font-weight: 700;
       cursor: pointer;
-      transition:
-        transform 120ms var(--ease-press),
-        background 180ms var(--ease-out),
-        color 180ms var(--ease-out),
-        opacity 180ms var(--ease-out),
-        box-shadow 180ms var(--ease-out);
+      transition: transform 120ms var(--ease-press), background 160ms;
       -webkit-tap-highlight-color: transparent;
-      user-select: none;
     }
 
-    .btn:hover:not(:disabled) { background: var(--bg-fill-strong); }
-    .btn:active:not(:disabled) { transform: scale(0.97); }
-    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
-    .btn:focus-visible { outline: 2px solid var(--tint); outline-offset: 2px; }
-
-    .btn.primary {
-      background: var(--tint);
-      color: #fff;
-    }
-
-    .btn.primary:hover:not(:disabled) { background: var(--tint-pressed); }
-
-    .btn.primary.is-busy {
-      background: var(--tint-pressed);
-    }
-
-    .btn.ghost {
-      background: transparent;
-      color: var(--tint);
-      font-weight: 560;
-      padding-inline: 0.65rem;
-    }
-
-    .btn.ghost:hover:not(:disabled) { background: var(--tint-soft); }
-
-    .btn.sm {
-      min-height: 32px;
-      padding: 0.3rem 0.7rem;
-      font-size: 0.8rem;
-    }
-
-    /* ——— Page ——— */
-    .page {
-      width: min(100%, 780px);
-      margin: 0 auto;
-      padding: 0.5rem 1.15rem 1rem;
-    }
-
-    .hero {
-      padding: 1.15rem 0.15rem 1.35rem;
-    }
-
-    .hero-kicker {
-      margin: 0 0 0.45rem;
-      font-size: 0.8rem;
-      font-weight: 590;
-      color: var(--tint);
-      letter-spacing: -0.01em;
-    }
-
-    .hero h2 {
-      margin: 0;
-      font-size: clamp(1.85rem, 5.2vw, 2.45rem);
-      font-weight: 700;
-      letter-spacing: -0.035em;
-      line-height: 1.08;
-    }
-
-    .hero p {
-      margin: 0.7rem 0 0;
-      max-width: 36rem;
-      font-size: 1.02rem;
-      line-height: 1.45;
-      letter-spacing: -0.011em;
-      color: var(--label-secondary);
-    }
-
-    .stat-strip {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 0.5rem;
-      margin-top: 1.15rem;
-    }
-
-    .stat {
-      padding: 0.85rem 0.75rem;
-      border-radius: var(--radius-md);
-      background: var(--bg-solid);
-      box-shadow: var(--shadow-sm);
-      text-align: center;
-      transition: transform 140ms var(--ease-press), box-shadow 180ms var(--ease-out);
-    }
-
-    .stat:active { transform: scale(0.98); }
-
-    .stat .num {
-      display: block;
-      font-size: 1.45rem;
-      font-weight: 700;
-      letter-spacing: -0.04em;
-      line-height: 1;
-      font-variant-numeric: tabular-nums;
-      color: var(--label);
-    }
-
-    .stat .lbl {
-      display: block;
-      margin-top: 0.35rem;
-      font-size: 0.7rem;
-      font-weight: 560;
-      letter-spacing: -0.01em;
-      color: var(--label-tertiary);
-      text-transform: uppercase;
-    }
-
-    /* ——— Panels ——— */
-    .stack {
-      display: flex;
-      flex-direction: column;
-      gap: 1.1rem;
-    }
-
-    .panel {
-      border-radius: var(--radius-lg);
-      background: var(--bg-grouped);
-      box-shadow: var(--shadow-sm);
-      overflow: clip;
-    }
-
-    .panel-header {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 0.85rem;
-      padding: 1.1rem 1.2rem 0.75rem;
-    }
-
-    .panel-header h3 {
-      margin: 0;
-      font-size: 1.2rem;
-      font-weight: 670;
-      letter-spacing: -0.025em;
-      line-height: 1.2;
-    }
-
-    .panel-header .lead {
-      margin: 0.28rem 0 0;
-      font-size: 0.88rem;
-      line-height: 1.4;
-      letter-spacing: -0.01em;
-      color: var(--label-secondary);
-    }
-
-    .panel-body { padding: 0 1.2rem 1.2rem; }
+    .btn:active { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn.primary { background: var(--purple); color: #fff; }
+    .btn.sm { min-height: 32px; padding: 0.3rem 0.7rem; font-size: 0.75rem; }
 
     .hint-bar {
       display: none;
       align-items: center;
       justify-content: space-between;
-      gap: 0.6rem;
-      margin-bottom: 0.75rem;
-      padding: 0.65rem 0.8rem;
-      border-radius: var(--radius-sm);
-      background: var(--tint-soft);
-      color: var(--tint);
-      font-size: 0.82rem;
-      font-weight: 560;
-      letter-spacing: -0.01em;
+      gap: 0.5rem;
+      margin-bottom: 0.65rem;
+      padding: 0.6rem 0.75rem;
+      border-radius: var(--r-sm);
+      background: var(--lavender-soft);
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--purple);
     }
 
     .hint-bar.is-visible { display: flex; }
 
-    /* ——— Vocabulary chips ——— */
-    .vocab-list {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
-      gap: 0.5rem;
-    }
-
-    .word-chip {
-      appearance: none;
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 0.2rem;
-      width: 100%;
-      padding: 0.85rem 0.9rem;
-      border: 1.5px solid transparent;
-      border-radius: var(--radius-md);
-      background: var(--bg);
-      color: inherit;
-      font: inherit;
-      text-align: left;
-      cursor: pointer;
-      transition:
-        transform 140ms var(--ease-press),
-        background 180ms var(--ease-out),
-        border-color 180ms var(--ease-out),
-        box-shadow 180ms var(--ease-out);
-      animation: chip-in 420ms var(--ease-out) both;
-      animation-delay: var(--chip-delay, 0ms);
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    @keyframes chip-in {
-      from { opacity: 0; transform: translateY(8px) scale(0.96); }
-      to { opacity: 1; transform: translateY(0) scale(1); }
-    }
-
-    .word-chip:hover {
-      background: var(--bg-fill);
-    }
-
-    .word-chip:active {
-      transform: scale(0.97);
-    }
-
-    .word-chip.is-selected {
-      background: var(--tint-soft);
-      border-color: rgba(0, 122, 255, 0.45);
-      box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
-    }
-
-    .word-chip.is-selected strong { color: var(--tint); }
-
-    .word-chip.is-dimmed {
-      opacity: 0.42;
-    }
-
-    .word-chip strong {
-      font-size: 1rem;
-      font-weight: 650;
-      letter-spacing: -0.02em;
-      line-height: 1.2;
-    }
-
-    .word-chip span {
-      font-size: 0.72rem;
-      font-weight: 500;
-      color: var(--label-tertiary);
-      line-height: 1.3;
-    }
-
-    .word-chip .check {
-      display: none;
-      margin-top: 0.35rem;
-      font-size: 0.68rem;
-      font-weight: 620;
-      color: var(--tint);
-      letter-spacing: -0.01em;
-    }
-
-    .word-chip.is-selected .check { display: block; }
-
-    /* ——— Empty / loading ——— */
-    .empty {
-      padding: 1.35rem 1.1rem;
-      border-radius: var(--radius-md);
-      background: var(--bg);
-      color: var(--label-secondary);
-      font-size: 0.92rem;
-      line-height: 1.5;
-      letter-spacing: -0.01em;
-    }
-
-    .empty strong { color: var(--label); font-weight: 600; }
-
-    .skeleton-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
-      gap: 0.5rem;
-    }
-
-    .skeleton {
-      height: 68px;
-      border-radius: var(--radius-md);
-      background: linear-gradient(90deg, var(--bg) 25%, var(--bg-fill) 50%, var(--bg) 75%);
-      background-size: 200% 100%;
-      animation: shimmer 1.1s linear infinite;
-    }
-
-    @keyframes shimmer {
-      to { background-position: -200% 0; }
-    }
-
-    .loading {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.55rem;
-      padding: 0.35rem 0;
-      color: var(--label-secondary);
-      font-size: 0.9rem;
-    }
-
-    .spinner {
-      width: 16px;
-      height: 16px;
-      border: 2px solid rgba(0, 0, 0, 0.08);
-      border-top-color: var(--tint);
-      border-radius: 50%;
-      animation: spin 0.65s linear infinite;
-    }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
-
     /* ——— Suggestions ——— */
     .summary-box {
-      padding: 1rem 1.05rem;
-      border-radius: var(--radius-md);
-      background: var(--tint-soft);
-      font-size: 0.95rem;
-      line-height: 1.5;
-      letter-spacing: -0.012em;
-      margin-bottom: 0.85rem;
-      animation: reveal-up 420ms var(--ease-out) both;
-    }
-
-    .tips-toggle {
-      width: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.75rem;
-      margin-bottom: 0.65rem;
-      padding: 0.75rem 0.9rem;
-      border: none;
-      border-radius: var(--radius-sm);
-      background: var(--bg);
-      color: var(--label);
-      font: inherit;
-      font-size: 0.88rem;
+      padding: 0.95rem 1rem;
+      border-radius: var(--r-sm);
+      background: var(--lavender-soft);
+      font-size: 0.9rem;
       font-weight: 600;
-      letter-spacing: -0.01em;
-      cursor: pointer;
-      transition: transform 120ms var(--ease-press), background 180ms var(--ease-out);
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    .tips-toggle:active { transform: scale(0.985); }
-
-    .tips-toggle .chev {
-      color: var(--label-tertiary);
-      transition: transform 220ms var(--ease-out);
-    }
-
-    .tips-toggle[aria-expanded="true"] .chev {
-      transform: rotate(180deg);
-    }
-
-    .tips-list {
-      margin: 0 0 0.85rem;
-      padding: 0;
-      list-style: none;
-      display: none;
-      flex-direction: column;
-      gap: 0.4rem;
-    }
-
-    .tips-list.is-open { display: flex; }
-
-    .tips-list li {
-      padding: 0.7rem 0.85rem;
-      border-radius: var(--radius-sm);
-      background: var(--bg);
-      font-size: 0.86rem;
       line-height: 1.45;
-      color: var(--label-secondary);
-      animation: reveal-up 320ms var(--ease-out) both;
+      margin-bottom: 0.75rem;
     }
 
-    .suggestion-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0.55rem;
-    }
+    .suggestion-list { display: flex; flex-direction: column; gap: 0.55rem; }
 
     .suggestion-card {
-      border-radius: var(--radius-md);
-      background: var(--bg);
+      border-radius: var(--r-sm);
+      background: var(--card-alt);
       overflow: clip;
-      transition:
-        transform 140ms var(--ease-press),
-        opacity 220ms var(--ease-out),
-        box-shadow 220ms var(--ease-out);
-      animation: reveal-up 420ms var(--ease-out) both;
-      animation-delay: var(--card-delay, 0ms);
+      animation: chip-in 380ms var(--ease-out) both;
+      animation-delay: var(--d, 0ms);
     }
 
-    .suggestion-card.is-hidden {
-      display: none;
-    }
-
-    .suggestion-card.is-focused {
-      box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.35);
-      background: #f7faff;
-    }
-
-    .suggestion-card.is-done {
-      opacity: 0.72;
-    }
-
-    .suggestion-card.is-done .card-title::after {
-      content: "Tried";
-      margin-left: 0.5rem;
-      padding: 0.12rem 0.45rem;
-      border-radius: 980px;
-      background: var(--success-soft);
-      color: #1f8f3a;
-      font-size: 0.68rem;
-      font-weight: 650;
-      vertical-align: middle;
-    }
+    .suggestion-card.is-hidden { display: none; }
+    .suggestion-card.is-focused { box-shadow: 0 0 0 2px var(--lavender); }
+    .suggestion-card.is-done { opacity: 0.7; }
 
     .card-head {
       width: 100%;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 0.75rem;
-      padding: 0.95rem 1rem;
+      gap: 0.65rem;
+      padding: 0.9rem 1rem;
       border: none;
       background: transparent;
-      color: inherit;
       font: inherit;
       text-align: left;
       cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
     }
 
-    .card-head:active { opacity: 0.85; }
-
-    .card-title {
+    .card-head h4 {
       margin: 0;
-      font-size: 1.05rem;
-      font-weight: 670;
-      letter-spacing: -0.025em;
+      font-family: "Fredoka", sans-serif;
+      font-size: 1rem;
+      font-weight: 600;
     }
 
     .card-meta {
-      display: flex;
-      align-items: center;
-      gap: 0.45rem;
-      flex-shrink: 0;
-      color: var(--label-tertiary);
-      font-size: 0.75rem;
-      font-weight: 560;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-muted);
     }
 
-    .card-meta .chev {
-      transition: transform 220ms var(--ease-out);
-    }
-
-    .suggestion-card.is-open .card-meta .chev {
-      transform: rotate(180deg);
-    }
+    .card-meta .chev { transition: transform 200ms var(--ease-out); }
+    .suggestion-card.is-open .chev { transform: rotate(180deg); }
 
     .card-body {
       display: grid;
       grid-template-rows: 0fr;
-      transition: grid-template-rows 260ms var(--ease-out);
+      transition: grid-template-rows 240ms var(--ease-out);
     }
 
-    .suggestion-card.is-open .card-body {
-      grid-template-rows: 1fr;
-    }
-
-    .card-body-inner {
-      overflow: hidden;
-      min-height: 0;
-    }
+    .suggestion-card.is-open .card-body { grid-template-rows: 1fr; }
+    .card-body-inner { overflow: hidden; min-height: 0; }
 
     .card-content {
       padding: 0 1rem 1rem;
       opacity: 0;
       transform: translateY(-4px);
-      transition:
-        opacity 200ms var(--ease-out),
-        transform 220ms var(--ease-out);
+      transition: opacity 180ms, transform 200ms var(--ease-out);
     }
 
     .suggestion-card.is-open .card-content {
       opacity: 1;
-      transform: translateY(0);
-    }
-
-    .question-list {
-      margin: 0;
-      padding: 0;
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 0.4rem;
+      transform: none;
     }
 
     .question-btn {
       width: 100%;
       display: flex;
       align-items: flex-start;
-      gap: 0.65rem;
-      padding: 0.75rem 0.8rem;
+      gap: 0.5rem;
+      padding: 0.7rem 0.75rem;
+      margin-bottom: 0.35rem;
       border: none;
-      border-radius: var(--radius-sm);
-      background: var(--bg-solid);
-      color: var(--label-secondary);
+      border-radius: 10px;
+      background: var(--card);
+      color: var(--text);
       font: inherit;
-      font-size: 0.9rem;
+      font-size: 0.86rem;
+      font-weight: 600;
       line-height: 1.4;
-      letter-spacing: -0.01em;
       text-align: left;
       cursor: pointer;
-      transition:
-        transform 120ms var(--ease-press),
-        background 180ms var(--ease-out),
-        color 180ms var(--ease-out);
-      -webkit-tap-highlight-color: transparent;
+      transition: transform 120ms var(--ease-press), background 160ms;
     }
 
-    .question-btn:hover { background: var(--tint-soft); color: var(--label); }
     .question-btn:active { transform: scale(0.985); }
-
-    .question-btn.is-copied {
-      background: var(--success-soft);
-      color: #1f8f3a;
-    }
-
-    .question-btn .q-mark {
-      flex-shrink: 0;
-      width: 1.2rem;
-      color: var(--tint);
-      font-weight: 700;
-      opacity: 0.75;
-    }
+    .question-btn.is-copied { background: rgba(92, 184, 138, 0.18); color: #2d7a52; }
 
     .question-btn .q-copy {
       margin-left: auto;
-      flex-shrink: 0;
-      font-size: 0.7rem;
-      font-weight: 620;
-      color: var(--label-tertiary);
+      font-size: 0.68rem;
+      color: var(--text-muted);
       opacity: 0;
-      transition: opacity 160ms var(--ease-out);
     }
 
     .question-btn:hover .q-copy,
-    .question-btn:focus-visible .q-copy,
-    .question-btn.is-copied .q-copy {
-      opacity: 1;
-    }
+    .question-btn.is-copied .q-copy { opacity: 1; }
 
     .activity-tip {
-      margin: 0.7rem 0 0;
-      padding: 0.65rem 0.75rem;
-      border-radius: var(--radius-sm);
-      background: var(--tint-soft);
-      font-size: 0.82rem;
-      line-height: 1.4;
-      color: var(--tint);
+      margin: 0.5rem 0 0;
+      padding: 0.6rem 0.7rem;
+      border-radius: 10px;
+      background: var(--lavender-soft);
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--purple);
     }
 
-    .card-actions {
-      display: flex;
-      gap: 0.45rem;
-      margin-top: 0.75rem;
+    .card-actions { display: flex; gap: 0.4rem; margin-top: 0.65rem; }
+
+    .empty, .loading {
+      padding: 1rem;
+      border-radius: var(--r-sm);
+      background: var(--card-alt);
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--text-2);
+      line-height: 1.45;
     }
+
+    .loading { display: flex; align-items: center; gap: 0.5rem; }
+
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--bar-muted);
+      border-top-color: var(--purple);
+      border-radius: 50%;
+      animation: spin 0.65s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .skeleton-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.5rem;
+    }
+
+    .skeleton {
+      height: 64px;
+      border-radius: var(--r-sm);
+      background: linear-gradient(90deg, var(--card-alt), #fff, var(--card-alt));
+      background-size: 200% 100%;
+      animation: shimmer 1s linear infinite;
+    }
+
+    @keyframes shimmer { to { background-position: -200% 0; } }
 
     .status {
-      margin: 0.85rem 0 0;
+      margin-top: 0.65rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--text-muted);
       min-height: 1.2em;
-      font-size: 0.82rem;
-      color: var(--label-tertiary);
     }
 
-    .status.err { color: var(--danger); }
     .status.ok { color: var(--success); }
+    .status.err { color: var(--danger); }
 
     /* ——— Practice dock ——— */
     .practice-dock {
       position: fixed;
       left: 50%;
-      bottom: calc(1rem + var(--safe-bottom));
+      bottom: calc(var(--nav-h) + var(--safe-bottom) + 0.5rem);
       z-index: 40;
-      width: min(calc(100% - 1.5rem), 420px);
-      transform: translateX(-50%) translateY(120%);
-      padding: 0.95rem 1rem 1rem;
-      border-radius: 22px;
-      background: rgba(28, 28, 30, 0.92);
-      backdrop-filter: blur(24px) saturate(160%);
-      -webkit-backdrop-filter: blur(24px) saturate(160%);
-      color: #f5f5f7;
-      box-shadow: var(--shadow-md);
-      transition: transform 380ms var(--ease-out), opacity 280ms var(--ease-out);
+      width: min(calc(100% - 2rem), 420px);
+      transform: translateX(-50%) translateY(130%);
+      padding: 1rem;
+      border-radius: var(--r-md);
+      background: var(--card-dark);
+      color: #fff;
+      box-shadow: var(--shadow);
+      transition: transform 360ms var(--ease-out), opacity 240ms;
       opacity: 0;
       pointer-events: none;
     }
@@ -747,107 +769,53 @@
       pointer-events: auto;
     }
 
-    .dock-top {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.75rem;
-      margin-bottom: 0.65rem;
-    }
-
-    .dock-word {
-      margin: 0;
-      font-size: 0.78rem;
-      font-weight: 650;
-      letter-spacing: 0.02em;
-      text-transform: uppercase;
-      color: rgba(255, 255, 255, 0.55);
-    }
-
-    .dock-close {
-      appearance: none;
-      border: none;
-      background: rgba(255, 255, 255, 0.12);
-      color: #fff;
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      font-size: 1rem;
-      line-height: 1;
-      cursor: pointer;
-      transition: transform 120ms var(--ease-press), background 160ms var(--ease-out);
-    }
-
-    .dock-close:active { transform: scale(0.92); }
-
     .dock-question {
-      margin: 0;
-      min-height: 3.2em;
-      font-size: 1.12rem;
-      font-weight: 600;
-      letter-spacing: -0.02em;
+      margin: 0.5rem 0 0;
+      font-family: "Fredoka", sans-serif;
+      font-size: 1.05rem;
       line-height: 1.3;
     }
 
     .dock-progress {
       display: flex;
-      gap: 0.3rem;
-      margin: 0.85rem 0 0.9rem;
+      gap: 0.25rem;
+      margin: 0.75rem 0;
     }
 
     .dock-dot {
       flex: 1;
       height: 3px;
-      border-radius: 980px;
-      background: rgba(255, 255, 255, 0.18);
-      transition: background 200ms var(--ease-out), transform 200ms var(--ease-out);
+      border-radius: 999px;
+      background: rgba(255,255,255,0.2);
     }
 
-    .dock-dot.is-active {
-      background: #fff;
-      transform: scaleY(1.35);
-    }
-
-    .dock-dot.is-done { background: rgba(52, 199, 89, 0.85); }
+    .dock-dot.is-active { background: #fff; }
+    .dock-dot.is-done { background: var(--success); }
 
     .dock-actions {
       display: grid;
       grid-template-columns: 1fr 1.2fr 1fr;
-      gap: 0.45rem;
+      gap: 0.4rem;
     }
 
-    .dock-actions .btn {
-      min-height: 42px;
-      background: rgba(255, 255, 255, 0.12);
-      color: #fff;
-    }
+    .dock-actions .btn { background: rgba(255,255,255,0.12); color: #fff; }
+    .dock-actions .btn.primary { background: var(--purple); }
 
-    .dock-actions .btn:hover:not(:disabled) {
-      background: rgba(255, 255, 255, 0.2);
-    }
-
-    .dock-actions .btn.primary {
-      background: var(--tint);
-    }
-
-    /* ——— Toast ——— */
     .toast {
       position: fixed;
-      top: calc(0.85rem + var(--safe-top));
+      top: calc(0.75rem + var(--safe-top));
       left: 50%;
       z-index: 50;
-      transform: translateX(-50%) translateY(-140%);
-      padding: 0.65rem 1rem;
-      border-radius: 980px;
-      background: rgba(28, 28, 30, 0.92);
+      transform: translateX(-50%) translateY(-120%);
+      padding: 0.6rem 1rem;
+      border-radius: 999px;
+      background: var(--card-dark);
       color: #fff;
-      font-size: 0.85rem;
-      font-weight: 560;
-      letter-spacing: -0.01em;
-      box-shadow: var(--shadow-md);
+      font-size: 0.82rem;
+      font-weight: 700;
       opacity: 0;
       pointer-events: none;
-      transition: transform 320ms var(--ease-out), opacity 240ms var(--ease-out);
+      transition: transform 280ms var(--ease-out), opacity 200ms;
     }
 
     .toast.is-visible {
@@ -855,210 +823,1271 @@
       opacity: 1;
     }
 
-    .reveal {
-      animation: reveal-up 480ms var(--ease-out) both;
-      animation-delay: var(--reveal-delay, 0ms);
+    /* ——— Bottom nav ——— */
+    .bottom-nav {
+      position: fixed;
+      left: 50%;
+      bottom: calc(0.65rem + var(--safe-bottom));
+      z-index: 35;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 0.15rem;
+      padding: 0.45rem 0.55rem;
+      border-radius: 999px;
+      background: var(--card-dark);
+      box-shadow: var(--shadow);
     }
 
-    @keyframes reveal-up {
-      from { opacity: 0; transform: translateY(10px) scale(0.98); }
-      to { opacity: 1; transform: translateY(0) scale(1); }
+    .nav-item {
+      appearance: none;
+      width: 48px;
+      height: 48px;
+      border: none;
+      border-radius: 50%;
+      background: transparent;
+      color: rgba(255, 255, 255, 0.45);
+      font-size: 1.15rem;
+      cursor: pointer;
+      transition: transform 140ms var(--ease-press), color 160ms, background 160ms;
+      -webkit-tap-highlight-color: transparent;
+      position: relative;
     }
 
-    @media (min-width: 820px) {
-      .stack {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        align-items: start;
-        gap: 1rem;
-      }
+    .nav-item:active { transform: scale(0.92); }
 
-      .stack > .panel:first-child {
-        position: sticky;
-        top: calc(4.5rem + var(--safe-top));
-      }
+    .nav-item.is-active {
+      background: var(--purple);
+      color: #fff;
+      transform: translateY(-6px);
+      box-shadow: 0 6px 16px rgba(108, 92, 224, 0.45);
     }
 
-    @media (prefers-reduced-motion: reduce) {
-      .reveal, .word-chip, .suggestion-card, .summary-box, .tips-list li, .skeleton, .spinner {
-        animation: none !important;
-      }
-      .btn, .word-chip, .suggestion-card, .card-body, .card-content, .practice-dock, .toast, .question-btn {
-        transition: none !important;
-      }
-      .btn:active:not(:disabled),
-      .word-chip:active,
-      .question-btn:active {
-        transform: none;
-      }
-      .practice-dock { transform: translateX(-50%); }
-      .practice-dock.is-open { opacity: 1; }
-      .toast { transform: translateX(-50%); }
+    /* ——— New parent UI blocks ——— */
+    .sync-strip {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      padding: 0.75rem 0.9rem;
+      border-radius: var(--r-md);
+      background: var(--card);
+      box-shadow: var(--shadow-sm);
     }
 
-    @media (prefers-reduced-transparency: reduce) {
-      .topbar, .practice-dock, .toast {
-        backdrop-filter: none;
-        -webkit-backdrop-filter: none;
-      }
-      .topbar { background: var(--bg); }
-      .practice-dock, .toast { background: #1c1c1e; }
+    .sync-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      background: var(--success);
+      box-shadow: 0 0 0 3px rgba(92, 184, 138, 0.25);
     }
+
+    .sync-dot.is-warn {
+      background: var(--orange);
+      box-shadow: 0 0 0 3px rgba(238, 155, 92, 0.28);
+    }
+
+    .sync-dot.is-off {
+      background: var(--text-muted);
+      box-shadow: none;
+    }
+
+    .sync-strip strong {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 800;
+    }
+
+    .sync-strip span {
+      display: block;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text-2);
+      margin-top: 0.1rem;
+    }
+
+    .today-card {
+      padding: 1rem 1.05rem;
+      border-radius: var(--r-md);
+      background: var(--card);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .today-card .eyebrow {
+      margin: 0 0 0.45rem;
+      font-size: 0.65rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .today-card .summary {
+      margin: 0;
+      font-size: 0.95rem;
+      font-weight: 700;
+      line-height: 1.45;
+    }
+
+    .today-card .meta {
+      margin: 0.55rem 0 0;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-2);
+    }
+
+    .tonight-card {
+      padding: 1rem 1.05rem 1.1rem;
+      border-radius: var(--r-md);
+      background: linear-gradient(135deg, var(--orange) 0%, var(--orange-to) 100%);
+      color: #fff;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .tonight-card .eyebrow {
+      margin: 0 0 0.5rem;
+      font-size: 0.65rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      opacity: 0.85;
+    }
+
+    .tonight-card h3 {
+      margin: 0 0 0.75rem;
+      font-size: 1.05rem;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .tonight-words {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+    }
+
+    .tonight-word {
+      appearance: none;
+      padding: 0.45rem 0.75rem;
+      border: none;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.22);
+      color: #fff;
+      font: inherit;
+      font-size: 0.82rem;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 120ms var(--ease-press), background 160ms;
+    }
+
+    .tonight-word:active { transform: scale(0.96); }
+    .tonight-word.is-done { background: rgba(255,255,255,0.38); text-decoration: line-through; opacity: 0.85; }
+
+    .compare-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.65rem;
+    }
+
+    .compare-card {
+      padding: 0.9rem 0.95rem;
+      border-radius: var(--r-md);
+      background: var(--card);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .compare-card .lbl {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-2);
+    }
+
+    .compare-card .vals {
+      display: flex;
+      align-items: baseline;
+      gap: 0.45rem;
+      margin-top: 0.35rem;
+    }
+
+    .compare-card .now {
+      font-family: "Fredoka", sans-serif;
+      font-size: 1.5rem;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .delta {
+      font-size: 0.72rem;
+      font-weight: 800;
+      padding: 0.15rem 0.45rem;
+      border-radius: 999px;
+    }
+
+    .delta.up { background: rgba(92, 184, 138, 0.18); color: #2d7a52; }
+    .delta.down { background: rgba(225, 79, 79, 0.14); color: var(--danger); }
+    .delta.flat { background: var(--card-alt); color: var(--text-2); }
+
+    .progress-track {
+      height: 8px;
+      border-radius: 999px;
+      background: var(--bar-muted);
+      overflow: hidden;
+      margin: 0.65rem 0 0.4rem;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--purple), var(--purple-to));
+      transition: width 500ms var(--ease-out);
+    }
+
+    .progress-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-2);
+    }
+
+    .digest-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding: 0.9rem 1rem;
+      border-radius: var(--r-md);
+      background: var(--card);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .digest-card strong {
+      display: block;
+      font-size: 0.88rem;
+      font-weight: 800;
+    }
+
+    .digest-card span {
+      display: block;
+      margin-top: 0.15rem;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text-2);
+    }
+
+    .toggle {
+      appearance: none;
+      width: 48px;
+      height: 28px;
+      border: none;
+      border-radius: 999px;
+      background: var(--bar-muted);
+      position: relative;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background 180ms;
+    }
+
+    .toggle::after {
+      content: "";
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+      transition: transform 180ms var(--ease-out);
+    }
+
+    .toggle.is-on { background: var(--purple); }
+    .toggle.is-on::after { transform: translateX(20px); }
+
+    .learner-switch {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding: 0.85rem 1rem;
+      border-radius: var(--r-md);
+      background: var(--lavender-soft);
+    }
+
+    .learner-switch strong {
+      display: block;
+      font-size: 0.88rem;
+      font-weight: 800;
+    }
+
+    .learner-switch span {
+      display: block;
+      margin-top: 0.1rem;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text-2);
+    }
+
+    .badge-practice {
+      display: inline-block;
+      margin-top: 0.25rem;
+      padding: 0.12rem 0.4rem;
+      border-radius: 999px;
+      background: rgba(238, 155, 92, 0.22);
+      color: #b86a28;
+      font-size: 0.62rem;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+
+    .word-chip.needs-practice {
+      border-color: rgba(238, 155, 92, 0.55);
+      background: rgba(238, 155, 92, 0.12);
+    }
+
+    .checklist {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      margin-top: 0.75rem;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      padding: 0.7rem 0.8rem;
+      border-radius: var(--r-sm);
+      background: var(--card-alt);
+      cursor: pointer;
+      transition: background 160ms, transform 120ms var(--ease-press);
+    }
+
+    .check-item:active { transform: scale(0.99); }
+    .check-item.is-done { opacity: 0.65; }
+
+    .check-box {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      border: 2px solid var(--lavender);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 800;
+      color: #fff;
+      flex-shrink: 0;
+      transition: background 160ms, border-color 160ms;
+    }
+
+    .check-item.is-done .check-box {
+      background: var(--success);
+      border-color: var(--success);
+    }
+
+    .check-item strong {
+      font-family: "Fredoka", sans-serif;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+
+    .check-item span {
+      margin-left: auto;
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: var(--text-muted);
+    }
+
+    .coming-soon {
+      font-size: 0.65rem;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--purple);
+      opacity: 0.8;
+    }
+
+    .lang-select-wrap {
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .lang-select {
+      appearance: none;
+      min-width: 7.25rem;
+      max-width: 8.5rem;
+      min-height: 40px;
+      padding: 0 1.85rem 0 0.7rem;
+      border: none;
+      border-radius: 999px;
+      background:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%238A8A94' d='M1.4 1.4 6 6l4.6-4.6'/%3E%3C/svg%3E") no-repeat right 0.7rem center,
+        var(--card);
+      box-shadow: var(--shadow-sm);
+      color: var(--text);
+      font: inherit;
+      font-size: 0.72rem;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 120ms var(--ease-press), box-shadow 160ms;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .lang-select:active { transform: scale(0.97); }
+    .lang-select:focus-visible {
+      outline: 2px solid var(--purple);
+      outline-offset: 2px;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
   </style>
+  <script>
+(function (global) {
+  const STORAGE_KEY = "lango-parent-lang";
+  const LANGS = ["en", "zh-Hant", "zh-Hans"];
+
+  const STRINGS = {
+    en: {
+      pageTitle: "Parent Portal — Lango",
+      loginTitle: "Parent Sign In — Lango",
+      langLabel: "Language",
+      langEn: "English",
+      langZhHant: "繁體中文",
+      langZhHans: "简体中文",
+      hello: "Hello, {name}",
+      streakLoading: "Loading activity…",
+      streakDays: "{n}-day streak",
+      streakCheckedIn: "checked in today",
+      streakCheckedOnly: "Checked in today",
+      streakNone: "No streak yet — play a game today",
+      refresh: "Refresh",
+      notifications: "Notifications",
+      navHome: "Home",
+      navWords: "Words",
+      navPractice: "Practice",
+      navProgress: "Progress",
+      syncChecking: "Checking smartpen…",
+      syncWaiting: "Waiting for sync data",
+      syncNotYet: "Smartpen not synced yet",
+      syncNotYetSub: "Words appear after the app connects and syncs",
+      syncToday: "Smartpen synced today",
+      syncLastWord: "Last word: {word} · {when}",
+      syncDaysAgo: "Synced {n} day ago",
+      syncDaysAgoPlural: "Synced {n} days ago",
+      syncLastWordShort: "Last word: {word}",
+      syncStale: "Sync may be stale",
+      syncStaleSub: "Last activity {when} — check the app is open",
+      todayEyebrow: "Today with Uncle Tommy",
+      todayLoading: "Loading today's learning…",
+      todayLearned: "{name} learned {n} new word today — {words}.",
+      todayLearnedPlural: "{name} learned {n} new words today — {words}.",
+      todayGames: "{name} played {n} game today. Ask what they enjoyed!",
+      todayGamesPlural: "{name} played {n} games today. Ask what they enjoyed!",
+      todayQuiet: "No new activity yet today. A short chat with {name} still helps.",
+      todayMeta: "Today · {parts}",
+      todayMetaNewWord: "{n} new word",
+      todayMetaNewWords: "{n} new words",
+      todayMetaGame: "{n} game",
+      todayMetaGames: "{n} games",
+      todayMetaCheckedIn: "checked in",
+      todayMetaFallback: "Session summary will improve when Uncle Tommy data connects",
+      tonightEyebrow: "Tonight's 3 words",
+      tonightPick: "Pick 3 to practice at home",
+      tonightWaiting: "Words will appear after sync",
+      tonightWaitingSub: "Waiting for smartpen words…",
+      tonightPractice: "Practice these {n} tonight",
+      compareWords: "Words · this week",
+      compareGames: "Games · this week",
+      compareSame: "—",
+      heroTitle: "Practice tonight's words together",
+      heroTitleNamed: "Practice with {name} tonight",
+      heroText: "Turn smartpen vocabulary into a short, warm conversation at home.",
+      heroCta: "Get conversation ideas",
+      heroCtaAria: "Generate practice ideas",
+      statWordsWeek: "Words this week",
+      statGamesWeek: "Games this week",
+      priorityEyebrow: "Your focus",
+      priorityGoal: "{current} of {goal} home practice moments",
+      weeklyActivity: "Weekly activity",
+      weeklyActivitySub: "Games played each day",
+      chartRange: "7 days ▾",
+      tonightEyebrowDark: "Tonight",
+      featureProgress: "{done}/{total} tonight's words practiced",
+      featureWaiting: "Words will appear after smartpen sync",
+      featureDefault: "Open practice ideas for recent words",
+      featureCtaAria: "Go to practice",
+      wordsTitle: "Smartpen words",
+      wordsLead: "Tap a word to focus practice.",
+      wordsLeadClear: "Tap again to clear focus.",
+      focusOn: "Focusing on “{word}”",
+      showAll: "Show all",
+      chipAll: "All",
+      chipSmartpen: "Smartpen",
+      chipGames: "Games",
+      chipNeedsPractice: "Needs practice",
+      badgePractice: "Practice",
+      vocabEmpty: "No words yet. They appear when the smartpen syncs or games record vocabulary.",
+      practiceTitle: "Practice at home",
+      practiceSub: "Copy questions or try them one by one.",
+      practiceEmpty: "Tap <strong>Generate</strong> for warm conversation ideas based on recent words.",
+      checklistTitle: "Tonight's checklist",
+      checklistSub: "Tick off words you practiced at home.",
+      checklistEmpty: "Tonight's words will show here after sync.",
+      checklistDone: "Done",
+      checklistTap: "Tap to mark",
+      generate: "Generate",
+      generating: "…",
+      preparing: "Preparing ideas…",
+      suggestionsEmpty: "No suggestions yet.",
+      suggestionsRegen: "Generate again after more words sync.",
+      copy: "Copy",
+      copied: "Copied",
+      tryNow: "Try now",
+      focus: "Focus",
+      statusReady: "Ready — tap a question to copy.",
+      statusNoWords: "No words yet.",
+      statusIdeasReady: "Ideas ready!",
+      learnerOne: "{name}",
+      signedInAs: "Signed in as {user}",
+      addChildSoon: "+ Add child soon",
+      streakLabel: "Day streak",
+      starsLabel: "Total stars",
+      digestTitle: "Weekly digest",
+      digestOff: "Get a Sunday summary of words & progress",
+      digestOn: "You'll get a Sunday summary (coming soon)",
+      digestAria: "Enable weekly digest",
+      digestSaved: "Digest saved for later",
+      digestOffToast: "Digest off",
+      profileTitle: "Learning profile",
+      profileSub: "What we know about your learner",
+      profileEmpty: "Profile details will appear as your child uses Lango.",
+      profileGrade: "Grade",
+      profileLearning: "Learning",
+      profileHomeLang: "Home language",
+      profileVocabLevel: "Vocabulary level",
+      gamesTitle: "Recent games",
+      gamesSub: "Last 7 days breakdown",
+      gamesEmpty: "No games recorded in the last 7 days.",
+      gamesPlays: "{n} plays",
+      chartEmpty: "No game activity yet.",
+      signOut: "Sign out",
+      dockBack: "Back",
+      dockNext: "Next",
+      dockDone: "Done",
+      dockClose: "Close",
+      niceWork: "Nice work!",
+      noQuestions: "No questions yet",
+      couldNotCopy: "Could not copy",
+      copiedToast: "Copied!",
+      loginEyebrow: "Parent Portal",
+      loginHeading: "See what they learned",
+      loginSub: "Sign in with your child's learner account to view smartpen vocabulary and get practice ideas.",
+      loginUsername: "Learner username",
+      loginPassword: "Password",
+      loginPlaceholder: "e.g. user01",
+      loginContinue: "Continue",
+      loginSigningIn: "Signing in…",
+      loginHint: "Looking for Uncle Tommy voice practice?",
+      loginStudent: "Student sign in",
+      loginFailed: "Sign in failed.",
+      loginCouldNot: "Could not sign in.",
+      word: "word",
+      words: "words",
+      qCount: "{n} Q",
+      activityTip: "No questions generated for this word.",
+    },
+    "zh-Hant": {
+      pageTitle: "家長入口 — Lango",
+      loginTitle: "家長登入 — Lango",
+      langLabel: "語言",
+      langEn: "English",
+      langZhHant: "繁體中文",
+      langZhHans: "简体中文",
+      hello: "你好，{name}",
+      streakLoading: "載入學習狀態…",
+      streakDays: "連續 {n} 天",
+      streakCheckedIn: "今日已簽到",
+      streakCheckedOnly: "今日已簽到",
+      streakNone: "尚未有連續紀錄 — 今日玩一場遊戲吧",
+      refresh: "重新整理",
+      notifications: "通知",
+      navHome: "首頁",
+      navWords: "詞彙",
+      navPractice: "練習",
+      navProgress: "進度",
+      syncChecking: "檢查智能筆…",
+      syncWaiting: "等待同步資料",
+      syncNotYet: "智能筆尚未同步",
+      syncNotYetSub: "應用程式連線並同步後，詞彙會顯示在這裡",
+      syncToday: "智能筆今日已同步",
+      syncLastWord: "最近詞彙：{word} · {when}",
+      syncDaysAgo: "{n} 天前已同步",
+      syncDaysAgoPlural: "{n} 天前已同步",
+      syncLastWordShort: "最近詞彙：{word}",
+      syncStale: "同步可能已過時",
+      syncStaleSub: "上次活動 {when} — 請確認應用程式已開啟",
+      todayEyebrow: "今日與 Uncle Tommy",
+      todayLoading: "載入今日學習…",
+      todayLearned: "{name} 今日學了 {n} 個新詞 — {words}。",
+      todayLearnedPlural: "{name} 今日學了 {n} 個新詞 — {words}。",
+      todayGames: "{name} 今日玩了 {n} 場遊戲，問問他喜歡什麼！",
+      todayGamesPlural: "{name} 今日玩了 {n} 場遊戲，問問他喜歡什麼！",
+      todayQuiet: "今日暫無新活動，和 {name} 簡短聊聊也很有幫助。",
+      todayMeta: "今日 · {parts}",
+      todayMetaNewWord: "{n} 個新詞",
+      todayMetaNewWords: "{n} 個新詞",
+      todayMetaGame: "{n} 場遊戲",
+      todayMetaGames: "{n} 場遊戲",
+      todayMetaCheckedIn: "已簽到",
+      todayMetaFallback: "連接 Uncle Tommy 資料後，摘要會更完整",
+      tonightEyebrow: "今晚 3 個詞",
+      tonightPick: "揀 3 個在家練習",
+      tonightWaiting: "同步後會顯示詞彙",
+      tonightWaitingSub: "等待智能筆詞彙…",
+      tonightPractice: "今晚練習這 {n} 個",
+      compareWords: "本週詞彙",
+      compareGames: "本週遊戲",
+      compareSame: "—",
+      heroTitle: "今晚一起練習詞彙",
+      heroTitleNamed: "今晚和 {name} 一起練",
+      heroText: "把智能筆詞彙變成在家裡的自然對話。",
+      heroCta: "取得對話建議",
+      heroCtaAria: "產生練習建議",
+      statWordsWeek: "本週詞彙",
+      statGamesWeek: "本週遊戲",
+      priorityEyebrow: "你的重點",
+      priorityGoal: "本週在家練習 {current}/{goal} 次",
+      weeklyActivity: "每週活動",
+      weeklyActivitySub: "每日遊戲次數",
+      chartRange: "7 天 ▾",
+      tonightEyebrowDark: "今晚",
+      featureProgress: "今晚已練 {done}/{total} 個詞",
+      featureWaiting: "智能筆同步後會顯示詞彙",
+      featureDefault: "查看最近詞彙的練習建議",
+      featureCtaAria: "前往練習",
+      wordsTitle: "智能筆詞彙",
+      wordsLead: "點選詞彙以聚焦練習。",
+      wordsLeadClear: "再點一次清除聚焦。",
+      focusOn: "聚焦於「{word}」",
+      showAll: "顯示全部",
+      chipAll: "全部",
+      chipSmartpen: "智能筆",
+      chipGames: "遊戲",
+      chipNeedsPractice: "需加強",
+      badgePractice: "練習",
+      vocabEmpty: "暫無詞彙。智能筆同步或遊戲記錄後會顯示。",
+      practiceTitle: "在家練習",
+      practiceSub: "複製問題或逐條試試。",
+      practiceEmpty: "點擊<strong>產生</strong>取得溫暖的對話建議。",
+      checklistTitle: "今晚清單",
+      checklistSub: "勾選已在家練習的詞。",
+      checklistEmpty: "同步後會顯示今晚的詞。",
+      checklistDone: "完成",
+      checklistTap: "點擊標記",
+      generate: "產生",
+      generating: "…",
+      preparing: "準備建議中…",
+      suggestionsEmpty: "暫無建議。",
+      suggestionsRegen: "更多詞彙同步後再試。",
+      copy: "複製",
+      copied: "已複製",
+      tryNow: "立即試",
+      focus: "聚焦",
+      statusReady: "已就緒 — 點問題即可複製。",
+      statusNoWords: "暫無詞彙。",
+      statusIdeasReady: "建議已就緒！",
+      learnerOne: "{name}",
+      signedInAs: "登入帳戶 {user}",
+      addChildSoon: "+ 即將支援多子女",
+      streakLabel: "連續天數",
+      starsLabel: "總星星",
+      digestTitle: "每週摘要",
+      digestOff: "每週日收到詞彙與進度摘要",
+      digestOn: "將於每週日收到摘要（即將推出）",
+      digestAria: "啟用每週摘要",
+      digestSaved: "已儲存，稍後推出",
+      digestOffToast: "已關閉摘要",
+      profileTitle: "學習檔案",
+      profileSub: "我們對學習者的了解",
+      profileEmpty: "孩子使用 Lango 後會顯示更多資料。",
+      profileGrade: "年級",
+      profileLearning: "學習語言",
+      profileHomeLang: "家中語言",
+      profileVocabLevel: "詞彙程度",
+      gamesTitle: "最近遊戲",
+      gamesSub: "過去 7 天分佈",
+      gamesEmpty: "過去 7 天沒有遊戲紀錄。",
+      gamesPlays: "{n} 次",
+      chartEmpty: "暫無遊戲活動。",
+      signOut: "登出",
+      dockBack: "上一步",
+      dockNext: "下一步",
+      dockDone: "完成",
+      dockClose: "關閉",
+      niceWork: "做得好！",
+      noQuestions: "暫無問題",
+      couldNotCopy: "無法複製",
+      copiedToast: "已複製！",
+      loginEyebrow: "家長入口",
+      loginHeading: "看看孩子學了什麼",
+      loginSub: "使用孩子的學習帳戶登入，查看智能筆詞彙並取得練習建議。",
+      loginUsername: "學習者帳戶",
+      loginPassword: "密碼",
+      loginPlaceholder: "例如 user01",
+      loginContinue: "繼續",
+      loginSigningIn: "登入中…",
+      loginHint: "想找 Uncle Tommy 語音練習？",
+      loginStudent: "學生登入",
+      loginFailed: "登入失敗。",
+      loginCouldNot: "無法登入。",
+      word: "詞",
+      words: "詞",
+      qCount: "{n} 題",
+      activityTip: "此詞暫無產生問題。",
+    },
+    "zh-Hans": {
+      pageTitle: "家长入口 — Lango",
+      loginTitle: "家长登录 — Lango",
+      langLabel: "语言",
+      langEn: "English",
+      langZhHant: "繁體中文",
+      langZhHans: "简体中文",
+      hello: "你好，{name}",
+      streakLoading: "加载学习状态…",
+      streakDays: "连续 {n} 天",
+      streakCheckedIn: "今日已签到",
+      streakCheckedOnly: "今日已签到",
+      streakNone: "尚无连续记录 — 今天玩一场游戏吧",
+      refresh: "刷新",
+      notifications: "通知",
+      navHome: "首页",
+      navWords: "词汇",
+      navPractice: "练习",
+      navProgress: "进度",
+      syncChecking: "检查智能笔…",
+      syncWaiting: "等待同步数据",
+      syncNotYet: "智能笔尚未同步",
+      syncNotYetSub: "应用连接并同步后，词汇会显示在这里",
+      syncToday: "智能笔今日已同步",
+      syncLastWord: "最近词汇：{word} · {when}",
+      syncDaysAgo: "{n} 天前已同步",
+      syncDaysAgoPlural: "{n} 天前已同步",
+      syncLastWordShort: "最近词汇：{word}",
+      syncStale: "同步可能已过时",
+      syncStaleSub: "上次活动 {when} — 请确认应用已打开",
+      todayEyebrow: "今日与 Uncle Tommy",
+      todayLoading: "加载今日学习…",
+      todayLearned: "{name} 今天学了 {n} 个新词 — {words}。",
+      todayLearnedPlural: "{name} 今天学了 {n} 个新词 — {words}。",
+      todayGames: "{name} 今天玩了 {n} 场游戏，问问他喜欢什么！",
+      todayGamesPlural: "{name} 今天玩了 {n} 场游戏，问问他喜欢什么！",
+      todayQuiet: "今天暂无新活动，和 {name} 简短聊聊也很有帮助。",
+      todayMeta: "今日 · {parts}",
+      todayMetaNewWord: "{n} 个新词",
+      todayMetaNewWords: "{n} 个新词",
+      todayMetaGame: "{n} 场游戏",
+      todayMetaGames: "{n} 场游戏",
+      todayMetaCheckedIn: "已签到",
+      todayMetaFallback: "连接 Uncle Tommy 数据后，摘要会更完整",
+      tonightEyebrow: "今晚 3 个词",
+      tonightPick: "选 3 个在家练习",
+      tonightWaiting: "同步后会显示词汇",
+      tonightWaitingSub: "等待智能笔词汇…",
+      tonightPractice: "今晚练习这 {n} 个",
+      compareWords: "本周词汇",
+      compareGames: "本周游戏",
+      compareSame: "—",
+      heroTitle: "今晚一起练习词汇",
+      heroTitleNamed: "今晚和 {name} 一起练",
+      heroText: "把智能笔词汇变成在家里的自然对话。",
+      heroCta: "获取对话建议",
+      heroCtaAria: "生成练习建议",
+      statWordsWeek: "本周词汇",
+      statGamesWeek: "本周游戏",
+      priorityEyebrow: "你的重点",
+      priorityGoal: "本周在家练习 {current}/{goal} 次",
+      weeklyActivity: "每周活动",
+      weeklyActivitySub: "每日游戏次数",
+      chartRange: "7 天 ▾",
+      tonightEyebrowDark: "今晚",
+      featureProgress: "今晚已练 {done}/{total} 个词",
+      featureWaiting: "智能笔同步后会显示词汇",
+      featureDefault: "查看最近词汇的练习建议",
+      featureCtaAria: "前往练习",
+      wordsTitle: "智能笔词汇",
+      wordsLead: "点选词汇以聚焦练习。",
+      wordsLeadClear: "再点一次清除聚焦。",
+      focusOn: "聚焦于「{word}」",
+      showAll: "显示全部",
+      chipAll: "全部",
+      chipSmartpen: "智能笔",
+      chipGames: "游戏",
+      chipNeedsPractice: "需加强",
+      badgePractice: "练习",
+      vocabEmpty: "暂无词汇。智能笔同步或游戏记录后会显示。",
+      practiceTitle: "在家练习",
+      practiceSub: "复制问题或逐条试试。",
+      practiceEmpty: "点击<strong>生成</strong>获取温暖的对话建议。",
+      checklistTitle: "今晚清单",
+      checklistSub: "勾选已在家练习的词。",
+      checklistEmpty: "同步后会显示今晚的词。",
+      checklistDone: "完成",
+      checklistTap: "点击标记",
+      generate: "生成",
+      generating: "…",
+      preparing: "准备建议中…",
+      suggestionsEmpty: "暂无建议。",
+      suggestionsRegen: "更多词汇同步后再试。",
+      copy: "复制",
+      copied: "已复制",
+      tryNow: "立即试",
+      focus: "聚焦",
+      statusReady: "已就绪 — 点问题即可复制。",
+      statusNoWords: "暂无词汇。",
+      statusIdeasReady: "建议已就绪！",
+      learnerOne: "{name}",
+      signedInAs: "登录账户 {user}",
+      addChildSoon: "+ 即将支持多子女",
+      streakLabel: "连续天数",
+      starsLabel: "总星星",
+      digestTitle: "每周摘要",
+      digestOff: "每周日收到词汇与进度摘要",
+      digestOn: "将于每周日收到摘要（即将推出）",
+      digestAria: "启用每周摘要",
+      digestSaved: "已保存，稍后推出",
+      digestOffToast: "已关闭摘要",
+      profileTitle: "学习档案",
+      profileSub: "我们对学习者的了解",
+      profileEmpty: "孩子使用 Lango 后会显示更多资料。",
+      profileGrade: "年级",
+      profileLearning: "学习语言",
+      profileHomeLang: "家中语言",
+      profileVocabLevel: "词汇程度",
+      gamesTitle: "最近游戏",
+      gamesSub: "过去 7 天分布",
+      gamesEmpty: "过去 7 天没有游戏记录。",
+      gamesPlays: "{n} 次",
+      chartEmpty: "暂无游戏活动。",
+      signOut: "登出",
+      dockBack: "上一步",
+      dockNext: "下一步",
+      dockDone: "完成",
+      dockClose: "关闭",
+      niceWork: "做得好！",
+      noQuestions: "暂无问题",
+      couldNotCopy: "无法复制",
+      copiedToast: "已复制！",
+      loginEyebrow: "家长入口",
+      loginHeading: "看看孩子学了什么",
+      loginSub: "使用孩子的学习账户登录，查看智能笔词汇并获取练习建议。",
+      loginUsername: "学习者账户",
+      loginPassword: "密码",
+      loginPlaceholder: "例如 user01",
+      loginContinue: "继续",
+      loginSigningIn: "登录中…",
+      loginHint: "想找 Uncle Tommy 语音练习？",
+      loginStudent: "学生登录",
+      loginFailed: "登录失败。",
+      loginCouldNot: "无法登录。",
+      word: "词",
+      words: "词",
+      qCount: "{n} 题",
+      activityTip: "此词暂无生成问题。",
+    },
+  };
+
+  const DAY_LABELS = {
+    en: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+    "zh-Hant": ["日", "一", "二", "三", "四", "五", "六"],
+    "zh-Hans": ["日", "一", "二", "三", "四", "五", "六"],
+  };
+
+  function normalizeLang(raw) {
+    const v = String(raw || "").trim();
+    if (LANGS.includes(v)) return v;
+    if (v.startsWith("zh")) {
+      if (v.includes("Hans") || v === "zh-CN" || v === "zh-SG") return "zh-Hans";
+      return "zh-Hant";
+    }
+    return "en";
+  }
+
+  function getParentLang() {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) return normalizeLang(saved);
+    } catch { /* ignore */ }
+    const nav = navigator.language || "en";
+    return normalizeLang(nav);
+  }
+
+  let currentLang = getParentLang();
+
+  function setParentLang(lang) {
+    currentLang = normalizeLang(lang);
+    try { localStorage.setItem(STORAGE_KEY, currentLang); } catch { /* ignore */ }
+    document.documentElement.lang = currentLang === "zh-Hans" ? "zh-Hans" : currentLang === "zh-Hant" ? "zh-Hant" : "en";
+    applyParentI18n();
+    global.dispatchEvent(new CustomEvent("parent-lang-change", { detail: { lang: currentLang } }));
+    return currentLang;
+  }
+
+  function t(key, params = {}) {
+    const table = STRINGS[currentLang] || STRINGS.en;
+    const fallback = STRINGS.en[key] || key;
+    let text = table[key] ?? fallback;
+    for (const [k, v] of Object.entries(params)) {
+      text = text.replaceAll(`{${k}}`, String(v ?? ""));
+    }
+    return text;
+  }
+
+  function dayLabels() {
+    return DAY_LABELS[currentLang] || DAY_LABELS.en;
+  }
+
+  function applyParentI18n(root = document) {
+    root.querySelectorAll("[data-i18n]").forEach((el) => {
+      const key = el.getAttribute("data-i18n");
+      if (key) el.textContent = t(key);
+    });
+    root.querySelectorAll("[data-i18n-html]").forEach((el) => {
+      const key = el.getAttribute("data-i18n-html");
+      if (key) el.innerHTML = t(key);
+    });
+    root.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
+      const key = el.getAttribute("data-i18n-placeholder");
+      if (key) el.placeholder = t(key);
+    });
+    root.querySelectorAll("[data-i18n-aria]").forEach((el) => {
+      const key = el.getAttribute("data-i18n-aria");
+      if (key) el.setAttribute("aria-label", t(key));
+    });
+    root.querySelectorAll("[data-i18n-title]").forEach((el) => {
+      const key = el.getAttribute("data-i18n-title");
+      if (key) el.title = t(key);
+    });
+    document.querySelectorAll(".lang-select").forEach((sel) => {
+      sel.value = currentLang;
+    });
+    if (document.titleKey) document.title = t(document.titleKey);
+  }
+
+  global.ParentI18n = {
+    LANGS,
+    getParentLang: () => currentLang,
+    setParentLang,
+    t,
+    dayLabels,
+    applyParentI18n,
+  };
+})(window);
+
+</script>
 </head>
 <body>
-  <header class="topbar" id="topbar">
-    <div class="brand">
-      <img src="/langoLogo.jpeg" alt="Lango" width="36" height="36" decoding="async">
-      <div class="brand-text">
-        <p class="eyebrow">Lango</p>
-        <h1 id="account-label">Parent Portal</h1>
+  <div class="app">
+    <header class="global-header">
+      <img class="avatar" src="/langoLogo.jpeg" alt="" width="44" height="44" decoding="async">
+      <div class="greeting">
+        <p class="hello" id="greeting">Hello, parent</p>
+        <p class="sub" id="greeting-sub">
+          <span class="streak-dot">🔥</span>
+          <span id="streak-line" data-i18n="streakLoading">Loading activity…</span>
+        </p>
       </div>
-    </div>
-    <div class="topbar-actions">
-      <button type="button" class="btn ghost" id="refresh-btn">Refresh</button>
-      <button type="button" class="btn" id="logout-btn">Sign out</button>
-    </div>
-  </header>
-
-  <main class="page">
-    <section class="hero reveal" style="--reveal-delay: 40ms">
-      <p class="hero-kicker" id="hero-kicker">Smartpen at home</p>
-      <h2 id="hero-title">Vocabulary that came home with them</h2>
-      <p id="hero-text">Tap a word to focus practice. Open a card, copy a question, or start a quick try-now session.</p>
-      <div class="stat-strip" id="stat-strip">
-        <div class="stat">
-          <span class="num" id="stat-words">0</span>
-          <span class="lbl">Words</span>
-        </div>
-        <div class="stat">
-          <span class="num" id="stat-ideas">0</span>
-          <span class="lbl">Ideas</span>
-        </div>
-        <div class="stat">
-          <span class="num" id="stat-tried">0</span>
-          <span class="lbl">Tried</span>
-        </div>
+      <div class="lang-select-wrap">
+        <label class="sr-only" for="lang-select" data-i18n="langLabel">Language</label>
+        <select id="lang-select" class="lang-select" aria-label="Language">
+          <option value="en" data-i18n="langEn">English</option>
+          <option value="zh-Hant" data-i18n="langZhHant">繁體中文</option>
+          <option value="zh-Hans" data-i18n="langZhHans">简体中文</option>
+        </select>
       </div>
-    </section>
+      <button type="button" class="icon-btn" id="refresh-btn" data-i18n-title="refresh" data-i18n-aria="refresh">↻</button>
+      <button type="button" class="icon-btn" id="notif-btn" data-i18n-title="notifications" data-i18n-aria="notifications">
+        🔔
+        <span class="badge" id="notif-badge"></span>
+      </button>
+    </header>
 
-    <div class="stack">
-      <section class="panel reveal" style="--reveal-delay: 100ms">
-        <div class="panel-header">
+    <main>
+      <!-- HOME -->
+      <section id="view-home" class="view is-active section-gap">
+        <div class="sync-strip" id="sync-strip">
+          <span class="sync-dot is-off" id="sync-dot"></span>
           <div>
-            <h3>Vocabulary</h3>
-            <p class="lead" id="vocab-lead">Tap a word to focus practice ideas.</p>
+            <strong id="sync-title" data-i18n="syncChecking">Checking smartpen…</strong>
+            <span id="sync-sub" data-i18n="syncWaiting">Waiting for sync data</span>
           </div>
         </div>
-        <div class="panel-body">
-          <div class="hint-bar" id="focus-hint">
-            <span id="focus-hint-text">Focusing…</span>
-            <button type="button" class="btn sm ghost" id="clear-focus-btn">Show all</button>
+
+        <article class="today-card" id="today-card">
+          <p class="eyebrow" data-i18n="todayEyebrow">Today with Uncle Tommy</p>
+          <p class="summary" id="today-summary" data-i18n="todayLoading">Loading today's learning…</p>
+          <p class="meta" id="today-meta"></p>
+        </article>
+
+        <article class="tonight-card" id="tonight-card">
+          <p class="eyebrow" data-i18n="tonightEyebrow">Tonight's 3 words</p>
+          <h3 id="tonight-title" data-i18n="tonightPick">Pick 3 to practice at home</h3>
+          <div class="tonight-words" id="tonight-words"></div>
+        </article>
+
+        <div class="compare-row">
+          <div class="compare-card">
+            <div class="lbl" data-i18n="compareWords">Words · this week</div>
+            <div class="vals">
+              <span class="now" id="cmp-words-now">0</span>
+              <span class="delta flat" id="cmp-words-delta">—</span>
+            </div>
           </div>
-          <div id="vocab-container">
-            <div class="skeleton-grid" aria-hidden="true">
-              <div class="skeleton"></div>
-              <div class="skeleton"></div>
-              <div class="skeleton"></div>
-              <div class="skeleton"></div>
+          <div class="compare-card">
+            <div class="lbl" data-i18n="compareGames">Games · this week</div>
+            <div class="vals">
+              <span class="now" id="cmp-games-now">0</span>
+              <span class="delta flat" id="cmp-games-delta">—</span>
             </div>
           </div>
         </div>
+
+        <article class="hero-promo">
+          <h2 id="hero-title" data-i18n="heroTitle">Practice tonight's words together</h2>
+          <p id="hero-text" data-i18n="heroText">Turn smartpen vocabulary into a short, warm conversation at home.</p>
+          <div class="hero-actions">
+            <button type="button" class="circle-cta" id="hero-cta" data-i18n-aria="heroCtaAria">→</button>
+            <span class="hero-cta-label" data-i18n="heroCta">Get conversation ideas</span>
+          </div>
+        </article>
+
+        <div class="stat-row">
+          <div class="stat-card">
+            <span class="icon-chip purple">📚</span>
+            <span class="num" id="stat-words-week">0</span>
+            <span class="lbl" data-i18n="statWordsWeek">Words this week</span>
+          </div>
+          <div class="stat-card">
+            <span class="icon-chip orange">🎮</span>
+            <span class="num" id="stat-games-week">0</span>
+            <span class="lbl" data-i18n="statGamesWeek">Games this week</span>
+          </div>
+        </div>
+
+        <div class="priority-card" id="priority-card" hidden>
+          <p class="eyebrow" data-i18n="priorityEyebrow">Your focus</p>
+          <p id="priority-text"></p>
+          <div class="progress-track"><div class="progress-fill" id="priority-fill" style="width:0%"></div></div>
+          <div class="progress-meta">
+            <span id="priority-progress-label" data-i18n="priorityGoal">Weekly goal</span>
+            <span id="priority-progress-val">0%</span>
+          </div>
+        </div>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h3 data-i18n="weeklyActivity">Weekly activity</h3>
+              <p data-i18n="weeklyActivitySub">Games played each day</p>
+            </div>
+            <button type="button" class="pill-filter" id="chart-range-btn" data-i18n="chartRange">7 days ▾</button>
+          </div>
+          <div class="chart-wrap" id="activity-chart"></div>
+          <div class="seg-bar" id="activity-seg" hidden></div>
+          <div class="legend" id="activity-legend"></div>
+        </section>
+
+        <article class="feature-card">
+          <p class="eyebrow" data-i18n="tonightEyebrowDark">Tonight</p>
+          <h4 id="feature-title" data-i18n="featureDefault">Open practice ideas for recent words</h4>
+          <button type="button" class="circle-cta" id="feature-cta" data-i18n-aria="featureCtaAria">→</button>
+        </article>
       </section>
 
-      <section class="panel reveal" style="--reveal-delay: 160ms">
-        <div class="panel-header">
-          <div>
-            <h3>Practice ideas</h3>
-            <p class="lead">Expand a word, tap a question to copy, or try now.</p>
+      <!-- WORDS -->
+      <section id="view-words" class="view section-gap">
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h3 data-i18n="wordsTitle">Smartpen words</h3>
+              <p id="vocab-lead" data-i18n="wordsLead">Tap a word to focus practice.</p>
+            </div>
           </div>
-          <button type="button" class="btn primary" id="generate-btn">Generate</button>
-        </div>
-        <div class="panel-body">
+          <div class="hint-bar" id="focus-hint">
+            <span id="focus-hint-text"></span>
+            <button type="button" class="btn sm" id="clear-focus-btn" data-i18n="showAll">Show all</button>
+          </div>
+          <div class="chip-row" id="source-chips">
+            <button type="button" class="chip is-active" data-source="all" data-i18n="chipAll">All</button>
+            <button type="button" class="chip" data-source="smartpen" data-i18n="chipSmartpen">Smartpen</button>
+            <button type="button" class="chip" data-source="game" data-i18n="chipGames">Games</button>
+            <button type="button" class="chip" data-source="needs-practice" data-i18n="chipNeedsPractice">Needs practice</button>
+          </div>
+          <div id="vocab-container">
+            <div class="skeleton-grid" aria-hidden="true">
+              <div class="skeleton"></div><div class="skeleton"></div>
+              <div class="skeleton"></div><div class="skeleton"></div>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <!-- PRACTICE -->
+      <section id="view-practice" class="view section-gap">
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h3 data-i18n="practiceTitle">Practice at home</h3>
+              <p data-i18n="practiceSub">Copy questions or try them one by one.</p>
+            </div>
+            <button type="button" class="btn primary" id="generate-btn" data-i18n="generate">Generate</button>
+          </div>
           <div id="suggestions-container">
-            <div class="empty">Tap <strong>Generate</strong> for parent-friendly questions based on recent words.</div>
+            <div class="empty" data-i18n-html="practiceEmpty">Tap <strong>Generate</strong> for warm conversation ideas based on recent words.</div>
           </div>
           <p class="status" id="suggestions-status" role="status" aria-live="polite"></p>
-        </div>
-      </section>
-    </div>
-  </main>
+        </section>
 
-  <div class="practice-dock" id="practice-dock" aria-live="polite" hidden>
-    <div class="dock-top">
-      <p class="dock-word" id="dock-word">Word</p>
-      <button type="button" class="dock-close" id="dock-close" aria-label="Close practice">×</button>
-    </div>
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h3 data-i18n="checklistTitle">Tonight's checklist</h3>
+              <p data-i18n="checklistSub">Tick off words you practiced at home.</p>
+            </div>
+          </div>
+          <div class="checklist" id="practice-checklist"></div>
+        </section>
+      </section>
+
+      <!-- PROGRESS -->
+      <section id="view-progress" class="view section-gap">
+        <div class="learner-switch">
+          <div>
+            <strong id="learner-name">1 learner</strong>
+            <span id="learner-account">Signed in as …</span>
+          </div>
+          <span class="coming-soon" data-i18n="addChildSoon">+ Add child soon</span>
+        </div>
+
+        <div class="stat-row">
+          <div class="stat-card">
+            <span class="icon-chip orange">🔥</span>
+            <span class="num" id="stat-streak">0</span>
+            <span class="lbl" data-i18n="streakLabel">Day streak</span>
+          </div>
+          <div class="stat-card">
+            <span class="icon-chip purple">⭐</span>
+            <span class="num" id="stat-stars">0</span>
+            <span class="lbl" data-i18n="starsLabel">Total stars</span>
+          </div>
+        </div>
+
+        <div class="digest-card">
+          <div>
+            <strong data-i18n="digestTitle">Weekly digest</strong>
+            <span id="digest-preview" data-i18n="digestOff">Get a Sunday summary of words &amp; progress</span>
+          </div>
+          <button type="button" class="toggle" id="digest-toggle" data-i18n-aria="digestAria"></button>
+        </div>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h3 data-i18n="profileTitle">Learning profile</h3>
+              <p data-i18n="profileSub">What we know about your learner</p>
+            </div>
+          </div>
+          <div id="profile-cards"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h3 data-i18n="gamesTitle">Recent games</h3>
+              <p data-i18n="gamesSub">Last 7 days breakdown</p>
+            </div>
+          </div>
+          <div id="games-breakdown"></div>
+        </section>
+
+        <button type="button" class="btn" id="logout-btn" style="width:100%" data-i18n="signOut">Sign out</button>
+      </section>
+    </main>
+  </div>
+
+  <nav class="bottom-nav" aria-label="Parent portal">
+    <button type="button" class="nav-item is-active" data-view="home" data-i18n-aria="navHome">🏠</button>
+    <button type="button" class="nav-item" data-view="words" data-i18n-aria="navWords">📚</button>
+    <button type="button" class="nav-item" data-view="practice" data-i18n-aria="navPractice">💬</button>
+    <button type="button" class="nav-item" data-view="progress" data-i18n-aria="navProgress">📊</button>
+  </nav>
+
+  <div class="practice-dock" id="practice-dock" hidden>
+    <p style="margin:0;font-size:0.72rem;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;opacity:0.55" id="dock-word">Word</p>
     <p class="dock-question" id="dock-question"></p>
     <div class="dock-progress" id="dock-progress"></div>
     <div class="dock-actions">
-      <button type="button" class="btn" id="dock-prev">Back</button>
-      <button type="button" class="btn primary" id="dock-copy">Copy</button>
-      <button type="button" class="btn" id="dock-next">Next</button>
+      <button type="button" class="btn" id="dock-prev" data-i18n="dockBack">Back</button>
+      <button type="button" class="btn primary" id="dock-copy" data-i18n="copy">Copy</button>
+      <button type="button" class="btn" id="dock-next" data-i18n="dockNext">Next</button>
     </div>
+    <button type="button" class="btn sm" id="dock-close" style="margin-top:0.5rem;width:100%;background:transparent;color:rgba(255,255,255,0.6)" data-i18n="dockClose">Close</button>
   </div>
 
-  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <div class="toast" id="toast" role="status"></div>
 
   <script>
-    const topbar = document.getElementById("topbar");
-    const accountLabel = document.getElementById("account-label");
-    const heroKicker = document.getElementById("hero-kicker");
-    const heroText = document.getElementById("hero-text");
-    const vocabLead = document.getElementById("vocab-lead");
-    const vocabContainer = document.getElementById("vocab-container");
-    const suggestionsContainer = document.getElementById("suggestions-container");
-    const suggestionsStatus = document.getElementById("suggestions-status");
-    const refreshBtn = document.getElementById("refresh-btn");
-    const generateBtn = document.getElementById("generate-btn");
-    const logoutBtn = document.getElementById("logout-btn");
-    const clearFocusBtn = document.getElementById("clear-focus-btn");
-    const focusHint = document.getElementById("focus-hint");
-    const focusHintText = document.getElementById("focus-hint-text");
-    const statWords = document.getElementById("stat-words");
-    const statIdeas = document.getElementById("stat-ideas");
-    const statTried = document.getElementById("stat-tried");
-    const toastEl = document.getElementById("toast");
-    const practiceDock = document.getElementById("practice-dock");
-    const dockWord = document.getElementById("dock-word");
-    const dockQuestion = document.getElementById("dock-question");
-    const dockProgress = document.getElementById("dock-progress");
-    const dockPrev = document.getElementById("dock-prev");
-    const dockNext = document.getElementById("dock-next");
-    const dockCopy = document.getElementById("dock-copy");
-    const dockClose = document.getElementById("dock-close");
+    const $ = (id) => document.getElementById(id);
+    const t = (...args) => ParentI18n.t(...args);
+
+    document.titleKey = "pageTitle";
 
     let currentUser = null;
     let currentProfile = {};
     let vocabItems = [];
     let suggestionData = null;
+    let checkInData = null;
+    let gameSummary = null;
     let selectedWord = null;
+    let sourceFilter = "all";
     let triedWords = new Set();
     let openCards = new Set();
-    let tipsOpen = false;
+    let homeCheckedWords = new Set();
     let toastTimer = null;
+    let practice = { word: null, questions: [], index: 0 };
+    let gameSummary14 = null;
+    const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    let practice = {
-      word: null,
-      questions: [],
-      index: 0,
-    };
-
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-    function formatDate(ts) {
-      if (!ts) return "—";
-      try {
-        return new Date(ts).toLocaleString(undefined, {
-          month: "short",
-          day: "numeric",
-          hour: "numeric",
-          minute: "2-digit",
-        });
-      } catch {
-        return "—";
-      }
+    function refreshStaticI18n() {
+      ParentI18n.applyParentI18n();
+      if ($("dock-prev")) $("dock-prev").textContent = t("dockBack");
+      if ($("dock-copy")) $("dock-copy").textContent = t("copy");
+      if ($("dock-close")) $("dock-close").textContent = t("dockClose");
+      if ($("generate-btn")) $("generate-btn").textContent = t("generate");
+      document.title = t(document.titleKey || "pageTitle");
     }
+
+    const CHECKLIST_KEY = () => `lango-parent-checklist:${currentUser || "guest"}`;
+
+    const views = {
+      home: $("view-home"),
+      words: $("view-words"),
+      practice: $("view-practice"),
+      progress: $("view-progress"),
+    };
 
     function displayName() {
       return currentProfile.childName?.trim()
@@ -1067,54 +2096,269 @@
         || "your child";
     }
 
-    function escapeHtml(value) {
-      return String(value ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;");
+    function escapeHtml(v) {
+      return String(v ?? "")
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
     }
 
-    function wordKey(value) {
-      return String(value || "").trim().toLowerCase();
+    function wordKey(v) { return String(v || "").trim().toLowerCase(); }
+
+    function formatDate(ts) {
+      if (!ts) return "—";
+      try {
+        return new Date(ts).toLocaleString(undefined, { month: "short", day: "numeric" });
+      } catch { return "—"; }
     }
 
-    function animateCount(el, to) {
-      const target = Number(to) || 0;
-      if (reduceMotion) {
-        el.textContent = String(target);
+    function daysBetween(ts) {
+      if (!ts) return null;
+      return Math.floor((Date.now() - Number(ts)) / 86400000);
+    }
+
+    function inRange(ts, minDays, maxDays) {
+      if (!ts) return false;
+      const age = Date.now() - Number(ts);
+      return age >= minDays * 86400000 && age < maxDays * 86400000;
+    }
+
+    function formatDelta(current, previous) {
+      const diff = current - previous;
+      if (diff > 0) return { text: `+${diff}`, cls: "up" };
+      if (diff < 0) return { text: `${diff}`, cls: "down" };
+      return { text: "same", cls: "flat" };
+    }
+
+    function applyDelta(el, current, previous) {
+      const d = formatDelta(current, previous);
+      el.textContent = d.text === "same" ? t("compareSame") : d.text;
+      el.className = `delta ${d.cls}`;
+    }
+
+    function needsPractice(item) {
+      const label = item.content || item.word || "";
+      const key = wordKey(label);
+      if (triedWords.has(key) || homeCheckedWords.has(key)) return false;
+      const age = daysBetween(item.learnedAt);
+      if (age === null) return false;
+      return age >= 2 || (age <= 1 && vocabItems.indexOf(item) < 3);
+    }
+
+    function loadChecklist() {
+      try {
+        const raw = localStorage.getItem(CHECKLIST_KEY());
+        if (raw) homeCheckedWords = new Set(JSON.parse(raw));
+      } catch { homeCheckedWords = new Set(); }
+    }
+
+    function saveChecklist() {
+      try {
+        localStorage.setItem(CHECKLIST_KEY(), JSON.stringify([...homeCheckedWords]));
+      } catch { /* ignore */ }
+    }
+
+    function getTonightWords() {
+      return vocabItems.slice(0, 3).map((i) => i.content || i.word || "").filter(Boolean);
+    }
+
+    function renderSyncStatus() {
+      const penWords = vocabItems.filter((i) => i.source === "smartpen");
+      const latest = penWords.reduce((best, item) => {
+        if (!item.learnedAt) return best;
+        return !best || item.learnedAt > best.learnedAt ? item : best;
+      }, null);
+
+      const dot = $("sync-dot");
+      const title = $("sync-title");
+      const sub = $("sync-sub");
+
+      if (!latest) {
+        dot.className = "sync-dot is-off";
+        title.textContent = t("syncNotYet");
+        sub.textContent = t("syncNotYetSub");
         return;
       }
-      const from = Number(el.textContent) || 0;
-      if (from === target) {
-        el.textContent = String(target);
+
+      const days = daysBetween(latest.learnedAt);
+      const when = formatDate(latest.learnedAt);
+      const word = latest.content || latest.word;
+      if (days === 0) {
+        dot.className = "sync-dot";
+        title.textContent = t("syncToday");
+        sub.textContent = t("syncLastWord", { word, when });
+      } else if (days !== null && days <= 3) {
+        dot.className = "sync-dot is-warn";
+        title.textContent = days === 1 ? t("syncDaysAgo", { n: days }) : t("syncDaysAgoPlural", { n: days });
+        sub.textContent = t("syncLastWordShort", { word });
+      } else {
+        dot.className = "sync-dot is-warn";
+        title.textContent = t("syncStale");
+        sub.textContent = t("syncStaleSub", { when });
+      }
+    }
+
+    function renderTodaySummary() {
+      const summaryEl = $("today-summary");
+      const metaEl = $("today-meta");
+      const aiSummary = suggestionData?.suggestions?.summary;
+      const todayWords = vocabItems.filter((i) => daysAgo(i.learnedAt, 1));
+      const gamesToday = (() => {
+        if (!gameSummary?.days || !checkInData?.today) return 0;
+        const day = gameSummary.days.find((d) => d.date === checkInData.today);
+        return day?.users?.find((u) => u.username === currentUser)?.totalPlays || 0;
+      })();
+
+      const name = displayName();
+      if (aiSummary) {
+        summaryEl.textContent = aiSummary;
+      } else if (todayWords.length) {
+        const names = todayWords.slice(0, 4).map((w) => w.content || w.word).join(", ");
+        summaryEl.textContent = todayWords.length === 1
+          ? t("todayLearned", { name, n: todayWords.length, words: names })
+          : t("todayLearnedPlural", { name, n: todayWords.length, words: names });
+      } else if (gamesToday > 0) {
+        summaryEl.textContent = gamesToday === 1
+          ? t("todayGames", { name, n: gamesToday })
+          : t("todayGamesPlural", { name, n: gamesToday });
+      } else {
+        summaryEl.textContent = t("todayQuiet", { name });
+      }
+
+      const parts = [];
+      if (todayWords.length) {
+        parts.push(todayWords.length === 1
+          ? t("todayMetaNewWord", { n: todayWords.length })
+          : t("todayMetaNewWords", { n: todayWords.length }));
+      }
+      if (gamesToday) {
+        parts.push(gamesToday === 1
+          ? t("todayMetaGame", { n: gamesToday })
+          : t("todayMetaGames", { n: gamesToday }));
+      }
+      if (checkInData?.checkedInToday) parts.push(t("todayMetaCheckedIn"));
+      metaEl.textContent = parts.length
+        ? t("todayMeta", { parts: parts.join(" · ") })
+        : t("todayMetaFallback");
+    }
+
+    function renderTonightWords() {
+      const words = getTonightWords();
+      const wrap = $("tonight-words");
+      if (!words.length) {
+        $("tonight-title").textContent = t("tonightWaiting");
+        wrap.innerHTML = `<span style="font-size:0.82rem;font-weight:700;opacity:0.9">${escapeHtml(t("tonightWaitingSub"))}</span>`;
         return;
       }
-      const start = performance.now();
-      const duration = 420;
-      function frame(now) {
-        const t = Math.min(1, (now - start) / duration);
-        const eased = 1 - Math.pow(1 - t, 3);
-        el.textContent = String(Math.round(from + (target - from) * eased));
-        if (t < 1) requestAnimationFrame(frame);
+      $("tonight-title").textContent = t("tonightPractice", { n: words.length });
+      wrap.innerHTML = words.map((w) => {
+        const done = homeCheckedWords.has(wordKey(w));
+        return `<button type="button" class="tonight-word${done ? " is-done" : ""}" data-word="${escapeHtml(w)}">${escapeHtml(w)}</button>`;
+      }).join("");
+      wrap.querySelectorAll(".tonight-word").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const key = wordKey(btn.dataset.word);
+          if (homeCheckedWords.has(key)) homeCheckedWords.delete(key);
+          else homeCheckedWords.add(key);
+          saveChecklist();
+          renderTonightWords();
+          renderPracticeChecklist();
+          renderVocabulary(vocabItems, { preserve: true });
+        });
+      });
+    }
+
+    function renderPracticeChecklist() {
+      const words = getTonightWords();
+      const list = $("practice-checklist");
+      if (!words.length) {
+        list.innerHTML = `<div class="empty">${escapeHtml(t("checklistEmpty"))}</div>`;
+        return;
       }
-      requestAnimationFrame(frame);
+      list.innerHTML = words.map((w) => {
+        const done = homeCheckedWords.has(wordKey(w));
+        return `
+          <div class="check-item${done ? " is-done" : ""}" data-word="${escapeHtml(w)}" role="button" tabindex="0">
+            <span class="check-box">${done ? "✓" : ""}</span>
+            <strong>${escapeHtml(w)}</strong>
+            <span>${done ? escapeHtml(t("checklistDone")) : escapeHtml(t("checklistTap"))}</span>
+          </div>`;
+      }).join("");
+      list.querySelectorAll(".check-item").forEach((row) => {
+        const toggle = () => {
+          const key = wordKey(row.dataset.word);
+          if (homeCheckedWords.has(key)) homeCheckedWords.delete(key);
+          else homeCheckedWords.add(key);
+          saveChecklist();
+          renderTonightWords();
+          renderPracticeChecklist();
+          renderVocabulary(vocabItems, { preserve: true });
+        };
+        row.addEventListener("click", toggle);
+        row.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
+        });
+      });
     }
 
-    function updateStats() {
-      const ideas = suggestionData?.suggestions?.wordSuggestions?.length || 0;
-      animateCount(statWords, vocabItems.length);
-      animateCount(statIdeas, ideas);
-      animateCount(statTried, triedWords.size);
+    function renderWeekCompare() {
+      const wordsThis = vocabItems.filter((i) => daysAgo(i.learnedAt, 7)).length;
+      const wordsLast = vocabItems.filter((i) => inRange(i.learnedAt, 7, 14)).length;
+
+      let gamesThis = 0;
+      let gamesLast = 0;
+      const today = checkInData?.today || new Date().toISOString().slice(0, 10);
+      if (gameSummary14?.days) {
+        for (const day of gameSummary14.days) {
+          const plays = day.users?.find((u) => u.username === currentUser)?.totalPlays || 0;
+          const diff = Math.floor((new Date(today + "T12:00:00") - new Date(day.date + "T12:00:00")) / 86400000);
+          if (diff >= 0 && diff < 7) gamesThis += plays;
+          else if (diff >= 7 && diff < 14) gamesLast += plays;
+        }
+      }
+
+      $("cmp-words-now").textContent = String(wordsThis);
+      $("cmp-games-now").textContent = String(gamesThis);
+      applyDelta($("cmp-words-delta"), wordsThis, wordsLast);
+      applyDelta($("cmp-games-delta"), gamesThis, gamesLast);
     }
 
-    function showToast(message) {
-      toastEl.textContent = message;
-      toastEl.classList.add("is-visible");
+    function renderPriorityProgress() {
+      const p = currentProfile.parentPriority?.trim();
+      const card = $("priority-card");
+      if (!p) { card.hidden = true; return; }
+      card.hidden = false;
+      $("priority-text").textContent = p;
+
+      const gamesWeek = Number($("cmp-games-now").textContent) || 0;
+      const wordsWeek = Number($("cmp-words-now").textContent) || 0;
+      const goal = 5;
+      const current = Math.min(goal, gamesWeek + Math.floor(wordsWeek / 3));
+      const pct = Math.round((current / goal) * 100);
+      $("priority-fill").style.width = `${pct}%`;
+      $("priority-progress-val").textContent = `${pct}%`;
+      $("priority-progress-label").textContent = t("priorityGoal", { current, goal });
+    }
+
+    function renderLearnerSwitch() {
+      $("learner-name").textContent = t("learnerOne", { name: displayName() });
+      $("learner-account").textContent = t("signedInAs", { user: currentUser });
+    }
+
+    function renderAllParentUI() {
+      renderSyncStatus();
+      renderTodaySummary();
+      renderTonightWords();
+      renderPracticeChecklist();
+      renderWeekCompare();
+      renderPriorityProgress();
+      renderLearnerSwitch();
+    }
+
+    function showToast(msg) {
+      $("toast").textContent = msg;
+      $("toast").classList.add("is-visible");
       clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => {
-        toastEl.classList.remove("is-visible");
-      }, 1600);
+      toastTimer = setTimeout(() => $("toast").classList.remove("is-visible"), 1600);
     }
 
     async function copyText(text) {
@@ -1122,357 +2366,417 @@
         await navigator.clipboard.writeText(text);
         return true;
       } catch {
-        try {
-          const ta = document.createElement("textarea");
-          ta.value = text;
-          ta.setAttribute("readonly", "");
-          ta.style.position = "fixed";
-          ta.style.opacity = "0";
-          document.body.appendChild(ta);
-          ta.select();
-          const ok = document.execCommand("copy");
-          ta.remove();
-          return ok;
-        } catch {
-          return false;
-        }
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.cssText = "position:fixed;opacity:0";
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand("copy");
+        ta.remove();
+        return ok;
       }
     }
 
-    function setSuggestionsStatus(message, kind = "") {
-      suggestionsStatus.textContent = message || "";
-      suggestionsStatus.className = `status${kind ? ` ${kind}` : ""}`;
+    function switchView(name) {
+      Object.entries(views).forEach(([key, el]) => {
+        el.classList.toggle("is-active", key === name);
+      });
+      document.querySelectorAll(".nav-item").forEach((btn) => {
+        btn.classList.toggle("is-active", btn.dataset.view === name);
+      });
+    }
+
+    function animateCount(el, to) {
+      const target = Number(to) || 0;
+      if (reduceMotion) { el.textContent = String(target); return; }
+      const from = Number(el.textContent) || 0;
+      const start = performance.now();
+      const tick = (now) => {
+        const progress = Math.min(1, (now - start) / 400);
+        el.textContent = String(Math.round(from + (target - from) * (1 - Math.pow(1 - progress, 3))));
+        if (progress < 1) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }
+
+    function renderHeader() {
+      const name = displayName();
+      $("greeting").textContent = t("hello", { name });
+      const streak = checkInData?.currentStreak ?? 0;
+      const checked = checkInData?.checkedInToday;
+      $("streak-line").textContent = streak
+        ? `${t("streakDays", { n: streak })}${checked ? ` · ${t("streakCheckedIn")}` : ""}`
+        : (checked ? t("streakCheckedOnly") : t("streakNone"));
+      animateCount($("stat-streak"), streak);
+      animateCount($("stat-stars"), checkInData?.totalStars ?? 0);
+    }
+
+    function renderPriority() {
+      renderPriorityProgress();
+    }
+
+    function renderProfileCards() {
+      const fields = [
+        ["profileGrade", currentProfile.grade || currentProfile.schoolGrade],
+        ["profileLearning", currentProfile.mainLearningLanguage],
+        ["profileHomeLang", currentProfile.homeLanguage],
+        ["profileVocabLevel", currentProfile.vocabularyLevel],
+      ].filter(([, v]) => v);
+      $("profile-cards").innerHTML = fields.length
+        ? fields.map(([l, v]) => `
+            <div style="display:flex;justify-content:space-between;padding:0.65rem 0;border-bottom:1px solid var(--bar-muted)">
+              <span style="font-size:0.82rem;font-weight:700;color:var(--text-2)">${escapeHtml(t(l))}</span>
+              <span style="font-size:0.82rem;font-weight:800">${escapeHtml(v)}</span>
+            </div>`).join("")
+        : `<div class="empty">${escapeHtml(t("profileEmpty"))}</div>`;
+    }
+
+    function buildWeekChart() {
+      const chart = $("activity-chart");
+      const seg = $("activity-seg");
+      const legend = $("activity-legend");
+      if (!gameSummary?.days) {
+        chart.innerHTML = `<div class="empty" style="width:100%">${escapeHtml(t("chartEmpty"))}</div>`;
+        return;
+      }
+
+      const dayMap = new Map();
+      for (const day of gameSummary.days) {
+        const user = day.users?.find((u) => u.username === currentUser);
+        dayMap.set(day.date, user?.totalPlays || 0);
+      }
+
+      const labels = ParentI18n.dayLabels();
+      const cols = [];
+      const today = checkInData?.today || new Date().toISOString().slice(0, 10);
+      let max = 1;
+      const weekData = [];
+
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(today + "T12:00:00");
+        d.setDate(d.getDate() - i);
+        const iso = d.toISOString().slice(0, 10);
+        const plays = dayMap.get(iso) || 0;
+        weekData.push({ iso, plays, label: labels[d.getDay()], isToday: iso === today });
+        max = Math.max(max, plays);
+      }
+
+      chart.innerHTML = weekData.map((d) => {
+        const h = d.plays ? Math.max(12, Math.round((d.plays / max) * 100)) : 4;
+        return `
+          <div class="bar-col">
+            <span class="bar-val">${d.plays || ""}</span>
+            <div class="bar ${d.isToday ? "is-today" : ""} ${d.plays ? "" : "is-empty"}" style="height:${h}px"></div>
+            <span class="bar-lbl">${d.label}</span>
+          </div>`;
+      }).join("");
+
+      const totalWeek = weekData.reduce((s, d) => s + d.plays, 0);
+      const gameTotals = new Map();
+      for (const day of gameSummary.days) {
+        const user = day.users?.find((u) => u.username === currentUser);
+        for (const g of user?.games || []) {
+          gameTotals.set(g.gameLabel, (gameTotals.get(g.gameLabel) || 0) + g.plays);
+        }
+      }
+      const colors = ["#F0A868", "#8B7EF0", "#D9D4E3", "#5CB88A"];
+      const entries = [...gameTotals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
+      if (entries.length && totalWeek) {
+        seg.hidden = false;
+        seg.innerHTML = entries.map(([label, n], i) =>
+          `<span style="width:${(n / totalWeek) * 100}%;background:${colors[i % colors.length]}" title="${escapeHtml(label)}"></span>`
+        ).join("");
+        legend.innerHTML = entries.map(([label, n], i) => `
+          <span class="legend-item">
+            <span class="legend-dot" style="background:${colors[i % colors.length]}"></span>
+            ${escapeHtml(label)} · ${n}
+          </span>`).join("");
+      } else {
+        seg.hidden = true;
+        legend.innerHTML = "";
+      }
+
+      $("games-breakdown").innerHTML = entries.length
+        ? entries.map(([label, n]) => `
+            <div style="display:flex;justify-content:space-between;padding:0.6rem 0;border-bottom:1px solid var(--bar-muted)">
+              <span style="font-weight:700">${escapeHtml(label)}</span>
+              <span style="font-weight:800;color:var(--purple)">${escapeHtml(t("gamesPlays", { n }))}</span>
+            </div>`).join("")
+        : `<div class="empty">${escapeHtml(t("gamesEmpty"))}</div>`;
+    }
+
+    function updateHomeStats() {
+      const wordsWeek = vocabItems.filter((i) => daysAgo(i.learnedAt, 7)).length;
+      animateCount($("stat-words-week"), wordsWeek);
+      let gamesWeek = 0;
+      if (gameSummary?.days) {
+        for (const day of gameSummary.days) {
+          const user = day.users?.find((u) => u.username === currentUser);
+          gamesWeek += user?.totalPlays || 0;
+        }
+      }
+      animateCount($("stat-games-week"), gamesWeek);
+      const newWords = vocabItems.filter((i) => daysAgo(i.learnedAt, 1)).length;
+      $("notif-btn").classList.toggle("has-badge", newWords > 0);
+      const tonight = getTonightWords();
+      const done = tonight.filter((w) => homeCheckedWords.has(wordKey(w))).length;
+      $("feature-title").textContent = tonight.length
+        ? t("featureProgress", { done, total: tonight.length })
+        : t("featureWaiting");
+      $("hero-title").textContent = t("heroTitleNamed", { name: displayName() });
+      renderAllParentUI();
+    }
+
+    function daysAgo(ts, days = 7) {
+      if (!ts) return false;
+      return Date.now() - Number(ts) < days * 86400000;
+    }
+
+    function filteredVocab() {
+      return vocabItems.filter((item) => {
+        if (sourceFilter === "needs-practice") return needsPractice(item);
+        if (sourceFilter !== "all" && item.source !== sourceFilter) return false;
+        return true;
+      });
+    }
+
+    function renderVocabulary(items, { preserve = false } = {}) {
+      vocabItems = items || [];
+      if (!preserve && selectedWord && !vocabItems.some((i) => wordKey(i.content || i.word) === wordKey(selectedWord))) {
+        selectedWord = null;
+      }
+      updateHomeStats();
+      updateFocusHint();
+
+      const list = filteredVocab();
+      if (!list.length) {
+        $("vocab-container").innerHTML = `<div class="empty">${escapeHtml(t("vocabEmpty"))}</div>`;
+        return;
+      }
+
+      const grid = document.createElement("div");
+      grid.className = "vocab-list";
+      list.forEach((item, i) => {
+        const label = item.content || item.word || item.code || "—";
+        const selected = selectedWord && wordKey(selectedWord) === wordKey(label);
+        const practiceFlag = needsPractice(item);
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = `word-chip${selected ? " is-selected" : ""}${selectedWord && !selected ? " is-dimmed" : ""}${practiceFlag ? " needs-practice" : ""}`;
+        btn.style.setProperty("--d", `${Math.min(i, 10) * 30}ms`);
+        btn.innerHTML = `
+          <strong>${escapeHtml(label)}</strong>
+          <span>${escapeHtml(formatDate(item.learnedAt))}</span>
+          ${practiceFlag ? `<span class="badge-practice">${escapeHtml(t("badgePractice"))}</span>` : ""}`;
+        btn.addEventListener("click", () => {
+          if (selectedWord && wordKey(selectedWord) === wordKey(label)) selectedWord = null;
+          else selectedWord = label;
+          updateFocusHint();
+          renderVocabulary(vocabItems, { preserve: true });
+          applySuggestionFilter({ scroll: true });
+        });
+        grid.appendChild(btn);
+      });
+      $("vocab-container").innerHTML = "";
+      $("vocab-container").appendChild(grid);
     }
 
     function updateFocusHint() {
+      const bar = $("focus-hint");
       if (!selectedWord) {
-        focusHint.classList.remove("is-visible");
-        vocabLead.textContent = "Tap a word to focus practice ideas.";
+        bar.classList.remove("is-visible");
+        $("vocab-lead").textContent = t("wordsLead");
         return;
       }
-      focusHint.classList.add("is-visible");
-      focusHintText.textContent = `Focusing on “${selectedWord}”`;
-      vocabLead.textContent = "Tap the same word again to clear focus.";
+      bar.classList.add("is-visible");
+      $("focus-hint-text").textContent = t("focusOn", { word: selectedWord });
+      $("vocab-lead").textContent = t("wordsLeadClear");
     }
 
-    function setSelectedWord(word, { scrollToCard = true } = {}) {
-      const next = word ? String(word) : null;
-      if (selectedWord && wordKey(selectedWord) === wordKey(next)) {
-        selectedWord = null;
-      } else {
-        selectedWord = next;
-      }
-      updateFocusHint();
-      renderVocabulary(vocabItems, { preserveSelection: true });
-      applySuggestionFilter({ scrollToCard });
-    }
-
-    function clearFocus() {
-      selectedWord = null;
-      updateFocusHint();
-      renderVocabulary(vocabItems, { preserveSelection: true });
-      applySuggestionFilter({ scrollToCard: false });
-    }
-
-    function renderVocabulary(items, { preserveSelection = false } = {}) {
-      vocabItems = items || [];
-      if (!preserveSelection && selectedWord) {
-        const stillThere = vocabItems.some((item) => {
-          const label = item.content || item.word || item.code || "";
-          return wordKey(label) === wordKey(selectedWord);
-        });
-        if (!stillThere) selectedWord = null;
-      }
-      updateFocusHint();
-      updateStats();
-
-      if (!vocabItems.length) {
-        vocabContainer.innerHTML = `
-          <div class="empty">
-            No smartpen words yet. When your child writes vocabulary with the Bluetooth pen and the app syncs,
-            the words will appear here automatically.
-          </div>`;
-        return;
-      }
-
-      const list = document.createElement("div");
-      list.className = "vocab-list";
-      vocabItems.forEach((item, index) => {
-        const label = item.content || item.word || item.code || "—";
-        const codeLabel = item.code && item.code !== label ? `Code ${item.code}` : "";
-        const selected = selectedWord && wordKey(selectedWord) === wordKey(label);
-        const dimmed = selectedWord && !selected;
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = `word-chip${selected ? " is-selected" : ""}${dimmed ? " is-dimmed" : ""}`;
-        btn.style.setProperty("--chip-delay", `${Math.min(index, 12) * 35}ms`);
-        btn.setAttribute("aria-pressed", selected ? "true" : "false");
-        btn.innerHTML = `
-          <strong>${escapeHtml(label)}</strong>
-          <span>${escapeHtml([codeLabel, formatDate(item.learnedAt)].filter(Boolean).join(" · "))}</span>
-          <span class="check">Focused</span>
-        `;
-        btn.addEventListener("click", () => {
-          setSelectedWord(label);
-          if (navigator.vibrate) navigator.vibrate(8);
-        });
-        list.appendChild(btn);
-      });
-      vocabContainer.innerHTML = "";
-      vocabContainer.appendChild(list);
-    }
-
-    function applySuggestionFilter({ scrollToCard = false } = {}) {
-      const cards = suggestionsContainer.querySelectorAll(".suggestion-card");
-      let firstVisible = null;
-      cards.forEach((card) => {
-        const word = card.dataset.word || "";
-        const match = !selectedWord || wordKey(word) === wordKey(selectedWord);
+    function applySuggestionFilter({ scroll = false } = {}) {
+      document.querySelectorAll(".suggestion-card").forEach((card) => {
+        const w = card.dataset.word || "";
+        const match = !selectedWord || wordKey(w) === wordKey(selectedWord);
         card.classList.toggle("is-hidden", !match);
         card.classList.toggle("is-focused", Boolean(selectedWord && match));
-        if (match && !firstVisible) firstVisible = card;
+        if (scroll && match && selectedWord) {
+          card.classList.add("is-open");
+          openCards.add(wordKey(w));
+          card.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "nearest" });
+        }
       });
-      if (scrollToCard && firstVisible) {
-        firstVisible.classList.add("is-open");
-        openCards.add(wordKey(firstVisible.dataset.word));
-        firstVisible.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "nearest" });
-      }
-    }
-
-    function markTried(word) {
-      triedWords.add(wordKey(word));
-      updateStats();
-      const card = suggestionsContainer.querySelector(`.suggestion-card[data-word-key="${CSS.escape(wordKey(word))}"]`);
-      if (card) card.classList.add("is-done");
-    }
-
-    function openPractice(word, questions) {
-      const list = (questions || []).filter(Boolean);
-      if (!list.length) {
-        showToast("No questions for this word yet");
-        return;
-      }
-      practice = { word, questions: list, index: 0 };
-      practiceDock.hidden = false;
-      requestAnimationFrame(() => practiceDock.classList.add("is-open"));
-      renderPracticeDock();
-      document.body.style.paddingBottom = `calc(11rem + var(--safe-bottom))`;
-    }
-
-    function closePractice() {
-      practiceDock.classList.remove("is-open");
-      setTimeout(() => {
-        if (!practiceDock.classList.contains("is-open")) practiceDock.hidden = true;
-      }, 380);
-      document.body.style.paddingBottom = `calc(5.5rem + var(--safe-bottom))`;
-    }
-
-    function renderPracticeDock() {
-      const { word, questions, index } = practice;
-      dockWord.textContent = word;
-      dockQuestion.textContent = questions[index] || "";
-      dockProgress.innerHTML = questions.map((_, i) => {
-        const cls = i < index ? "is-done" : i === index ? "is-active" : "";
-        return `<span class="dock-dot ${cls}"></span>`;
-      }).join("");
-      dockPrev.disabled = index <= 0;
-      dockNext.textContent = index >= questions.length - 1 ? "Done" : "Next";
     }
 
     function renderSuggestions(data) {
       suggestionData = data;
-      const suggestions = data?.suggestions;
-      updateStats();
-
-      if (!suggestions) {
-        suggestionsContainer.innerHTML = `<div class="empty">No suggestions yet.</div>`;
+      const s = data?.suggestions;
+      if (!s) {
+        $("suggestions-container").innerHTML = `<div class="empty">${escapeHtml(t("suggestionsEmpty"))}</div>`;
         return;
       }
-
       const parts = [];
-      if (suggestions.summary) {
-        parts.push(`<div class="summary-box">${escapeHtml(suggestions.summary)}</div>`);
-      }
-
-      if (Array.isArray(suggestions.generalTips) && suggestions.generalTips.length) {
-        parts.push(`
-          <button type="button" class="tips-toggle" id="tips-toggle" aria-expanded="${tipsOpen ? "true" : "false"}">
-            <span>Home practice tips</span>
-            <span class="chev">▾</span>
-          </button>
-          <ul class="tips-list${tipsOpen ? " is-open" : ""}" id="tips-list">
-            ${suggestions.generalTips.map((tip) => `<li>${escapeHtml(tip)}</li>`).join("")}
-          </ul>
-        `);
-      }
-
-      const wordSuggestions = Array.isArray(suggestions.wordSuggestions) ? suggestions.wordSuggestions : [];
-      if (wordSuggestions.length) {
-        parts.push(`<div class="suggestion-list">${wordSuggestions.map((entry, index) => {
+      if (s.summary) parts.push(`<div class="summary-box">${escapeHtml(s.summary)}</div>`);
+      const words = Array.isArray(s.wordSuggestions) ? s.wordSuggestions : [];
+      if (words.length) {
+        parts.push(`<div class="suggestion-list">${words.map((entry, i) => {
           const word = entry.word || "";
           const key = wordKey(word);
-          const questions = Array.isArray(entry.questions) ? entry.questions : [];
-          const isOpen = openCards.has(key) || (selectedWord && wordKey(selectedWord) === key);
-          const isDone = triedWords.has(key);
-          const questionHtml = questions.length
-            ? `<ul class="question-list">${questions.map((q) => `
-                <li>
-                  <button type="button" class="question-btn" data-copy="${escapeHtml(q)}">
-                    <span class="q-mark">“</span>
-                    <span>${escapeHtml(q)}</span>
-                    <span class="q-copy">Copy</span>
-                  </button>
-                </li>`).join("")}</ul>`
-            : `<p class="activity-tip">No questions generated for this word.</p>`;
-          const tip = entry.activityTip
-            ? `<p class="activity-tip">${escapeHtml(entry.activityTip)}</p>`
-            : "";
+          const qs = Array.isArray(entry.questions) ? entry.questions : [];
+          const open = openCards.has(key);
           return `
-            <article
-              class="suggestion-card${isOpen ? " is-open" : ""}${isDone ? " is-done" : ""}"
-              data-word="${escapeHtml(word)}"
-              data-word-key="${escapeHtml(key)}"
-              style="--card-delay: ${Math.min(index, 10) * 40}ms"
-            >
-              <button type="button" class="card-head" aria-expanded="${isOpen ? "true" : "false"}">
-                <h4 class="card-title">${escapeHtml(word)}</h4>
-                <span class="card-meta">
-                  <span>${questions.length} Q</span>
-                  <span class="chev">▾</span>
-                </span>
+            <article class="suggestion-card${open ? " is-open" : ""}${triedWords.has(key) ? " is-done" : ""}"
+              data-word="${escapeHtml(word)}" data-word-key="${escapeHtml(key)}" style="--d:${i * 35}ms">
+              <button type="button" class="card-head" aria-expanded="${open}">
+                <h4>${escapeHtml(word)}</h4>
+                <span class="card-meta">${escapeHtml(t("qCount", { n: qs.length }))} <span class="chev">▾</span></span>
               </button>
-              <div class="card-body">
-                <div class="card-body-inner">
-                  <div class="card-content">
-                    ${questionHtml}
-                    ${tip}
-                    <div class="card-actions">
-                      <button type="button" class="btn sm primary try-now-btn" data-word="${escapeHtml(word)}">Try now</button>
-                      <button type="button" class="btn sm focus-word-btn" data-word="${escapeHtml(word)}">Focus word</button>
-                    </div>
-                  </div>
+              <div class="card-body"><div class="card-body-inner"><div class="card-content">
+                ${qs.map((q) => `
+                  <button type="button" class="question-btn" data-copy="${escapeHtml(q)}">
+                    <span>“</span><span>${escapeHtml(q)}</span><span class="q-copy">${escapeHtml(t("copy"))}</span>
+                  </button>`).join("")}
+                ${entry.activityTip ? `<p class="activity-tip">${escapeHtml(entry.activityTip)}</p>` : ""}
+                <div class="card-actions">
+                  <button type="button" class="btn sm primary try-btn" data-word="${escapeHtml(word)}">${escapeHtml(t("tryNow"))}</button>
+                  <button type="button" class="btn sm focus-btn" data-word="${escapeHtml(word)}">${escapeHtml(t("focus"))}</button>
                 </div>
-              </div>
+              </div></div></div>
             </article>`;
         }).join("")}</div>`);
-      } else if (!suggestions.summary) {
-        parts.push(`<div class="empty">No word-specific suggestions yet. Try again after more smartpen words sync.</div>`);
+      } else if (!s.summary) {
+        parts.push(`<div class="empty">${escapeHtml(t("suggestionsRegen"))}</div>`);
       }
-
-      suggestionsContainer.innerHTML = parts.join("");
-      wireSuggestionInteractions(wordSuggestions);
-      applySuggestionFilter({ scrollToCard: Boolean(selectedWord) });
+      $("suggestions-container").innerHTML = parts.join("");
+      wireSuggestions(words);
+      applySuggestionFilter();
+      renderTodaySummary();
     }
 
-    function wireSuggestionInteractions(wordSuggestions) {
-      const tipsToggle = document.getElementById("tips-toggle");
-      const tipsList = document.getElementById("tips-list");
-      if (tipsToggle && tipsList) {
-        tipsToggle.addEventListener("click", () => {
-          tipsOpen = !tipsOpen;
-          tipsToggle.setAttribute("aria-expanded", tipsOpen ? "true" : "false");
-          tipsList.classList.toggle("is-open", tipsOpen);
-        });
-      }
-
-      suggestionsContainer.querySelectorAll(".suggestion-card").forEach((card) => {
-        const head = card.querySelector(".card-head");
-        const key = card.dataset.wordKey;
-        head?.addEventListener("click", () => {
-          const willOpen = !card.classList.contains("is-open");
-          card.classList.toggle("is-open", willOpen);
-          head.setAttribute("aria-expanded", willOpen ? "true" : "false");
-          if (willOpen) openCards.add(key);
-          else openCards.delete(key);
+    function wireSuggestions(words) {
+      document.querySelectorAll(".suggestion-card .card-head").forEach((head) => {
+        head.addEventListener("click", () => {
+          const card = head.closest(".suggestion-card");
+          const open = !card.classList.contains("is-open");
+          card.classList.toggle("is-open", open);
+          head.setAttribute("aria-expanded", open);
+          if (open) openCards.add(card.dataset.wordKey);
+          else openCards.delete(card.dataset.wordKey);
         });
       });
-
-      suggestionsContainer.querySelectorAll(".question-btn").forEach((btn) => {
+      document.querySelectorAll(".question-btn").forEach((btn) => {
         btn.addEventListener("click", async () => {
-          const text = btn.dataset.copy || btn.textContent.trim();
-          const ok = await copyText(text);
-          if (!ok) {
-            showToast("Could not copy");
-            return;
+          const ok = await copyText(btn.dataset.copy);
+          showToast(ok ? t("copiedToast") : t("couldNotCopy"));
+          if (ok) {
+            btn.classList.add("is-copied");
+            btn.querySelector(".q-copy").textContent = t("copied");
+            setTimeout(() => {
+              btn.classList.remove("is-copied");
+              btn.querySelector(".q-copy").textContent = t("copy");
+            }, 1200);
           }
-          btn.classList.add("is-copied");
-          const label = btn.querySelector(".q-copy");
-          if (label) label.textContent = "Copied";
-          showToast("Question copied");
-          if (navigator.vibrate) navigator.vibrate(10);
-          setTimeout(() => {
-            btn.classList.remove("is-copied");
-            if (label) label.textContent = "Copy";
-          }, 1200);
         });
       });
-
-      suggestionsContainer.querySelectorAll(".try-now-btn").forEach((btn) => {
+      document.querySelectorAll(".try-btn").forEach((btn) => {
         btn.addEventListener("click", () => {
-          const word = btn.dataset.word;
-          const entry = wordSuggestions.find((item) => wordKey(item.word) === wordKey(word));
-          openPractice(word, entry?.questions || []);
+          const entry = words.find((w) => wordKey(w.word) === wordKey(btn.dataset.word));
+          openPractice(btn.dataset.word, entry?.questions || []);
         });
       });
-
-      suggestionsContainer.querySelectorAll(".focus-word-btn").forEach((btn) => {
+      document.querySelectorAll(".focus-btn").forEach((btn) => {
         btn.addEventListener("click", () => {
-          setSelectedWord(btn.dataset.word, { scrollToCard: true });
+          selectedWord = btn.dataset.word;
+          updateFocusHint();
+          renderVocabulary(vocabItems, { preserve: true });
+          switchView("words");
+          applySuggestionFilter({ scroll: true });
         });
       });
+    }
+
+    function openPractice(word, questions) {
+      const list = (questions || []).filter(Boolean);
+      if (!list.length) return showToast(t("noQuestions"));
+      practice = { word, questions: list, index: 0 };
+      const dock = $("practice-dock");
+      dock.hidden = false;
+      requestAnimationFrame(() => dock.classList.add("is-open"));
+      renderDock();
+    }
+
+    function closePractice() {
+      $("practice-dock").classList.remove("is-open");
+      setTimeout(() => { if (!$("practice-dock").classList.contains("is-open")) $("practice-dock").hidden = true; }, 360);
+    }
+
+    function renderDock() {
+      const { word, questions, index } = practice;
+      $("dock-word").textContent = word;
+      $("dock-question").textContent = questions[index] || "";
+      $("dock-progress").innerHTML = questions.map((_, i) =>
+        `<span class="dock-dot ${i < index ? "is-done" : i === index ? "is-active" : ""}"></span>`
+      ).join("");
+      $("dock-prev").disabled = index <= 0;
+      $("dock-next").textContent = index >= questions.length - 1 ? t("dockDone") : t("dockNext");
+    }
+
+    function setStatus(msg, kind = "") {
+      $("suggestions-status").textContent = msg || "";
+      $("suggestions-status").className = `status${kind ? ` ${kind}` : ""}`;
     }
 
     async function requireAuth() {
       const res = await fetch("/api/me");
-      if (!res.ok) {
-        location.href = "/parent/login?next=" + encodeURIComponent("/parent");
-        throw new Error("Not signed in.");
-      }
+      if (!res.ok) { location.href = "/parent/login?next=/parent"; throw new Error("Not signed in"); }
       const data = await res.json();
-      if (data.role !== "student") {
-        location.href = "/parent/login";
-        throw new Error("Student account required.");
-      }
+      if (data.role !== "student") { location.href = "/parent/login"; throw new Error("Student required"); }
       currentUser = data.username;
-      accountLabel.textContent = currentUser;
     }
 
     async function loadProfile() {
       const res = await fetch("/api/me/profile");
-      if (!res.ok) throw new Error("Could not load profile.");
-      const data = await res.json();
-      currentProfile = data.profile || {};
-      const name = displayName();
-      heroKicker.textContent = `${name}'s learning`;
-      heroText.textContent = "Tap a word to focus. Expand a card, copy a question, or start Try now for a quick home practice loop.";
-      accountLabel.textContent = name;
+      if (!res.ok) throw new Error("Profile failed");
+      currentProfile = (await res.json()).profile || {};
+      renderHeader();
+      renderPriority();
+      renderProfileCards();
+      $("hero-title").textContent = t("heroTitleNamed", { name: displayName() });
+    }
+
+    async function loadCheckIn() {
+      try {
+        const res = await fetch("/api/check-in");
+        if (res.ok) checkInData = await res.json();
+      } catch { /* optional */ }
+      renderHeader();
+    }
+
+    async function loadGameSummary() {
+      try {
+        const [res7, res14] = await Promise.all([
+          fetch("/api/game-plays/daily-summary?days=7"),
+          fetch("/api/game-plays/daily-summary?days=14"),
+        ]);
+        if (res7.ok) gameSummary = await res7.json();
+        if (res14.ok) gameSummary14 = await res14.json();
+      } catch { /* optional */ }
+      buildWeekChart();
+      updateHomeStats();
     }
 
     async function loadVocabulary() {
-      vocabContainer.innerHTML = `
-        <div class="skeleton-grid" aria-hidden="true">
-          <div class="skeleton"></div>
-          <div class="skeleton"></div>
-          <div class="skeleton"></div>
-          <div class="skeleton"></div>
-        </div>`;
+      $("vocab-container").innerHTML = `<div class="skeleton-grid"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>`;
       const res = await fetch("/api/learned-vocabulary?limit=50");
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Could not load vocabulary.");
-      }
-      const data = await res.json();
-      renderVocabulary(data.items || []);
+      if (!res.ok) throw new Error("Vocabulary failed");
+      renderVocabulary((await res.json()).items || []);
     }
 
     async function generateSuggestions() {
-      generateBtn.disabled = true;
-      refreshBtn.disabled = true;
-      generateBtn.classList.add("is-busy");
-      generateBtn.textContent = "Generating…";
-      setSuggestionsStatus("");
-      suggestionsContainer.innerHTML = `<div class="loading"><span class="spinner" aria-hidden="true"></span> Preparing practice ideas…</div>`;
-
+      const btn = $("generate-btn");
+      btn.disabled = true;
+      btn.textContent = t("generating");
+      setStatus("");
+      $("suggestions-container").innerHTML = `<div class="loading"><span class="spinner"></span> ${escapeHtml(t("preparing"))}</div>`;
       try {
         const res = await fetch("/api/parent/vocab-suggestions", {
           method: "POST",
@@ -1480,95 +2784,109 @@
           body: JSON.stringify({ limit: 20 }),
         });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          throw new Error(data.error || "Could not generate suggestions.");
-        }
-        openCards = new Set();
-        tipsOpen = false;
+        if (!res.ok) throw new Error(data.error || "Failed");
+        openCards.clear();
         renderSuggestions(data);
-        if (Array.isArray(data.words)) {
-          renderVocabulary(data.words, { preserveSelection: true });
-        }
-        if (data.generated) {
-          setSuggestionsStatus("Ideas ready — tap a word or open a card.", "ok");
-          showToast("Practice ideas ready");
-        } else {
-          setSuggestionsStatus("No words to analyze yet.");
-        }
-      } catch (err) {
-        suggestionsContainer.innerHTML = `<div class="empty">${escapeHtml(err.message || "Could not generate suggestions.")}</div>`;
-        setSuggestionsStatus(err.message || "Generation failed.", "err");
+        if (Array.isArray(data.words)) renderVocabulary(data.words, { preserve: true });
+        setStatus(data.generated ? t("statusReady") : t("statusNoWords"), data.generated ? "ok" : "");
+        if (data.generated) showToast(t("statusIdeasReady"));
+      } catch (e) {
+        $("suggestions-container").innerHTML = `<div class="empty">${escapeHtml(e.message)}</div>`;
+        setStatus(e.message, "err");
       } finally {
-        generateBtn.disabled = false;
-        refreshBtn.disabled = false;
-        generateBtn.classList.remove("is-busy");
-        generateBtn.textContent = "Generate";
+        btn.disabled = false;
+        btn.textContent = t("generate");
       }
     }
 
     async function loadAll({ autoGenerate = false } = {}) {
-      refreshBtn.disabled = true;
+      $("refresh-btn").disabled = true;
       try {
         await requireAuth();
-        await loadProfile();
-        await loadVocabulary();
-        if (autoGenerate && vocabItems.length) {
-          await generateSuggestions();
-        }
-      } catch (err) {
-        vocabContainer.innerHTML = `<div class="empty">${escapeHtml(err.message || "Could not load portal.")}</div>`;
+        loadChecklist();
+        await Promise.all([loadProfile(), loadCheckIn(), loadGameSummary(), loadVocabulary()]);
+        renderAllParentUI();
+        if (autoGenerate && vocabItems.length) await generateSuggestions();
+      } catch (e) {
+        $("vocab-container").innerHTML = `<div class="empty">${escapeHtml(e.message)}</div>`;
       } finally {
-        refreshBtn.disabled = false;
+        $("refresh-btn").disabled = false;
       }
     }
 
-    window.addEventListener("scroll", () => {
-      topbar.classList.toggle("is-scrolled", window.scrollY > 8);
-    }, { passive: true });
-
-    clearFocusBtn.addEventListener("click", clearFocus);
-
-    refreshBtn.addEventListener("click", () => {
-      loadAll({ autoGenerate: false }).catch(() => {});
+    document.querySelectorAll(".nav-item").forEach((btn) => {
+      btn.addEventListener("click", () => switchView(btn.dataset.view));
     });
 
-    generateBtn.addEventListener("click", () => {
-      generateSuggestions().catch(() => {});
+    document.querySelectorAll("#source-chips .chip").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        sourceFilter = chip.dataset.source;
+        document.querySelectorAll("#source-chips .chip").forEach((c) => c.classList.toggle("is-active", c === chip));
+        renderVocabulary(vocabItems, { preserve: true });
+      });
     });
 
-    logoutBtn.addEventListener("click", async () => {
-      await fetch("/api/logout", { method: "POST" });
-      location.href = "/parent/login";
-    });
-
-    dockClose.addEventListener("click", closePractice);
-
-    dockPrev.addEventListener("click", () => {
-      if (practice.index > 0) {
-        practice.index -= 1;
-        renderPracticeDock();
-      }
-    });
-
-    dockNext.addEventListener("click", () => {
+    $("hero-cta").addEventListener("click", () => { switchView("practice"); generateSuggestions(); });
+    $("feature-cta").addEventListener("click", () => switchView("practice"));
+    $("generate-btn").addEventListener("click", () => generateSuggestions());
+    $("refresh-btn").addEventListener("click", () => loadAll());
+    $("clear-focus-btn").addEventListener("click", () => { selectedWord = null; updateFocusHint(); renderVocabulary(vocabItems, { preserve: true }); applySuggestionFilter(); });
+    $("notif-btn").addEventListener("click", () => { switchView("words"); $("notif-btn").classList.remove("has-badge"); });
+    $("logout-btn").addEventListener("click", async () => { await fetch("/api/logout", { method: "POST" }); location.href = "/parent/login"; });
+    $("dock-prev").addEventListener("click", () => { if (practice.index > 0) { practice.index--; renderDock(); } });
+    $("dock-next").addEventListener("click", () => {
       if (practice.index >= practice.questions.length - 1) {
-        markTried(practice.word);
-        showToast(`Marked “${practice.word}” as tried`);
+        triedWords.add(wordKey(practice.word));
+        showToast(t("niceWork"));
         closePractice();
         return;
       }
-      practice.index += 1;
-      renderPracticeDock();
+      practice.index++;
+      renderDock();
+    });
+    $("dock-copy").addEventListener("click", async () => {
+      const ok = await copyText(practice.questions[practice.index] || "");
+      showToast(ok ? t("copiedToast") : t("couldNotCopy"));
+    });
+    $("dock-close").addEventListener("click", closePractice);
+
+    $("digest-toggle").addEventListener("click", () => {
+      const on = !$("digest-toggle").classList.contains("is-on");
+      $("digest-toggle").classList.toggle("is-on", on);
+      $("digest-preview").textContent = on ? t("digestOn") : t("digestOff");
+      showToast(on ? t("digestSaved") : t("digestOffToast"));
     });
 
-    dockCopy.addEventListener("click", async () => {
-      const text = practice.questions[practice.index];
-      const ok = await copyText(text || "");
-      showToast(ok ? "Copied" : "Could not copy");
-      if (ok && navigator.vibrate) navigator.vibrate(10);
+    function onLangChange(lang) {
+      ParentI18n.setParentLang(lang);
+      refreshStaticI18n();
+      renderHeader();
+      renderProfileCards();
+      renderAllParentUI();
+      renderVocabulary(vocabItems, { preserve: true });
+      if (suggestionData) renderSuggestions(suggestionData);
+      buildWeekChart();
+    }
+
+    function syncLangSelects() {
+      document.querySelectorAll(".lang-select").forEach((sel) => {
+        sel.value = ParentI18n.getParentLang();
+      });
+    }
+
+    document.querySelectorAll(".lang-select").forEach((sel) => {
+      sel.addEventListener("change", () => onLangChange(sel.value));
     });
 
-    loadAll({ autoGenerate: true }).catch(() => {});
+    window.addEventListener("parent-lang-change", () => {
+      refreshStaticI18n();
+      syncLangSelects();
+    });
+
+    ParentI18n.setParentLang(ParentI18n.getParentLang());
+    refreshStaticI18n();
+    syncLangSelects();
+    loadAll({ autoGenerate: true });
   </script>
 </body>
 </html>

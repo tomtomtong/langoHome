@@ -2882,6 +2882,7 @@ function isPublicPath(url) {
     || url === '/turn-based.html'
     || url === '/assets/page-motion.css'
     || url === '/assets/page-motion.js'
+    || url === '/assets/parent-i18n.js'
     || /^\/assets\/uncle-tommy-transition\/(?:uncle-tommy-transition\.(?:css|js)|user_uncletommy_[1-4]\.png)$/i.test(url)
     || url === '/langoLogo.jpeg';
 }
@@ -2929,6 +2930,7 @@ function isPreviewStaticAsset(url) {
     || /^\/assets\/(?:lango-home|daily-rewards|collections|map|sfx|bgm)\/.+\.(?:png|jpe?g|webp|svg|json|mp3|wav)$/i.test(url)
     || url === '/assets/page-motion.css'
     || url === '/assets/page-motion.js'
+    || url === '/assets/parent-i18n.js'
     || /^\/assets\/uncle-tommy-transition\/(?:uncle-tommy-transition\.(?:css|js)|user_uncletommy_[1-4]\.png)$/i.test(url)
     || url === '/assets/vendor/lottie_light.min.js'
     || /^\/games\/.+\.(?:css|js|svg|png|jpe?g|webp|gif|mp3|wav)$/i.test(url)
@@ -2996,6 +2998,7 @@ function isPreviewSafeRequest(req, url, rawUrl) {
     || url.startsWith('/assets/bgm/')
     || url === '/assets/page-motion.css'
     || url === '/assets/page-motion.js'
+    || url === '/assets/parent-i18n.js'
     || url.startsWith('/assets/uncle-tommy-transition/')
     || url.startsWith('/games/assets/')
     || /^\/games\/.+\.(?:css|js|svg|png|jpe?g|webp|gif|mp3|wav)$/i.test(url)
@@ -4446,6 +4449,12 @@ const server = createServer(async (req, res) => {
   const url = qIndex === -1 ? rawUrl : rawUrl.slice(0, qIndex);
   const query = qIndex === -1 ? '' : rawUrl.slice(qIndex);
 
+  // Parent portal i18n must load on /parent/login without a session.
+  if (url === '/assets/parent-i18n.js') {
+    serveFile(res, join(ROOT, 'assets', 'parent-i18n.js'));
+    return;
+  }
+
   if (url === '/api/login' && req.method === 'POST') {
     readJsonBody(req, res, (parsed) => {
       const username = String(parsed.username || '').trim();
@@ -5361,7 +5370,7 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  const sharedMotionAsset = url.match(/^\/assets\/(page-motion\.(?:css|js))$/i);
+  const sharedMotionAsset = url.match(/^\/assets\/(page-motion\.(?:css|js)|parent-i18n\.js)$/i);
   if (sharedMotionAsset) {
     serveFile(res, join(ROOT, 'assets', sharedMotionAsset[1]));
     return;
