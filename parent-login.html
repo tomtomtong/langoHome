@@ -2,185 +2,308 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="color-scheme" content="light">
   <title>Parent Sign In — Lango</title>
   <link rel="stylesheet" href="/assets/page-motion.css">
   <script src="/assets/page-motion.js"></script>
   <link rel="preload" href="/langoLogo.jpeg" as="image">
   <style>
+    :root {
+      --bg: #f2f2f7;
+      --bg-solid: #ffffff;
+      --bg-fill: rgba(120, 120, 128, 0.12);
+      --bg-fill-strong: rgba(120, 120, 128, 0.2);
+      --label: #1c1c1e;
+      --label-secondary: rgba(60, 60, 67, 0.72);
+      --label-tertiary: rgba(60, 60, 67, 0.48);
+      --separator: rgba(60, 60, 67, 0.18);
+      --tint: #007aff;
+      --tint-pressed: #0066d6;
+      --danger: #ff3b30;
+      --danger-soft: rgba(255, 59, 48, 0.1);
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 12px 40px rgba(0, 0, 0, 0.08);
+      --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+      --ease-press: cubic-bezier(0.2, 0.8, 0.2, 1);
+      color-scheme: light;
+    }
+
     * { box-sizing: border-box; }
 
     html, body {
       margin: 0;
       min-height: 100%;
-      font-family: system-ui, -apple-system, sans-serif;
-      background: linear-gradient(160deg, #15192b 0%, #0f1117 45%, #12151f 100%);
-      color: #e8eaed;
+      min-height: 100dvh;
+      font: 100%/1.47 -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+        "Helvetica Neue", Helvetica, Arial, sans-serif;
+      font-optical-sizing: auto;
+      background:
+        radial-gradient(120% 80% at 50% -20%, rgba(0, 122, 255, 0.1), transparent 50%),
+        var(--bg);
+      color: var(--label);
+      -webkit-font-smoothing: antialiased;
     }
 
     body {
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 1.5rem;
+      padding: max(1.5rem, env(safe-area-inset-top)) 1.25rem max(1.5rem, env(safe-area-inset-bottom));
     }
 
     .login-card {
-      width: min(100%, 420px);
-      padding: 2.5rem 2rem;
-      border-radius: 18px;
-      background: rgba(26, 29, 39, 0.96);
-      border: 1px solid #2f3547;
-      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35);
+      width: min(100%, 400px);
+      padding: 2.1rem 1.65rem 1.75rem;
+      border-radius: 24px;
+      background: rgba(255, 255, 255, 0.78);
+      backdrop-filter: blur(28px) saturate(180%);
+      -webkit-backdrop-filter: blur(28px) saturate(180%);
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(255, 255, 255, 0.55);
+      animation: card-in 520ms var(--ease-out) both;
+    }
+
+    @keyframes card-in {
+      from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.985);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
     }
 
     .logo-wrap {
       display: flex;
       justify-content: center;
-      margin-bottom: 1.25rem;
+      margin-bottom: 1.15rem;
     }
 
     .logo-wrap img {
-      width: min(50vw, 140px);
-      height: auto;
-      object-fit: contain;
-    }
-
-    .badge {
-      display: inline-block;
-      margin: 0 auto 0.75rem;
-      padding: 0.25rem 0.65rem;
-      border-radius: 999px;
-      background: rgba(108, 140, 255, 0.14);
-      border: 1px solid rgba(108, 140, 255, 0.35);
-      color: #b4c5ff;
-      font-size: 0.75rem;
-      font-weight: 600;
-      letter-spacing: 0.03em;
-      text-transform: uppercase;
+      width: 72px;
+      height: 72px;
+      border-radius: 18px;
+      object-fit: cover;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
     }
 
     .title-wrap {
       text-align: center;
-      margin-bottom: 1.75rem;
+      margin-bottom: 1.6rem;
+    }
+
+    .eyebrow {
+      margin: 0 0 0.45rem;
+      font-size: 0.72rem;
+      font-weight: 650;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--tint);
     }
 
     h1 {
-      margin: 0 0 0.35rem;
-      font-size: 1.45rem;
-      font-weight: 650;
+      margin: 0;
+      font-size: clamp(1.55rem, 5vw, 1.85rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.12;
     }
 
     .subtitle {
-      margin: 0;
-      font-size: 0.92rem;
-      color: #9aa0a6;
-      line-height: 1.55;
+      margin: 0.55rem 0 0;
+      font-size: 0.95rem;
+      line-height: 1.45;
+      letter-spacing: -0.01em;
+      color: var(--label-secondary);
+    }
+
+    .field {
+      margin-bottom: 0.85rem;
     }
 
     label {
       display: block;
-      margin-bottom: 0.4rem;
-      font-size: 0.85rem;
-      color: #bdc1c6;
+      margin-bottom: 0.35rem;
+      padding-left: 0.15rem;
+      font-size: 0.8rem;
+      font-weight: 560;
+      letter-spacing: -0.01em;
+      color: var(--label-secondary);
     }
 
     input {
       width: 100%;
-      padding: 0.78rem 0.9rem;
-      margin-bottom: 1rem;
-      border: 1px solid #3c4048;
-      border-radius: 10px;
-      background: #0f1117;
-      color: #e8eaed;
-      font-size: 1rem;
+      min-height: 48px;
+      padding: 0.8rem 0.95rem;
+      border: 1px solid transparent;
+      border-radius: 14px;
+      background: var(--bg-fill);
+      color: var(--label);
+      font: inherit;
+      font-size: 1.02rem;
+      letter-spacing: -0.01em;
       outline: none;
-      transition: border-color 0.15s;
+      transition:
+        background 180ms var(--ease-out),
+        border-color 180ms var(--ease-out),
+        box-shadow 180ms var(--ease-out);
+    }
+
+    input::placeholder {
+      color: var(--label-tertiary);
+    }
+
+    input:hover {
+      background: var(--bg-fill-strong);
     }
 
     input:focus {
-      border-color: #7c9cff;
+      background: var(--bg-solid);
+      border-color: rgba(0, 122, 255, 0.45);
+      box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.15);
     }
 
-    button {
+    button[type="submit"] {
       width: 100%;
-      padding: 0.88rem;
-      margin-top: 0.35rem;
+      min-height: 50px;
+      margin-top: 0.45rem;
+      padding: 0.85rem 1rem;
       border: none;
-      border-radius: 10px;
-      background: linear-gradient(135deg, #5a7cff, #4664e8);
+      border-radius: 980px;
+      background: var(--tint);
       color: #fff;
-      font-size: 1rem;
-      font-weight: 600;
+      font: inherit;
+      font-size: 1.02rem;
+      font-weight: 620;
+      letter-spacing: -0.015em;
       cursor: pointer;
-      transition: opacity 0.15s, transform 0.15s;
+      transition:
+        transform 120ms var(--ease-press),
+        background 180ms var(--ease-out),
+        opacity 180ms var(--ease-out);
+      -webkit-tap-highlight-color: transparent;
     }
 
-    button:hover:not(:disabled) {
-      opacity: 0.95;
-      transform: translateY(-1px);
+    button[type="submit"]:hover:not(:disabled) {
+      background: var(--tint-pressed);
     }
 
-    button:disabled {
-      opacity: 0.65;
+    button[type="submit"]:active:not(:disabled) {
+      transform: scale(0.97);
+    }
+
+    button[type="submit"]:disabled {
+      opacity: 0.55;
       cursor: not-allowed;
+    }
+
+    button[type="submit"]:focus-visible {
+      outline: 2px solid var(--tint);
+      outline-offset: 3px;
     }
 
     .error {
       display: none;
-      margin-bottom: 1rem;
-      padding: 0.75rem 0.9rem;
-      border-radius: 10px;
-      background: rgba(234, 67, 53, 0.12);
-      border: 1px solid rgba(234, 67, 53, 0.35);
-      color: #f28b82;
+      margin-bottom: 0.95rem;
+      padding: 0.8rem 0.95rem;
+      border-radius: 14px;
+      background: var(--danger-soft);
+      color: var(--danger);
       font-size: 0.9rem;
+      letter-spacing: -0.01em;
       text-align: center;
+      line-height: 1.4;
     }
 
     .error.visible {
       display: block;
+      animation: shake 320ms var(--ease-out);
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-4px); }
+      75% { transform: translateX(4px); }
     }
 
     .hint {
-      margin: 1.25rem 0 0;
+      margin: 1.35rem 0 0;
       font-size: 0.82rem;
-      color: #7d848c;
       line-height: 1.5;
+      letter-spacing: -0.01em;
+      color: var(--label-tertiary);
       text-align: center;
     }
 
     .hint a {
-      color: #9eb0ff;
+      color: var(--tint);
       text-decoration: none;
+      font-weight: 560;
     }
 
     .hint a:hover {
       text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .login-card,
+      .error.visible {
+        animation: none !important;
+      }
+
+      button[type="submit"],
+      input {
+        transition: none !important;
+      }
+
+      button[type="submit"]:active:not(:disabled) {
+        transform: none;
+      }
+    }
+
+    @media (prefers-reduced-transparency: reduce) {
+      .login-card {
+        background: var(--bg-solid);
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+      }
+    }
+
+    @media (prefers-contrast: more) {
+      .login-card,
+      input {
+        border: 1px solid var(--label);
+      }
     }
   </style>
 </head>
 <body>
   <div class="login-card">
     <div class="logo-wrap">
-      <img src="/langoLogo.jpeg" alt="Lango" width="140" height="140" decoding="async">
+      <img src="/langoLogo.jpeg" alt="Lango" width="72" height="72" decoding="async">
     </div>
     <div class="title-wrap">
-      <div class="badge">Parent Portal</div>
-      <h1>See what your child learned</h1>
-      <p class="subtitle">Sign in with your child’s learner account to view smartpen vocabulary and get conversation ideas.</p>
+      <p class="eyebrow">Parent Portal</p>
+      <h1>See what they learned</h1>
+      <p class="subtitle">Sign in with your child’s learner account to view smartpen vocabulary and get practice ideas.</p>
     </div>
 
     <div id="error" class="error" role="alert"></div>
 
     <form id="login-form">
-      <label for="username">Learner username</label>
-      <input id="username" name="username" type="text" autocomplete="username" required autofocus placeholder="e.g. user01">
+      <div class="field">
+        <label for="username">Learner username</label>
+        <input id="username" name="username" type="text" autocomplete="username" required autofocus placeholder="e.g. user01">
+      </div>
 
-      <label for="password">Password</label>
-      <input id="password" name="password" type="password" autocomplete="current-password" required>
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required>
+      </div>
 
-      <button type="submit" id="submit-btn">View vocabulary</button>
+      <button type="submit" id="submit-btn">Continue</button>
     </form>
 
     <p class="hint">
@@ -229,7 +352,7 @@
       } catch (err) {
         showError(err.message || "Could not sign in.");
         submitBtn.disabled = false;
-        submitBtn.textContent = "View vocabulary";
+        submitBtn.textContent = "Continue";
       }
     });
   </script>
