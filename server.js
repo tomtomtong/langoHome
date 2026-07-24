@@ -3481,6 +3481,10 @@ function isSmartpenSyncPublicApi(url, method) {
   return url === '/api/smartpen/sync' && (method || 'GET').toUpperCase() === 'POST';
 }
 
+function isBluetoothCodesImportPublicApi(url, method) {
+  return url === '/api/bluetooth-codes/import' && (method || 'GET').toUpperCase() === 'POST';
+}
+
 /** Turn-based test page: REST STT / LLM / TTS without login (Railway-friendly sandbox). */
 function isTurnBasedPublicApi(url, method) {
   const m = (method || 'GET').toUpperCase();
@@ -3638,6 +3642,7 @@ function requiresAdmin(url, method) {
 
   if (url.startsWith('/api/bluetooth-codes')) {
     if (url.match(/^\/api\/bluetooth-codes\/[^/]+\/audio$/) && m === 'GET') return false;
+    if (url === '/api/bluetooth-codes/import' && m === 'POST') return false;
     return true;
   }
 
@@ -5172,6 +5177,7 @@ const server = createServer(async (req, res) => {
     && !isCrashReportPublicApi(url, req.method)
     && !isLearnedVocabularyPublicApi(url, req.method)
     && !isSmartpenSyncPublicApi(url, req.method)
+    && !isBluetoothCodesImportPublicApi(url, req.method)
     && !isTurnBasedSafeRequest(req, url)
     && !isPreviewSafeRequest(req, url, rawUrl)
     && !isAuthenticated(req)
