@@ -5008,7 +5008,7 @@
                 return;
               }
               openRecord({ tab: 'pub', highlightLatest: true, word });
-            }, 1000);
+            }, 100);
           };
           window.LangoRecord = { open: openRecord, close };
           window.addEventListener('lango:open-record', onOpen);
