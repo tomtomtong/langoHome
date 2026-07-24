@@ -4875,12 +4875,139 @@
               id: item.id || `${date}-${word}-${index}`,
               date,
               word,
+              code: String(item.code || '').trim() || null,
+              pairId: String(item.pairId || '').trim() || null,
+              audioUrl: String(item.audioUrl || '').trim() || null,
               learnedAt: Number(item.learnedAt) || 0,
             };
           })
           .filter(Boolean)
           .sort((a, b) => (b.learnedAt - a.learnedAt) || b.date.localeCompare(a.date));
       }
+
+      const LangoVocabSpeech = (() => {
+        let requestId = 0;
+        let currentAudio = null;
+        let objectUrl = null;
+
+        function stop() {
+          requestId += 1;
+          if (currentAudio) {
+            currentAudio.pause();
+            currentAudio.src = '';
+            currentAudio = null;
+          }
+          if (objectUrl) {
+            URL.revokeObjectURL(objectUrl);
+            objectUrl = null;
+          }
+        }
+
+        function playAudio(audio, id) {
+          currentAudio = audio;
+          audio.addEventListener('ended', () => {
+            if (id !== requestId) return;
+            if (objectUrl) {
+              URL.revokeObjectURL(objectUrl);
+              objectUrl = null;
+            }
+            currentAudio = null;
+          }, { once: true });
+          return audio.play().then(() => true).catch((error) => {
+            console.warn('[vocab-speech] Could not play word audio', error);
+            if (id === requestId) {
+              currentAudio = null;
+            }
+            return false;
+          });
+        }
+
+        function createAudioFromBase64(base64, mimeType) {
+          const binary = atob(base64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+          if (objectUrl) URL.revokeObjectURL(objectUrl);
+          objectUrl = URL.createObjectURL(new Blob([bytes], { type: mimeType || 'audio/mpeg' }));
+          return new Audio(objectUrl);
+        }
+
+        async function cacheTtsAudio({ pairId, code, audioContent, mimeType }) {
+          const pairRef = String(pairId || code || '').trim();
+          if (!pairRef || !audioContent) return null;
+          try {
+            const res = await fetch('/api/bluetooth-codes/tts-cache', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                pairId: pairId || undefined,
+                code: code || undefined,
+                audioContent,
+                mimeType: mimeType || 'audio/mpeg',
+              }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+              console.warn('[vocab-speech] Could not cache TTS audio', data.error || res.status);
+              return null;
+            }
+            return data.audio?.url || null;
+          } catch (error) {
+            console.warn('[vocab-speech] Could not cache TTS audio', error);
+            return null;
+          }
+        }
+
+        async function speakFromTts(text, id, { pairId, code } = {}) {
+          const res = await fetch('/api/inworld/tts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text }),
+          });
+          if (id !== requestId) return null;
+          const data = await res.json().catch(() => ({}));
+          if (id !== requestId) return null;
+          if (!res.ok || !data.audioContent) {
+            console.warn('[vocab-speech] TTS unavailable', data.error || res.status);
+            return null;
+          }
+          const mimeType = data.mimeType || 'audio/mpeg';
+          await playAudio(createAudioFromBase64(data.audioContent, mimeType), id);
+          if (id !== requestId) return null;
+          const cachedUrl = await cacheTtsAudio({
+            pairId,
+            code,
+            audioContent: data.audioContent,
+            mimeType,
+          });
+          return cachedUrl;
+        }
+
+        async function speak(word, { audioUrl, pairId, code } = {}) {
+          const text = String(word || '').trim();
+          const clipUrl = String(audioUrl || '').trim();
+          if (!text && !clipUrl) return null;
+          stop();
+          const id = requestId;
+          try {
+            if (clipUrl) {
+              const played = await playAudio(new Audio(clipUrl), id);
+              if (id !== requestId) return null;
+              if (played !== false) return clipUrl;
+            }
+            if (text) return speakFromTts(text, id, { pairId, code });
+            return null;
+          } catch (error) {
+            if (id === requestId) {
+              console.warn('[vocab-speech] Could not speak word', error);
+              stop();
+            }
+            return null;
+          }
+        }
+
+        return { speak, stop };
+      })();
+      window.LangoVocabSpeech = LangoVocabSpeech;
 
       function RecordPage() {
         const [visible, setVisible] = React.useState(false);
@@ -4905,11 +5032,30 @@
           });
         };
 
-        const applyLatestVocabHighlight = (records, wordHint) => {
-          const latest = records[0];
+        const applyLatestVocabHighlight = (records, wordHint, options = {}) => {
+          const hint = String(wordHint || '').trim().toLowerCase();
+          const matched = hint
+            ? records.find((row) => String(row.word || '').trim().toLowerCase() === hint)
+            : null;
+          const latest = matched || records[0];
           const word = String(wordHint || latest?.word || '').trim();
           if (word) setFeaturedWord(word);
           if (latest?.id) setHighlightRowId(latest.id);
+          if (options.speak !== false && word) {
+            LangoVocabSpeech.speak(word, {
+              audioUrl: options.audioUrl || latest?.audioUrl || null,
+              pairId: options.pairId || latest?.pairId || null,
+              code: options.code || latest?.code || null,
+            }).then((cachedUrl) => {
+              if (!cachedUrl || !latest?.id) return;
+              setPubRecords((current) => current.map((row) => (
+                row.id === latest.id && !row.audioUrl
+                  ? { ...row, audioUrl: cachedUrl }
+                  : row
+              )));
+            });
+          }
+          return latest || null;
         };
 
         const loadRecords = async () => {
@@ -4954,16 +5100,26 @@
           resetScroll();
           const records = await loadRecords();
           if (highlightLatest && tab === 'pub') {
-            applyLatestVocabHighlight(records.pub, wordHint);
+            applyLatestVocabHighlight(records.pub, wordHint, {
+              speak: options.speak !== false,
+              audioUrl: options.audioUrl,
+              pairId: options.pairId,
+              code: options.code,
+            });
           }
         };
 
-        const refreshLatestVocab = async (wordHint) => {
+        const refreshLatestVocab = async (wordHint, options = {}) => {
           setActiveTab('pub');
           resetScroll();
           if (new URLSearchParams(location.search).get('preview') === '1') {
             setPubRecords(RECORD_PREVIEW_PUB_ROWS);
-            applyLatestVocabHighlight(RECORD_PREVIEW_PUB_ROWS, wordHint);
+            applyLatestVocabHighlight(RECORD_PREVIEW_PUB_ROWS, wordHint, {
+              speak: options.speak !== false,
+              audioUrl: options.audioUrl,
+              pairId: options.pairId,
+              code: options.code,
+            });
             return;
           }
           try {
@@ -4973,10 +5129,24 @@
               : { items: [] };
             const pub = mapPubVocabRecords(vocabData.items);
             setPubRecords(pub);
-            applyLatestVocabHighlight(pub, wordHint);
+            applyLatestVocabHighlight(pub, wordHint, {
+              speak: options.speak !== false,
+              audioUrl: options.audioUrl,
+              pairId: options.pairId,
+              code: options.code,
+            });
           } catch {
             const word = String(wordHint || '').trim();
-            if (word) setFeaturedWord(word);
+            if (word) {
+              setFeaturedWord(word);
+              if (options.speak !== false) {
+                LangoVocabSpeech.speak(word, {
+                  audioUrl: options.audioUrl,
+                  pairId: options.pairId,
+                  code: options.code,
+                });
+              }
+            }
           }
         };
 
@@ -4987,6 +5157,7 @@
         React.useEffect(() => {
           const close = () => {
             clearTimeout(penOpenTimerRef.current);
+            LangoVocabSpeech.stop();
             setVisible(false);
             setFeaturedWord(null);
             setHighlightRowId(null);
@@ -4997,17 +5168,29 @@
               tab: detail.tab,
               highlightLatest: detail.highlightLatest,
               word: detail.word,
+              audioUrl: detail.audioUrl,
+              pairId: detail.pairId,
+              code: detail.code,
+              speak: detail.speak,
             });
           };
           const onPenWordLearned = (event) => {
-            const { word } = event?.detail || {};
+            const { word, audioUrl, pairId, code } = event?.detail || {};
             clearTimeout(penOpenTimerRef.current);
             penOpenTimerRef.current = setTimeout(() => {
               if (recordVisibleRef.current) {
-                refreshLatestVocab(word);
+                refreshLatestVocab(word, { audioUrl, pairId, code, speak: true });
                 return;
               }
-              openRecord({ tab: 'pub', highlightLatest: true, word });
+              openRecord({
+                tab: 'pub',
+                highlightLatest: true,
+                word,
+                audioUrl,
+                pairId,
+                code,
+                speak: true,
+              });
             }, 100);
           };
           window.LangoRecord = { open: openRecord, close };
@@ -5023,6 +5206,7 @@
 
         const closeRecord = () => {
           clearTimeout(penOpenTimerRef.current);
+          LangoVocabSpeech.stop();
           window.LangoSfx?.play('back');
           setVisible(false);
           setFeaturedWord(null);
@@ -5044,6 +5228,7 @@
           window.LangoSfx?.play('next');
           setActiveTab(tab);
           if (tab !== 'pub') {
+            LangoVocabSpeech.stop();
             setFeaturedWord(null);
             setHighlightRowId(null);
           }
@@ -5416,10 +5601,10 @@
             clearTimeout(recordRemindTimer.current);
             recordRemindTimer.current = setTimeout(() => setRecordReminding(false), 8000);
           };
-          const onPenWordLearned = ({ word, username } = {}) => {
+          const onPenWordLearned = ({ word, username, audioUrl, pairId, code } = {}) => {
             flashRecord();
             window.dispatchEvent(new CustomEvent('lango:pen-word-learned', {
-              detail: { word, username },
+              detail: { word, username, audioUrl, pairId, code },
             }));
           };
           const onPenConnected = ({ deviceName } = {}) => {

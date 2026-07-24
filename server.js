@@ -837,6 +837,7 @@ function rowToLearnedVocabulary(row) {
     id: row.id,
     username: row.username,
     code: storedCode || null,
+    pairId: pair?.id || null,
     word: content,
     content,
     audioUrl: pair?.audio?.url || null,
@@ -1822,6 +1823,62 @@ function clearBluetoothCodeAudio(pairId) {
       try { unlinkSync(join(pairDir, name)); } catch {}
     }
   }
+}
+
+function extensionForAudioMime(mimeType) {
+  const mime = String(mimeType || '').trim().toLowerCase();
+  if (mime.includes('wav')) return '.wav';
+  if (mime.includes('ogg')) return '.ogg';
+  if (mime.includes('mp4') || mime.includes('m4a') || mime.includes('aac')) return '.m4a';
+  if (mime.includes('webm')) return '.webm';
+  return '.mp3';
+}
+
+function saveBluetoothCodeAudioFromBase64(pairRef, audioContent, mimeType = 'audio/mpeg', {
+  overwrite = false,
+} = {}) {
+  const needle = String(pairRef || '').trim();
+  if (!needle) return { ok: false, error: 'Bluetooth code or pair id is required.' };
+  const pair = findBluetoothCodePairById(needle) || findBluetoothCodePair(needle);
+  if (!pair) return { ok: false, error: 'Pair not found.' };
+
+  const existing = getBluetoothCodeAudioInfo(pair.id);
+  if (existing && !overwrite) {
+    return { ok: true, skipped: true, pairId: pair.id, code: pair.code, audio: existing };
+  }
+
+  const base64 = String(audioContent || '').trim();
+  if (!base64) return { ok: false, error: 'audioContent is required.' };
+
+  let buffer;
+  try {
+    buffer = Buffer.from(base64, 'base64');
+  } catch {
+    return { ok: false, error: 'Invalid audioContent.' };
+  }
+  if (!buffer.length) return { ok: false, error: 'audioContent is empty.' };
+  if (buffer.length > AUDIO_MAX_BYTES) {
+    return {
+      ok: false,
+      error: `File must be under ${Math.round(AUDIO_MAX_BYTES / (1024 * 1024))} MB.`,
+    };
+  }
+
+  const pairDir = join(BLUETOOTH_CODES_AUDIO_DIR, pair.id);
+  ensureBluetoothCodesAudioDir();
+  if (!existsSync(pairDir)) mkdirSync(pairDir, { recursive: true });
+  clearBluetoothCodeAudio(pair.id);
+
+  const ext = extensionForAudioMime(mimeType);
+  const filename = `audio${ext}`;
+  writeFileSync(join(pairDir, filename), buffer);
+  return {
+    ok: true,
+    skipped: false,
+    pairId: pair.id,
+    code: pair.code,
+    audio: getBluetoothCodeAudioInfo(pair.id),
+  };
 }
 
 function deleteBluetoothCodePairDir(pairId) {
@@ -3643,6 +3700,7 @@ function requiresAdmin(url, method) {
   if (url.startsWith('/api/bluetooth-codes')) {
     if (url.match(/^\/api\/bluetooth-codes\/[^/]+\/audio$/) && m === 'GET') return false;
     if (url === '/api/bluetooth-codes/import' && m === 'POST') return false;
+    if (url === '/api/bluetooth-codes/tts-cache' && m === 'POST') return false;
     return true;
   }
 
@@ -5476,6 +5534,31 @@ const server = createServer(async (req, res) => {
       return;
     }
     sendJson(res, 200, result);
+    return;
+  }
+
+  if (url === '/api/bluetooth-codes/tts-cache' && req.method === 'POST') {
+    const session = getSession(req);
+    if (!session) {
+      sendJson(res, 401, { error: 'Login required.' });
+      return;
+    }
+    readJsonBody(req, res, (parsed) => {
+      const pairRef = parsed?.pairId || parsed?.pair_id || parsed?.code || parsed?.bluetoothCode;
+      const result = saveBluetoothCodeAudioFromBase64(
+        pairRef,
+        parsed?.audioContent || parsed?.audio_content,
+        parsed?.mimeType || parsed?.mime_type || 'audio/mpeg',
+        { overwrite: Boolean(parsed?.overwrite) },
+      );
+      if (!result.ok) {
+        sendJson(res, result.error === 'Pair not found.' ? 404 : 400, {
+          error: result.error || 'Could not cache TTS audio.',
+        });
+        return;
+      }
+      sendJson(res, 200, result);
+    });
     return;
   }
 
