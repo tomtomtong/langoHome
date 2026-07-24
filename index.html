@@ -4778,6 +4778,7 @@
         const scrollbarRef = React.useRef(null);
         const dragRef = React.useRef({ pointerId: null, offset: 0 });
         const penOpenTimerRef = React.useRef(null);
+        const recordVisibleRef = React.useRef(false);
         const recordAsset = (name) => `/assets/record/${name}.png?v=20260723c`;
 
         const resetScroll = () => {
@@ -4840,6 +4841,32 @@
           }
         };
 
+        const refreshLatestVocab = async (wordHint) => {
+          setActiveTab('pub');
+          resetScroll();
+          if (new URLSearchParams(location.search).get('preview') === '1') {
+            setPubRecords(RECORD_PREVIEW_PUB_ROWS);
+            applyLatestVocabHighlight(RECORD_PREVIEW_PUB_ROWS, wordHint);
+            return;
+          }
+          try {
+            const vocabResponse = await fetch('/api/learned-vocabulary?limit=200');
+            const vocabData = vocabResponse.ok
+              ? await vocabResponse.json()
+              : { items: [] };
+            const pub = mapPubVocabRecords(vocabData.items);
+            setPubRecords(pub);
+            applyLatestVocabHighlight(pub, wordHint);
+          } catch {
+            const word = String(wordHint || '').trim();
+            if (word) setFeaturedWord(word);
+          }
+        };
+
+        React.useEffect(() => {
+          recordVisibleRef.current = visible;
+        }, [visible]);
+
         React.useEffect(() => {
           const close = () => {
             clearTimeout(penOpenTimerRef.current);
@@ -4859,6 +4886,10 @@
             const { word } = event?.detail || {};
             clearTimeout(penOpenTimerRef.current);
             penOpenTimerRef.current = setTimeout(() => {
+              if (recordVisibleRef.current) {
+                refreshLatestVocab(word);
+                return;
+              }
               openRecord({ tab: 'pub', highlightLatest: true, word });
             }, 1000);
           };
