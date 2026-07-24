@@ -3606,6 +3606,62 @@
       text-shadow: 0 2px 0 #542007;
     }
 
+    .record-page__featured-vocab {
+      position: absolute;
+      z-index: 4;
+      top: 21%;
+      left: 50%;
+      display: grid;
+      gap: .35rem;
+      width: min(78%, 520px);
+      padding: clamp(10px, 1.4cqw, 18px) clamp(16px, 2.2cqw, 28px);
+      border-radius: 18px;
+      transform: translateX(-50%);
+      background: rgba(255, 245, 210, .94);
+      box-shadow: 0 8px 18px rgba(84, 32, 7, .22);
+      pointer-events: none;
+      text-align: center;
+      animation: record-featured-in 420ms ease-out;
+    }
+
+    .record-page__featured-label {
+      margin: 0;
+      color: #8a4a18;
+      font-family: "Baloo 2", system-ui, sans-serif;
+      font-size: clamp(14px, 1.6cqw, 22px);
+      font-weight: 700;
+      letter-spacing: .02em;
+      text-transform: uppercase;
+    }
+
+    .record-page__featured-word {
+      margin: 0;
+      overflow: hidden;
+      color: var(--record-brown);
+      font-family: "Baloo 2", system-ui, sans-serif;
+      font-size: clamp(28px, 4.8cqw, 64px);
+      font-weight: 800;
+      line-height: 1.05;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .record-page__row.is-latest .record-page__word {
+      color: #b45919;
+      transform-origin: right center;
+      animation: record-latest-pulse 1.1s ease-in-out 3;
+    }
+
+    @keyframes record-featured-in {
+      from { opacity: 0; transform: translateX(-50%) translateY(8px) scale(.96); }
+      to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+    }
+
+    @keyframes record-latest-pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.06); }
+    }
+
     .record-page__sr-only {
       position: absolute;
       width: 1px;
@@ -4716,9 +4772,12 @@
         const [pubRecords, setPubRecords] = React.useState([]);
         const [loading, setLoading] = React.useState(false);
         const [scrollProgress, setScrollProgress] = React.useState(0);
+        const [featuredWord, setFeaturedWord] = React.useState(null);
+        const [highlightRowId, setHighlightRowId] = React.useState(null);
         const listRef = React.useRef(null);
         const scrollbarRef = React.useRef(null);
         const dragRef = React.useRef({ pointerId: null, offset: 0 });
+        const penOpenTimerRef = React.useRef(null);
         const recordAsset = (name) => `/assets/record/${name}.png?v=20260723c`;
 
         const resetScroll = () => {
@@ -4728,11 +4787,18 @@
           });
         };
 
+        const applyLatestVocabHighlight = (records, wordHint) => {
+          const latest = records[0];
+          const word = String(wordHint || latest?.word || '').trim();
+          if (word) setFeaturedWord(word);
+          if (latest?.id) setHighlightRowId(latest.id);
+        };
+
         const loadRecords = async () => {
           if (new URLSearchParams(location.search).get('preview') === '1') {
             setExerciseRecords(RECORD_PREVIEW_ROWS);
             setPubRecords(RECORD_PREVIEW_PUB_ROWS);
-            return;
+            return { exercise: RECORD_PREVIEW_ROWS, pub: RECORD_PREVIEW_PUB_ROWS };
           }
           setLoading(true);
           try {
@@ -4741,60 +4807,98 @@
               fetch('/api/learned-vocabulary?limit=200'),
             ]);
             const playsData = playsResponse.ok ? await playsResponse.json() : { plays: [] };
-            setExerciseRecords(groupExerciseRecords(playsData.plays));
+            const exercise = groupExerciseRecords(playsData.plays);
+            setExerciseRecords(exercise);
 
             const vocabData = vocabResponse.ok
               ? await vocabResponse.json()
               : { items: [] };
-            setPubRecords(mapPubVocabRecords(vocabData.items));
+            const pub = mapPubVocabRecords(vocabData.items);
+            setPubRecords(pub);
+            return { exercise, pub };
           } catch {
             setExerciseRecords([]);
             setPubRecords([]);
+            return { exercise: [], pub: [] };
           } finally {
             setLoading(false);
           }
         };
 
+        const openRecord = async (options = {}) => {
+          const tab = options.tab === 'pub' ? 'pub' : 'exercise';
+          const highlightLatest = Boolean(options.highlightLatest);
+          const wordHint = String(options.word || '').trim();
+          setActiveTab(tab);
+          setVisible(true);
+          setHighlightRowId(null);
+          setFeaturedWord(highlightLatest && wordHint ? wordHint : null);
+          resetScroll();
+          const records = await loadRecords();
+          if (highlightLatest && tab === 'pub') {
+            applyLatestVocabHighlight(records.pub, wordHint);
+          }
+        };
+
         React.useEffect(() => {
-          const close = () => setVisible(false);
-          const open = () => {
-            setActiveTab('exercise');
-            setVisible(true);
-            resetScroll();
-            loadRecords();
+          const close = () => {
+            clearTimeout(penOpenTimerRef.current);
+            setVisible(false);
+            setFeaturedWord(null);
+            setHighlightRowId(null);
           };
-          const onOpen = () => open();
-          window.LangoRecord = { open, close };
+          const onOpen = (event) => {
+            const detail = event?.detail || {};
+            openRecord({
+              tab: detail.tab,
+              highlightLatest: detail.highlightLatest,
+              word: detail.word,
+            });
+          };
+          const onPenWordLearned = (event) => {
+            const { word } = event?.detail || {};
+            clearTimeout(penOpenTimerRef.current);
+            penOpenTimerRef.current = setTimeout(() => {
+              openRecord({ tab: 'pub', highlightLatest: true, word });
+            }, 1000);
+          };
+          window.LangoRecord = { open: openRecord, close };
           window.addEventListener('lango:open-record', onOpen);
+          window.addEventListener('lango:pen-word-learned', onPenWordLearned);
           return () => {
+            clearTimeout(penOpenTimerRef.current);
             window.removeEventListener('lango:open-record', onOpen);
-            if (window.LangoRecord?.open === open) delete window.LangoRecord;
+            window.removeEventListener('lango:pen-word-learned', onPenWordLearned);
+            if (window.LangoRecord?.open === openRecord) delete window.LangoRecord;
           };
         }, []);
+
+        const closeRecord = () => {
+          clearTimeout(penOpenTimerRef.current);
+          window.LangoSfx?.play('back');
+          setVisible(false);
+          setFeaturedWord(null);
+          setHighlightRowId(null);
+          document.querySelector('.lango-home__record')?.focus();
+        };
 
         React.useEffect(() => {
           if (!visible) return undefined;
           const onKeyDown = (event) => {
-            if (event.key === 'Escape') {
-              window.LangoSfx?.play('back');
-              setVisible(false);
-              document.querySelector('.lango-home__record')?.focus();
-            }
+            if (event.key === 'Escape') closeRecord();
           };
           window.addEventListener('keydown', onKeyDown);
           return () => window.removeEventListener('keydown', onKeyDown);
         }, [visible]);
 
-        const closeRecord = () => {
-          window.LangoSfx?.play('back');
-          setVisible(false);
-          document.querySelector('.lango-home__record')?.focus();
-        };
-
         const setTab = (tab) => {
           if (tab === activeTab) return;
           window.LangoSfx?.play('next');
           setActiveTab(tab);
+          if (tab !== 'pub') {
+            setFeaturedWord(null);
+            setHighlightRowId(null);
+          }
           resetScroll();
         };
 
@@ -4937,6 +5041,15 @@
                 e('span', { className: 'record-page__tab-label' }, 'Lango Pub'),
               ),
             ),
+            activeTab === 'pub' && featuredWord && e('div', {
+              className: 'record-page__featured-vocab',
+              role: 'status',
+              'aria-live': 'polite',
+              'aria-label': `Latest smartpen word: ${featuredWord}`,
+            },
+              e('p', { className: 'record-page__featured-label' }, 'Latest word'),
+              e('p', { className: 'record-page__featured-word' }, featuredWord),
+            ),
             e('div', { className: 'record-page__list-panel' },
               e('ol', {
                 id: 'record-page-list',
@@ -4951,7 +5064,9 @@
                   key: activeTab === 'exercise'
                     ? `exercise-${row.date}`
                     : `pub-${row.id || `${row.date}-${row.word}`}`,
-                  className: 'record-page__row',
+                  className: `record-page__row${
+                    activeTab === 'pub' && highlightRowId && row.id === highlightRowId ? ' is-latest' : ''
+                  }`,
                 },
                   e('img', {
                     className: 'record-page__row-background',
