@@ -3614,47 +3614,152 @@
       display: grid;
       gap: .35rem;
       width: min(78%, 520px);
-      padding: clamp(10px, 1.4cqw, 18px) clamp(16px, 2.2cqw, 28px);
-      border-radius: 18px;
+      padding: clamp(12px, 1.6cqw, 22px) clamp(18px, 2.4cqw, 32px);
+      border: 4px solid #fff;
+      border-radius: 22px;
       transform: translateX(-50%);
-      background: rgba(255, 245, 210, .94);
-      box-shadow: 0 8px 18px rgba(84, 32, 7, .22);
+      background: linear-gradient(
+        135deg,
+        #fff9c4 0%,
+        #ffe082 22%,
+        #ffab91 45%,
+        #ce93d8 68%,
+        #90caf9 100%
+      );
+      box-shadow:
+        0 0 0 3px #ff6b35,
+        0 14px 28px rgba(255, 107, 53, .32),
+        0 0 36px rgba(255, 193, 7, .38);
       pointer-events: none;
       text-align: center;
-      animation: record-featured-in 420ms ease-out;
+      overflow: hidden;
+      isolation: isolate;
+      animation: record-featured-in 420ms ease-out, record-featured-glow 2.6s ease-in-out infinite;
+    }
+
+    .record-page__featured-vocab::before {
+      content: "";
+      position: absolute;
+      inset: -40%;
+      z-index: -1;
+      background: conic-gradient(
+        from 0deg,
+        #ff6b35,
+        #ffd54f,
+        #66bb6a,
+        #42a5f5,
+        #ab47bc,
+        #ef5350,
+        #ff6b35
+      );
+      opacity: .28;
+      animation: record-featured-spin 8s linear infinite;
+    }
+
+    .record-page__featured-spark {
+      position: absolute;
+      top: 8%;
+      left: 6%;
+      font-size: clamp(18px, 2.2cqw, 28px);
+      line-height: 1;
+      filter: drop-shadow(0 2px 2px rgba(84, 32, 7, .25));
+      animation: record-spark-bounce 1.8s ease-in-out infinite;
+    }
+
+    .record-page__featured-spark--right {
+      top: auto;
+      right: 6%;
+      bottom: 10%;
+      left: auto;
+      animation-delay: .6s;
     }
 
     .record-page__featured-label {
       margin: 0;
-      color: #8a4a18;
+      color: #d84315;
       font-family: "Baloo 2", system-ui, sans-serif;
       font-size: clamp(14px, 1.6cqw, 22px);
-      font-weight: 700;
-      letter-spacing: .02em;
+      font-weight: 800;
+      letter-spacing: .06em;
       text-transform: uppercase;
+      text-shadow: 0 1px 0 #fff, 0 2px 6px rgba(216, 67, 21, .28);
     }
 
     .record-page__featured-word {
       margin: 0;
       overflow: hidden;
-      color: var(--record-brown);
       font-family: "Baloo 2", system-ui, sans-serif;
       font-size: clamp(28px, 4.8cqw, 64px);
       font-weight: 800;
       line-height: 1.05;
       text-overflow: ellipsis;
       white-space: nowrap;
+      background: linear-gradient(
+        90deg,
+        #1565c0 0%,
+        #7b1fa2 25%,
+        #c2185b 50%,
+        #e65100 75%,
+        #2e7d32 100%
+      );
+      background-size: 200% auto;
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 2px 0 rgba(255, 255, 255, .85));
+      animation: record-word-shimmer 3s linear infinite;
+    }
+
+    .record-page__row.is-latest {
+      box-shadow:
+        0 0 0 3px #ffd54f,
+        0 0 22px rgba(255, 193, 7, .55),
+        inset 0 -6px 4px rgba(139, 97, 45, .25);
     }
 
     .record-page__row.is-latest .record-page__word {
-      color: #b45919;
+      background: linear-gradient(90deg, #ff6f00, #e91e63, #9c27b0, #1565c0);
+      background-size: 200% auto;
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      -webkit-text-fill-color: transparent;
       transform-origin: right center;
-      animation: record-latest-pulse 1.1s ease-in-out 3;
+      animation: record-latest-pulse 1.1s ease-in-out 3, record-word-shimmer 2.4s linear infinite;
     }
 
     @keyframes record-featured-in {
       from { opacity: 0; transform: translateX(-50%) translateY(8px) scale(.96); }
       to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+    }
+
+    @keyframes record-featured-glow {
+      0%, 100% {
+        box-shadow:
+          0 0 0 3px #ff6b35,
+          0 14px 28px rgba(255, 107, 53, .32),
+          0 0 36px rgba(255, 193, 7, .38);
+      }
+      50% {
+        box-shadow:
+          0 0 0 3px #42a5f5,
+          0 14px 28px rgba(66, 165, 245, .34),
+          0 0 40px rgba(206, 147, 216, .42);
+      }
+    }
+
+    @keyframes record-featured-spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes record-spark-bounce {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(-4px) scale(1.12); }
+    }
+
+    @keyframes record-word-shimmer {
+      to { background-position: 200% center; }
     }
 
     @keyframes record-latest-pulse {
@@ -3676,8 +3781,20 @@
 
     body.in-session .record-page.is-visible { display: none; }
 
+    .record-page.is-vocab-reveal .record-page__tab.is-active .record-page__tab-label {
+      color: #fff;
+      text-shadow: 0 2px 0 #c62828, 0 0 12px rgba(255, 193, 7, .65);
+    }
+
     @media (prefers-reduced-motion: reduce) {
       .record-page.is-visible { animation: none; }
+      .record-page__featured-vocab,
+      .record-page__featured-vocab::before,
+      .record-page__featured-word,
+      .record-page__featured-spark,
+      .record-page__row.is-latest .record-page__word {
+        animation: none;
+      }
     }
   </style>
 </head>
@@ -4999,7 +5116,9 @@
           : 'No Lango Pub words yet. Use the Bluetooth smart pen to begin!';
 
         return e('section', {
-          className: `record-page${visible ? ' is-visible' : ''}`,
+          className: `record-page${visible ? ' is-visible' : ''}${
+            activeTab === 'pub' && featuredWord ? ' is-vocab-reveal' : ''
+          }`,
           role: 'dialog',
           'aria-modal': 'true',
           'aria-hidden': visible ? 'false' : 'true',
@@ -5078,8 +5197,13 @@
               'aria-live': 'polite',
               'aria-label': `Latest smartpen word: ${featuredWord}`,
             },
+              e('span', { className: 'record-page__featured-spark', 'aria-hidden': 'true' }, '✨'),
               e('p', { className: 'record-page__featured-label' }, 'Latest word'),
               e('p', { className: 'record-page__featured-word' }, featuredWord),
+              e('span', {
+                className: 'record-page__featured-spark record-page__featured-spark--right',
+                'aria-hidden': 'true',
+              }, '🎉'),
             ),
             e('div', { className: 'record-page__list-panel' },
               e('ol', {
