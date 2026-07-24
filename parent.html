@@ -356,6 +356,32 @@
       padding-top: 0.5rem;
     }
 
+    .chart-block {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.65rem;
+    }
+
+    .chart-block .chart-wrap {
+      width: 100%;
+    }
+
+    .demo-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.28rem 0.65rem;
+      border-radius: 999px;
+      background: var(--lavender-soft);
+      color: var(--purple);
+      font-size: 0.68rem;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+    }
+
+    .demo-badge[hidden] { display: none !important; }
+
     .bar-col {
       flex: 1;
       display: flex;
@@ -427,6 +453,151 @@
       width: 8px;
       height: 8px;
       border-radius: 50%;
+    }
+
+    /* ——— Pie / donut charts ——— */
+    .pie-panel {
+      margin-top: 0.85rem;
+      padding-top: 0.85rem;
+      border-top: 1px solid var(--bar-muted);
+      text-align: center;
+    }
+
+    .pie-panel--flush {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: none;
+      padding-bottom: 0.75rem;
+    }
+
+    .pie-panel[hidden] { display: none !important; }
+
+    .pie-caption {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.15rem;
+      margin: 0 0 0.85rem;
+    }
+
+    .pie-caption strong {
+      font-size: 0.82rem;
+      font-weight: 800;
+      color: var(--text);
+    }
+
+    .pie-caption span:not(.demo-badge) {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .pie-row {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+    }
+
+    .pie-wrap {
+      position: relative;
+      width: 132px;
+      height: 132px;
+      flex-shrink: 0;
+      margin: 0 auto;
+    }
+
+    .pie-chart {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: var(--bar-muted);
+      box-shadow: inset 0 0 0 1px rgba(27, 27, 38, 0.04);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .pie-chart .pie-svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .pie-chart.is-empty {
+      background: var(--bar-muted);
+    }
+
+    .pie-chart.is-animating {
+      animation: pie-in 520ms var(--ease-out) both;
+    }
+
+    @keyframes pie-in {
+      from { transform: scale(0.86) rotate(-18deg); opacity: 0; }
+      to { transform: scale(1) rotate(0deg); opacity: 1; }
+    }
+
+    .pie-center {
+      position: absolute;
+      inset: 24%;
+      border-radius: 50%;
+      background: var(--card);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      line-height: 1.1;
+      box-shadow: 0 0 0 1px rgba(27, 27, 38, 0.05);
+    }
+
+    .pie-center strong {
+      font-family: "Fredoka", sans-serif;
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .pie-center small {
+      font-size: 0.62rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .pie-legend {
+      width: min(100%, 260px);
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      min-width: 0;
+      text-align: left;
+    }
+
+    .pie-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--text-2);
+    }
+
+    .pie-legend-item .pie-legend-val {
+      margin-left: auto;
+      font-weight: 800;
+      color: var(--text);
+    }
+
+    .pie-legend-pct {
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      min-width: 2.2rem;
+      text-align: right;
     }
 
     /* ——— Feature card (dark) ——— */
@@ -979,6 +1150,52 @@
       font-size: 0.75rem;
       font-weight: 600;
       color: var(--text-2);
+    }
+
+    .activity-total {
+      margin: 0.65rem 0 0;
+      font-family: "Fredoka", sans-serif;
+      font-size: 1.65rem;
+      font-weight: 700;
+      line-height: 1;
+      color: var(--purple);
+    }
+
+    .activity-breakdown {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.5rem;
+      margin-top: 0.85rem;
+    }
+
+    .activity-stat {
+      padding: 0.55rem 0.45rem;
+      border-radius: 12px;
+      background: var(--card-alt);
+      text-align: center;
+    }
+
+    .activity-stat .icon {
+      display: block;
+      font-size: 1rem;
+      line-height: 1;
+      margin-bottom: 0.2rem;
+    }
+
+    .activity-stat strong {
+      display: block;
+      font-size: 0.92rem;
+      font-weight: 800;
+      color: var(--text);
+    }
+
+    .activity-stat span {
+      display: block;
+      margin-top: 0.12rem;
+      font-size: 0.62rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      line-height: 1.2;
     }
 
     .tonight-card {
@@ -1835,7 +2052,7 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
-      .empty-illus .illus, .notif-item, .view.view-enter-forward, .view.view-enter-back, .bar.is-animating, .nav-item.nav-tap {
+      .empty-illus .illus, .notif-item, .view.view-enter-forward, .view.view-enter-back, .bar.is-animating, .nav-item.nav-tap, .pie-chart.is-animating {
         animation: none !important;
       }
       .sheet, .practice-dock { transition: opacity 200ms; }
@@ -1886,7 +2103,23 @@
       syncStale: "Sync may be stale",
       syncStaleSub: "Last activity {when} — check the app is open",
       todayEyebrow: "Today with Uncle Tommy",
+      todayActivityEyebrow: "Today's learning",
       todayLoading: "Loading today's learning…",
+      activityTotal: "{n} min today",
+      activityTommy: "Uncle Tommy",
+      activityGames: "Games",
+      activitySmartpen: "Smartpen",
+      activityMinuteShort: "{n}m",
+      lastActiveNow: "Last active just now",
+      lastActiveMinutes: "Last active {n} min ago",
+      lastActiveHours: "Last active {n} hr ago",
+      lastActiveConversation: "Last active: Uncle Tommy chat",
+      lastActiveGame: "Last active: games",
+      lastActiveSmartpen: "Last active: smartpen",
+      lastActiveNone: "No activity yet today",
+      syncConnected: "Smartpen connected",
+      syncSyncing: "Syncing smartpen…",
+      syncError: "Smartpen sync issue",
       todayLearned: "{name} learned {n} new word today — {words}.",
       todayLearnedPlural: "{name} learned {n} new words today — {words}.",
       todayGames: "{name} played {n} game today. Ask what they enjoyed!",
@@ -1897,6 +2130,8 @@
       todayMetaNewWords: "{n} new words",
       todayMetaGame: "{n} game",
       todayMetaGames: "{n} games",
+      todayMetaTommy: "{n} Uncle Tommy chat",
+      todayMetaTommys: "{n} Uncle Tommy chats",
       todayMetaCheckedIn: "checked in",
       todayMetaFallback: "Session summary will improve when Uncle Tommy data connects",
       tonightEyebrow: "Tonight's 3 words",
@@ -1984,9 +2219,10 @@
       starsLabel: "Total stars",
       digestTitle: "Weekly digest",
       digestOff: "Get a Sunday summary of words & progress",
-      digestOn: "You'll get a Sunday summary (coming soon)",
+      digestOn: "Weekly digest is on",
+      digestPreviewReady: "Preview of this week's summary",
       digestAria: "Enable weekly digest",
-      digestSaved: "Digest saved for later",
+      digestSaved: "Weekly digest enabled",
       digestOffToast: "Digest off",
       profileTitle: "Learning profile",
       profileSub: "What we know about your learner",
@@ -2000,6 +2236,15 @@
       gamesEmpty: "No games recorded in the last 7 days.",
       gamesPlays: "{n} plays",
       chartEmpty: "No game activity yet.",
+      pieGamesTitle: "Game mix",
+      pieGamesSub: "Share of plays in this period",
+      pieGamesTotal: "plays",
+      pieVocabTitle: "Where words come from",
+      pieVocabSub: "Smartpen vs games",
+      pieVocabTotal: "words",
+      pieOther: "Other",
+      pieEmpty: "No data yet",
+      demoBadge: "Preview · sample data",
       signOut: "Sign out",
       dockBack: "Back",
       dockNext: "Next",
@@ -2057,7 +2302,23 @@
       syncStale: "同步可能已過時",
       syncStaleSub: "上次活動 {when} — 請確認應用程式已開啟",
       todayEyebrow: "今日與 Uncle Tommy",
+      todayActivityEyebrow: "今日學習",
       todayLoading: "載入今日學習…",
+      activityTotal: "今日 {n} 分鐘",
+      activityTommy: "Uncle Tommy",
+      activityGames: "遊戲",
+      activitySmartpen: "智能筆",
+      activityMinuteShort: "{n} 分鐘",
+      lastActiveNow: "剛剛有活動",
+      lastActiveMinutes: "{n} 分鐘前有活動",
+      lastActiveHours: "{n} 小時前有活動",
+      lastActiveConversation: "最近活動：Uncle Tommy 對話",
+      lastActiveGame: "最近活動：遊戲",
+      lastActiveSmartpen: "最近活動：智能筆",
+      lastActiveNone: "今日暫無活動",
+      syncConnected: "智能筆已連線",
+      syncSyncing: "智能筆同步中…",
+      syncError: "智能筆同步出現問題",
       todayLearned: "{name} 今日學了 {n} 個新詞 — {words}。",
       todayLearnedPlural: "{name} 今日學了 {n} 個新詞 — {words}。",
       todayGames: "{name} 今日玩了 {n} 場遊戲，問問他喜歡什麼！",
@@ -2068,6 +2329,8 @@
       todayMetaNewWords: "{n} 個新詞",
       todayMetaGame: "{n} 場遊戲",
       todayMetaGames: "{n} 場遊戲",
+      todayMetaTommy: "{n} 次 Uncle Tommy 對話",
+      todayMetaTommys: "{n} 次 Uncle Tommy 對話",
       todayMetaCheckedIn: "已簽到",
       todayMetaFallback: "連接 Uncle Tommy 資料後，摘要會更完整",
       tonightEyebrow: "今晚 3 個詞",
@@ -2155,9 +2418,10 @@
       starsLabel: "總星星",
       digestTitle: "每週摘要",
       digestOff: "每週日收到詞彙與進度摘要",
-      digestOn: "將於每週日收到摘要（即將推出）",
+      digestOn: "已啟用每週摘要",
+      digestPreviewReady: "本週摘要預覽",
       digestAria: "啟用每週摘要",
-      digestSaved: "已儲存，稍後推出",
+      digestSaved: "已啟用每週摘要",
       digestOffToast: "已關閉摘要",
       profileTitle: "學習檔案",
       profileSub: "我們對學習者的了解",
@@ -2171,6 +2435,15 @@
       gamesEmpty: "過去 7 天沒有遊戲紀錄。",
       gamesPlays: "{n} 次",
       chartEmpty: "暫無遊戲活動。",
+      pieGamesTitle: "遊戲分佈",
+      pieGamesSub: "此時段遊戲次數佔比",
+      pieGamesTotal: "次",
+      pieVocabTitle: "詞彙來源",
+      pieVocabSub: "智能筆與遊戲",
+      pieVocabTotal: "個詞",
+      pieOther: "其他",
+      pieEmpty: "暫無資料",
+      demoBadge: "示範預覽 · 範例數據",
       signOut: "登出",
       dockBack: "上一步",
       dockNext: "下一步",
@@ -2228,7 +2501,23 @@
       syncStale: "同步可能已过时",
       syncStaleSub: "上次活动 {when} — 请确认应用已打开",
       todayEyebrow: "今日与 Uncle Tommy",
+      todayActivityEyebrow: "今日学习",
       todayLoading: "加载今日学习…",
+      activityTotal: "今日 {n} 分钟",
+      activityTommy: "Uncle Tommy",
+      activityGames: "游戏",
+      activitySmartpen: "智能笔",
+      activityMinuteShort: "{n} 分钟",
+      lastActiveNow: "刚刚有活动",
+      lastActiveMinutes: "{n} 分钟前有活动",
+      lastActiveHours: "{n} 小时前有活动",
+      lastActiveConversation: "最近活动：Uncle Tommy 对话",
+      lastActiveGame: "最近活动：游戏",
+      lastActiveSmartpen: "最近活动：智能笔",
+      lastActiveNone: "今天暂无活动",
+      syncConnected: "智能笔已连接",
+      syncSyncing: "智能笔同步中…",
+      syncError: "智能笔同步出现问题",
       todayLearned: "{name} 今天学了 {n} 个新词 — {words}。",
       todayLearnedPlural: "{name} 今天学了 {n} 个新词 — {words}。",
       todayGames: "{name} 今天玩了 {n} 场游戏，问问他喜欢什么！",
@@ -2239,6 +2528,8 @@
       todayMetaNewWords: "{n} 个新词",
       todayMetaGame: "{n} 场游戏",
       todayMetaGames: "{n} 场游戏",
+      todayMetaTommy: "{n} 次 Uncle Tommy 对话",
+      todayMetaTommys: "{n} 次 Uncle Tommy 对话",
       todayMetaCheckedIn: "已签到",
       todayMetaFallback: "连接 Uncle Tommy 数据后，摘要会更完整",
       tonightEyebrow: "今晚 3 个词",
@@ -2326,9 +2617,10 @@
       starsLabel: "总星星",
       digestTitle: "每周摘要",
       digestOff: "每周日收到词汇与进度摘要",
-      digestOn: "将于每周日收到摘要（即将推出）",
+      digestOn: "已启用每周摘要",
+      digestPreviewReady: "本周摘要预览",
       digestAria: "启用每周摘要",
-      digestSaved: "已保存，稍后推出",
+      digestSaved: "已启用每周摘要",
       digestOffToast: "已关闭摘要",
       profileTitle: "学习档案",
       profileSub: "我们对学习者的了解",
@@ -2342,6 +2634,15 @@
       gamesEmpty: "过去 7 天没有游戏记录。",
       gamesPlays: "{n} 次",
       chartEmpty: "暂无游戏活动。",
+      pieGamesTitle: "游戏分布",
+      pieGamesSub: "此时段游戏次数占比",
+      pieGamesTotal: "次",
+      pieVocabTitle: "词汇来源",
+      pieVocabSub: "智能笔与游戏",
+      pieVocabTotal: "个词",
+      pieOther: "其他",
+      pieEmpty: "暂无数据",
+      demoBadge: "示范预览 · 示例数据",
       signOut: "登出",
       dockBack: "上一步",
       dockNext: "下一步",
@@ -2497,8 +2798,26 @@
         </div>
 
         <article class="today-card" id="today-card">
-          <p class="eyebrow" data-i18n="todayEyebrow">Today with Uncle Tommy</p>
+          <p class="eyebrow" data-i18n="todayActivityEyebrow">Today's learning</p>
           <p class="summary" id="today-summary" data-i18n="todayLoading">Loading today's learning…</p>
+          <p class="activity-total" id="activity-total">—</p>
+          <div class="activity-breakdown" id="activity-breakdown">
+            <div class="activity-stat">
+              <span class="icon" aria-hidden="true">🗣️</span>
+              <strong id="act-tommy">0m</strong>
+              <span data-i18n="activityTommy">Uncle Tommy</span>
+            </div>
+            <div class="activity-stat">
+              <span class="icon" aria-hidden="true">🎮</span>
+              <strong id="act-games">0m</strong>
+              <span data-i18n="activityGames">Games</span>
+            </div>
+            <div class="activity-stat">
+              <span class="icon" aria-hidden="true">✏️</span>
+              <strong id="act-smartpen">0m</strong>
+              <span data-i18n="activitySmartpen">Smartpen</span>
+            </div>
+          </div>
           <p class="meta" id="today-meta"></p>
         </article>
 
@@ -2568,9 +2887,24 @@
               <button type="button" data-chart-days="30" data-i18n="chart30">30 days</button>
             </div>
           </div>
-          <div class="chart-wrap" id="activity-chart"></div>
-          <div class="seg-bar" id="activity-seg" hidden></div>
-          <div class="legend" id="activity-legend"></div>
+          <div class="chart-block">
+            <span class="demo-badge" id="activity-chart-demo" hidden data-i18n="demoBadge">Preview · sample data</span>
+            <div class="chart-wrap" id="activity-chart"></div>
+          </div>
+          <div class="pie-panel" id="games-pie-panel">
+            <p class="pie-caption">
+              <span class="demo-badge" id="games-pie-demo" hidden data-i18n="demoBadge">Preview · sample data</span>
+              <strong data-i18n="pieGamesTitle">Game mix</strong>
+              <span data-i18n="pieGamesSub">Share of plays in this period</span>
+            </p>
+            <div class="pie-row">
+              <div class="pie-wrap" aria-hidden="true">
+                <div class="pie-chart" id="games-pie"></div>
+                <div class="pie-center" id="games-pie-center"></div>
+              </div>
+              <div class="pie-legend" id="games-pie-legend" role="list"></div>
+            </div>
+          </div>
         </section>
 
         <article class="feature-card">
@@ -2603,6 +2937,20 @@
             <div class="skeleton-grid" aria-hidden="true">
               <div class="skeleton"></div><div class="skeleton"></div>
               <div class="skeleton"></div><div class="skeleton"></div>
+            </div>
+          </div>
+          <div class="pie-panel" id="vocab-pie-panel">
+            <p class="pie-caption">
+              <span class="demo-badge" id="vocab-pie-demo" hidden data-i18n="demoBadge">Preview · sample data</span>
+              <strong data-i18n="pieVocabTitle">Where words come from</strong>
+              <span data-i18n="pieVocabSub">Smartpen vs games</span>
+            </p>
+            <div class="pie-row">
+              <div class="pie-wrap" aria-hidden="true">
+                <div class="pie-chart" id="vocab-pie"></div>
+                <div class="pie-center" id="vocab-pie-center"></div>
+              </div>
+              <div class="pie-legend" id="vocab-pie-legend" role="list"></div>
             </div>
           </div>
         </section>
@@ -2681,6 +3029,18 @@
             <div>
               <h3 data-i18n="gamesTitle">Recent games</h3>
               <p data-i18n="gamesSub">Last 7 days breakdown</p>
+            </div>
+          </div>
+          <div class="pie-panel pie-panel--flush" id="progress-games-pie-panel">
+            <p class="pie-caption">
+              <span class="demo-badge" id="progress-games-pie-demo" hidden data-i18n="demoBadge">Preview · sample data</span>
+            </p>
+            <div class="pie-row">
+              <div class="pie-wrap" aria-hidden="true">
+                <div class="pie-chart" id="progress-games-pie"></div>
+                <div class="pie-center" id="progress-games-pie-center"></div>
+              </div>
+              <div class="pie-legend" id="progress-games-pie-legend" role="list"></div>
             </div>
           </div>
           <div id="games-breakdown"></div>
@@ -2786,6 +3146,9 @@
     let activeWordItem = null;
     let openSheet = null;
     let activeView = "home";
+    let activitySummary = null;
+    let smartpenSync = null;
+    let digestPrefs = null;
     const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
     const VIEW_ORDER = ["home", "words", "practice", "progress"];
     const isMobileSheet = () => matchMedia("(max-width: 899px)").matches;
@@ -2880,56 +3243,113 @@
       return vocabItems.slice(0, 3).map((i) => i.content || i.word || "").filter(Boolean);
     }
 
-    function renderSyncStatus() {
-      const penWords = vocabItems.filter((i) => i.source === "smartpen");
-      const latest = penWords.reduce((best, item) => {
-        if (!item.learnedAt) return best;
-        return !best || item.learnedAt > best.learnedAt ? item : best;
-      }, null);
+    function formatMinutesShort(n) {
+      return t("activityMinuteShort", { n: Math.max(0, Math.round(Number(n) || 0)) });
+    }
 
+    function formatLastActive(ts, type) {
+      if (!ts) return t("lastActiveNone");
+      const mins = Math.floor((Date.now() - Number(ts)) / 60000);
+      if (mins < 1) return t("lastActiveNow");
+      if (mins < 60) return t("lastActiveMinutes", { n: mins });
+      const hours = Math.floor(mins / 60);
+      if (hours < 24) return t("lastActiveHours", { n: hours });
+      if (type === "conversation") return t("lastActiveConversation");
+      if (type === "game") return t("lastActiveGame");
+      if (type === "smartpen") return t("lastActiveSmartpen");
+      return t("lastActiveHours", { n: hours });
+    }
+
+    function renderSyncStatus() {
       const dot = $("sync-dot");
       const title = $("sync-title");
       const sub = $("sync-sub");
+      const sync = smartpenSync;
 
-      if (!latest) {
+      if (!sync) {
         dot.className = "sync-dot is-off";
-        title.textContent = t("syncNotYet");
-        sub.textContent = t("syncNotYetSub");
+        title.textContent = t("syncChecking");
+        sub.textContent = t("syncWaiting");
         return;
       }
 
-      const days = daysBetween(latest.learnedAt);
-      const when = formatDate(latest.learnedAt);
-      const word = latest.content || latest.word;
-      if (days === 0) {
+      const when = sync.lastSyncAt ? formatDate(sync.lastSyncAt) : "—";
+      const word = sync.lastWord || "—";
+
+      if (sync.status === "connected") {
+        dot.className = "sync-dot";
+        title.textContent = t("syncConnected");
+        sub.textContent = sync.deviceName || t("syncWaiting");
+      } else if (sync.status === "syncing") {
+        dot.className = "sync-dot";
+        title.textContent = t("syncSyncing");
+        sub.textContent = sync.deviceName || t("syncWaiting");
+      } else if (sync.status === "synced") {
         dot.className = "sync-dot";
         title.textContent = t("syncToday");
-        sub.textContent = t("syncLastWord", { word, when });
-      } else if (days !== null && days <= 3) {
+        sub.textContent = word !== "—" ? t("syncLastWord", { word, when }) : t("syncWaiting");
+      } else if (sync.status === "error") {
         dot.className = "sync-dot is-warn";
-        title.textContent = days === 1 ? t("syncDaysAgo", { n: days }) : t("syncDaysAgoPlural", { n: days });
-        sub.textContent = t("syncLastWordShort", { word });
+        title.textContent = t("syncError");
+        sub.textContent = sync.error || t("syncStaleSub", { when });
+      } else if (sync.status === "disconnected") {
+        dot.className = "sync-dot is-off";
+        title.textContent = t("syncNotYet");
+        sub.textContent = t("syncNotYetSub");
+      } else if (sync.lastWord) {
+        const days = daysBetween(sync.lastWordAt || sync.lastSyncAt);
+        if (days === 0) {
+          dot.className = "sync-dot";
+          title.textContent = t("syncToday");
+          sub.textContent = t("syncLastWord", { word, when });
+        } else if (days !== null && days <= 3) {
+          dot.className = "sync-dot is-warn";
+          title.textContent = days === 1 ? t("syncDaysAgo", { n: days }) : t("syncDaysAgoPlural", { n: days });
+          sub.textContent = t("syncLastWordShort", { word });
+        } else {
+          dot.className = "sync-dot is-warn";
+          title.textContent = t("syncStale");
+          sub.textContent = t("syncStaleSub", { when });
+        }
       } else {
-        dot.className = "sync-dot is-warn";
-        title.textContent = t("syncStale");
-        sub.textContent = t("syncStaleSub", { when });
+        dot.className = "sync-dot is-off";
+        title.textContent = t("syncNotYet");
+        sub.textContent = t("syncNotYetSub");
       }
     }
 
     function renderTodaySummary() {
       const summaryEl = $("today-summary");
       const metaEl = $("today-meta");
+      const activity = activitySummary;
+      const name = displayName();
+
+      if (activity) {
+        $("activity-total").textContent = t("activityTotal", { n: activity.minutes.total });
+        $("act-tommy").textContent = formatMinutesShort(activity.minutes.uncleTommy);
+        $("act-games").textContent = formatMinutesShort(activity.minutes.games);
+        $("act-smartpen").textContent = formatMinutesShort(activity.minutes.smartpen);
+        metaEl.textContent = formatLastActive(activity.lastActiveAt, activity.lastActiveType);
+      } else {
+        $("activity-total").textContent = "—";
+        $("act-tommy").textContent = "0m";
+        $("act-games").textContent = "0m";
+        $("act-smartpen").textContent = "0m";
+        metaEl.textContent = t("todayMetaFallback");
+      }
+
       const aiSummary = suggestionData?.suggestions?.summary;
       const todayWords = vocabItems.filter((i) => daysAgo(i.learnedAt, 1));
-      const gamesToday = (() => {
-        if (!gameSummary?.days || !checkInData?.today) return 0;
-        const day = gameSummary.days.find((d) => d.date === checkInData.today);
-        return day?.users?.find((u) => u.username === currentUser)?.totalPlays || 0;
-      })();
+      const gamesToday = activity?.counts?.gamePlays ?? 0;
 
-      const name = displayName();
       if (aiSummary) {
         summaryEl.textContent = aiSummary;
+      } else if (activity?.minutes?.total > 0) {
+        summaryEl.textContent = t("todayLearnedPlural", {
+          name,
+          n: activity.counts.newWords || activity.minutes.total,
+          words: todayWords.slice(0, 3).map((w) => w.content || w.word).join(", ") || t("activityTommy"),
+        });
       } else if (todayWords.length) {
         const names = todayWords.slice(0, 4).map((w) => w.content || w.word).join(", ");
         summaryEl.textContent = todayWords.length === 1
@@ -2943,21 +3363,41 @@
         summaryEl.textContent = t("todayQuiet", { name });
       }
 
-      const parts = [];
-      if (todayWords.length) {
-        parts.push(todayWords.length === 1
-          ? t("todayMetaNewWord", { n: todayWords.length })
-          : t("todayMetaNewWords", { n: todayWords.length }));
+      if (activity?.counts) {
+        const parts = [];
+        if (activity.counts.newWords) {
+          parts.push(activity.counts.newWords === 1
+            ? t("todayMetaNewWord", { n: activity.counts.newWords })
+            : t("todayMetaNewWords", { n: activity.counts.newWords }));
+        }
+        if (activity.counts.gamePlays) {
+          parts.push(activity.counts.gamePlays === 1
+            ? t("todayMetaGame", { n: activity.counts.gamePlays })
+            : t("todayMetaGames", { n: activity.counts.gamePlays }));
+        }
+        if (activity.counts.uncleTommySessions) {
+          parts.push(activity.counts.uncleTommySessions === 1
+            ? t("todayMetaTommy", { n: activity.counts.uncleTommySessions })
+            : t("todayMetaTommys", { n: activity.counts.uncleTommySessions }));
+        }
+        if (activity.counts.checkedInToday) parts.push(t("todayMetaCheckedIn"));
+        if (parts.length && activity.lastActiveAt) {
+          metaEl.textContent = `${formatLastActive(activity.lastActiveAt, activity.lastActiveType)} · ${parts.join(" · ")}`;
+        }
       }
-      if (gamesToday) {
-        parts.push(gamesToday === 1
-          ? t("todayMetaGame", { n: gamesToday })
-          : t("todayMetaGames", { n: gamesToday }));
+    }
+
+    function renderDigestPrefs() {
+      const toggle = $("digest-toggle");
+      const preview = $("digest-preview");
+      if (!toggle || !preview) return;
+      const enabled = Boolean(digestPrefs?.enabled);
+      toggle.classList.toggle("is-on", enabled);
+      if (enabled) {
+        preview.textContent = digestPrefs?.lastDigest?.summary || t("digestPreviewReady");
+      } else {
+        preview.textContent = t("digestOff");
       }
-      if (checkInData?.checkedInToday) parts.push(t("todayMetaCheckedIn"));
-      metaEl.textContent = parts.length
-        ? t("todayMeta", { parts: parts.join(" · ") })
-        : t("todayMetaFallback");
     }
 
     function renderTonightWords() {
@@ -3066,6 +3506,8 @@
       renderWeekCompare();
       renderPriorityProgress();
       renderLearnerSwitch();
+      buildVocabPie();
+      renderDigestPrefs();
     }
 
     function showToast(msg) {
@@ -3401,45 +3843,60 @@
       openSheetUI("word-sheet");
     }
 
-    function buildWeekChart() {
-      const chart = $("activity-chart");
-      const seg = $("activity-seg");
-      const legend = $("activity-legend");
-      const summary = chartRangeDays <= 7 ? gameSummary : gameSummary30;
-      if (!summary?.days) {
-        chart.innerHTML = renderEmptyIllus("chart");
-        seg.hidden = true;
-        legend.innerHTML = "";
-        return;
-      }
+    const PIE_COLORS = ["#F0A868", "#8B7EF0", "#5CB88A", "#D9D4E3", "#6C5CE0"];
+    const DEMO_BAR_PATTERN_7 = [2, 1, 0, 4, 3, 5, 2];
 
-      const dayMap = new Map();
-      for (const day of summary.days) {
-        const user = day.users?.find((u) => u.username === currentUser);
-        dayMap.set(day.date, user?.totalPlays || 0);
-      }
+    function setDemoBadge(id, show) {
+      const el = $(id);
+      if (!el) return;
+      el.hidden = !show;
+      if (show) el.textContent = t("demoBadge");
+    }
 
-      const labels = ParentI18n.dayLabels();
-      const today = checkInData?.today || new Date().toISOString().slice(0, 10);
-      const span = chartRangeDays - 1;
-      let max = 1;
+    function getDemoGameSegments() {
+      return [
+        { label: "Picture-Word Memory Match", value: 12 },
+        { label: "Word-Whack Blitz", value: 8 },
+        { label: "Find the Object", value: 5 },
+      ];
+    }
+
+    function getDemoVocabSegments() {
+      return [
+        { label: t("chipSmartpen"), value: 8 },
+        { label: t("chipGames"), value: 5 },
+      ];
+    }
+
+    function demoPlaysForIndex(index) {
+      return Math.max(0, ((index * 3 + 2) % 7) - 1);
+    }
+
+    function buildDemoWeekData(span, today, labels, chartDays) {
       const weekData = [];
-
       for (let i = span; i >= 0; i--) {
         const d = new Date(today + "T12:00:00");
         d.setDate(d.getDate() - i);
-        const iso = d.toISOString().slice(0, 10);
-        const plays = dayMap.get(iso) || 0;
-        const showLabel = chartRangeDays <= 7 || i % 5 === 0 || i === 0;
+        const iso = toLocalISODate(d);
+        const idx = span - i;
+        const plays = chartDays <= 7
+          ? (DEMO_BAR_PATTERN_7[idx] ?? demoPlaysForIndex(idx))
+          : demoPlaysForIndex(idx);
+        const showLabel = chartDays <= 7 || i % 5 === 0 || i === 0;
         weekData.push({
           iso,
           plays,
-          label: showLabel ? (chartRangeDays <= 7 ? labels[d.getDay()] : String(d.getDate())) : "",
+          label: showLabel ? (chartDays <= 7 ? labels[d.getDay()] : String(d.getDate())) : "",
           isToday: iso === today,
         });
-        max = Math.max(max, plays);
       }
+      return weekData;
+    }
 
+    function renderActivityBars(weekData) {
+      const chart = $("activity-chart");
+      let max = 1;
+      for (const d of weekData) max = Math.max(max, d.plays);
       chart.innerHTML = weekData.map((d, i) => {
         const h = d.plays ? Math.max(12, Math.round((d.plays / max) * 100)) : 4;
         return `
@@ -3449,35 +3906,168 @@
             <span class="bar-lbl">${d.label}</span>
           </div>`;
       }).join("");
+      return max;
+    }
 
-      const rangeStart = new Date(today + "T12:00:00");
-      rangeStart.setDate(rangeStart.getDate() - span);
-      const rangeDates = weekData.map((d) => d.iso);
-      const totalWeek = weekData.reduce((s, d) => s + d.plays, 0);
-      const gameTotals = new Map();
-      for (const day of summary.days) {
-        if (!rangeDates.includes(day.date)) continue;
-        const user = day.users?.find((u) => u.username === currentUser);
-        for (const g of user?.games || []) {
-          gameTotals.set(g.gameLabel, (gameTotals.get(g.gameLabel) || 0) + g.plays);
+    function toLocalISODate(d) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    }
+
+    function buildPieSvg(segments) {
+      const radius = 38;
+      const stroke = 14;
+      const circumference = 2 * Math.PI * radius;
+      let offset = 0;
+      const arcs = segments.map((s) => {
+        const len = (s.pct / 100) * circumference;
+        const arc = `<circle cx="50" cy="50" r="${radius}" fill="none" stroke="${s.color}" stroke-width="${stroke}" stroke-linecap="butt" stroke-dasharray="${len} ${Math.max(0.001, circumference - len)}" stroke-dashoffset="${-offset}" transform="rotate(-90 50 50)"/>`;
+        offset += len;
+        return arc;
+      });
+      return `<svg viewBox="0 0 100 100" class="pie-svg" aria-hidden="true">${arcs.join("")}</svg>`;
+    }
+
+    function renderDonutChart({ chartEl, centerEl, legendEl, panelEl, segments, totalLabel, demoBadgeId, isDemo = false }) {
+      const panel = panelEl || chartEl?.closest(".pie-panel");
+      const active = segments.filter((s) => s.value > 0);
+      const total = active.reduce((sum, s) => sum + s.value, 0);
+
+      if (panel) panel.hidden = false;
+      if (demoBadgeId) setDemoBadge(demoBadgeId, false);
+
+      if (!total || !active.length) {
+        if (chartEl) {
+          chartEl.classList.remove("is-animating");
+          chartEl.classList.add("is-empty");
+          chartEl.innerHTML = `<svg viewBox="0 0 100 100" class="pie-svg" aria-hidden="true"><circle cx="50" cy="50" r="38" fill="none" stroke="#E9DCC8" stroke-width="14"/></svg>`;
         }
+        if (centerEl) {
+          centerEl.innerHTML = `<strong>—</strong><small>${escapeHtml(t("pieEmpty"))}</small>`;
+        }
+        if (legendEl) {
+          legendEl.innerHTML = `<div class="pie-legend-item" role="listitem"><span>${escapeHtml(t("pieEmpty"))}</span></div>`;
+        }
+        return;
       }
-      const colors = ["#F0A868", "#8B7EF0", "#D9D4E3", "#5CB88A"];
-      const entries = [...gameTotals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
-      if (entries.length && totalWeek) {
-        seg.hidden = false;
-        seg.innerHTML = entries.map(([label, n], i) =>
-          `<span style="width:${(n / totalWeek) * 100}%;background:${colors[i % colors.length]}" title="${escapeHtml(label)}"></span>`
-        ).join("");
-        legend.innerHTML = entries.map(([label, n], i) => `
-          <span class="legend-item">
-            <span class="legend-dot" style="background:${colors[i % colors.length]}"></span>
-            ${escapeHtml(label)} · ${n}
-          </span>`).join("");
-      } else {
-        seg.hidden = true;
-        legend.innerHTML = "";
+
+      if (demoBadgeId) setDemoBadge(demoBadgeId, isDemo);
+
+      const withPct = active.map((s, i) => ({
+        ...s,
+        color: s.color || PIE_COLORS[i % PIE_COLORS.length],
+        pct: (s.value / total) * 100,
+      }));
+
+      if (chartEl) {
+        chartEl.classList.remove("is-empty", "is-animating");
+        chartEl.innerHTML = buildPieSvg(withPct);
+        void chartEl.offsetWidth;
+        if (!reduceMotion) chartEl.classList.add("is-animating");
       }
+
+      if (centerEl) {
+        centerEl.innerHTML = `<strong>${total}</strong><small>${escapeHtml(totalLabel)}</small>`;
+      }
+
+      if (legendEl) {
+        legendEl.innerHTML = withPct.map((s) => `
+          <div class="pie-legend-item" role="listitem">
+            <span class="legend-dot" style="background:${s.color}"></span>
+            <span>${escapeHtml(s.label)}</span>
+            <span class="pie-legend-pct">${Math.round(s.pct)}%</span>
+            <span class="pie-legend-val">${s.value}</span>
+          </div>`).join("");
+      }
+    }
+
+    function getRangeDates(span, today) {
+      const dates = [];
+      for (let i = span; i >= 0; i--) {
+        const d = new Date(today + "T12:00:00");
+        d.setDate(d.getDate() - i);
+        dates.push(toLocalISODate(d));
+      }
+      return dates;
+    }
+
+    function getGameBreakdown(summary, rangeDates) {
+      if (!summary?.days?.length) return [];
+
+      const compute = (dates) => {
+        const gameTotals = new Map();
+        for (const day of summary.days) {
+          if (!dates.includes(day.date)) continue;
+          const user = day.users?.find((u) => u.username === currentUser);
+          for (const g of user?.games || []) {
+            gameTotals.set(g.gameLabel, (gameTotals.get(g.gameLabel) || 0) + g.plays);
+          }
+        }
+        return [...gameTotals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+      };
+
+      let entries = compute(rangeDates);
+      if (!entries.length) {
+        entries = compute(summary.days.map((d) => d.date));
+      }
+      return entries;
+    }
+
+    function resolveGameEntries(summary, rangeDates) {
+      let entries = getGameBreakdown(summary, rangeDates);
+      if (!entries.length && summary !== gameSummary30 && gameSummary30?.days?.length) {
+        entries = getGameBreakdown(gameSummary30, gameSummary30.days.map((d) => d.date));
+      }
+      return entries;
+    }
+
+    function buildVocabPie() {
+      const pen = vocabItems.filter((i) => i.source === "smartpen").length;
+      const game = vocabItems.filter((i) => i.source === "game").length;
+      const other = Math.max(0, vocabItems.length - pen - game);
+      let segments = [
+        { label: t("chipSmartpen"), value: pen },
+        { label: t("chipGames"), value: game },
+      ];
+      if (other > 0) segments.push({ label: t("pieOther"), value: other });
+
+      const total = segments.reduce((sum, s) => sum + s.value, 0);
+      const useDemo = total === 0;
+      if (useDemo) segments = getDemoVocabSegments();
+
+      renderDonutChart({
+        chartEl: $("vocab-pie"),
+        centerEl: $("vocab-pie-center"),
+        legendEl: $("vocab-pie-legend"),
+        panelEl: $("vocab-pie-panel"),
+        segments,
+        totalLabel: t("pieVocabTotal"),
+        demoBadgeId: "vocab-pie-demo",
+        isDemo: useDemo,
+      });
+    }
+
+    function buildProgressGamesChart() {
+      const dates7 = gameSummary?.days?.map((d) => d.date) || [];
+      let entries = resolveGameEntries(gameSummary, dates7);
+      let useDemo = !entries.length;
+      if (useDemo) {
+        entries = getDemoGameSegments().map((s) => [s.label, s.value]);
+      }
+      const segments = entries.map(([label, n]) => ({ label, value: n }));
+
+      renderDonutChart({
+        chartEl: $("progress-games-pie"),
+        centerEl: $("progress-games-pie-center"),
+        legendEl: $("progress-games-pie-legend"),
+        panelEl: $("progress-games-pie-panel"),
+        segments,
+        totalLabel: t("pieGamesTotal"),
+        demoBadgeId: "progress-games-pie-demo",
+        isDemo: useDemo,
+      });
 
       $("games-breakdown").innerHTML = entries.length
         ? entries.map(([label, n]) => `
@@ -3486,6 +4076,78 @@
               <span style="font-weight:800;color:var(--purple)">${escapeHtml(t("gamesPlays", { n }))}</span>
             </div>`).join("")
         : `<div class="empty">${escapeHtml(t("gamesEmpty"))}</div>`;
+    }
+
+    function buildWeekChart() {
+      const chart = $("activity-chart");
+      const summary = chartRangeDays <= 7 ? gameSummary : gameSummary30;
+      const labels = ParentI18n.dayLabels();
+      const today = checkInData?.today || toLocalISODate(new Date());
+      const span = chartRangeDays - 1;
+
+      if (!summary?.days) {
+        const weekData = buildDemoWeekData(span, today, labels, chartRangeDays);
+        setDemoBadge("activity-chart-demo", true);
+        renderActivityBars(weekData);
+        renderDonutChart({
+          chartEl: $("games-pie"),
+          centerEl: $("games-pie-center"),
+          legendEl: $("games-pie-legend"),
+          panelEl: $("games-pie-panel"),
+          segments: getDemoGameSegments(),
+          totalLabel: t("pieGamesTotal"),
+          demoBadgeId: "games-pie-demo",
+          isDemo: true,
+        });
+        return;
+      }
+
+      const dayMap = new Map();
+      for (const day of summary.days) {
+        const user = day.users?.find((u) => u.username === currentUser);
+        dayMap.set(day.date, user?.totalPlays || 0);
+      }
+
+      let weekData = [];
+      for (let i = span; i >= 0; i--) {
+        const d = new Date(today + "T12:00:00");
+        d.setDate(d.getDate() - i);
+        const iso = toLocalISODate(d);
+        const plays = dayMap.get(iso) || 0;
+        const showLabel = chartRangeDays <= 7 || i % 5 === 0 || i === 0;
+        weekData.push({
+          iso,
+          plays,
+          label: showLabel ? (chartRangeDays <= 7 ? labels[d.getDay()] : String(d.getDate())) : "",
+          isToday: iso === today,
+        });
+      }
+
+      const totalPlays = weekData.reduce((sum, d) => sum + d.plays, 0);
+      const useDemoBars = totalPlays === 0;
+      if (useDemoBars) {
+        weekData = buildDemoWeekData(span, today, labels, chartRangeDays);
+      }
+      setDemoBadge("activity-chart-demo", useDemoBars);
+      renderActivityBars(weekData);
+
+      const rangeDates = weekData.map((d) => d.iso);
+      let entries = resolveGameEntries(summary, rangeDates);
+      let useDemoPie = !entries.length;
+      if (useDemoPie) {
+        entries = getDemoGameSegments().map((s) => [s.label, s.value]);
+      }
+
+      renderDonutChart({
+        chartEl: $("games-pie"),
+        centerEl: $("games-pie-center"),
+        legendEl: $("games-pie-legend"),
+        panelEl: $("games-pie-panel"),
+        segments: entries.map(([label, n]) => ({ label, value: n })),
+        totalLabel: t("pieGamesTotal"),
+        demoBadgeId: "games-pie-demo",
+        isDemo: useDemoPie,
+      });
     }
 
     function updateHomeStats() {
@@ -3534,6 +4196,7 @@
       const list = filteredVocab();
       if (!list.length) {
         $("vocab-container").innerHTML = renderEmptyIllus("words");
+        buildVocabPie();
         return;
       }
 
@@ -3556,6 +4219,7 @@
       });
       $("vocab-container").innerHTML = "";
       $("vocab-container").appendChild(grid);
+      buildVocabPie();
     }
 
     function updateFocusHint() {
@@ -3725,6 +4389,52 @@
       $("hero-title").textContent = t("heroTitleNamed", { name: displayName() });
     }
 
+    async function loadActivitySummary() {
+      try {
+        const res = await fetch("/api/parent/activity-summary");
+        if (res.ok) activitySummary = await res.json();
+      } catch { /* optional */ }
+      renderTodaySummary();
+    }
+
+    async function loadSmartpenSync() {
+      try {
+        const res = await fetch("/api/parent/smartpen-sync");
+        if (res.ok) smartpenSync = await res.json();
+      } catch { /* optional */ }
+      renderSyncStatus();
+    }
+
+    async function loadDigestPrefs() {
+      try {
+        const res = await fetch("/api/parent/weekly-digest");
+        if (res.ok) {
+          const data = await res.json();
+          digestPrefs = data.prefs || null;
+          if (data.digest && digestPrefs?.enabled) {
+            digestPrefs.lastDigest = data.digest;
+          }
+        }
+      } catch { /* optional */ }
+      renderDigestPrefs();
+    }
+
+    async function saveDigestPrefs(enabled) {
+      const res = await fetch("/api/parent/weekly-digest", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          enabled,
+          locale: ParentI18n.getParentLang(),
+        }),
+      });
+      if (!res.ok) throw new Error("Digest save failed");
+      const data = await res.json();
+      digestPrefs = data.prefs || digestPrefs;
+      if (data.digest) digestPrefs.lastDigest = data.digest;
+      renderDigestPrefs();
+    }
+
     async function loadCheckIn() {
       try {
         const res = await fetch("/api/check-in");
@@ -3745,6 +4455,7 @@
         if (res30.ok) gameSummary30 = await res30.json();
       } catch { /* optional */ }
       buildWeekChart();
+      buildProgressGamesChart();
       updateHomeStats();
     }
 
@@ -3788,7 +4499,15 @@
       try {
         await requireAuth();
         loadChecklist();
-        await Promise.all([loadProfile(), loadCheckIn(), loadGameSummary(), loadVocabulary()]);
+        await Promise.all([
+          loadProfile(),
+          loadCheckIn(),
+          loadGameSummary(),
+          loadVocabulary(),
+          loadActivitySummary(),
+          loadSmartpenSync(),
+          loadDigestPrefs(),
+        ]);
         renderAllParentUI();
         if (autoGenerate && vocabItems.length) await generateSuggestions();
       } catch (e) {
@@ -3900,11 +4619,17 @@
     });
     $("dock-close").addEventListener("click", closePractice);
 
-    $("digest-toggle").addEventListener("click", () => {
+    $("digest-toggle").addEventListener("click", async () => {
       const on = !$("digest-toggle").classList.contains("is-on");
-      $("digest-toggle").classList.toggle("is-on", on);
-      $("digest-preview").textContent = on ? t("digestOn") : t("digestOff");
-      showToast(on ? t("digestSaved") : t("digestOffToast"));
+      $("digest-toggle").disabled = true;
+      try {
+        await saveDigestPrefs(on);
+        showToast(on ? t("digestSaved") : t("digestOffToast"));
+      } catch {
+        showToast(t("couldNotCopy"));
+      } finally {
+        $("digest-toggle").disabled = false;
+      }
     });
 
     function onLangChange(lang) {
@@ -3916,6 +4641,11 @@
       renderVocabulary(vocabItems, { preserve: true });
       if (suggestionData) renderSuggestions(suggestionData);
       buildWeekChart();
+      buildProgressGamesChart();
+      buildVocabPie();
+      renderTodaySummary();
+      renderSyncStatus();
+      renderDigestPrefs();
     }
 
     function syncLangSelects() {

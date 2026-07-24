@@ -79,6 +79,7 @@ const STUDENT_USERS_PATH = join(CONFIG_DIR, 'student-users.json');
 const BLUETOOTH_CODES_PATH = join(CONFIG_DIR, 'bluetooth-codes.json');
 const BLUETOOTH_CODES_AUDIO_DIR = join(CONFIG_DIR, 'bluetooth-codes-audio');
 const CHECK_INS_PATH = join(CONFIG_DIR, 'check-ins.json');
+const PARENT_DIGEST_PATH = join(CONFIG_DIR, 'parent-digest.json');
 const SESSIONS_PATH = join(CONFIG_DIR, 'sessions.json');
 const DEBUG_LOG_PATH = join(CONFIG_DIR, 'hello-debug-log.json');
 const DEBUG_LOG_MAX_REPORTS = 20;
@@ -188,6 +189,19 @@ conversationsDb.exec(`
     UNIQUE(username, word)
   );
   CREATE INDEX IF NOT EXISTS idx_learned_vocabulary_user ON learned_vocabulary(username, learned_at DESC);
+  CREATE TABLE IF NOT EXISTS smartpen_sync_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL,
+    status TEXT NOT NULL,
+    words_added INTEGER NOT NULL DEFAULT 0,
+    words_updated INTEGER NOT NULL DEFAULT 0,
+    device_name TEXT,
+    battery_level INTEGER,
+    error_message TEXT,
+    metadata_json TEXT,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_smartpen_sync_user ON smartpen_sync_events(username, created_at DESC);
 `);
 try {
   conversationsDb.exec(`ALTER TABLE conversations ADD COLUMN user_audio_path TEXT`);
@@ -894,6 +908,12 @@ function recordLearnedVocabulary(username, codesInput) {
     if (existing) updated += 1;
     else added += 1;
   }
+  if (added > 0 || updated > 0) {
+    recordSmartpenSyncEvent(username, 'synced', {
+      wordsAdded: added,
+      wordsUpdated: updated,
+    });
+  }
   if (!items.length) {
     return {
       ok: false,
@@ -1229,6 +1249,333 @@ function getGamePlayDailySummary({
     days: daysOut,
     games: [...VALID_GAME_IDS].map((id) => ({ id, label: GAME_LABELS[id] })),
     users: getUserList(),
+  };
+}
+
+const GAME_PLAY_ESTIMATE_MINUTES = 3;
+const SMARTPEN_WORD_ESTIMATE_MINUTES = 1;
+const SMARTPEN_CONNECTED_TTL_MS = 15 * 60 * 1000;
+const VALID_SMARTPEN_SYNC_STATUSES = new Set([
+  'connected', 'disconnected', 'syncing', 'synced', 'error',
+]);
+
+const insertSmartpenSyncEventStmt = conversationsDb.prepare(`
+  INSERT INTO smartpen_sync_events (
+    username, status, words_added, words_updated, device_name, battery_level,
+    error_message, metadata_json, created_at
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+`);
+const latestSmartpenSyncEventStmt = conversationsDb.prepare(`
+  SELECT id, username, status, words_added, words_updated, device_name, battery_level,
+         error_message, metadata_json, created_at
+  FROM smartpen_sync_events
+  WHERE username = ?
+  ORDER BY created_at DESC
+  LIMIT 1
+`);
+const smartpenSyncEventsTodayStmt = conversationsDb.prepare(`
+  SELECT COUNT(*) AS total FROM smartpen_sync_events
+  WHERE username = ? AND status = 'synced' AND created_at >= ?
+`);
+
+function formatDateInTimezone(ts, timezone) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(ts));
+}
+
+function recordSmartpenSyncEvent(username, status, {
+  wordsAdded = 0,
+  wordsUpdated = 0,
+  deviceName = null,
+  batteryLevel = null,
+  error = null,
+  metadata = null,
+} = {}) {
+  if (!STUDENT_USERS[username]) return null;
+  const normalized = String(status || '').trim().toLowerCase();
+  if (!VALID_SMARTPEN_SYNC_STATUSES.has(normalized)) return null;
+  const result = insertSmartpenSyncEventStmt.run(
+    username,
+    normalized,
+    Math.max(0, Number(wordsAdded) || 0),
+    Math.max(0, Number(wordsUpdated) || 0),
+    deviceName ? String(deviceName).slice(0, 120) : null,
+    Number.isFinite(Number(batteryLevel)) ? Math.round(Number(batteryLevel)) : null,
+    error ? String(error).slice(0, 500) : null,
+    metadata && typeof metadata === 'object' ? JSON.stringify(metadata) : null,
+    Date.now(),
+  );
+  return Number(result.lastInsertRowid);
+}
+
+function rowToSmartpenSyncEvent(row) {
+  if (!row) return null;
+  let metadata = null;
+  try {
+    if (row.metadata_json) metadata = JSON.parse(row.metadata_json);
+  } catch { /* ignore */ }
+  return {
+    id: row.id,
+    username: row.username,
+    status: row.status,
+    wordsAdded: row.words_added,
+    wordsUpdated: row.words_updated,
+    deviceName: row.device_name,
+    batteryLevel: row.battery_level,
+    error: row.error_message,
+    metadata,
+    createdAt: row.created_at,
+  };
+}
+
+function getLatestSmartpenWord(username) {
+  const row = conversationsDb.prepare(`
+    SELECT word, source, learned_at, metadata_json
+    FROM learned_vocabulary
+    WHERE username = ? AND source IN ('smartpen', 'bluetooth-pen', 'pen')
+    ORDER BY learned_at DESC
+    LIMIT 1
+  `).get(username);
+  if (!row) return null;
+  return rowToLearnedVocabulary({
+    id: 0,
+    username,
+    word: row.word,
+    source: row.source,
+    learned_at: row.learned_at,
+    metadata_json: row.metadata_json,
+  });
+}
+
+function getSmartpenSyncStatus(username) {
+  const timezone = getVideoPairsTimezone();
+  const today = getTodayDateString(timezone);
+  const now = Date.now();
+  const latestEvent = rowToSmartpenSyncEvent(latestSmartpenSyncEventStmt.get(username));
+  const latestWord = getLatestSmartpenWord(username);
+  const todayStart = Date.parse(`${today}T00:00:00`);
+  const wordsSyncedToday = smartpenSyncEventsTodayStmt.get(username, todayStart)?.total || 0;
+
+  let connectionStatus = 'never';
+  if (latestEvent) {
+    const age = now - latestEvent.createdAt;
+    if (latestEvent.status === 'connected' || latestEvent.status === 'syncing') {
+      connectionStatus = age <= SMARTPEN_CONNECTED_TTL_MS ? latestEvent.status : 'stale';
+    } else if (latestEvent.status === 'synced') {
+      connectionStatus = age <= 24 * 60 * 60 * 1000 ? 'synced' : 'stale';
+    } else if (latestEvent.status === 'disconnected') {
+      connectionStatus = 'disconnected';
+    } else if (latestEvent.status === 'error') {
+      connectionStatus = 'error';
+    }
+  }
+
+  if (connectionStatus === 'never' && latestWord) {
+    const days = Math.floor((now - latestWord.learnedAt) / 86400000);
+    if (days === 0) connectionStatus = 'synced';
+    else if (days <= 3) connectionStatus = 'stale';
+    else connectionStatus = 'stale';
+  }
+
+  return {
+    timezone,
+    status: connectionStatus,
+    lastEvent: latestEvent,
+    lastSyncAt: latestEvent?.status === 'synced' ? latestEvent.createdAt : (latestWord?.learnedAt || null),
+    lastConnectedAt: latestEvent?.status === 'connected' ? latestEvent.createdAt : null,
+    lastWord: latestWord?.content || latestWord?.word || null,
+    lastWordAt: latestWord?.learnedAt || null,
+    wordsSyncedToday,
+    deviceName: latestEvent?.deviceName || null,
+    batteryLevel: latestEvent?.batteryLevel ?? null,
+    error: latestEvent?.status === 'error' ? latestEvent.error : null,
+  };
+}
+
+function getParentActivitySummary(username) {
+  const timezone = getVideoPairsTimezone();
+  const today = getTodayDateString(timezone);
+  const now = Date.now();
+
+  const conversations = conversationsDb.prepare(`
+    SELECT started_at, ended_at, turn_count
+    FROM conversations
+    WHERE username = ?
+    ORDER BY started_at DESC
+    LIMIT 200
+  `).all(username);
+
+  let uncleTommyMinutes = 0;
+  let uncleTommySessions = 0;
+  let lastConversationAt = null;
+  for (const row of conversations) {
+    if (formatDateInTimezone(row.started_at, timezone) !== today) continue;
+    uncleTommySessions += 1;
+    const end = row.ended_at || now;
+    uncleTommyMinutes += Math.max(0, end - row.started_at) / 60000;
+    if (!lastConversationAt || row.started_at > lastConversationAt) {
+      lastConversationAt = row.started_at;
+    }
+  }
+
+  const gameRows = conversationsDb.prepare(`
+    SELECT played_at FROM game_plays
+    WHERE username = ? AND play_date = ?
+    ORDER BY played_at DESC
+  `).all(username, today);
+  const gamePlays = gameRows.length;
+  const gamesMinutes = gamePlays * GAME_PLAY_ESTIMATE_MINUTES;
+  const lastGameAt = gameRows[0]?.played_at || null;
+
+  const vocabRows = conversationsDb.prepare(`
+    SELECT learned_at, source FROM learned_vocabulary
+    WHERE username = ? AND learned_at >= ?
+    ORDER BY learned_at DESC
+  `).all(username, Date.parse(`${today}T00:00:00`));
+  const newWords = vocabRows.length;
+  const smartpenWords = vocabRows.filter((row) => (
+    ['smartpen', 'bluetooth-pen', 'pen'].includes(row.source)
+  )).length;
+  const smartpenMinutes = smartpenWords * SMARTPEN_WORD_ESTIMATE_MINUTES;
+  const lastVocabAt = vocabRows[0]?.learned_at || null;
+
+  const checkIn = getCheckInRecord(username);
+  const checkedInToday = checkIn.lastCheckInDate === today;
+
+  const activityCandidates = [
+    lastConversationAt ? { at: lastConversationAt, type: 'conversation' } : null,
+    lastGameAt ? { at: lastGameAt, type: 'game' } : null,
+    lastVocabAt ? { at: lastVocabAt, type: 'smartpen' } : null,
+  ].filter(Boolean).sort((a, b) => b.at - a.at);
+  const lastActive = activityCandidates[0] || null;
+
+  const totalMinutes = Math.round(uncleTommyMinutes + gamesMinutes + smartpenMinutes);
+
+  return {
+    timezone,
+    today,
+    minutes: {
+      total: totalMinutes,
+      uncleTommy: Math.round(uncleTommyMinutes),
+      games: gamesMinutes,
+      smartpen: smartpenMinutes,
+    },
+    counts: {
+      uncleTommySessions,
+      gamePlays,
+      newWords,
+      smartpenWords,
+      checkedInToday,
+    },
+    lastActiveAt: lastActive?.at || null,
+    lastActiveType: lastActive?.type || null,
+    estimates: {
+      gamePlayMinutes: GAME_PLAY_ESTIMATE_MINUTES,
+      smartpenWordMinutes: SMARTPEN_WORD_ESTIMATE_MINUTES,
+    },
+  };
+}
+
+function loadParentDigestPrefs() {
+  try {
+    if (existsSync(PARENT_DIGEST_PATH)) {
+      const data = JSON.parse(readFileSync(PARENT_DIGEST_PATH, 'utf8'));
+      if (data && typeof data === 'object' && !Array.isArray(data)) return data;
+    }
+  } catch (e) {
+    console.warn('Could not load parent-digest.json:', e.message);
+  }
+  return {};
+}
+
+function saveParentDigestPrefs(data) {
+  ensureConfigDir();
+  writeFileSync(PARENT_DIGEST_PATH, JSON.stringify(data, null, 2) + '\n');
+}
+
+function getParentDigestPrefs(username) {
+  const all = loadParentDigestPrefs();
+  const raw = all[username] || {};
+  return {
+    enabled: Boolean(raw.enabled),
+    email: String(raw.email || '').trim(),
+    locale: String(raw.locale || 'en').trim() || 'en',
+    updatedAt: Number(raw.updatedAt) || 0,
+    lastSentAt: Number(raw.lastSentAt) || 0,
+    lastWeekStart: String(raw.lastWeekStart || '').trim(),
+    lastDigest: raw.lastDigest && typeof raw.lastDigest === 'object' ? raw.lastDigest : null,
+  };
+}
+
+function saveParentDigestPrefsForUser(username, patch) {
+  if (!STUDENT_USERS[username]) return null;
+  const all = loadParentDigestPrefs();
+  const next = {
+    ...getParentDigestPrefs(username),
+    ...patch,
+    updatedAt: Date.now(),
+  };
+  all[username] = next;
+  saveParentDigestPrefs(all);
+  return next;
+}
+
+function buildWeeklyDigest(username) {
+  const timezone = getVideoPairsTimezone();
+  const today = getTodayDateString(timezone);
+  const weekStart = offsetDateString(today, -6, timezone);
+  const profile = getUserProfile(username);
+  const checkIn = getCheckInStatus(username);
+
+  const words = listLearnedVocabulary(username, { limit: 200 }).items.filter((item) => {
+    if (!item.learnedAt) return false;
+    const day = formatDateInTimezone(item.learnedAt, timezone);
+    return day >= weekStart && day <= today;
+  });
+
+  const gameSummary = getGamePlayDailySummary({ username, days: 7 });
+  let gamePlays = 0;
+  const gameBreakdown = new Map();
+  for (const day of gameSummary.days || []) {
+    const user = day.users?.find((entry) => entry.username === username);
+    gamePlays += user?.totalPlays || 0;
+    for (const game of user?.games || []) {
+      gameBreakdown.set(game.gameLabel, (gameBreakdown.get(game.gameLabel) || 0) + game.plays);
+    }
+  }
+
+  const activity = getParentActivitySummary(username);
+  const topGames = [...gameBreakdown.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const childName = profile.childName || profile.nickname || username;
+  const wordSamples = words.slice(0, 5).map((w) => w.content || w.word).filter(Boolean);
+
+  const summary = words.length
+    ? `${childName} learned ${words.length} word${words.length === 1 ? '' : 's'} this week${wordSamples.length ? `, including ${wordSamples.join(', ')}` : ''}.`
+    : gamePlays
+      ? `${childName} played ${gamePlays} game${gamePlays === 1 ? '' : 's'} this week.`
+      : `${childName} had a quiet week on Lango — a short practice session at home could help.`;
+
+  return {
+    weekStart,
+    weekEnd: today,
+    childName,
+    summary,
+    stats: {
+      wordsLearned: words.length,
+      gamePlays,
+      streak: checkIn.currentStreak,
+      totalStars: checkIn.totalStars,
+      todayMinutes: activity.minutes.total,
+    },
+    highlights: {
+      words: wordSamples,
+      games: topGames.map(([label, plays]) => ({ label, plays })),
+    },
+    generatedAt: Date.now(),
   };
 }
 
@@ -3130,6 +3477,10 @@ function isLearnedVocabularyPublicApi(url, method) {
   return url === '/api/learned-vocabulary' && (method || 'GET').toUpperCase() === 'POST';
 }
 
+function isSmartpenSyncPublicApi(url, method) {
+  return url === '/api/smartpen/sync' && (method || 'GET').toUpperCase() === 'POST';
+}
+
 /** Turn-based test page: REST STT / LLM / TTS without login (Railway-friendly sandbox). */
 function isTurnBasedPublicApi(url, method) {
   const m = (method || 'GET').toUpperCase();
@@ -4820,6 +5171,7 @@ const server = createServer(async (req, res) => {
     && !isTurnBasedPublicApi(url, req.method)
     && !isCrashReportPublicApi(url, req.method)
     && !isLearnedVocabularyPublicApi(url, req.method)
+    && !isSmartpenSyncPublicApi(url, req.method)
     && !isTurnBasedSafeRequest(req, url)
     && !isPreviewSafeRequest(req, url, rawUrl)
     && !isAuthenticated(req)
@@ -4867,6 +5219,98 @@ const server = createServer(async (req, res) => {
         return;
       }
       sendJson(res, 200, result);
+    });
+    return;
+  }
+
+  if (url === '/api/parent/activity-summary' && req.method === 'GET') {
+    const session = getSession(req);
+    if (!session || session.role !== 'student') {
+      sendJson(res, 403, { error: 'Student login required.' });
+      return;
+    }
+    sendJson(res, 200, getParentActivitySummary(session.username));
+    return;
+  }
+
+  if (url === '/api/parent/smartpen-sync' && req.method === 'GET') {
+    const session = getSession(req);
+    if (!session || session.role !== 'student') {
+      sendJson(res, 403, { error: 'Student login required.' });
+      return;
+    }
+    sendJson(res, 200, getSmartpenSyncStatus(session.username));
+    return;
+  }
+
+  if (url === '/api/smartpen/sync' && req.method === 'POST') {
+    const session = getSession(req);
+    readJsonBody(req, res, (parsed) => {
+      const username = session?.role === 'student'
+        ? session.username
+        : String(parsed?.username || '').trim();
+      if (!username || !STUDENT_USERS[username]) {
+        sendJson(res, 400, { error: 'Valid student username is required.' });
+        return;
+      }
+      const status = String(parsed?.status || parsed?.event || 'synced').trim().toLowerCase();
+      const eventId = recordSmartpenSyncEvent(username, status, {
+        wordsAdded: parsed?.wordsAdded ?? parsed?.words_added ?? parsed?.added,
+        wordsUpdated: parsed?.wordsUpdated ?? parsed?.words_updated ?? parsed?.updated,
+        deviceName: parsed?.deviceName ?? parsed?.device_name ?? parsed?.device,
+        batteryLevel: parsed?.batteryLevel ?? parsed?.battery_level ?? parsed?.battery,
+        error: parsed?.error ?? parsed?.message,
+        metadata: parsed?.metadata,
+      });
+      if (!eventId) {
+        sendJson(res, 400, { error: 'Invalid smartpen sync status.' });
+        return;
+      }
+      sendJson(res, 200, {
+        ok: true,
+        eventId,
+        status: getSmartpenSyncStatus(username),
+      });
+    });
+    return;
+  }
+
+  if (url === '/api/parent/weekly-digest' && req.method === 'GET') {
+    const session = getSession(req);
+    if (!session || session.role !== 'student') {
+      sendJson(res, 403, { error: 'Student login required.' });
+      return;
+    }
+    const prefs = getParentDigestPrefs(session.username);
+    const digest = buildWeeklyDigest(session.username);
+    sendJson(res, 200, { prefs, digest });
+    return;
+  }
+
+  if (url === '/api/parent/weekly-digest' && req.method === 'PUT') {
+    const session = getSession(req);
+    if (!session || session.role !== 'student') {
+      sendJson(res, 403, { error: 'Student login required.' });
+      return;
+    }
+    readJsonBody(req, res, (parsed) => {
+      const enabled = Boolean(parsed?.enabled);
+      const email = String(parsed?.email || '').trim();
+      const locale = String(parsed?.locale || 'en').trim();
+      const prefs = saveParentDigestPrefsForUser(session.username, {
+        enabled,
+        email,
+        locale,
+      });
+      let digest = null;
+      if (enabled) {
+        digest = buildWeeklyDigest(session.username);
+        saveParentDigestPrefsForUser(session.username, {
+          lastDigest: digest,
+          lastWeekStart: digest.weekStart,
+        });
+      }
+      sendJson(res, 200, { ok: true, prefs, digest });
     });
     return;
   }

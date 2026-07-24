@@ -3345,7 +3345,8 @@
       border-radius: 18px;
       overflow: hidden;
       appearance: none;
-      background: transparent;
+      background: transparent !important;
+      box-shadow: none !important;
       cursor: pointer;
       filter: drop-shadow(0 4px 2px rgba(75, 31, 4, .25));
       transition: transform 120ms ease, filter 120ms ease;
@@ -3363,8 +3364,15 @@
       user-select: none;
     }
 
+    .record-page__return:hover,
+    .record-page__return:active,
+    .record-page__return:focus {
+      background: transparent !important;
+      box-shadow: none !important;
+    }
     .record-page__return:hover { transform: scale(1.035); filter: drop-shadow(0 6px 3px rgba(75, 31, 4, .34)); }
     .record-page__return:active { transform: translateY(2px) scale(.97); }
+    .record-page__return:focus:not(:focus-visible) { outline: none; }
     .record-page__return:focus-visible { outline: 4px solid #fff5b2; outline-offset: 4px; }
 
     .record-page__board {
@@ -3412,7 +3420,8 @@
       border: 0;
       border-radius: 18px;
       appearance: none;
-      background: transparent;
+      background: transparent !important;
+      box-shadow: none !important;
       color: var(--record-cream);
       cursor: pointer;
       font: inherit;
@@ -3445,8 +3454,15 @@
     }
 
     .record-page__tab:not(.is-active) { opacity: .94; }
+    .record-page__tab:hover,
+    .record-page__tab:active,
+    .record-page__tab:focus {
+      background: transparent !important;
+      box-shadow: none !important;
+    }
     .record-page__tab:hover { filter: brightness(1.07); }
     .record-page__tab:active { transform: scale(.985); }
+    .record-page__tab:focus:not(:focus-visible) { outline: none; }
     .record-page__tab:focus-visible { outline: 4px solid #fff5b2; outline-offset: -4px; }
 
     .record-page__list-panel {
@@ -3521,6 +3537,20 @@
       font-size: clamp(24px, 3.51cqw, 48px);
       font-weight: 400;
       line-height: normal;
+      white-space: nowrap;
+    }
+
+    .record-page__word {
+      margin: 0;
+      max-width: 52%;
+      overflow: hidden;
+      color: var(--record-text);
+      font: inherit;
+      font-size: clamp(24px, 3.51cqw, 48px);
+      font-weight: 700;
+      line-height: normal;
+      text-align: right;
+      text-overflow: ellipsis;
       white-space: nowrap;
     }
 
@@ -4622,11 +4652,31 @@
         { date: '2026-07-01', stars: 3 },
       ]);
 
+      const RECORD_PREVIEW_PUB_ROWS = Object.freeze([
+        { id: 'preview-1', date: '2026-07-04', word: 'apple' },
+        { id: 'preview-2', date: '2026-07-03', word: 'happy' },
+        { id: 'preview-3', date: '2026-07-02', word: 'friend' },
+      ]);
+
       function formatRecordDate(value) {
         const [year, month, day] = String(value || '').slice(0, 10).split('-').map(Number);
         if (!year || !month || !day) return String(value || 'Unknown date');
         const date = new Date(year, month - 1, day);
         return `${day} ${date.toLocaleString('en-GB', { month: 'long' })} ${year}`;
+      }
+
+      function learnedAtToDateKey(learnedAt) {
+        const ms = Number(learnedAt);
+        if (Number.isFinite(ms) && ms > 0) {
+          const date = new Date(ms);
+          if (!Number.isNaN(date.getTime())) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+          }
+        }
+        return String(learnedAt || '').slice(0, 10);
       }
 
       function groupExerciseRecords(plays = []) {
@@ -4642,18 +4692,21 @@
           .sort((a, b) => b.date.localeCompare(a.date));
       }
 
-      function groupPubRecords(conversations = []) {
-        const records = new Map();
-        conversations.forEach((conversation) => {
-          const date = String(conversation.startedAt || '').slice(0, 10);
-          if (!date) return;
-          const turns = Math.max(0, Number(conversation.turnCount) || 0);
-          const stars = turns >= 8 ? 3 : 1;
-          records.set(date, Math.max(records.get(date) || 0, stars));
-        });
-        return [...records.entries()]
-          .map(([date, stars]) => ({ date, stars }))
-          .sort((a, b) => b.date.localeCompare(a.date));
+      function mapPubVocabRecords(items = []) {
+        return items
+          .map((item, index) => {
+            const word = String(item.content || item.word || '').trim();
+            const date = learnedAtToDateKey(item.learnedAt);
+            if (!word || !date) return null;
+            return {
+              id: item.id || `${date}-${word}-${index}`,
+              date,
+              word,
+              learnedAt: Number(item.learnedAt) || 0,
+            };
+          })
+          .filter(Boolean)
+          .sort((a, b) => (b.learnedAt - a.learnedAt) || b.date.localeCompare(a.date));
       }
 
       function RecordPage() {
@@ -4678,35 +4731,22 @@
         const loadRecords = async () => {
           if (new URLSearchParams(location.search).get('preview') === '1') {
             setExerciseRecords(RECORD_PREVIEW_ROWS);
-            setPubRecords(RECORD_PREVIEW_ROWS.slice(0, 3));
+            setPubRecords(RECORD_PREVIEW_PUB_ROWS);
             return;
           }
           setLoading(true);
           try {
-            const [playsResponse, meResponse] = await Promise.all([
+            const [playsResponse, vocabResponse] = await Promise.all([
               fetch('/api/game-plays?limit=200'),
-              fetch('/api/me'),
+              fetch('/api/learned-vocabulary?limit=200'),
             ]);
             const playsData = playsResponse.ok ? await playsResponse.json() : { plays: [] };
             setExerciseRecords(groupExerciseRecords(playsData.plays));
 
-            if (meResponse.ok) {
-              const me = await meResponse.json();
-              const username = String(me.username || '').trim();
-              if (username) {
-                const conversationsResponse = await fetch(
-                  `/api/conversations?username=${encodeURIComponent(username)}&limit=200`,
-                );
-                const conversationsData = conversationsResponse.ok
-                  ? await conversationsResponse.json()
-                  : { conversations: [] };
-                setPubRecords(groupPubRecords(conversationsData.conversations));
-              } else {
-                setPubRecords([]);
-              }
-            } else {
-              setPubRecords([]);
-            }
+            const vocabData = vocabResponse.ok
+              ? await vocabResponse.json()
+              : { items: [] };
+            setPubRecords(mapPubVocabRecords(vocabData.items));
           } catch {
             setExerciseRecords([]);
             setPubRecords([]);
@@ -4821,7 +4861,7 @@
         const rows = activeTab === 'exercise' ? exerciseRecords : pubRecords;
         const emptyMessage = activeTab === 'exercise'
           ? 'No exercise records yet. Play a game to begin!'
-          : 'No Lango Pub records yet. Talk with Uncle Tommy to begin!';
+          : 'No Lango Pub words yet. Use the Bluetooth smart pen to begin!';
 
         return e('section', {
           className: `record-page${visible ? ' is-visible' : ''}`,
@@ -4908,7 +4948,9 @@
                 loading && e('li', { className: 'record-page__empty' }, 'Loading records…'),
                 !loading && !rows.length && e('li', { className: 'record-page__empty' }, emptyMessage),
                 !loading && rows.map((row) => e('li', {
-                  key: `${activeTab}-${row.date}`,
+                  key: activeTab === 'exercise'
+                    ? `exercise-${row.date}`
+                    : `pub-${row.id || `${row.date}-${row.word}`}`,
                   className: 'record-page__row',
                 },
                   e('img', {
@@ -4919,12 +4961,14 @@
                   }),
                   e('div', { className: 'record-page__row-content' },
                     e('p', { className: 'record-page__date' }, formatRecordDate(row.date)),
-                    e('img', {
-                      className: 'record-page__stars',
-                      src: recordAsset(row.stars >= 3 ? 'stars-3' : 'stars-1'),
-                      alt: `${row.stars} out of 3 stars`,
-                      draggable: false,
-                    }),
+                    activeTab === 'exercise'
+                      ? e('img', {
+                        className: 'record-page__stars',
+                        src: recordAsset(row.stars >= 3 ? 'stars-3' : 'stars-1'),
+                        alt: `${row.stars} out of 3 stars`,
+                        draggable: false,
+                      })
+                      : e('p', { className: 'record-page__word' }, row.word),
                   ),
                 )),
               ),
