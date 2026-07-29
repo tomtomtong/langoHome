@@ -58,6 +58,10 @@ export class LipsyncPlayer {
     this.timeline = durationMs > 0 ? scaleTimeline(base, durationMs) : base;
   }
 
+  setTimeline(timeline) {
+    this.timeline = Array.isArray(timeline) ? timeline.slice() : [];
+  }
+
   start() {
     this.active = true;
     this.lastStepT = performance.now();

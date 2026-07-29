@@ -34,6 +34,21 @@ export const PHONE_TO_BLEND = {
   R: 13, S: 15, SH: 16, T: 19, TH: 19, V: 18, W: 7, Y: 6, Z: 15, ZH: 16,
 };
 
+/** Inworld TTS viseme symbols (language-agnostic). */
+export const VISEME_TO_BLEND = {
+  aei: 1,
+  o: 8,
+  ee: 6,
+  bmp: 21,
+  fv: 18,
+  l: 14,
+  r: 13,
+  th: 17,
+  qw: 7,
+  chjsh: 16,
+  cdgknstxyz: 19,
+};
+
 export function hasFaceMorphTargets(morphTargetDictionary) {
   return (
     morphTargetDictionary?.["0"] !== undefined &&

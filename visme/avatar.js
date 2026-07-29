@@ -3,6 +3,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
 import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from "@pixiv/three-vrm-animation";
 import { LipsyncPlayer, clearBlend } from "./lipsync.js";
+import { inworldTimestampToTimeline, mergeVisemeTimelines } from "./viseme-timeline.js";
 import { FacialIdleController } from "./facial-idle.js";
 import { loadMixamoIdleClip } from "./mixamo-idle.js";
 import {
@@ -128,6 +129,8 @@ export class TommyAvatar {
     this.defaultBackground = new THREE.Color(0x0b1222);
     this.morphMeshes = [];
     this.lipsync = null;
+    this._visemeTimeline = [];
+    this._usingVisemeTimeline = false;
     this.mixer = null;
     this.idleAction = null;
     this.danceAction = null;
@@ -690,8 +693,33 @@ export class TommyAvatar {
     this.lipsync?.start();
   }
 
+  resetSpeechTimeline() {
+    this._visemeTimeline = [];
+    this._usingVisemeTimeline = false;
+    this.lipsync?.setTimeline([]);
+  }
+
+  hasVisemeTimeline() {
+    return this._usingVisemeTimeline;
+  }
+
+  appendSpeechVisemes(timestampInfo) {
+    const chunk = inworldTimestampToTimeline(timestampInfo);
+    if (!chunk.length) return false;
+    this._visemeTimeline = mergeVisemeTimelines(this._visemeTimeline, chunk);
+    this._usingVisemeTimeline = true;
+    this.lipsync?.setTimeline(this._visemeTimeline);
+    return true;
+  }
+
+  setSpeechTimeline(timeline) {
+    this._visemeTimeline = Array.isArray(timeline) ? timeline.slice() : [];
+    this._usingVisemeTimeline = this._visemeTimeline.length > 0;
+    this.lipsync?.setTimeline(this._visemeTimeline);
+  }
+
   updateSpeechText(text, durationMs) {
-    if (!this.lipsync) return;
+    if (!this.lipsync || this._usingVisemeTimeline) return;
     this.lipsync.setText(text, durationMs);
   }
 
@@ -701,6 +729,8 @@ export class TommyAvatar {
 
   endSpeech() {
     this.speaking = false;
+    this._visemeTimeline = [];
+    this._usingVisemeTimeline = false;
     this.lipsync?.stop();
   }
 

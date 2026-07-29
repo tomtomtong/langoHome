@@ -186,6 +186,7 @@
       DEFAULT_LIPSYNC,
       DEFAULT_LIGHTING,
     } from "/visme/avatar.js";
+    import { inworldTimestampToTimeline } from "/visme/viseme-timeline.js";
 
     const SAMPLE_RATE = 16000;
 
@@ -341,7 +342,7 @@
       avatar?.endSpeech();
     }
 
-    async function speakReply(text, base64Mp3) {
+    async function speakReply(text, base64Mp3, timestampInfo = null) {
       stopSpeaking();
       const av = await ensureAvatar();
       replyAudio = new Audio(`data:audio/mpeg;base64,${base64Mp3}`);
@@ -352,7 +353,13 @@
       });
 
       const durationMs = replyAudio.duration * 1000;
-      av.updateSpeechText(text, durationMs);
+      av.resetSpeechTimeline();
+      const visemeTimeline = timestampInfo ? inworldTimestampToTimeline(timestampInfo) : [];
+      if (visemeTimeline.length) {
+        av.setSpeechTimeline(visemeTimeline);
+      } else {
+        av.updateSpeechText(text, durationMs);
+      }
       av.beginSpeech();
 
       await new Promise((resolve, reject) => {
@@ -477,7 +484,7 @@
 
         setStatus("Speaking…", { live: true });
         const ttsData = await postJson("/api/inworld/tts", { text: reply });
-        await speakReply(reply, ttsData.audioContent);
+        await speakReply(reply, ttsData.audioContent, ttsData.timestampInfo);
 
         setStatus("Done. Click Record for another turn.");
       } catch (err) {

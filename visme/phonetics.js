@@ -150,8 +150,72 @@ function letter(c, next, last) {
   return map[c] || [];
 }
 
+const MULTILINGUAL_VISEMES = [1, 6, 8, 11, 14, 15, 19, 21];
+
+function isLatinWord(raw) {
+  return /^[\p{Script=Latin}\p{M}''-]+$/u.test(raw);
+}
+
+export function isMostlyLatinText(text) {
+  const letters = text.match(/\p{L}/gu) || [];
+  if (!letters.length) return false;
+  let latin = 0;
+  for (const ch of letters) {
+    if (/[\p{Script=Latin}]/u.test(ch)) latin += 1;
+  }
+  return latin / letters.length >= 0.75;
+}
+
+function splitSpeechUnits(text) {
+  const units = [];
+  const re = /(\p{Script=Han}|\p{Script=Hiragana}|\p{Script=Katakana}|\p{Script=Hangul}|\p{Script=Arabic}|\p{Script=Hebrew}|\p{Script=Devanagari}|\p{Script=Thai}|\p{L}+|\d+)/gu;
+  let match;
+  while ((match = re.exec(text)) !== null) {
+    const token = match[0].trim();
+    if (token) units.push(token);
+  }
+  return units;
+}
+
+function multilingualUnitTimeline(units, msPerPhone) {
+  const timeline = [];
+  let t = 0;
+  const hold = Math.max(60, msPerPhone);
+  const gap = Math.max(30, Math.round(hold * 0.35));
+
+  for (let i = 0; i < units.length; i += 1) {
+    const unit = units[i];
+    const phones = isLatinWord(unit) ? wordToPhonemes(unit) : [];
+    if (phones.length) {
+      for (const p of phones) {
+        timeline.push({ phoneme: p, start: t, end: t + hold, blendId: PHONE_TO_BLEND[p] ?? 0 });
+        t += hold;
+      }
+    } else {
+      const graphemes = [...unit];
+      for (let gi = 0; gi < graphemes.length; gi += 1) {
+        const blendId = MULTILINGUAL_VISEMES[(i + gi) % MULTILINGUAL_VISEMES.length];
+        timeline.push({
+          phoneme: graphemes[gi],
+          start: t,
+          end: t + hold,
+          blendId,
+        });
+        t += hold;
+      }
+    }
+    if (i < units.length - 1) {
+      timeline.push({ phoneme: "SIL", start: t, end: t + gap, blendId: 0 });
+      t += gap;
+    }
+  }
+
+  timeline.push({ phoneme: "SIL", start: t, end: t + gap, blendId: 0 });
+  return timeline;
+}
+
 function wordToPhonemes(raw) {
-  const w = raw.toLowerCase().replace(/[^a-z]/g, "");
+  const w = raw.toLowerCase().replace(/[^a-z']/g, "");
   if (!w) return [];
   if (DICT[w]) return [...DICT[w]];
 
@@ -174,25 +238,39 @@ function wordToPhonemes(raw) {
 }
 
 export function textToPhonemeTimeline(text, msPerPhone = 120) {
-  const words = text.trim().split(/\s+/).filter(Boolean);
+  const trimmed = text.trim();
+  if (!trimmed) return [];
+
+  if (!isMostlyLatinText(trimmed)) {
+    return multilingualUnitTimeline(splitSpeechUnits(trimmed), msPerPhone);
+  }
+
+  const words = trimmed.split(/\s+/).filter(Boolean);
   const timeline = [];
   let t = 0;
   const wordGap = Math.round((msPerPhone * 80) / 120);
   const finalSilence = Math.round((msPerPhone * 100) / 120);
 
   for (let wi = 0; wi < words.length; wi++) {
-    const phones = wordToPhonemes(words[wi]);
-    for (const p of phones) {
-      timeline.push({ phoneme: p, start: t, end: t + msPerPhone, blendId: PHONE_TO_BLEND[p] ?? 0 });
-      t += msPerPhone;
+    const phones = isLatinWord(words[wi]) ? wordToPhonemes(words[wi]) : [];
+    if (phones.length) {
+      for (const p of phones) {
+        timeline.push({ phoneme: p, start: t, end: t + msPerPhone, blendId: PHONE_TO_BLEND[p] ?? 0 });
+        t += msPerPhone;
+      }
+    } else {
+      const graphemes = [...words[wi]];
+      for (let gi = 0; gi < graphemes.length; gi += 1) {
+        const blendId = MULTILINGUAL_VISEMES[gi % MULTILINGUAL_VISEMES.length];
+        timeline.push({ phoneme: graphemes[gi], start: t, end: t + msPerPhone, blendId });
+        t += msPerPhone;
+      }
     }
-    // short silence between words
     if (wi < words.length - 1) {
       timeline.push({ phoneme: "SIL", start: t, end: t + wordGap, blendId: 0 });
       t += wordGap;
     }
   }
-  // final silence
   timeline.push({ phoneme: "SIL", start: t, end: t + finalSilence, blendId: 0 });
   return timeline;
 }

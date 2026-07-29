@@ -8723,12 +8723,19 @@
       speechStarted = false;
       audioDone = false;
       speechPlaybackStart = 0;
+      avatar?.resetSpeechTimeline();
       if (id) updateAgentCaption("");
     }
 
     function syncLipsyncTimeline() {
-      if (!responseText.trim() || !avatar) return;
+      if (!avatar || avatar.hasVisemeTimeline()) return;
+      if (!responseText.trim()) return;
       avatar.updateSpeechText(responseText, responseAudioMs);
+    }
+
+    function ingestVisemeTimestamp(timestampInfo) {
+      if (!timestampInfo || !avatar) return;
+      avatar.appendSpeechVisemes(timestampInfo);
     }
 
     function startLipsyncClock() {
@@ -9144,6 +9151,8 @@
 
       if (e.type === "response.output_audio.delta") {
         setStatus("Conversation active — speak anytime", true);
+
+        if (e.timestamp_info) ingestVisemeTimestamp(e.timestamp_info);
 
         const pcm16 = Uint8Array.from(atob(e.delta), (c) => c.charCodeAt(0));
         addAudioChunkMs(new Int16Array(pcm16.buffer));

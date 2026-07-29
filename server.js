@@ -6569,7 +6569,9 @@ function buildSessionCfg({
   }
   const ttsLang = String(ttsLanguage || '').trim();
   if (ttsLang) ttsPd.language = ttsLang;
-  if (Object.keys(ttsPd).length) providerData.tts = ttsPd;
+  ttsPd.timestamp_type = 'WORD';
+  ttsPd.timestamp_transport_strategy = 'SYNC';
+  providerData.tts = ttsPd;
 
   if (Object.keys(providerData).length) session.providerData = providerData;
 

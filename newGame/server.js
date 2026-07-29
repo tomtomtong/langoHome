@@ -1572,23 +1572,29 @@ app.post("/api/inworld/tts", express.json(), async (req, res) => {
   }
 
   const voiceId = getInworldVoiceId();
+  const language = String(req.body?.language || req.body?.ttsLanguage || "").trim();
 
   try {
+    const requestBody = {
+      text,
+      voiceId,
+      modelId: "inworld-tts-2",
+      timestampType: "WORD",
+      timestampTransportStrategy: "SYNC",
+      audioConfig: {
+        audioEncoding: "MP3",
+        sampleRateHertz: 24000,
+      },
+    };
+    if (language) requestBody.language = language;
+
     const upstream = await fetch(INWORLD_TTS_URL, {
       method: "POST",
       headers: {
         Authorization: `Basic ${apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        text,
-        voiceId,
-        modelId: "inworld-tts-1.5-max",
-        audioConfig: {
-          audioEncoding: "MP3",
-          sampleRateHertz: 24000,
-        },
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     const payload = await upstream.json();
@@ -1608,6 +1614,7 @@ app.post("/api/inworld/tts", express.json(), async (req, res) => {
     res.json({
       audioContent: payload.audioContent,
       mimeType: "audio/mpeg",
+      timestampInfo: payload.timestampInfo || payload.timestamp_info || null,
     });
   } catch (err) {
     res.status(502).json({ error: err.message || "Failed to reach Inworld TTS." });
