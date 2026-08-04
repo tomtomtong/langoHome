@@ -691,6 +691,139 @@ function buildConversationExportArchive(conversationId) {
   };
 }
 
+function buildAccountUsageExportFilename(username) {
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, '').replace('T', '-');
+  const user = String(username || 'unknown').replace(/[^a-zA-Z0-9_-]+/g, '-');
+  return `usage-logs-${user}-${stamp}.zip`;
+}
+
+function jsonZipEntry(name, value) {
+  return {
+    name,
+    data: Buffer.from(`${JSON.stringify(value, null, 2)}\n`, 'utf8'),
+  };
+}
+
+function listAllProfileSyncLogsForUser(username) {
+  const rows = conversationsDb.prepare(`
+    SELECT id, conversation_id, username, model, status, message, changed_fields, updates_json, created_at
+    FROM profile_sync_logs
+    WHERE username = ?
+    ORDER BY created_at DESC
+  `).all(username);
+  return rows.map(rowToProfileSyncLog);
+}
+
+function listAllGamePlaysForUser(username) {
+  const rows = conversationsDb.prepare(`
+    SELECT id, username, game_id, score, play_date, played_at, details_json
+    FROM game_plays
+    WHERE username = ?
+    ORDER BY played_at DESC
+  `).all(username);
+  return rows.map(rowToGamePlay);
+}
+
+function listAllLearnedVocabularyForUser(username) {
+  const rows = conversationsDb.prepare(`
+    SELECT id, username, word, source, learned_at, metadata_json
+    FROM learned_vocabulary
+    WHERE username = ?
+    ORDER BY learned_at DESC
+  `).all(username);
+  return rows.map(rowToLearnedVocabulary);
+}
+
+function listAllCrashReportsForUser(username) {
+  const rows = conversationsDb.prepare(`
+    SELECT id, source, message, stack, fatal, platform, app_version, build_number,
+           package_name, client_timestamp, username, created_at
+    FROM crash_reports
+    WHERE username = ?
+    ORDER BY created_at DESC
+  `).all(username);
+  return rows.map(rowToCrashReport);
+}
+
+function listAllSmartpenSyncEventsForUser(username) {
+  const rows = conversationsDb.prepare(`
+    SELECT id, username, status, words_added, words_updated, device_name, battery_level,
+           error_message, metadata_json, created_at
+    FROM smartpen_sync_events
+    WHERE username = ?
+    ORDER BY created_at DESC
+  `).all(username);
+  return rows.map(rowToSmartpenSyncEvent);
+}
+
+function buildAccountUsageExportArchive(username) {
+  if (!isValidUsername(username)) return null;
+
+  const entries = [];
+  const safeUser = String(username).replace(/[^a-zA-Z0-9_-]+/g, '-');
+  const prefix = `${safeUser}/`;
+
+  const gamePlays = listAllGamePlaysForUser(username);
+  const profileSyncLogs = listAllProfileSyncLogsForUser(username);
+  const learnedVocabulary = listAllLearnedVocabularyForUser(username);
+  const crashReports = listAllCrashReportsForUser(username);
+  const smartpenSyncEvents = listAllSmartpenSyncEventsForUser(username);
+  const conversationRows = conversationsDb.prepare(`
+    SELECT id, username, role, started_at, ended_at, turn_count, user_audio_path
+    FROM conversations
+    WHERE username = ?
+    ORDER BY started_at DESC
+  `).all(username);
+
+  entries.push(jsonZipEntry(`${prefix}profile.json`, getUserProfile(username)));
+  entries.push(jsonZipEntry(`${prefix}login-meta.json`, getUserLoginMeta(username)));
+  entries.push(jsonZipEntry(`${prefix}check-in.json`, getCheckInRecord(username)));
+  entries.push(jsonZipEntry(`${prefix}game-plays.json`, gamePlays));
+  entries.push(jsonZipEntry(`${prefix}profile-sync-logs.json`, profileSyncLogs));
+  entries.push(jsonZipEntry(`${prefix}learned-vocabulary.json`, learnedVocabulary));
+  entries.push(jsonZipEntry(`${prefix}crash-reports.json`, crashReports));
+  entries.push(jsonZipEntry(`${prefix}smartpen-sync-events.json`, smartpenSyncEvents));
+
+  let conversationCount = 0;
+  for (const row of conversationRows) {
+    const record = getConversationRecord(row.id);
+    if (!record) continue;
+    conversationCount += 1;
+    const convFolder = `${prefix}conversations/${row.id}/`;
+    entries.push({
+      name: `${convFolder}transcript.txt`,
+      data: Buffer.from(formatConversationTranscriptText(record), 'utf8'),
+    });
+    if (row.user_audio_path) {
+      const audioPath = join(SESSION_AUDIO_DIR, row.user_audio_path);
+      if (existsSync(audioPath)) {
+        entries.push({
+          name: `${convFolder}session-audio.wav`,
+          data: readFileSync(audioPath),
+        });
+      }
+    }
+  }
+
+  entries.push(jsonZipEntry(`${prefix}manifest.json`, {
+    exportedAt: new Date().toISOString(),
+    username,
+    counts: {
+      conversations: conversationCount,
+      gamePlays: gamePlays.length,
+      profileSyncLogs: profileSyncLogs.length,
+      learnedVocabulary: learnedVocabulary.length,
+      crashReports: crashReports.length,
+      smartpenSyncEvents: smartpenSyncEvents.length,
+    },
+  }));
+
+  return {
+    buffer: buildZipStoreArchive(entries),
+    filename: buildAccountUsageExportFilename(username),
+  };
+}
+
 function rowToProfileSyncLog(row) {
   let changedFields = [];
   let updates = null;
@@ -1587,13 +1720,6 @@ const SECURITY_HEADERS = {
 
 const BUILTIN_STUDENT_USERS = {
   demo: 'demo',
-  'demo-1': '123456',
-  ...Object.fromEntries(
-    Array.from({ length: 20 }, (_, i) => {
-      const username = `user${String(i + 1).padStart(2, '0')}`;
-      return [username, 'password123'];
-    }),
-  ),
 };
 
 /** Mutable map of username → password (built-ins + custom accounts from student-users.json). */
@@ -1643,29 +1769,9 @@ function mergeCustomStudentUsers() {
   }
 }
 
-function createStudentUser(username, password) {
-  const u = String(username || '').trim();
-  const p = String(password ?? '');
-  if (!USERNAME_RE.test(u)) {
-    return { ok: false, error: 'Username must be 2–32 characters: letters, numbers, _ or -.' };
-  }
-  if (u === ADMIN_USERNAME) {
-    return { ok: false, error: 'That username is reserved.' };
-  }
-  if (!p || p.length < 4) {
-    return { ok: false, error: 'Password must be at least 4 characters.' };
-  }
-  if (STUDENT_USERS[u]) {
-    return { ok: false, error: 'That username already exists.' };
-  }
-  const custom = loadCustomStudentUsers();
-  custom[u] = p;
-  saveCustomStudentUsers(custom);
-  STUDENT_USERS[u] = p;
-  return { ok: true, username: u };
+function createStudentUser(_username, _password) {
+  return { ok: false, error: 'Account creation is disabled.' };
 }
-
-mergeCustomStudentUsers();
 
 const DEFAULT_USER_PROFILE = {
   childName: '',
@@ -3429,6 +3535,10 @@ function getSession(req) {
     deleteSession(token);
     return null;
   }
+  if (session.role !== 'student' || session.username !== 'demo') {
+    deleteSession(token);
+    return null;
+  }
   return session;
 }
 
@@ -3449,12 +3559,8 @@ function verifyStudentCredentials(username, password) {
   return timingSafeEqual(a, b);
 }
 
-function verifyAdminCredentials(username, password) {
-  if (username !== ADMIN_USERNAME) return false;
-  const a = Buffer.from(password);
-  const b = Buffer.from(ADMIN_PASSWORD);
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
+function verifyAdminCredentials(_username, _password) {
+  return false;
 }
 
 function createSession(username, role) {
@@ -5699,6 +5805,24 @@ const server = createServer(async (req, res) => {
         users: getUserList(),
       });
     });
+    return;
+  }
+
+  const profileExportMatch = url.match(/^\/api\/user-profiles\/([^/]+)\/export$/);
+  if (profileExportMatch && req.method === 'GET') {
+    const username = decodeURIComponent(profileExportMatch[1]);
+    const archive = buildAccountUsageExportArchive(username);
+    if (!archive) {
+      sendJson(res, 404, { error: 'Unknown account.' });
+      return;
+    }
+    res.writeHead(200, {
+      'Content-Type': 'application/zip',
+      'Content-Disposition': `attachment; filename="${archive.filename}"`,
+      'Content-Length': archive.buffer.length,
+      ...SECURITY_HEADERS,
+    });
+    res.end(archive.buffer);
     return;
   }
 

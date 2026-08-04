@@ -28,7 +28,7 @@
       <aside class="admin-sidebar" id="admin-sidebar">
         <div class="admin-sidebar-brand">
           <strong>Uncle Tommy CMS</strong>
-          <span>admin / admin</span>
+          <span>CMS</span>
         </div>
         <nav class="admin-sidebar-nav" aria-label="Admin sections">
           ${links}

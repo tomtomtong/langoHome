@@ -73,7 +73,7 @@
     }
     .account-picker {
       display: grid;
-      grid-template-columns: 1fr auto;
+      grid-template-columns: minmax(0, 1fr) auto auto auto;
       gap: 0.75rem;
       align-items: end;
       margin-bottom: 1.5rem;
@@ -164,6 +164,11 @@
       padding: 0.25rem 0.5rem;
       font-size: 0.75rem;
     }
+    .export-btn {
+      padding: 0.35rem 0.65rem;
+      font-size: 0.75rem;
+      white-space: nowrap;
+    }
     .device-pill {
       display: inline-block;
       padding: 0.15rem 0.45rem;
@@ -230,6 +235,7 @@
           <select id="account-select"></select>
         </div>
         <button type="button" class="secondary" id="load-btn">Reload</button>
+        <button type="button" class="secondary export-btn" id="export-usage-btn">Export usage logs</button>
         <button type="button" class="danger" id="clear-profile-btn">Clear profile fields</button>
       </div>
 
@@ -245,10 +251,11 @@
                 <th>OS</th>
                 <th>Browser</th>
                 <th>Last sign-in</th>
+                <th>Export</th>
               </tr>
             </thead>
             <tbody id="login-meta-body">
-              <tr><td colspan="5">Loading…</td></tr>
+              <tr><td colspan="6">Loading…</td></tr>
             </tbody>
           </table>
         </div>
@@ -572,6 +579,7 @@
     const profileForm = document.getElementById("profile-form");
     const statusEl = document.getElementById("status");
     const loadBtn = document.getElementById("load-btn");
+    const exportUsageBtn = document.getElementById("export-usage-btn");
     const clearProfileBtn = document.getElementById("clear-profile-btn");
     const loginMetaBody = document.getElementById("login-meta-body");
     const learnedVocabBody = document.getElementById("learned-vocab-body");
@@ -603,6 +611,45 @@
     function formatLearnedTime(ms) {
       if (!ms) return "—";
       return new Date(ms).toLocaleString();
+    }
+
+    function parseContentDispositionFilename(header) {
+      if (!header) return null;
+      const encoded = header.match(/filename\*=UTF-8''([^;]+)/i);
+      if (encoded?.[1]) {
+        try {
+          return decodeURIComponent(encoded[1]);
+        } catch {
+          return encoded[1];
+        }
+      }
+      const plain = header.match(/filename="([^"]+)"/i);
+      return plain?.[1] || null;
+    }
+
+    async function exportUsageLogs(username) {
+      if (!username) return;
+      clearStatus();
+      showStatus(`Preparing export for ${username}…`);
+      try {
+        const res = await fetch(`/api/user-profiles/${encodeURIComponent(username)}/export`);
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Export failed.");
+        }
+        const blob = await res.blob();
+        const filename = parseContentDispositionFilename(res.headers.get("Content-Disposition"))
+          || `usage-logs-${username}.zip`;
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        link.click();
+        URL.revokeObjectURL(url);
+        showStatus(`Downloaded usage logs for ${username}.`, true);
+      } catch (e) {
+        showStatus(e.message || "Could not export usage logs.", false);
+      }
     }
 
     function renderLearnedVocabulary(items, total) {
@@ -679,7 +726,7 @@
 
     function renderLoginMetaTable(users) {
       if (!users?.length) {
-        loginMetaBody.innerHTML = '<tr><td colspan="5">No accounts.</td></tr>';
+        loginMetaBody.innerHTML = '<tr><td colspan="6">No accounts.</td></tr>';
         return;
       }
       const selected = selectedAccount();
@@ -699,6 +746,9 @@
           <td>${os}</td>
           <td>${browser}</td>
           <td>${when}</td>
+          <td class="learned-vocab-actions">
+            <button type="button" class="secondary export-btn" data-export-user="${username}">Export</button>
+          </td>
         </tr>`;
       }).join("");
 
@@ -706,6 +756,13 @@
         row.addEventListener("click", () => {
           accountSelect.value = row.dataset.user;
           accountSelect.dispatchEvent(new Event("change"));
+        });
+      });
+
+      loginMetaBody.querySelectorAll("[data-export-user]").forEach((btn) => {
+        btn.addEventListener("click", (event) => {
+          event.stopPropagation();
+          exportUsageLogs(btn.dataset.exportUser).catch(() => {});
         });
       });
     }
@@ -883,6 +940,10 @@
 
     clearLearnedVocabBtn.addEventListener("click", () => {
       clearLearnedVocabulary().catch(() => {});
+    });
+
+    exportUsageBtn.addEventListener("click", () => {
+      exportUsageLogs(selectedAccount()).catch(() => {});
     });
 
     loadProfiles().catch((e) => {
