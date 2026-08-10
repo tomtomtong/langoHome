@@ -61,6 +61,51 @@
       color: #9aa0a6;
       line-height: 1.45;
     }
+    .actions {
+      margin-top: 2rem;
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.6rem 1.1rem;
+      border-radius: 8px;
+      border: 1px solid #2a2f3a;
+      background: #1a1d27;
+      color: #e8eaed;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      text-decoration: none;
+    }
+    .btn:hover {
+      border-color: #6c8cff;
+      background: #22252f;
+    }
+    .btn.primary {
+      background: #6c8cff;
+      border-color: #6c8cff;
+      color: #fff;
+    }
+    .btn.primary:hover {
+      background: #5a7aee;
+    }
+    .toast {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      padding: 0.75rem 1.25rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      z-index: 999;
+      animation: fadeIn 0.2s;
+    }
+    .toast.success { background: #1b5e20; color: #a5d6a7; }
+    .toast.error { background: #b71c1c; color: #ef9a9a; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
   </style>
 </head>
 <body>
@@ -110,7 +155,81 @@
         <p>Return to the main Uncle Tommy conversation experience.</p>
       </a>
     </div>
+
+    <div class="actions">
+      <button class="btn primary" id="exportBtn">Export All CMS Data</button>
+      <button class="btn" id="importBtn">Import CMS Data</button>
+      <input type="file" id="importFile" accept=".zip" style="display:none">
+    </div>
   </div>
   <script src="/admin-nav.js"></script>
+  <script>
+    function showToast(msg, type) {
+      const el = document.createElement('div');
+      el.className = 'toast ' + type;
+      el.textContent = msg;
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 3500);
+    }
+
+    document.getElementById('exportBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('exportBtn');
+      btn.disabled = true;
+      btn.textContent = 'Exporting...';
+      try {
+        const res = await fetch('/api/cms/export');
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'Export failed');
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const disp = res.headers.get('Content-Disposition') || '';
+        const m = disp.match(/filename="?(.+?)"?$/);
+        a.download = m ? m[1] : 'cms-export.zip';
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('Export complete', 'success');
+      } catch (e) {
+        showToast(e.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Export All CMS Data';
+      }
+    });
+
+    document.getElementById('importBtn').addEventListener('click', () => {
+      document.getElementById('importFile').click();
+    });
+
+    document.getElementById('importFile').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const btn = document.getElementById('importBtn');
+      btn.disabled = true;
+      btn.textContent = 'Importing...';
+      try {
+        const res = await fetch('/api/cms/import', {
+          method: 'POST',
+          body: file,
+        });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error || 'Import failed');
+        const parts = [];
+        if (result.imported?.length) parts.push(`${result.imported.length} items imported`);
+        if (result.skipped?.length) parts.push(`${result.skipped.length} skipped`);
+        if (result.errors?.length) parts.push(`${result.errors.length} errors`);
+        showToast(parts.join(', ') || 'Import complete', result.errors?.length ? 'error' : 'success');
+      } catch (e) {
+        showToast(e.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Import CMS Data';
+        e.target.value = '';
+      }
+    });
+  </script>
 </body>
 </html>

@@ -115,7 +115,7 @@ function ensureConfigDir() {
 }
 
 ensureConfigDir();
-const conversationsDb = new Database(CONVERSATIONS_DB_PATH);
+let conversationsDb = new Database(CONVERSATIONS_DB_PATH);
 conversationsDb.exec(`
   CREATE TABLE IF NOT EXISTS conversations (
     id TEXT PRIMARY KEY,
@@ -822,6 +822,397 @@ function buildAccountUsageExportArchive(username) {
     buffer: buildZipStoreArchive(entries),
     filename: buildAccountUsageExportFilename(username),
   };
+}
+
+function buildCmsExportArchive() {
+  const entries = [];
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, '').replace('T', '-');
+
+  // config.json
+  entries.push(jsonZipEntry('config.json', loadConfig()));
+
+  // user-profiles.json
+  entries.push(jsonZipEntry('user-profiles.json', loadUserProfiles()));
+
+  // student-users.json
+  entries.push(jsonZipEntry('student-users.json', STUDENT_USERS));
+
+  // user-login-meta.json
+  try {
+    if (existsSync(USER_LOGIN_META_PATH)) {
+      entries.push({
+        name: 'user-login-meta.json',
+        data: readFileSync(USER_LOGIN_META_PATH),
+      });
+    }
+  } catch {}
+
+  // bluetooth-codes.json
+  entries.push(jsonZipEntry('bluetooth-codes.json', loadBluetoothCodesManifest()));
+
+  // video-pairs manifest
+  entries.push(jsonZipEntry('video-pairs/manifest.json', loadVideoPairsManifest()));
+
+  // video-pairs media files
+  if (existsSync(VIDEO_PAIRS_DIR)) {
+    for (const pairDir of readdirSync(VIDEO_PAIRS_DIR)) {
+      const pairPath = join(VIDEO_PAIRS_DIR, pairDir);
+      if (!statSync(pairPath).isDirectory()) continue;
+      for (const file of readdirSync(pairPath)) {
+        entries.push({
+          name: `video-pairs/${pairDir}/${file}`,
+          data: readFileSync(join(pairPath, file)),
+        });
+      }
+    }
+  }
+
+  // bluetooth-codes audio
+  if (existsSync(BLUETOOTH_CODES_AUDIO_DIR)) {
+    for (const pairDir of readdirSync(BLUETOOTH_CODES_AUDIO_DIR)) {
+      const pairPath = join(BLUETOOTH_CODES_AUDIO_DIR, pairDir);
+      if (!statSync(pairPath).isDirectory()) continue;
+      for (const file of readdirSync(pairPath)) {
+        entries.push({
+          name: `bluetooth-codes-audio/${pairDir}/${file}`,
+          data: readFileSync(join(pairPath, file)),
+        });
+      }
+    }
+  }
+
+  // idle-video
+  if (existsSync(IDLE_VIDEO_DIR)) {
+    for (const file of readdirSync(IDLE_VIDEO_DIR)) {
+      entries.push({
+        name: `idle-video/${file}`,
+        data: readFileSync(join(IDLE_VIDEO_DIR, file)),
+      });
+    }
+  }
+
+  // transition-video
+  if (existsSync(TRANSITION_VIDEO_DIR)) {
+    for (const file of readdirSync(TRANSITION_VIDEO_DIR)) {
+      entries.push({
+        name: `transition-video/${file}`,
+        data: readFileSync(join(TRANSITION_VIDEO_DIR, file)),
+      });
+    }
+  }
+
+  // avatar-background
+  if (existsSync(AVATAR_BG_DIR)) {
+    for (const file of readdirSync(AVATAR_BG_DIR)) {
+      entries.push({
+        name: `avatar-background/${file}`,
+        data: readFileSync(join(AVATAR_BG_DIR, file)),
+      });
+    }
+  }
+
+  // game-icons
+  if (existsSync(GAME_ICONS_DIR)) {
+    for (const gameDir of readdirSync(GAME_ICONS_DIR)) {
+      const gamePath = join(GAME_ICONS_DIR, gameDir);
+      if (!statSync(gamePath).isDirectory()) continue;
+      for (const file of readdirSync(gamePath)) {
+        entries.push({
+          name: `game-icons/${gameDir}/${file}`,
+          data: readFileSync(join(gamePath, file)),
+        });
+      }
+    }
+  }
+
+  // conversations.db (SQLite)
+  if (existsSync(CONVERSATIONS_DB_PATH)) {
+    entries.push({
+      name: 'conversations.db',
+      data: readFileSync(CONVERSATIONS_DB_PATH),
+    });
+  }
+
+  // game.db (SQLite)
+  if (existsSync(GAME_DB_PATH)) {
+    entries.push({
+      name: 'game.db',
+      data: readFileSync(GAME_DB_PATH),
+    });
+  }
+
+  // check-ins.json
+  try {
+    if (existsSync(CHECK_INS_PATH)) {
+      entries.push({
+        name: 'check-ins.json',
+        data: readFileSync(CHECK_INS_PATH),
+      });
+    }
+  } catch {}
+
+  // parent-digest.json
+  try {
+    if (existsSync(PARENT_DIGEST_PATH)) {
+      entries.push({
+        name: 'parent-digest.json',
+        data: readFileSync(PARENT_DIGEST_PATH),
+      });
+    }
+  } catch {}
+
+  // elevenlabs-config.json
+  try {
+    if (existsSync(ELEVENLABS_CONFIG_PATH)) {
+      entries.push({
+        name: 'elevenlabs-config.json',
+        data: readFileSync(ELEVENLABS_CONFIG_PATH),
+      });
+    }
+  } catch {}
+
+  // manifest
+  entries.push(jsonZipEntry('cms-export-manifest.json', {
+    exportedAt: new Date().toISOString(),
+    version: 1,
+  }));
+
+  return {
+    buffer: buildZipStoreArchive(entries),
+    filename: `cms-export-${stamp}.zip`,
+  };
+}
+
+function importCmsFromZip(zipBuffer) {
+  const results = { imported: [], skipped: [], errors: [] };
+  const entries = readZipStoreArchive(zipBuffer);
+  if (!entries || entries.length === 0) {
+    results.errors.push('Empty or invalid ZIP archive.');
+    return results;
+  }
+
+  const hasManifest = entries.some((e) => e.name === 'cms-export-manifest.json');
+  if (!hasManifest) {
+    results.errors.push('Not a valid CMS export archive (missing cms-export-manifest.json).');
+    return results;
+  }
+
+  ensureConfigDir();
+
+  for (const entry of entries) {
+    try {
+      if (entry.name === 'cms-export-manifest.json') continue;
+
+      if (entry.name === 'config.json') {
+        const config = JSON.parse(entry.data.toString('utf8'));
+        saveConfig(config);
+        results.imported.push('config.json');
+      } else if (entry.name === 'user-profiles.json') {
+        writeFileSync(USER_PROFILES_PATH, entry.data);
+        results.imported.push('user-profiles.json');
+      } else if (entry.name === 'student-users.json') {
+        writeFileSync(STUDENT_USERS_PATH, entry.data);
+        // Reload student users
+        const custom = loadCustomStudentUsers();
+        mergeCustomStudentUsers();
+        results.imported.push('student-users.json');
+      } else if (entry.name === 'user-login-meta.json') {
+        writeFileSync(USER_LOGIN_META_PATH, entry.data);
+        results.imported.push('user-login-meta.json');
+      } else if (entry.name === 'bluetooth-codes.json') {
+        writeFileSync(BLUETOOTH_CODES_PATH, entry.data);
+        results.imported.push('bluetooth-codes.json');
+      } else if (entry.name === 'video-pairs/manifest.json') {
+        writeFileSync(VIDEO_PAIRS_MANIFEST_PATH, entry.data);
+        results.imported.push('video-pairs/manifest.json');
+      } else if (entry.name.startsWith('video-pairs/') && entry.name !== 'video-pairs/manifest.json') {
+        const relPath = entry.name.slice('video-pairs/'.length);
+        const destPath = join(VIDEO_PAIRS_DIR, relPath);
+        const destDir = dirname(destPath);
+        if (!existsSync(destDir)) mkdirSync(destDir, { recursive: true });
+        writeFileSync(destPath, entry.data);
+        results.imported.push(entry.name);
+      } else if (entry.name.startsWith('bluetooth-codes-audio/')) {
+        const relPath = entry.name.slice('bluetooth-codes-audio/'.length);
+        const destPath = join(BLUETOOTH_CODES_AUDIO_DIR, relPath);
+        const destDir = dirname(destPath);
+        if (!existsSync(destDir)) mkdirSync(destDir, { recursive: true });
+        writeFileSync(destPath, entry.data);
+        results.imported.push(entry.name);
+      } else if (entry.name.startsWith('idle-video/')) {
+        const relPath = entry.name.slice('idle-video/'.length);
+        const destPath = join(IDLE_VIDEO_DIR, relPath);
+        if (!existsSync(IDLE_VIDEO_DIR)) mkdirSync(IDLE_VIDEO_DIR, { recursive: true });
+        writeFileSync(destPath, entry.data);
+        results.imported.push(entry.name);
+      } else if (entry.name.startsWith('transition-video/')) {
+        const relPath = entry.name.slice('transition-video/'.length);
+        const destPath = join(TRANSITION_VIDEO_DIR, relPath);
+        if (!existsSync(TRANSITION_VIDEO_DIR)) mkdirSync(TRANSITION_VIDEO_DIR, { recursive: true });
+        writeFileSync(destPath, entry.data);
+        results.imported.push(entry.name);
+      } else if (entry.name.startsWith('avatar-background/')) {
+        const relPath = entry.name.slice('avatar-background/'.length);
+        const destPath = join(AVATAR_BG_DIR, relPath);
+        if (!existsSync(AVATAR_BG_DIR)) mkdirSync(AVATAR_BG_DIR, { recursive: true });
+        writeFileSync(destPath, entry.data);
+        results.imported.push(entry.name);
+      } else if (entry.name.startsWith('game-icons/')) {
+        const relPath = entry.name.slice('game-icons/'.length);
+        const destPath = join(GAME_ICONS_DIR, relPath);
+        const destDir = dirname(destPath);
+        if (!existsSync(destDir)) mkdirSync(destDir, { recursive: true });
+        writeFileSync(destPath, entry.data);
+        results.imported.push(entry.name);
+      } else if (entry.name === 'conversations.db') {
+        if (conversationsDb) {
+          try { conversationsDb.close(); } catch {}
+        }
+        writeFileSync(CONVERSATIONS_DB_PATH, entry.data);
+        conversationsDb = new Database(CONVERSATIONS_DB_PATH);
+        conversationsDb.exec(`
+          CREATE TABLE IF NOT EXISTS conversations (
+            id TEXT PRIMARY KEY,
+            username TEXT NOT NULL,
+            role TEXT NOT NULL,
+            started_at INTEGER NOT NULL,
+            ended_at INTEGER,
+            turn_count INTEGER NOT NULL DEFAULT 0
+          );
+          CREATE TABLE IF NOT EXISTS conversation_turns (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            conversation_id TEXT NOT NULL,
+            role TEXT NOT NULL,
+            text TEXT NOT NULL,
+            event_type TEXT,
+            created_at INTEGER NOT NULL,
+            FOREIGN KEY (conversation_id) REFERENCES conversations(id)
+          );
+          CREATE INDEX IF NOT EXISTS idx_conversations_started ON conversations(started_at DESC);
+          CREATE INDEX IF NOT EXISTS idx_turns_conversation ON conversation_turns(conversation_id, created_at);
+          CREATE TABLE IF NOT EXISTS profile_sync_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            conversation_id TEXT,
+            username TEXT NOT NULL,
+            model TEXT,
+            status TEXT NOT NULL,
+            message TEXT,
+            changed_fields TEXT,
+            updates_json TEXT,
+            created_at INTEGER NOT NULL
+          );
+          CREATE INDEX IF NOT EXISTS idx_profile_sync_logs_created ON profile_sync_logs(created_at DESC);
+          CREATE INDEX IF NOT EXISTS idx_profile_sync_logs_conversation ON profile_sync_logs(conversation_id);
+          CREATE INDEX IF NOT EXISTS idx_profile_sync_logs_username ON profile_sync_logs(username, created_at DESC);
+          CREATE TABLE IF NOT EXISTS game_plays (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            game_id TEXT NOT NULL,
+            score INTEGER NOT NULL DEFAULT 0,
+            play_date TEXT NOT NULL,
+            played_at INTEGER NOT NULL,
+            details_json TEXT
+          );
+          CREATE INDEX IF NOT EXISTS idx_game_plays_username_date ON game_plays(username, play_date DESC);
+          CREATE INDEX IF NOT EXISTS idx_game_plays_played_at ON game_plays(played_at DESC);
+          CREATE INDEX IF NOT EXISTS idx_game_plays_date_game ON game_plays(play_date, game_id);
+          CREATE TABLE IF NOT EXISTS crash_reports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source TEXT NOT NULL,
+            message TEXT,
+            stack TEXT,
+            fatal INTEGER NOT NULL DEFAULT 0,
+            platform TEXT,
+            app_version TEXT,
+            build_number TEXT,
+            package_name TEXT,
+            client_timestamp TEXT,
+            username TEXT,
+            created_at INTEGER NOT NULL
+          );
+          CREATE INDEX IF NOT EXISTS idx_crash_reports_created ON crash_reports(created_at DESC);
+          CREATE INDEX IF NOT EXISTS idx_crash_reports_source ON crash_reports(source, created_at DESC);
+          CREATE INDEX IF NOT EXISTS idx_crash_reports_platform ON crash_reports(platform, created_at DESC);
+          CREATE TABLE IF NOT EXISTS learned_vocabulary (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            word TEXT NOT NULL,
+            source TEXT NOT NULL DEFAULT 'smartpen',
+            learned_at INTEGER NOT NULL,
+            metadata_json TEXT,
+            UNIQUE(username, word)
+          );
+          CREATE INDEX IF NOT EXISTS idx_learned_vocabulary_user ON learned_vocabulary(username, learned_at DESC);
+          CREATE TABLE IF NOT EXISTS smartpen_sync_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            status TEXT NOT NULL,
+            words_added INTEGER NOT NULL DEFAULT 0,
+            words_updated INTEGER NOT NULL DEFAULT 0,
+            device_name TEXT,
+            battery_level INTEGER,
+            error_message TEXT,
+            metadata_json TEXT,
+            created_at INTEGER NOT NULL
+          );
+          CREATE INDEX IF NOT EXISTS idx_smartpen_sync_user ON smartpen_sync_events(username, created_at DESC);
+        `);
+        results.imported.push('conversations.db (restart recommended)');
+      } else if (entry.name === 'game.db') {
+        writeFileSync(GAME_DB_PATH, entry.data);
+        results.imported.push('game.db');
+      } else if (entry.name === 'check-ins.json') {
+        writeFileSync(CHECK_INS_PATH, entry.data);
+        results.imported.push('check-ins.json');
+      } else if (entry.name === 'parent-digest.json') {
+        writeFileSync(PARENT_DIGEST_PATH, entry.data);
+        results.imported.push('parent-digest.json');
+      } else if (entry.name === 'elevenlabs-config.json') {
+        writeFileSync(ELEVENLABS_CONFIG_PATH, entry.data);
+        results.imported.push('elevenlabs-config.json');
+      } else {
+        results.skipped.push(entry.name);
+      }
+    } catch (e) {
+      results.errors.push(`${entry.name}: ${e.message}`);
+    }
+  }
+
+  return results;
+}
+
+function readZipStoreArchive(buffer) {
+  const entries = [];
+  let pos = 0;
+
+  while (pos < buffer.length - 4) {
+    const sig = buffer.readUInt32LE(pos);
+    if (sig === 0x04034b50) {
+      // Local file header
+      const nameLen = buffer.readUInt16LE(pos + 26);
+      const extraLen = buffer.readUInt16LE(pos + 28);
+      const compMethod = buffer.readUInt16LE(pos + 8);
+      const compSize = buffer.readUInt32LE(pos + 18);
+      const uncompSize = buffer.readUInt32LE(pos + 22);
+      const name = buffer.toString('utf8', pos + 30, pos + 30 + nameLen);
+      const dataStart = pos + 30 + nameLen + extraLen;
+      const dataEnd = dataStart + (compMethod === 0 ? compSize : uncompSize);
+      if (dataEnd <= buffer.length) {
+        entries.push({
+          name,
+          data: buffer.subarray(dataStart, dataEnd),
+        });
+      }
+      pos = dataEnd;
+    } else if (sig === 0x02014b50 || sig === 0x06054b50) {
+      // Central directory or end of central directory — stop
+      break;
+    } else {
+      pos += 1;
+    }
+  }
+
+  return entries;
 }
 
 function rowToProfileSyncLog(row) {
@@ -3794,6 +4185,8 @@ function requiresAdmin(url, method) {
   if (url.match(/^\/api\/learned-vocabulary\/\d+$/) && m === 'DELETE') return true;
   if (url === '/api/learned-vocabulary' && m === 'DELETE') return true;
   if (url === '/api/inworld/models') return true;
+  if (url === '/api/cms/export') return true;
+  if (url === '/api/cms/import') return true;
 
   const uploadPaths = ['/api/idle-video', '/api/transition-video', '/api/avatar-background'];
   if (uploadPaths.includes(url) && m !== 'GET') return true;
@@ -6336,6 +6729,33 @@ const server = createServer(async (req, res) => {
 
   if (url === '/ChickenDance.fbx') {
     serveFile(res, join(ROOT, 'Animation', 'Dance', 'ChickenDance.fbx'));
+    return;
+  }
+
+  if (url === '/api/cms/export' && req.method === 'GET') {
+    const archive = buildCmsExportArchive();
+    res.writeHead(200, {
+      'Content-Type': 'application/zip',
+      'Content-Disposition': `attachment; filename="${archive.filename}"`,
+      'Content-Length': archive.buffer.length,
+      ...SECURITY_HEADERS,
+    });
+    res.end(archive.buffer);
+    return;
+  }
+
+  if (url === '/api/cms/import' && req.method === 'POST') {
+    const chunks = [];
+    req.on('data', (chunk) => chunks.push(chunk));
+    req.on('end', () => {
+      try {
+        const buffer = Buffer.concat(chunks);
+        const result = importCmsFromZip(buffer);
+        sendJson(res, 200, { ok: true, ...result });
+      } catch (e) {
+        sendJson(res, 400, { error: e.message || 'Import failed.' });
+      }
+    });
     return;
   }
 
