@@ -3926,10 +3926,6 @@ function getSession(req) {
     deleteSession(token);
     return null;
   }
-  if (session.role !== 'student' || session.username !== 'demo') {
-    deleteSession(token);
-    return null;
-  }
   return session;
 }
 
@@ -3950,8 +3946,12 @@ function verifyStudentCredentials(username, password) {
   return timingSafeEqual(a, b);
 }
 
-function verifyAdminCredentials(_username, _password) {
-  return false;
+function verifyAdminCredentials(username, password) {
+  if (username !== ADMIN_USERNAME) return false;
+  const a = Buffer.from(password);
+  const b = Buffer.from(ADMIN_PASSWORD);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
 }
 
 function createSession(username, role) {
