@@ -2733,6 +2733,125 @@ function getUserLoginMetaForUsers(usernames) {
   return out;
 }
 
+function listHistoricalUsernames() {
+  const names = new Set(getUserList());
+  for (const username of Object.keys(loadUserProfiles())) names.add(username);
+  for (const username of Object.keys(loadUserLoginMeta())) names.add(username);
+  for (const username of Object.keys(loadCheckIns())) names.add(username);
+
+  const rows = conversationsDb.prepare(`
+    SELECT username FROM conversations GROUP BY username
+    UNION SELECT username FROM game_plays GROUP BY username
+    UNION SELECT username FROM learned_vocabulary GROUP BY username
+    UNION SELECT username FROM profile_sync_logs GROUP BY username
+    UNION SELECT username FROM smartpen_sync_events GROUP BY username
+    UNION SELECT username FROM crash_reports WHERE username IS NOT NULL AND username != '' GROUP BY username
+  `).all();
+  for (const row of rows) {
+    if (row.username) names.add(row.username);
+  }
+
+  return [...names].sort((a, b) => a.localeCompare(b));
+}
+
+function mapCountRows(rows) {
+  const out = new Map();
+  for (const row of rows) {
+    out.set(row.username, Number(row.total) || 0);
+  }
+  return out;
+}
+
+function mapMaxTimestampRows(rows) {
+  const out = new Map();
+  for (const row of rows) {
+    out.set(row.username, Number(row.lastAt) || 0);
+  }
+  return out;
+}
+
+function buildAdminDashboardSummary() {
+  const usernames = listHistoricalUsernames();
+  const activeLogins = new Set(getUserList());
+  const profiles = loadUserProfiles();
+  const loginMeta = loadUserLoginMeta();
+  const checkIns = loadCheckIns();
+
+  const conversationCounts = mapCountRows(conversationsDb.prepare(`
+    SELECT username, COUNT(*) AS total FROM conversations GROUP BY username
+  `).all());
+  const gamePlayCounts = mapCountRows(conversationsDb.prepare(`
+    SELECT username, COUNT(*) AS total FROM game_plays GROUP BY username
+  `).all());
+  const vocabCounts = mapCountRows(conversationsDb.prepare(`
+    SELECT username, COUNT(*) AS total FROM learned_vocabulary GROUP BY username
+  `).all());
+  const crashCounts = mapCountRows(conversationsDb.prepare(`
+    SELECT username, COUNT(*) AS total FROM crash_reports
+    WHERE username IS NOT NULL AND username != ''
+    GROUP BY username
+  `).all());
+  const conversationLastAt = mapMaxTimestampRows(conversationsDb.prepare(`
+    SELECT username, MAX(started_at) AS lastAt FROM conversations GROUP BY username
+  `).all());
+  const gamePlayLastAt = mapMaxTimestampRows(conversationsDb.prepare(`
+    SELECT username, MAX(played_at) AS lastAt FROM game_plays GROUP BY username
+  `).all());
+
+  const accounts = usernames.map((username) => {
+    const profile = normalizeUserProfile(profiles[username]);
+    const meta = normalizeUserLoginMeta(loginMeta[username]);
+    const checkIn = normalizeCheckInRecord(checkIns[username]);
+    const lastActivityAt = Math.max(
+      meta.lastLoginAt || 0,
+      conversationLastAt.get(username) || 0,
+      gamePlayLastAt.get(username) || 0,
+    );
+    return {
+      username,
+      childName: profile.childName || '',
+      nickname: profile.nickname || '',
+      grade: profile.grade || profile.schoolGrade || '',
+      canLogin: activeLogins.has(username),
+      conversations: conversationCounts.get(username) || 0,
+      gamePlays: gamePlayCounts.get(username) || 0,
+      learnedWords: vocabCounts.get(username) || 0,
+      crashes: crashCounts.get(username) || 0,
+      totalCheckIns: checkIn.totalCheckIns || 0,
+      totalStars: checkIn.totalStars || 0,
+      lastLoginAt: meta.lastLoginAt || 0,
+      lastActivityAt,
+    };
+  });
+
+  accounts.sort((a, b) => {
+    if (b.lastActivityAt !== a.lastActivityAt) return b.lastActivityAt - a.lastActivityAt;
+    return a.username.localeCompare(b.username);
+  });
+
+  const totals = accounts.reduce((acc, account) => {
+    acc.conversations += account.conversations;
+    acc.gamePlays += account.gamePlays;
+    acc.learnedWords += account.learnedWords;
+    acc.crashes += account.crashes;
+    if (account.canLogin) acc.activeLogins += 1;
+    if (!account.canLogin && (account.conversations || account.gamePlays || account.learnedWords || account.childName)) {
+      acc.historicalOnly += 1;
+    }
+    return acc;
+  }, {
+    accounts: accounts.length,
+    activeLogins: 0,
+    historicalOnly: 0,
+    conversations: 0,
+    gamePlays: 0,
+    learnedWords: 0,
+    crashes: 0,
+  });
+
+  return { totals, accounts };
+}
+
 function recordStudentLogin(username, userAgent) {
   if (!STUDENT_USERS[username]) return;
   const classified = classifyClientDevice(userAgent);
@@ -4187,6 +4306,7 @@ function requiresAdmin(url, method) {
   if (url === '/api/inworld/models') return true;
   if (url === '/api/cms/export') return true;
   if (url === '/api/cms/import') return true;
+  if (url === '/api/admin/dashboard' && m === 'GET') return true;
 
   const uploadPaths = ['/api/idle-video', '/api/transition-video', '/api/avatar-background'];
   if (uploadPaths.includes(url) && m !== 'GET') return true;
@@ -5756,6 +5876,11 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  if (url === '/api/admin/dashboard' && req.method === 'GET') {
+    sendJson(res, 200, buildAdminDashboardSummary());
+    return;
+  }
+
   if (url === '/api/me/profile' && req.method === 'GET') {
     const session = getSession(req);
     sendJson(res, 200, {
@@ -6164,7 +6289,7 @@ const server = createServer(async (req, res) => {
 
   if (url === '/api/user-profiles' && req.method === 'GET') {
     const profiles = loadUserProfiles();
-    const users = getUserList();
+    const users = listHistoricalUsernames();
     const normalized = {};
     for (const username of users) {
       normalized[username] = normalizeUserProfile(profiles[username]);

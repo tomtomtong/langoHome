@@ -18,7 +18,7 @@
       padding: 1.5rem;
     }
     .page {
-      width: min(100%, 960px);
+      width: min(100%, 1200px);
       margin: 0 auto;
     }
     h1 {
@@ -30,6 +30,97 @@
       color: #9aa0a6;
       font-size: 0.9rem;
       line-height: 1.5;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 0.75rem;
+      margin-bottom: 1.75rem;
+    }
+    .stat {
+      padding: 1rem 1.1rem;
+      border-radius: 12px;
+      background: #1a1d27;
+      border: 1px solid #2a2f3a;
+    }
+    .stat-label {
+      margin: 0 0 0.35rem;
+      font-size: 0.75rem;
+      color: #9aa0a6;
+    }
+    .stat-value {
+      margin: 0;
+      font-size: 1.35rem;
+      font-weight: 600;
+      color: #e8eaed;
+    }
+    .section-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 1rem;
+      margin: 0 0 0.75rem;
+    }
+    .section-head h2 {
+      margin: 0;
+      font-size: 1rem;
+      color: #e8eaed;
+    }
+    .section-head p {
+      margin: 0;
+      font-size: 0.8125rem;
+      color: #9aa0a6;
+    }
+    .history-card {
+      background: #1a1d27;
+      border: 1px solid #2a2f3a;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 1.75rem;
+    }
+    .table-wrap { overflow-x: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8125rem;
+    }
+    th, td {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid #2a2f3a;
+      vertical-align: top;
+    }
+    th {
+      color: #9aa0a6;
+      font-weight: 500;
+      background: #151821;
+    }
+    tr:last-child td { border-bottom: none; }
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.45rem;
+      border-radius: 999px;
+      font-size: 0.68rem;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .badge.active { background: #1b5e20; color: #a5d6a7; }
+    .badge.historical { background: #3a2f1a; color: #ffcc80; }
+    .row-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+    }
+    .row-links a {
+      color: #8ab4ff;
+      text-decoration: none;
+      font-size: 0.75rem;
+    }
+    .row-links a:hover { text-decoration: underline; }
+    .empty-state {
+      padding: 1.25rem 1rem;
+      color: #9aa0a6;
+      font-size: 0.875rem;
     }
     .grid {
       display: grid;
@@ -113,6 +204,41 @@
     <h1>Admin CMS</h1>
     <p class="lead">Manage voice agent settings, avatar, videos, learner profiles, and game assets from one place. Sign in with <strong>admin</strong> / <strong>admin</strong>.</p>
 
+    <div class="stats" id="stats">
+      <div class="stat"><p class="stat-label">Accounts</p><p class="stat-value" id="stat-accounts">—</p></div>
+      <div class="stat"><p class="stat-label">Historical only</p><p class="stat-value" id="stat-historical">—</p></div>
+      <div class="stat"><p class="stat-label">Conversations</p><p class="stat-value" id="stat-conversations">—</p></div>
+      <div class="stat"><p class="stat-label">Game plays</p><p class="stat-value" id="stat-game-plays">—</p></div>
+      <div class="stat"><p class="stat-label">Learned words</p><p class="stat-value" id="stat-learned-words">—</p></div>
+      <div class="stat"><p class="stat-label">Crash reports</p><p class="stat-value" id="stat-crashes">—</p></div>
+    </div>
+
+    <div class="history-card">
+      <div class="section-head" style="padding: 1rem 1rem 0;">
+        <div>
+          <h2>Learner history</h2>
+          <p>Includes user01–user20 and other stored accounts, even if login is disabled.</p>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Account</th>
+              <th>Profile</th>
+              <th>Status</th>
+              <th>Activity</th>
+              <th>Last active</th>
+              <th>Links</th>
+            </tr>
+          </thead>
+          <tbody id="history-body">
+            <tr><td colspan="6" class="empty-state">Loading history…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <div class="grid">
       <a class="card" href="/config">
         <h2>Voice Settings</h2>
@@ -132,7 +258,7 @@
       </a>
       <a class="card" href="/account-config">
         <h2>Account Profiles</h2>
-        <p>Child profiles and preferences for learner accounts user01–user20.</p>
+        <p>Child profiles and preferences for all stored learner accounts, including historical user01–user20 data.</p>
       </a>
       <a class="card" href="/conversations">
         <h2>Conversations</h2>
@@ -171,6 +297,86 @@
       document.body.appendChild(el);
       setTimeout(() => el.remove(), 3500);
     }
+
+    function formatDate(ts) {
+      if (!ts) return '—';
+      return new Date(ts).toLocaleString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function renderDashboard(data) {
+      const totals = data.totals || {};
+      document.getElementById('stat-accounts').textContent = totals.accounts ?? 0;
+      document.getElementById('stat-historical').textContent = totals.historicalOnly ?? 0;
+      document.getElementById('stat-conversations').textContent = totals.conversations ?? 0;
+      document.getElementById('stat-game-plays').textContent = totals.gamePlays ?? 0;
+      document.getElementById('stat-learned-words').textContent = totals.learnedWords ?? 0;
+      document.getElementById('stat-crashes').textContent = totals.crashes ?? 0;
+
+      const body = document.getElementById('history-body');
+      const accounts = data.accounts || [];
+      if (!accounts.length) {
+        body.innerHTML = '<tr><td colspan="6" class="empty-state">No learner history found yet.</td></tr>';
+        return;
+      }
+
+      body.innerHTML = accounts.map((account) => {
+        const profileLabel = [account.childName, account.nickname, account.grade]
+          .filter(Boolean)
+          .join(' · ') || '—';
+        const status = account.canLogin
+          ? '<span class="badge active">Can login</span>'
+          : '<span class="badge historical">History only</span>';
+        const activity = [
+          account.conversations ? `${account.conversations} chats` : '',
+          account.gamePlays ? `${account.gamePlays} games` : '',
+          account.learnedWords ? `${account.learnedWords} words` : '',
+          account.totalCheckIns ? `${account.totalCheckIns} check-ins` : '',
+          account.crashes ? `${account.crashes} crashes` : '',
+        ].filter(Boolean).join(' · ') || '—';
+        const user = encodeURIComponent(account.username);
+        return `<tr>
+          <td><strong>${escapeHtml(account.username)}</strong></td>
+          <td>${escapeHtml(profileLabel)}</td>
+          <td>${status}</td>
+          <td>${escapeHtml(activity)}</td>
+          <td>${escapeHtml(formatDate(account.lastActivityAt))}</td>
+          <td>
+            <div class="row-links">
+              <a href="/account-config?user=${user}">Profile</a>
+              <a href="/conversations">Conversations</a>
+              <a href="/game-plays">Game plays</a>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    async function loadDashboard() {
+      try {
+        const res = await fetch('/api/admin/dashboard');
+        if (!res.ok) throw new Error('Could not load dashboard history');
+        renderDashboard(await res.json());
+      } catch (e) {
+        document.getElementById('history-body').innerHTML =
+          `<tr><td colspan="6" class="empty-state">${escapeHtml(e.message)}</td></tr>`;
+      }
+    }
+
+    loadDashboard();
 
     document.getElementById('exportBtn').addEventListener('click', async () => {
       const btn = document.getElementById('exportBtn');
