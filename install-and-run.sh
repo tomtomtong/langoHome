@@ -4,7 +4,7 @@ set -euo pipefail
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NODE_MAJOR="${NODE_MAJOR:-20}"
 CRON_INTERVAL="${CRON_INTERVAL:-*/5 * * * *}"
-NGINX_UPLOAD_LIMIT="${NGINX_UPLOAD_LIMIT:-500m}"
+NGINX_UPLOAD_LIMIT="${NGINX_UPLOAD_LIMIT:-2g}"
 
 if [[ "${EUID}" -eq 0 ]]; then
   SUDO=""

@@ -184,6 +184,38 @@
     .btn.primary:hover {
       background: #5a7aee;
     }
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .import-local {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid #2a2f3a;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+    }
+    .import-local label {
+      font-size: 0.85rem;
+      color: #9aa0a6;
+    }
+    .import-local select {
+      min-width: 280px;
+      padding: 0.55rem 0.75rem;
+      border-radius: 8px;
+      border: 1px solid #2a2f3a;
+      background: #1a1d27;
+      color: #e8eaed;
+      font-size: 0.85rem;
+    }
+    .import-hint {
+      width: 100%;
+      margin: 0;
+      font-size: 0.8rem;
+      color: #9aa0a6;
+    }
     .toast {
       position: fixed;
       bottom: 1.5rem;
@@ -286,6 +318,12 @@
       <button class="btn primary" id="exportBtn">Export All CMS Data</button>
       <button class="btn" id="importBtn">Import CMS Data</button>
       <input type="file" id="importFile" accept=".zip" style="display:none">
+      <div class="import-local" id="importLocalSection" hidden>
+        <label for="importLocalSelect">Or import backup already on this server</label>
+        <select id="importLocalSelect"></select>
+        <button class="btn" id="importLocalBtn" type="button">Import Selected</button>
+        <p class="import-hint">Large uploads use 8 MB chunks to avoid proxy limits. You can also place a file in the app folder or <code>data/cms-imports/</code> and import it here.</p>
+      </div>
     </div>
   </div>
   <script src="/admin-nav.js"></script>
@@ -378,6 +416,119 @@
 
     loadDashboard();
 
+    function formatBytes(bytes) {
+      if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+      const units = ['B', 'KB', 'MB', 'GB'];
+      let value = bytes;
+      let unit = 0;
+      while (value >= 1024 && unit < units.length - 1) {
+        value /= 1024;
+        unit += 1;
+      }
+      return `${value.toFixed(value >= 10 || unit === 0 ? 0 : 1)} ${units[unit]}`;
+    }
+
+    const CMS_IMPORT_CHUNK_BYTES = 8 * 1024 * 1024;
+    const CMS_IMPORT_SINGLE_UPLOAD_BYTES = 40 * 1024 * 1024;
+
+    async function parseImportResponse(res) {
+      const contentType = res.headers.get('content-type') || '';
+      if (res.status === 401 || res.status === 403) {
+        window.location.href = `/admin/login?next=${encodeURIComponent('/admin')}`;
+        return null;
+      }
+      if (!contentType.includes('application/json')) {
+        if (res.status === 413) {
+          throw new Error('Import failed. The backup file is too large for the server proxy. Try the server-side import below, or increase nginx client_max_body_size.');
+        }
+        throw new Error(`Import failed (${res.status || 'network error'}).`);
+      }
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Import failed');
+      return result;
+    }
+
+    function showImportResult(result) {
+      const parts = [];
+      if (result.imported?.length) parts.push(`${result.imported.length} items imported`);
+      if (result.skipped?.length) parts.push(`${result.skipped.length} skipped`);
+      if (result.errors?.length) parts.push(`${result.errors.length} errors`);
+      showToast(parts.join(', ') || 'Import complete', result.errors?.length ? 'error' : 'success');
+    }
+
+    async function uploadCmsBackup(file, onProgress) {
+      if (file.size <= CMS_IMPORT_SINGLE_UPLOAD_BYTES) {
+        const res = await fetch('/api/cms/import', {
+          method: 'POST',
+          headers: { Accept: 'application/json' },
+          credentials: 'same-origin',
+          body: file,
+        });
+        return parseImportResponse(res);
+      }
+
+      const uploadId = crypto.randomUUID();
+      const totalChunks = Math.ceil(file.size / CMS_IMPORT_CHUNK_BYTES);
+      for (let i = 0; i < totalChunks; i += 1) {
+        const start = i * CMS_IMPORT_CHUNK_BYTES;
+        const chunk = file.slice(start, start + CMS_IMPORT_CHUNK_BYTES);
+        const res = await fetch('/api/cms/import/chunk', {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'X-Upload-Id': uploadId,
+            'X-Chunk-Index': String(i),
+            'X-Total-Chunks': String(totalChunks),
+            'X-File-Name': file.name,
+          },
+          credentials: 'same-origin',
+          body: chunk,
+        });
+        const parsed = await parseImportResponse(res);
+        if (!parsed) return null;
+        if (onProgress) onProgress(i + 1, totalChunks);
+      }
+
+      const res = await fetch('/api/cms/import/complete', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({ uploadId }),
+      });
+      return parseImportResponse(res);
+    }
+
+    async function loadLocalImportFiles() {
+      const section = document.getElementById('importLocalSection');
+      const select = document.getElementById('importLocalSelect');
+      try {
+        const res = await fetch('/api/cms/import/local-files', {
+          credentials: 'same-origin',
+          headers: { Accept: 'application/json' },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const files = Array.isArray(data.files) ? data.files : [];
+        select.innerHTML = '';
+        if (!files.length) {
+          section.hidden = true;
+          return;
+        }
+        for (const file of files) {
+          const option = document.createElement('option');
+          option.value = file.name;
+          option.textContent = `${file.name} (${formatBytes(file.size)})`;
+          select.appendChild(option);
+        }
+        section.hidden = false;
+      } catch {
+        section.hidden = true;
+      }
+    }
+
     document.getElementById('exportBtn').addEventListener('click', async () => {
       const btn = document.getElementById('exportBtn');
       btn.disabled = true;
@@ -417,36 +568,48 @@
       btn.disabled = true;
       btn.textContent = 'Importing...';
       try {
-        const res = await fetch('/api/cms/import', {
-          method: 'POST',
-          headers: { Accept: 'application/json' },
-          credentials: 'same-origin',
-          body: file,
+        const result = await uploadCmsBackup(file, (done, total) => {
+          btn.textContent = `Importing... ${done}/${total}`;
         });
-        const contentType = res.headers.get('content-type') || '';
-        if (res.status === 401 || res.status === 403) {
-          window.location.href = `/admin/login?next=${encodeURIComponent('/admin')}`;
-          return;
-        }
-        if (!contentType.includes('application/json')) {
-          if (res.status === 413) throw new Error('Import failed. The backup file is too large.');
-          throw new Error(`Import failed (${res.status || 'network error'}).`);
-        }
-        const result = await res.json();
-        if (!res.ok) throw new Error(result.error || 'Import failed');
-        const parts = [];
-        if (result.imported?.length) parts.push(`${result.imported.length} items imported`);
-        if (result.skipped?.length) parts.push(`${result.skipped.length} skipped`);
-        if (result.errors?.length) parts.push(`${result.errors.length} errors`);
-        showToast(parts.join(', ') || 'Import complete', result.errors?.length ? 'error' : 'success');
-      } catch (e) {
-        showToast(e.message, 'error');
+        if (result) showImportResult(result);
+      } catch (err) {
+        showToast(err.message, 'error');
       } finally {
         btn.disabled = false;
         btn.textContent = 'Import CMS Data';
         e.target.value = '';
+        loadLocalImportFiles();
       }
     });
+
+    document.getElementById('importLocalBtn').addEventListener('click', async () => {
+      const select = document.getElementById('importLocalSelect');
+      const filename = select.value;
+      if (!filename) return;
+      const btn = document.getElementById('importLocalBtn');
+      btn.disabled = true;
+      btn.textContent = 'Importing...';
+      try {
+        const res = await fetch('/api/cms/import/local', {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
+          credentials: 'same-origin',
+          body: JSON.stringify({ filename }),
+        });
+        const result = await parseImportResponse(res);
+        if (result) showImportResult(result);
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Import Selected';
+      }
+    });
+
+    loadLocalImportFiles();
   </script>
 </body>
 </html>

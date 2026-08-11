@@ -1,4 +1,14 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync, readdirSync, statSync, copyFileSync } from 'fs';
+import {
+  readFileSync,
+  writeFileSync,
+  existsSync,
+  mkdirSync,
+  unlinkSync,
+  readdirSync,
+  statSync,
+  copyFileSync,
+  rmSync,
+} from 'fs';
 import { randomBytes, timingSafeEqual } from 'crypto';
 import { createServer } from 'http';
 import { createRequire } from 'module';
@@ -100,6 +110,10 @@ const DEFAULT_VIDEO_PAIRS_TIMEZONE = 'Asia/Hong_Kong';
 const VIDEO_MAX_BYTES = 100 * 1024 * 1024;
 const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 const AUDIO_MAX_BYTES = 10 * 1024 * 1024;
+const CMS_IMPORT_MAX_BYTES = 2 * 1024 * 1024 * 1024;
+const CMS_IMPORT_CHUNK_MAX_BYTES = 8 * 1024 * 1024;
+const CMS_IMPORTS_DIR = join(CONFIG_DIR, 'cms-imports');
+const CMS_IMPORT_UPLOAD_DIR = join(CONFIG_DIR, 'cms-import-uploads');
 
 if (!process.env.GAME_DATA_DIR) {
   process.env.GAME_DATA_DIR =
@@ -1179,6 +1193,175 @@ function importCmsFromZip(zipBuffer) {
   }
 
   return results;
+}
+
+function ensureCmsImportDirs() {
+  ensureConfigDir();
+  if (!existsSync(CMS_IMPORTS_DIR)) mkdirSync(CMS_IMPORTS_DIR, { recursive: true });
+  if (!existsSync(CMS_IMPORT_UPLOAD_DIR)) mkdirSync(CMS_IMPORT_UPLOAD_DIR, { recursive: true });
+}
+
+function sanitizeCmsUploadId(uploadId) {
+  const id = String(uploadId || '').trim();
+  return /^[a-f0-9-]{36}$/i.test(id) ? id : null;
+}
+
+function readRawBody(req, maxBytes) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let receivedBytes = 0;
+    let rejected = false;
+    req.on('data', (chunk) => {
+      if (rejected) return;
+      receivedBytes += chunk.length;
+      if (receivedBytes > maxBytes) {
+        rejected = true;
+        reject(new Error('BODY_TOO_LARGE'));
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on('end', () => {
+      if (rejected) return;
+      resolve(Buffer.concat(chunks));
+    });
+    req.on('error', reject);
+  });
+}
+
+function cleanupCmsImportUpload(uploadDir) {
+  try {
+    rmSync(uploadDir, { recursive: true, force: true });
+  } catch { /* ignore */ }
+}
+
+function assembleCmsImportUpload(uploadId) {
+  const uploadDir = join(CMS_IMPORT_UPLOAD_DIR, uploadId);
+  const metaPath = join(uploadDir, 'meta.json');
+  if (!existsSync(metaPath)) {
+    throw new Error('Upload not found.');
+  }
+  const meta = JSON.parse(readFileSync(metaPath, 'utf8'));
+  const received = new Set(meta.receivedChunks || []);
+  if (received.size !== meta.totalChunks) {
+    throw new Error(`Missing chunks (${received.size}/${meta.totalChunks}).`);
+  }
+  const parts = [];
+  for (let i = 0; i < meta.totalChunks; i += 1) {
+    const chunkPath = join(uploadDir, `chunk-${String(i).padStart(6, '0')}`);
+    if (!existsSync(chunkPath)) {
+      throw new Error(`Missing chunk ${i}.`);
+    }
+    parts.push(readFileSync(chunkPath));
+  }
+  const buffer = Buffer.concat(parts);
+  if (buffer.length > CMS_IMPORT_MAX_BYTES) {
+    throw new Error('Import failed. The backup file is too large.');
+  }
+  return buffer;
+}
+
+function listLocalCmsImportFiles() {
+  ensureCmsImportDirs();
+  const files = [];
+  const seen = new Set();
+  for (const dir of [CMS_IMPORTS_DIR, ROOT]) {
+    if (!existsSync(dir)) continue;
+    for (const name of readdirSync(dir)) {
+      if (!/^cms-export-.*\.zip$/i.test(name) || seen.has(name)) continue;
+      const fullPath = join(dir, name);
+      if (!statSync(fullPath).isFile()) continue;
+      seen.add(name);
+      files.push({
+        name,
+        size: statSync(fullPath).size,
+        location: dir === ROOT ? 'app-root' : 'cms-imports',
+      });
+    }
+  }
+  return files.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function resolveLocalCmsImportFile(filename) {
+  const safeName = String(filename || '').replace(/[/\\]/g, '');
+  if (!/^cms-export-.*\.zip$/i.test(safeName)) {
+    throw new Error('Invalid backup filename.');
+  }
+  for (const dir of [CMS_IMPORTS_DIR, ROOT]) {
+    const fullPath = join(dir, safeName);
+    if (existsSync(fullPath) && statSync(fullPath).isFile()) {
+      return fullPath;
+    }
+  }
+  throw new Error('Backup file not found on server.');
+}
+
+async function handleCmsImportChunk(req, res) {
+  const uploadId = sanitizeCmsUploadId(req.headers['x-upload-id']);
+  const chunkIndex = Number(req.headers['x-chunk-index']);
+  const totalChunks = Number(req.headers['x-total-chunks']);
+  const fileName = String(req.headers['x-file-name'] || 'cms-export.zip').trim();
+  if (
+    !uploadId
+    || !Number.isInteger(chunkIndex)
+    || chunkIndex < 0
+    || !Number.isInteger(totalChunks)
+    || totalChunks < 1
+    || chunkIndex >= totalChunks
+  ) {
+    sendJson(res, 400, { error: 'Invalid chunk headers.' });
+    return;
+  }
+
+  ensureCmsImportDirs();
+  const uploadDir = join(CMS_IMPORT_UPLOAD_DIR, uploadId);
+  mkdirSync(uploadDir, { recursive: true });
+  const metaPath = join(uploadDir, 'meta.json');
+  let meta = existsSync(metaPath) ? JSON.parse(readFileSync(metaPath, 'utf8')) : null;
+  if (!meta) {
+    meta = { fileName, totalChunks, receivedChunks: [], createdAt: Date.now() };
+  }
+  if (meta.totalChunks !== totalChunks) {
+    sendJson(res, 400, { error: 'Chunk count mismatch.' });
+    return;
+  }
+  if (meta.receivedChunks.includes(chunkIndex)) {
+    sendJson(res, 200, { ok: true, duplicate: true, received: meta.receivedChunks.length, total: totalChunks });
+    return;
+  }
+
+  try {
+    const data = await readRawBody(req, CMS_IMPORT_CHUNK_MAX_BYTES + 1024);
+    writeFileSync(join(uploadDir, `chunk-${String(chunkIndex).padStart(6, '0')}`), data);
+    meta.receivedChunks.push(chunkIndex);
+    writeFileSync(metaPath, JSON.stringify(meta));
+    sendJson(res, 200, { ok: true, received: meta.receivedChunks.length, total: totalChunks });
+  } catch (e) {
+    if (e.message === 'BODY_TOO_LARGE') {
+      sendJson(res, 413, { error: 'Import chunk too large.' });
+      return;
+    }
+    sendJson(res, 500, { error: e.message || 'Chunk upload failed.' });
+  }
+}
+
+function handleCmsImportComplete(uploadId, res) {
+  const safeUploadId = sanitizeCmsUploadId(uploadId);
+  if (!safeUploadId) {
+    sendJson(res, 400, { error: 'Invalid upload id.' });
+    return;
+  }
+  const uploadDir = join(CMS_IMPORT_UPLOAD_DIR, safeUploadId);
+  try {
+    const buffer = assembleCmsImportUpload(safeUploadId);
+    const result = importCmsFromZip(buffer);
+    sendJson(res, 200, { ok: true, ...result });
+  } catch (e) {
+    const status = /too large/i.test(e.message || '') ? 413 : 400;
+    sendJson(res, status, { error: e.message || 'Import failed.' });
+  } finally {
+    cleanupCmsImportUpload(uploadDir);
+  }
 }
 
 function readZipStoreArchive(buffer) {
@@ -4306,6 +4489,10 @@ function requiresAdmin(url, method) {
   if (url === '/api/inworld/models') return true;
   if (url === '/api/cms/export') return true;
   if (url === '/api/cms/import') return true;
+  if (url === '/api/cms/import/chunk' && m === 'POST') return true;
+  if (url === '/api/cms/import/complete' && m === 'POST') return true;
+  if (url === '/api/cms/import/local-files' && m === 'GET') return true;
+  if (url === '/api/cms/import/local' && m === 'POST') return true;
   if (url === '/api/admin/dashboard' && m === 'GET') return true;
 
   const uploadPaths = ['/api/idle-video', '/api/transition-video', '/api/avatar-background'];
@@ -6871,13 +7058,12 @@ const server = createServer(async (req, res) => {
 
   if (url === '/api/cms/import' && req.method === 'POST') {
     const chunks = [];
-    const maxImportBytes = 2 * 1024 * 1024 * 1024;
     let receivedBytes = 0;
     let rejected = false;
     req.on('data', (chunk) => {
       if (rejected) return;
       receivedBytes += chunk.length;
-      if (receivedBytes > maxImportBytes) {
+      if (receivedBytes > CMS_IMPORT_MAX_BYTES) {
         rejected = true;
         sendJson(res, 413, { error: 'Import failed. The backup file is too large.' });
         return;
@@ -6889,6 +7075,41 @@ const server = createServer(async (req, res) => {
       try {
         const buffer = Buffer.concat(chunks);
         const result = importCmsFromZip(buffer);
+        sendJson(res, 200, { ok: true, ...result });
+      } catch (e) {
+        sendJson(res, 400, { error: e.message || 'Import failed.' });
+      }
+    });
+    return;
+  }
+
+  if (url === '/api/cms/import/chunk' && req.method === 'POST') {
+    handleCmsImportChunk(req, res);
+    return;
+  }
+
+  if (url === '/api/cms/import/complete' && req.method === 'POST') {
+    readJsonBody(req, res, (parsed) => {
+      handleCmsImportComplete(parsed?.uploadId, res);
+    });
+    return;
+  }
+
+  if (url === '/api/cms/import/local-files' && req.method === 'GET') {
+    sendJson(res, 200, { files: listLocalCmsImportFiles() });
+    return;
+  }
+
+  if (url === '/api/cms/import/local' && req.method === 'POST') {
+    readJsonBody(req, res, (parsed) => {
+      try {
+        const filePath = resolveLocalCmsImportFile(parsed?.filename);
+        const size = statSync(filePath).size;
+        if (size > CMS_IMPORT_MAX_BYTES) {
+          sendJson(res, 413, { error: 'Import failed. The backup file is too large.' });
+          return;
+        }
+        const result = importCmsFromZip(readFileSync(filePath));
         sendJson(res, 200, { ok: true, ...result });
       } catch (e) {
         sendJson(res, 400, { error: e.message || 'Import failed.' });
