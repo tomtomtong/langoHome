@@ -4,7 +4,8 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "start:prod": "PORT=80 node server.js"
   },
   "dependencies": {
     "@elevenlabs/client": "^1.15.1",
