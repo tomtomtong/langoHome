@@ -4355,7 +4355,7 @@ function denyAdminAccess(req, res, nextUrl) {
 
 function wantsHtml(req) {
   const accept = req.headers.accept || '';
-  return accept.includes('text/html') || accept === '*/*' || !accept.includes('application/json');
+  return !req.url?.startsWith('/api/') && accept.includes('text/html');
 }
 
 const MIME = {
