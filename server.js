@@ -6871,8 +6871,21 @@ const server = createServer(async (req, res) => {
 
   if (url === '/api/cms/import' && req.method === 'POST') {
     const chunks = [];
-    req.on('data', (chunk) => chunks.push(chunk));
+    const maxImportBytes = 2 * 1024 * 1024 * 1024;
+    let receivedBytes = 0;
+    let rejected = false;
+    req.on('data', (chunk) => {
+      if (rejected) return;
+      receivedBytes += chunk.length;
+      if (receivedBytes > maxImportBytes) {
+        rejected = true;
+        sendJson(res, 413, { error: 'Import failed. The backup file is too large.' });
+        return;
+      }
+      chunks.push(chunk);
+    });
     req.on('end', () => {
+      if (rejected) return;
       try {
         const buffer = Buffer.concat(chunks);
         const result = importCmsFromZip(buffer);
