@@ -3,6 +3,7 @@ set -euo pipefail
 
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NODE_MAJOR="${NODE_MAJOR:-20}"
+CRON_INTERVAL="${CRON_INTERVAL:-*/5 * * * *}"
 
 if [[ "${EUID}" -eq 0 ]]; then
   SUDO=""
@@ -26,4 +27,52 @@ export NODE_ENV="${NODE_ENV:-production}"
 export PORT="${PORT:-4000}"
 export CONFIG_DIR="${CONFIG_DIR:-$APP_DIR/data}"
 
-exec npm start
+# --- auto-update cron job ---
+AUTO_UPDATE_SCRIPT="$APP_DIR/auto-update.sh"
+cat > "$AUTO_UPDATE_SCRIPT" << 'AUTOUPDATE'
+#!/usr/bin/env bash
+set -euo pipefail
+APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$APP_DIR"
+git fetch origin main
+LOCAL=$(git rev-parse HEAD)
+REMOTE=$(git rev-parse origin/main)
+if [ "$LOCAL" != "$REMOTE" ]; then
+  git pull origin main
+  npm ci --omit=dev
+  systemctl restart langohome 2>/dev/null || true
+fi
+AUTOUPDATE
+chmod +x "$AUTO_UPDATE_SCRIPT"
+
+# --- systemd service ---
+SERVICE_FILE="/etc/systemd/system/langohome.service"
+cat > /tmp/langohome.service << SERVICEEOF
+[Unit]
+Description=LangoHome Server
+After=network.target
+
+[Service]
+Type=simple
+User=$(whoami)
+WorkingDirectory=$APP_DIR
+Environment="NODE_ENV=${NODE_ENV:-production}"
+Environment="PORT=${PORT:-4000}"
+Environment="CONFIG_DIR=${CONFIG_DIR:-$APP_DIR/data}"
+ExecStart=$(command -v node) $APP_DIR/server.js
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+SERVICEEOF
+$SUDO mv /tmp/langohome.service "$SERVICE_FILE"
+$SUDO systemctl daemon-reload
+$SUDO systemctl enable langohome
+
+# --- cron job ---
+( crontab -l 2>/dev/null | grep -v "$AUTO_UPDATE_SCRIPT" ; echo "$CRON_INTERVAL $AUTO_UPDATE_SCRIPT" ) | crontab -
+
+# --- start ---
+$SUDO systemctl restart langohome
+echo "LangoHome installed and running. Auto-update cron: $CRON_INTERVAL"
